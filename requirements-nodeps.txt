@@ -1,0 +1,4 @@
+# Сгенерировано: python -m infra.verified_manifest --nodeps  (версии из infra/verified_manifest.json)
+# Ставить так: pip install --no-deps -r requirements-nodeps.txt
+qwen-asr==0.0.6
+qwen-tts==0.1.1

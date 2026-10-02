@@ -1,0 +1,6 @@
+# ЗАПАСНОЙ путь установки PyTorch с CUDA (основной - `uv pip install torch --torch-backend=auto`, см. build.bat).
+# Индекс cu128 подходит для драйверов с CUDA 12.8+.
+# TODO-needs-Windows-check: если на pytorch.org появился более новый индекс (cu13x), поменяйте строку ниже.
+--index-url https://download.pytorch.org/whl/cu128
+torch
+torchaudio

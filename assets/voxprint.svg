@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<title>Voxprint</title>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#18222f"/><stop offset="1" stop-color="#080c12"/></linearGradient>
+<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="300" y1="200" x2="740" y2="860"><stop offset="0" stop-color="#2ee6d6"/><stop offset="0.5" stop-color="#22b8f0"/><stop offset="1" stop-color="#3b82f6"/></linearGradient>
+<linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2ee6d6"/><stop offset="1" stop-color="#3b82f6"/></linearGradient>
+<radialGradient id="glow" cx="0.3" cy="0.2" r="0.9"><stop offset="0" stop-color="#2ee6d6" stop-opacity="0.12"/><stop offset="1" stop-color="#2ee6d6" stop-opacity="0"/></radialGradient>
+</defs>
+<rect x="32" y="32" width="960" height="960" rx="224" fill="url(#bg)"/>
+<rect x="32" y="32" width="960" height="960" rx="224" fill="url(#glow)"/>
+<rect x="35" y="35" width="954" height="954" rx="221" fill="none" stroke="#fff" stroke-opacity="0.10" stroke-width="6"/>
+<g transform="translate(512 512) scale(0.8816) translate(-522.0 -509.0)"><g fill="none" stroke="url(#g)" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(200 62) scale(26)" stroke-width="2.0" ><path d="M18.9 7a8 8 0 0 1 1.1 5v1a6 6 0 0 0 .8 3"/><path d="M8 11a4 4 0 0 1 8 0v1a10 10 0 0 0 2 6"/><path d="M12 11v2a14 14 0 0 0 2.5 8"/><path d="M8 15a18 18 0 0 0 1.8 6"/><path d="M4.9 19a22 22 0 0 1 -.9 -7v-1a8 8 0 0 1 12 -6.95"/></g><g stroke-width="52.0"><line x1="302.0" y1="755.0" x2="302.0" y2="815.0"/><line x1="407.0" y1="720.0" x2="407.0" y2="850.0"/><line x1="512.0" y1="690.0" x2="512.0" y2="880.0"/><line x1="617.0" y1="720.0" x2="617.0" y2="850.0"/><line x1="722.0" y1="755.0" x2="722.0" y2="815.0"/></g></g></g>
+
+</svg>

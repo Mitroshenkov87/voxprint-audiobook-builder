@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "name": "Voxprint verified set",
+  "date": "2026-10-02",
+  "note": "Версии, с которыми Voxprint проверен (юнит-тесты + tiny-модель на CPU, peft 0.18.1 и 0.21.2). Прогон на GPU/Windows - TODO. peft закреплён на версии Alexandria (0.18.1): формат адаптера должен читаться его PeftModel.from_pretrained.",
+  "packages": {
+    "qwen-asr": "0.0.6",
+    "qwen-tts": "0.1.1",
+    "transformers": "4.57.6",
+    "peft": "0.18.1",
+    "accelerate": "1.15.0",
+    "huggingface_hub": "0.36.2",
+    "ru-normalizr": "0.3.0",
+    "rutextnorm": "2.1.0"
+  },
+  "models": {
+    "Qwen/Qwen3-ForcedAligner-0.6B": "c7cbfc2048c462b0d63a45797104fc9db3ad62b7",
+    "Qwen/Qwen3-TTS-12Hz-1.7B-Base": "fd4b254389122332181a7c3db7f27e918eec64e3",
+    "Qwen/Qwen3-TTS-12Hz-0.6B-Base": "5d83992436eae1d760afd27aff78a71d676296fc"
+  }
+}
