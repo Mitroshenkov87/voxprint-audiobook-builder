@@ -19,17 +19,17 @@ from core.events import Stage
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(prog="python -m core.cli", description="Voxprint: аудио + текст -> датасет")
+    ap = argparse.ArgumentParser(prog="python -m core.cli", description="Voxprint: audio + text -> dataset (developer CLI)")
     ap.add_argument("audio")
     ap.add_argument("text")
     ap.add_argument("--out", default="dataset")
-    ap.add_argument("--language", default=None, help="Russian, English, ... (по умолчанию определяется)")
+    ap.add_argument("--language", default=None, help="Russian, English, ... (auto-detected by default)")
     ap.add_argument("--device", default="auto", help="auto | cuda | cpu")
     ap.add_argument("--sr", type=int, default=24000)
-    ap.add_argument("--fake-aligner", action="store_true", help="без нейросети (сухой прогон)")
-    ap.add_argument("--model", default=None, help="путь/ID модели выравнивателя")
-    ap.add_argument("--train", action="store_true", help="после датасета обучить LoRA")
-    ap.add_argument("--output-dir", default="output", help="куда сохранить адаптер (с --train)")
+    ap.add_argument("--fake-aligner", action="store_true", help="no neural network (dry run)")
+    ap.add_argument("--model", default=None, help="path/ID of the aligner model")
+    ap.add_argument("--train", action="store_true", help="train a LoRA after building the dataset")
+    ap.add_argument("--output-dir", default="output", help="where to save the adapter (with --train)")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
@@ -49,7 +49,7 @@ def main(argv=None) -> int:
             aligner = make_default_aligner(str(path), dev)
         cfg = BuildConfig(sample_rate=args.sr, language=args.language)
         res = DatasetBuilder(aligner, cfg).run(args.audio, args.text, Path(args.out), progress)
-        print(f"\nГотово: {res.n_segments} сегментов, {res.total_seconds:.0f} с -> {res.dataset_dir}")
+        print(f"\nDone: {res.n_segments} segments, {res.total_seconds:.0f} s -> {res.dataset_dir}")
         for w in res.warnings:
             print("  ! " + w)
         if args.train:
@@ -58,12 +58,12 @@ def main(argv=None) -> int:
 
             out = train_lora_from_dataset(res.dataset_dir, Path(args.output_dir), progress=progress,
                                       language=res.training_language)
-            print(f"Адаптер: {out}")
+            print(f"Adapter: {out}")
         return 0
     except DatasetMakerError as exc:
-        print(f"ОШИБКА: {exc.user_message}", file=sys.stderr)
+        print(f"ERROR: {exc.user_message}", file=sys.stderr)
         if exc.details:
-            print(f"  детали: {exc.details}", file=sys.stderr)
+            print(f"  details: {exc.details}", file=sys.stderr)
         return 2
 
 

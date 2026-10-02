@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+from core.i18n import tr
 import sys
 from dataclasses import dataclass
 from typing import Optional
@@ -48,13 +49,12 @@ def check_os(build: Optional[int] = None, is_windows: Optional[bool] = None) -> 
     """Мягкая проверка ОС: сообщение для пользователя, исключений не бросает."""
     win = IS_WINDOWS if is_windows is None else is_windows
     if not win:
-        return OsCheck(False, None, "Voxprint рассчитан на Windows 11 (26H2). На этой системе возможны сбои.")
+        return OsCheck(False, None, tr("os.unsupported"))
     b = build if build is not None else windows_build()
     if b is None:
         return OsCheck(True, None, "")
     if b < MIN_BUILD:
-        return OsCheck(False, b, f"Voxprint рассчитан на Windows 11 26H2 (сборка {MIN_BUILD}+). "
-                                 f"У вас сборка {b}: программа может работать некорректно. Обновите Windows.")
+        return OsCheck(False, b, tr("os.old_build", min=MIN_BUILD, build=b))
     return OsCheck(True, b, "")
 
 

@@ -12,6 +12,8 @@ rem     запасной вариант - индекс cu128 из requirements-t
 rem   * НИКОГДА не запускайте "uv run" без --no-sync: он пересинхронизирует окружение и заменит CUDA-torch на CPU.
 rem   * flash-attn на Windows не ставим (обучение идёт на eager/SDPA).
 rem   * qwen-asr и qwen-tts закрепляют разные версии transformers -> ставятся с --no-deps.
+rem   * soynlp (GPLv3) не ставится и не упаковывается: нужен только корейскому выравниванию qwen-asr, оно недоступно.
+rem   * Для замены библиотек Qt/PySide6 (LGPL) предпочтительна сборка 'build.bat onedir'.
 rem   * Версии берутся из набора "проверено Voxprint" (requirements-verified.txt <- infra\verified_manifest.json).
 rem ==========================================================================
 setlocal enableextensions
@@ -44,6 +46,11 @@ if errorlevel 1 (
     echo bitsandbytes работает.
 )
 
+echo === Лицензии третьих сторон ===
+rem  credits.json -> THIRD_PARTY_NOTICES.md (+ список лицензий реально установленных пакетов, включая зависимости)
+if not exist "build\notices" mkdir "build\notices"
+python tools\gen_notices.py --with-installed --out "build\notices\THIRD_PARTY_NOTICES.md" || (echo [ОШИБКА] Не создан THIRD_PARTY_NOTICES.md. & exit /b 1)
+
 echo === Тесты ===
 python -m pytest || (echo [ОШИБКА] Тесты не прошли. & exit /b 1)
 
@@ -54,6 +61,9 @@ echo === Сборка (%MODE%) ===
 pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --paths . ^
   --add-data "infra\verified_manifest.json;infra" ^
+  --add-data "locales;locales" --add-data "credits.json;." --add-data "licenses;licenses" ^
+  --add-data "build\notices\THIRD_PARTY_NOTICES.md;." ^
+  --hidden-import core.i18n --hidden-import core.appinfo --hidden-import core.model_export ^
   --hidden-import core.aligner --hidden-import core.slicer --hidden-import core.dataset_builder ^
   --hidden-import core.audio_utils --hidden-import core.lora_trainer --hidden-import core.teacher_forcing ^
   --hidden-import core.normalizer --hidden-import core.quality ^
@@ -67,17 +77,17 @@ pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --hidden-import qwen_tts.inference.qwen3_tts_tokenizer ^
   --hidden-import peft --hidden-import bitsandbytes --hidden-import accelerate --hidden-import safetensors.torch ^
   --hidden-import scipy.signal --hidden-import soundfile --hidden-import pydub --hidden-import imageio_ffmpeg ^
-  --hidden-import onnxruntime --hidden-import sox --hidden-import soynlp.tokenizer --hidden-import nagisa ^
+  --hidden-import onnxruntime --hidden-import sox --hidden-import nagisa ^
   --hidden-import huggingface_hub --hidden-import librosa ^
   --collect-all qwen_asr --collect-all qwen_tts --collect-all nagisa --collect-all imageio_ffmpeg ^
-  --collect-all bitsandbytes --collect-data soynlp --collect-data librosa ^
+  --collect-all bitsandbytes --collect-data librosa ^
   --collect-all ru_normalizr --collect-all rutextnorm --collect-all pymorphy3 --collect-all pymorphy3_dicts_ru ^
   --collect-all num2words --collect-all eng_to_ipa ^
   --copy-metadata transformers --copy-metadata tokenizers --copy-metadata huggingface_hub --copy-metadata safetensors ^
   --copy-metadata accelerate --copy-metadata peft --copy-metadata torch --copy-metadata numpy --copy-metadata tqdm ^
   --copy-metadata regex --copy-metadata requests --copy-metadata packaging --copy-metadata filelock ^
   --copy-metadata qwen-asr --copy-metadata qwen-tts ^
-  --exclude-module gradio --exclude-module flask --exclude-module tkinter --exclude-module matplotlib ^
+  --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
   main.py
 if errorlevel 1 (echo [ОШИБКА] PyInstaller завершился с ошибкой. & exit /b 1)
 

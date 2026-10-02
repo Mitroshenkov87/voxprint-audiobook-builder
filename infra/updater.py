@@ -21,6 +21,7 @@
 """
 from __future__ import annotations
 
+from core.i18n import tr
 import json
 import logging
 import logging.handlers
@@ -129,22 +130,25 @@ class UpdateResult:
     needs_restart: bool = False
     messages: List[str] = field(default_factory=list)
 
-    def summary_ru(self) -> str:
+    def summary(self) -> str:
         lines: List[str] = []
         for k in sorted(set(self.before) | set(self.after)):
             b, a = self.before.get(k), self.after.get(k)
             if b != a:
-                lines.append(f"{k}: {b or 'нет'} → {a or 'нет'}")
+                lines.append(tr("upd.change", name=k, before=b or tr("upd.none"), after=a or tr("upd.none")))
         for m in self.models_updated:
-            lines.append(f"модель {m}: обновлена")
+            lines.append(tr("upd.model_updated", name=m))
         if self.rolled_back:
-            lines.append("Обновление не прошло проверку совместимости — оставлена прежняя версия.")
+            lines.append(tr("upd.rolled_back"))
         if not lines:
-            lines.append("Всё уже актуально.")
+            lines.append(tr("upd.up_to_date"))
         lines.extend(self.messages)
         if self.needs_restart:
-            lines.append("Перезапустите программу, чтобы начать использовать обновления.")
+            lines.append(tr("upd.restart"))
         return "\n".join(lines)
+
+
+UpdateResult.summary_ru = UpdateResult.summary  # прежнее имя (совместимость)
 
 
 class Updater:
@@ -220,11 +224,11 @@ class Updater:
         for p in todo:
             res.before[p.name] = p.installed
         if todo:
-            progress(Stage.UPDATES, 0.1, "Устанавливаю обновления компонентов…")
+            progress(Stage.UPDATES, 0.1, tr("upd.installing"))
             self._apply_packages(todo, res)
         for i, m in enumerate(report.outdated_models):
             progress(Stage.UPDATES, 0.5 + 0.4 * i / max(1, len(report.outdated_models)),
-                     f"Обновляю модель {m.repo_id.split('/')[-1]}…")
+                     tr("upd.updating_model", name=m.repo_id.split("/")[-1]))
             if self._apply_model(m.repo_id, progress, m.target_sha):
                 res.models_updated.append(m.repo_id)
         st = self._load_state()
@@ -233,13 +237,13 @@ class Updater:
             "models": res.models_updated, "rolled_back": res.rolled_back})
         st["history"] = st["history"][-20:]
         self._save_state(st)
-        progress(Stage.UPDATES, 1.0, "Обновления обработаны")
-        log.info("apply result: %s", res.summary_ru().replace("\n", " | "))
+        progress(Stage.UPDATES, 1.0, tr("upd.processed"))
+        log.info("apply result: %s", res.summary().replace("\n", " | "))
         return res
 
     def _apply_packages(self, todo, res: UpdateResult) -> None:
         if not self.python:
-            res.messages.append("Обновление пакетов пропущено: на компьютере не найден Python.")
+            res.messages.append(tr("upd.no_python"))
             log.warning("no python for pip; skipping package update")
             return
         ts = time.strftime("%Y%m%d-%H%M%S", time.localtime(self.now()))
@@ -259,7 +263,7 @@ class Updater:
             log.info("pip rc=%s\n%s", rc, out[-4000:])
             if rc != 0:
                 res.rolled_back = True
-                res.messages.append("Не удалось скачать обновления; оставлена прежняя версия.")
+                res.messages.append(tr("upd.download_failed"))
                 return
             # проверка совместимости в отдельном процессе с новым каталогом в sys.path
             ok, versions = self._smoke(site, [p.name for p in todo])
@@ -285,7 +289,7 @@ class Updater:
         except OSError as exc:
             log.exception("package update failed")
             res.rolled_back = True
-            res.messages.append(f"Не удалось установить обновление: {exc}")
+            res.messages.append(tr("upd.install_failed", error=exc))
         finally:
             shutil.rmtree(stage_root, ignore_errors=True)
 
@@ -328,7 +332,7 @@ class Updater:
             md.ensure_model(repo_id, progress, root=stage_models, snapshot_download=self.snapshot_download,
                             get_remote_sha=self.get_remote_sha, stage=Stage.UPDATES, revision=revision)
             if not md.verify_local_model(new_dir):
-                raise UpdateError("модель не прошла проверку")
+                raise UpdateError(tr("upd.model_check_failed"))
         except Exception as exc:  # noqa: BLE001 - любая ошибка = остаёмся на старой модели
             log.error("model update failed for %s: %s", repo_id, exc)
             shutil.rmtree(new_dir, ignore_errors=True)
@@ -353,21 +357,21 @@ class Updater:
         """Возвращает пакеты и модели к набору «проверено Voxprint» (откат вниз тоже допустим)."""
         rep = self.check(channel=CHANNEL_VERIFIED)
         if not rep.network_ok:
-            return UpdateResult(messages=["Нет подключения к интернету — вернуть проверенные версии не удалось."])
+            return UpdateResult(messages=[tr("upd.no_net_restore")])
         res = self.apply(rep, progress)
         res.unverified_newer = rep.unverified_newer
         return res
 
     # ---- «всё сразу» для UI
     def check_and_apply(self, progress: ProgressCallback = noop_progress) -> Tuple[VersionReport, UpdateResult]:
-        progress(Stage.UPDATES, 0.0, "Проверяю обновления…")
+        progress(Stage.UPDATES, 0.0, tr("upd.checking"))
         rep = self.check()
         if not rep.network_ok:
-            r = UpdateResult(messages=["Нет подключения к интернету — проверка обновлений пропущена."])
+            r = UpdateResult(messages=[tr("upd.no_net_check")])
             progress(Stage.UPDATES, 1.0, r.messages[0])
             return rep, r
         if not rep.has_updates:
-            progress(Stage.UPDATES, 1.0, "Установлены проверенные версии")
+            progress(Stage.UPDATES, 1.0, tr("upd.verified_installed"))
             return rep, UpdateResult(unverified_newer=rep.unverified_newer)
         res = self.apply(rep, progress)
         res.unverified_newer = rep.unverified_newer

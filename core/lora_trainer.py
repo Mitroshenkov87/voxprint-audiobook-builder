@@ -23,6 +23,7 @@ TODO-needs-GPU-test: загрузка настоящих весов 1.7B-Base, b
 """
 from __future__ import annotations
 
+from core.i18n import tr
 import gc
 import json
 import logging
@@ -57,17 +58,17 @@ def load_training_rows(dataset_dir: Path) -> Dict[str, Any]:
     dataset_dir = Path(dataset_dir)
     meta = dataset_dir / "metadata.jsonl"
     if not meta.exists():
-        raise TrainingError("В папке нет metadata.jsonl. Сначала создайте датасет.")
+        raise TrainingError(tr("err.no_metadata"))
     entries = read_metadata_jsonl(meta)
     if not entries:
-        raise TrainingError("Датасет пустой.")
+        raise TrainingError(tr("err.dataset_empty"))
     rows = []
     for e in entries:
         rel = e.get("audio_filepath") or e.get("audio", "")
         rows.append({"audio": str(dataset_dir / rel), "text": e["text"], "rel": rel})
     for r in rows:
         if not Path(r["audio"]).exists():
-            raise TrainingError(f"Не найден файл датасета: {r['rel']}")
+            raise TrainingError(tr("err.dataset_file_missing", file=r["rel"]))
     if entries[0].get("ref_audio"):
         ref = dataset_dir / entries[0]["ref_audio"]
     elif (dataset_dir / "ref.wav").exists():
@@ -75,7 +76,7 @@ def load_training_rows(dataset_dir: Path) -> Dict[str, Any]:
     else:
         ref = Path(rows[0]["audio"])
     if not ref.exists():
-        raise TrainingError("Не найден образец голоса ref.wav.")
+        raise TrainingError(tr("err.no_ref"))
     rt = dataset_dir / "ref_text.txt"
     ref_text = rt.read_text(encoding="utf-8").strip() if rt.exists() else ""
     if not ref_text:
@@ -127,11 +128,11 @@ def prepare_samples(rows: List[Dict[str, Any]], tokenize: Callable[[str], Any],
             ids = ids.unsqueeze(0)
         samples.append({"codec_ids": codes.to(device), "spk_embedding": spk_embedding,
                         "text_ids": ids.to(device), "text": r["text"], "duration": dur})
-        progress(Stage.TRAIN, 0.03 * (i + 1) / len(rows), "Готовлю аудио-коды…")
+        progress(Stage.TRAIN, 0.03 * (i + 1) / len(rows), tr("progress.prep_codes"))
     if skipped:
-        warnings.append(f"Пропущено слишком длинных клипов: {skipped}.")
+        warnings.append(tr("warn.skipped_long", n=skipped))
     if not samples:
-        raise TrainingError("В датасете нет подходящих клипов для обучения.")
+        raise TrainingError(tr("err.no_clips"))
     return samples
 
 
@@ -164,7 +165,7 @@ def make_optimizer(params: List[Any], lr: float, use_8bit: bool, device: str, wa
             import bitsandbytes as bnb  # type: ignore
 
             return bnb.optim.AdamW8bit(params, lr=lr, weight_decay=0.01)
-        warnings.append("8-битный оптимизатор недоступен, использую обычный (памяти нужно чуть больше).")
+        warnings.append(tr("warn.adam8_unavailable"))
     return torch.optim.AdamW(params, lr=lr, weight_decay=0.01)
 
 
@@ -193,11 +194,9 @@ def compute_sample_loss(sample: Dict[str, Any], hf_model: Any, base_talker: Any,
 def loss_warnings(final_loss: float, first_loss: float) -> List[str]:
     out: List[str] = []
     if final_loss < LOSS_WARN_BELOW:
-        out.append(f"Итоговая ошибка обучения низкая ({final_loss:.2f} < {LOSS_WARN_BELOW}): "
-                   "возможно, голос получился «кашей» или речь не заканчивается. Если звучит плохо - "
-                   "запишите больше текста и повторите.")
+        out.append(tr("warn.loss_low", loss=f"{final_loss:.2f}", threshold=LOSS_WARN_BELOW))
     if final_loss >= first_loss * 0.98:
-        out.append("Ошибка обучения почти не уменьшилась - голос может быть не похож на ваш.")
+        out.append(tr("warn.loss_flat"))
     return out
 
 
@@ -244,7 +243,7 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
         log.warning("gradient checkpointing unavailable: %s", exc)
     params = [p for p in peft_talker.parameters() if p.requires_grad]
     if not params:
-        raise TrainingError("LoRA не нашёл слоёв для обучения (несовместимая версия модели).")
+        raise TrainingError(tr("err.no_lora_layers"))
     for p in params:  # LoRA-веса в fp32 для устойчивости (peft обычно делает это сам)
         p.data = p.data.float()
     log.info("LoRA trainable params: %d (r=%d alpha=%d lr=%g epochs=%d accum=%d, %d samples)",
@@ -282,16 +281,16 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
                 opt.zero_grad(set_to_none=True)
             if k % 4 == 0 or k == n:
                 snap = VramMonitor.snapshot()
-                vram = f", видеопамять {snap[0]:.1f} из {snap[1]:.1f} ГБ" if snap else ""
+                vram = tr("progress.vram_part", used=f"{snap[0]:.1f}", total=f"{snap[1]:.1f}") if snap else ""
                 progress(Stage.TRAIN, 0.03 + 0.97 * done / total_steps,
-                         f"Обучение голоса: эпоха {epoch} из {plan.epochs}, фрагмент {k} из {n}{vram}")
+                         tr("progress.training", epoch=epoch, epochs=plan.epochs, k=k, n=n, vram=vram))
         avg = acc_loss / max(1, count)
         epoch_losses.append(avg)
         log.info("epoch %d/%d avg_loss=%.4f", epoch, plan.epochs, avg)
         best = min(best, avg)
         save_adapter_folder(peft_talker, output_dir / "checkpoints" / f"epoch_{epoch:02d}")
 
-    progress(Stage.SAVE, 0.0, "Сохраняю голосовой адаптер…")
+    progress(Stage.SAVE, 0.0, tr("progress.saving_adapter"))
     final_loss = epoch_losses[-1]
     warnings.extend(loss_warnings(final_loss, epoch_losses[0]))
     meta = {
@@ -308,7 +307,7 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
         encoding="utf-8")
     for w in warnings:
         log.warning("training: %s", w)
-    progress(Stage.SAVE, 1.0, "Адаптер сохранён")
+    progress(Stage.SAVE, 1.0, tr("progress.adapter_saved"))
     return output_dir
 
 
@@ -367,7 +366,7 @@ def train_lora_from_dataset(dataset_dir, output_dir, progress: ProgressCallback 
         except (OSError, ValueError):
             language = None
     plan = plan or plan_training(detect_gpu(), n_items, force_cpu=force_cpu, language=language or "russian")
-    progress(Stage.TRAIN, 0.0, f"Параметры подобраны автоматически ({plan.device}, эпох: {plan.epochs})")
+    progress(Stage.TRAIN, 0.0, tr("progress.plan", device=plan.device, epochs=plan.epochs))
     while True:
         try:
             return _run(dataset_dir, output_dir, plan, progress, cancel, warnings_out)
@@ -377,7 +376,7 @@ def train_lora_from_dataset(dataset_dir, output_dir, progress: ProgressCallback 
             if nxt is None:
                 raise
             log.warning("OOM -> retry with reduced plan: %s", exc.details[:200])
-            progress(Stage.TRAIN, 0.0, "Не хватило видеопамяти — пробую с меньшей нагрузкой…")
+            progress(Stage.TRAIN, 0.0, tr("progress.oom_retry"))
             plan = nxt
         except DatasetMakerError:
             raise
@@ -389,5 +388,5 @@ def train_lora_from_dataset(dataset_dir, output_dir, progress: ProgressCallback 
                     raise OutOfMemoryError_(details=str(exc)) from exc
                 plan = nxt
                 continue
-            raise TrainingError("Обучение остановилось из-за ошибки. Подробности записаны в журнал.",
+            raise TrainingError(tr("err.train_failed"),
                                 details=str(exc)) from exc

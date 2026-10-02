@@ -10,6 +10,7 @@ ref_text.txt, metadata.jsonl.
 """
 from __future__ import annotations
 
+from core.i18n import tr
 import json
 import logging
 import re
@@ -190,17 +191,17 @@ class DatasetBuilder:
         a_align = audios[ALIGNER_SR]
         total = au.duration(a_align, ALIGNER_SR)
         if total < 10:
-            raise AudioReadError("Запись слишком короткая (меньше 10 секунд). Нужно хотя бы несколько минут.")
+            raise AudioReadError(tr("err.audio_short"))
         if total < 120:
-            warnings.append("Запись короче 2 минут: для хорошего голоса лучше 5-15 минут.")
+            warnings.append(tr("warn.audio_short_2min"))
         log.info("audio %.1fs, text %d chars, %d sentences, language=%s, normalizer=%s (changed=%s)",
                  total, len(text), len(sentences), language, norm.engine, norm.changed)
         cancel.check()
 
         # --- загрузка модели
-        progress(Stage.MODEL, 0.0, "Загружаю модель выравнивания…")
+        progress(Stage.MODEL, 0.0, tr("progress.aligner_loading"))
         self.aligner.load()
-        progress(Stage.MODEL, 1.0, "Модель готова")
+        progress(Stage.MODEL, 1.0, tr("progress.model_ready"))
         cancel.check()
 
         # --- выравнивание (по «произносимому» тексту; 16 кГц - только здесь)
@@ -214,11 +215,11 @@ class DatasetBuilder:
         cancel.check()
 
         # --- нарезка
-        progress(Stage.SLICE, 0.0, "Нарезаю на фрагменты по паузам…")
+        progress(Stage.SLICE, 0.0, tr("progress.slicing"))
         sres = slice_words(words, text, total, cfg.slice)
         warnings.extend(sres.warnings)
         if not sres.segments:
-            raise AlignmentError("Не получилось нарезать запись на фрагменты. Проверьте, что запись и текст совпадают.")
+            raise AlignmentError(tr("err.slice_failed"))
         for k, seg in enumerate(sres.segments):
             seg.extra["ord"] = k
             a, b = seg.extra.get("char_span", (None, None))
@@ -235,23 +236,22 @@ class DatasetBuilder:
             n_dropped_q, q_summary = qr.n_dropped, qr.summary()
             if n_dropped_q:
                 log.info("quality filter dropped %d of %d segments: %s", n_dropped_q, len(pieces), q_summary)
-                warnings.append(f"Автоматически отброшено фрагментов с плохим звуком: {n_dropped_q}.")
+                warnings.append(tr("warn.quality_dropped", n=n_dropped_q))
             if qr.snr_disabled:
-                warnings.append("Запись ровная по громкости: проверка шума отключена.")
+                warnings.append(tr("warn.quality_snr_off"))
             kept = [(sg, p) for sg, p, ok in zip(sres.segments, pieces, qr.keep) if ok]
             if not kept:
-                raise AlignmentError("Все фрагменты записи оказались слишком тихими или с искажениями. "
-                                     "Проверьте микрофон и перезапишите.")
+                raise AlignmentError(tr("err.all_dropped"))
             segments = [sg for sg, _ in kept]
             pieces = [p for _, p in kept]
             for k, sg in enumerate(segments, start=1):
                 sg.index = k
         else:
             segments = sres.segments
-        progress(Stage.SLICE, 1.0, f"Получилось фрагментов: {len(segments)}")
+        progress(Stage.SLICE, 1.0, tr("progress.pieces", n=len(segments)))
 
         # --- сохранение
-        progress(self.save_stage, 0.0, "Сохраняю датасет…")
+        progress(self.save_stage, 0.0, tr("progress.saving_dataset"))
         self._clean_old(out)
         out.mkdir(parents=True, exist_ok=True)
         for seg, x in zip(segments, pieces):
@@ -260,7 +260,7 @@ class DatasetBuilder:
         ref = select_ref(main_audio, cfg.sample_rate, segments, cfg.ref_min, cfg.ref_max)
         assert ref is not None
         if not (cfg.ref_min <= ref.end - ref.start <= cfg.ref_max):
-            warnings.append("Не нашлось фрагмента 5-10 с для образца голоса; взят самый длинный.")
+            warnings.append(tr("warn.no_ref_5_10"))
         au.write_wav(out / "ref.wav", au.apply_fade(ref.samples, cfg.sample_rate), cfg.sample_rate)
         (out / "ref_text.txt").write_text(ref.text.strip() + "\n", encoding="utf-8", newline="\n")
 
@@ -287,7 +287,7 @@ class DatasetBuilder:
                               for s in segments],
         }
         (out / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-        progress(self.save_stage, 1.0, "Датасет сохранён")
+        progress(self.save_stage, 1.0, tr("progress.dataset_saved"))
         return BuildResult(out, len(segments), total_seg, out / "ref.wav", meta_path, language, warnings,
                            ref_text=ref.text, n_dropped_quality=n_dropped_q)
 

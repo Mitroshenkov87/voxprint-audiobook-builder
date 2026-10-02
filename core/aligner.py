@@ -19,6 +19,7 @@ Qwen/Qwen3-ForcedAligner-0.6B (см. README, раздел «Что провер�
 """
 from __future__ import annotations
 
+from core.i18n import tr
 import abc
 import gc
 import logging
@@ -77,7 +78,7 @@ class Qwen3Aligner(BaseAligner):
             from qwen_asr import Qwen3ForcedAligner  # type: ignore
         except ImportError as exc:
             raise AlignmentError(
-                "Не найдены компоненты распознавания (qwen-asr / torch). Переустановите программу.",
+                tr("err.aligner_missing"),
                 details=str(exc),
             ) from exc
         dev = self.device
@@ -105,7 +106,7 @@ class Qwen3Aligner(BaseAligner):
         if self._model is None:
             self.load()
         if language not in SUPPORTED_LANGUAGES:
-            raise AlignmentError(f"Язык «{language}» не поддерживается выравнивателем.")
+            raise AlignmentError(tr("err.lang_unsupported", language=language))
         try:
             import torch
 
@@ -142,7 +143,7 @@ class CtcAligner(BaseAligner):
             import torch
             from ctc_forced_aligner import load_alignment_model  # type: ignore
         except ImportError as exc:
-            raise AlignmentError("Запасной выравниватель (ctc-forced-aligner) не установлен.", details=str(exc)) from exc
+            raise AlignmentError(tr("err.fallback_missing"), details=str(exc)) from exc
         dev = self.device
         if dev == "auto":
             dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -311,14 +312,14 @@ def align_long(
     total = len(audio) / float(sr)
     if total <= max_chunk_sec * 1.1:
         cancel_check()
-        on_progress(0.0, "Выравнивание текста по записи…")
+        on_progress(0.0, tr("progress.aligning"))
         words = aligner.align(audio, sr, text, language)
-        on_progress(1.0, "Выравнивание завершено")
+        on_progress(1.0, tr("progress.aligned"))
         return list(words)
 
     units = split_clauses(text)
     if not units:
-        raise AlignmentError("В тексте нет предложений для выравнивания.")
+        raise AlignmentError(tr("err.no_sentences"))
     unit_chars = [max(1, count_clean_chars(u)) for u in units]
     voiced_total = au.voiced_seconds(audio, sr)
     words_all: List[WordTiming] = []
@@ -330,7 +331,7 @@ def align_long(
         cancel_check()
         remaining = total - t0
         frac_done = min(0.99, t0 / total)
-        on_progress(frac_done, f"Выравнивание: {int(t0 // 60)} из {int(total // 60) + 1} мин записи…")
+        on_progress(frac_done, tr("progress.aligning_chunk", done=int(t0 // 60), total=int(total // 60) + 1))
         if remaining <= max_chunk_sec * 1.1 or ui >= n_units - 1:
             chunk = audio[int(t0 * sr):]
             chunk_text = " ".join(units[ui:])
@@ -379,7 +380,7 @@ def align_long(
         words_all.extend(ws)
         ui += k
         t0 = cut
-    on_progress(1.0, "Выравнивание завершено")
+    on_progress(1.0, tr("progress.aligned"))
     return words_all
 
 
@@ -388,7 +389,7 @@ def check_alignment(words: Sequence[WordTiming], audio: np.ndarray, sr: int) -> 
     Возвращает список мягких предупреждений."""
     warnings: List[str] = []
     if not words:
-        raise AudioTextMismatchError("Не удалось найти в записи ни одного слова из текста.")
+        raise AudioTextMismatchError(tr("err.no_words_found"))
     vs, ve = au.voiced_bounds(audio, sr)
     voiced = max(0.5, au.voiced_seconds(audio, sr))
     chars = sum(len(clean_token(w.word)) for w in words)
@@ -398,16 +399,14 @@ def check_alignment(words: Sequence[WordTiming], audio: np.ndarray, sr: int) -> 
     head_gap = words[0].start - vs
     if zero > 0.25 or rate < 2.5 or rate > 40:
         raise AudioTextMismatchError(
-            "Похоже, что запись и текст не совпадают: текст значительно длиннее или короче записи. "
-            "Проверьте, что вы выбрали правильные файлы и прочитали весь текст.",
+            tr("err.mismatch_length"),
             details=f"zero_frac={zero:.2f} chars_per_voiced_sec={rate:.1f}",
         )
     if tail_gap > 15 or head_gap > 15:
         raise AudioTextMismatchError(
-            "В записи есть длинные участки речи, которых нет в тексте (в начале или в конце). "
-            "Обрежьте лишнее или выберите другой текст.",
+            tr("err.mismatch_extra"),
             details=f"head_gap={head_gap:.1f} tail_gap={tail_gap:.1f}",
         )
     if zero > 0.05:
-        warnings.append("Часть слов выровнялась неточно; качество нарезки может быть чуть ниже.")
+        warnings.append(tr("warn.align_inexact"))
     return warnings

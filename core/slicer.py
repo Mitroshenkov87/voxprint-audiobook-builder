@@ -1,6 +1,7 @@
 """Нарезка по словам с временными метками: паузы > 300 мс, сегменты 3-10 с (мин. 2 c, макс. 10 c)."""
 from __future__ import annotations
 
+from core.i18n import tr
 from dataclasses import dataclass, field
 from typing import List, Sequence
 
@@ -95,7 +96,7 @@ def slice_words(words: Sequence[WordTiming], text: str, total_duration: float,
     n = len(phrases)
     result = SliceResult(segments=[])
     if n == 0:
-        result.warnings.append("Нет слов для нарезки.")
+        result.warnings.append(tr("warn.no_words"))
         return result
 
     INF = float("inf")
@@ -145,7 +146,7 @@ def slice_words(words: Sequence[WordTiming], text: str, total_duration: float,
     result.segments = kept
     if result.dropped:
         result.warnings.append(
-            f"{result.dropped} фрагм. пропущено (слишком короткие/длинные); это нормально для конца записи.")
+            tr("warn.slice_dropped", n=result.dropped))
     return result
 
 

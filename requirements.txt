@@ -31,7 +31,6 @@ rutextnorm
 # зависимости qwen-asr / qwen-tts (сами пакеты - в requirements-nodeps.txt)
 einops
 onnxruntime
-nagisa
-soynlp
+nagisa            # soynlp (GPLv3) намеренно НЕ ставим: qwen-asr импортирует его лениво, только для корейского языка
 sox
 qwen-omni-utils

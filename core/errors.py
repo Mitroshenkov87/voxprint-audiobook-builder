@@ -1,5 +1,7 @@
-"""Исключения приложения. Каждое несёт понятное пользователю сообщение (по-русски)."""
+"""Исключения приложения. Каждое несёт понятное пользователю сообщение (на языке интерфейса, см. core/i18n)."""
 from __future__ import annotations
+
+from core.i18n import tr
 
 
 class DatasetMakerError(Exception):
@@ -16,8 +18,8 @@ class DatasetMakerError(Exception):
 class CancelledByUser(DatasetMakerError):
     kind = "cancelled"
 
-    def __init__(self, user_message: str = "Операция отменена пользователем.") -> None:
-        super().__init__(user_message)
+    def __init__(self, user_message: str = "") -> None:
+        super().__init__(user_message or tr("err.cancelled"))
 
 
 class AudioReadError(DatasetMakerError):
@@ -53,8 +55,8 @@ class OutOfMemoryError_(DatasetMakerError):
 
     kind = "oom"
 
-    def __init__(self, user_message: str = "Не хватило видеопамяти (VRAM).", *, details: str = "") -> None:
-        super().__init__(user_message, details=details)
+    def __init__(self, user_message: str = "", *, details: str = "") -> None:
+        super().__init__(user_message or tr("err.oom"), details=details)
 
 
 class TrainingError(DatasetMakerError):

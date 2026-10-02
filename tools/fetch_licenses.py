@@ -57,6 +57,8 @@ SOURCES = {
     "tabler-icons": ("repo", "tabler/tabler-icons"),
     "ctc-forced-aligner": ("repo", "MahmoudAshraf97/ctc-forced-aligner"),
     "gpl-3.0": ("spdx", "GPL-3.0-only"),
+    "MPL-2.0": ("spdx", "MPL-2.0"),
+    "CC-BY-NC-4.0": ("spdx", "CC-BY-NC-4.0"),
     "qt-lgpl-3.0": ("spdx", "LGPL-3.0-only"),
     "Apache-2.0": ("spdx", "Apache-2.0"),
 }

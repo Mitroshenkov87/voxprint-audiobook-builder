@@ -1,6 +1,7 @@
 """Фоновые потоки Qt (QThread) для тяжёлых операций. Интерфейс с UI - только сигналы."""
 from __future__ import annotations
 
+from core.i18n import tr
 import logging
 import traceback
 from typing import Any, Callable, Optional
@@ -22,8 +23,7 @@ def classify_exception(exc: BaseException) -> tuple:
     name = type(exc).__name__
     if "OutOfMemory" in name or "out of memory" in str(exc).lower():
         return "oom", OutOfMemoryError_().user_message, str(exc), ""
-    return ("other", "Что-то пошло не так. Попробуйте ещё раз. Если ошибка повторится, отправьте разработчику "
-            "файл журнала из папки программы.", "".join(traceback.format_exception_only(type(exc), exc)).strip(), "")
+    return ("other", tr("err.other"), "".join(traceback.format_exception_only(type(exc), exc)).strip(), "")
 
 
 class ProcessWorker(QThread):
@@ -61,7 +61,7 @@ class ProcessWorker(QThread):
             log.exception("task failed")
             self.failed.emit(*classify_exception(exc))
             return
-        self.progress.emit(100, Stage.SAVE.label, "Готово")
+        self.progress.emit(100, Stage.SAVE.label, tr("ui.ready"))
         self.done.emit(result)
 
 
@@ -93,7 +93,7 @@ class UpdateWorker(QThread):
             _, res = u.check_and_apply(
                 lambda s, f, m: self.progress.emit(int(f * 100), s.label, m))
             changed = bool(res.after or res.models_updated)
-            self.done.emit(res.summary_ru(), changed)
+            self.done.emit(res.summary(), changed)
         except BaseException as exc:  # noqa: BLE001
             log.exception("update failed")
             self.failed.emit(*classify_exception(exc))

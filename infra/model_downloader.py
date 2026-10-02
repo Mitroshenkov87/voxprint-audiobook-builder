@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+from core.i18n import tr
 import logging
 import os
 import shutil
@@ -115,7 +116,7 @@ def ensure_model(
         return target
 
     short = repo_id.split("/")[-1]
-    progress(stage, 0.0, f"Первый запуск: скачиваю модель {short} (это делается один раз)…")
+    progress(stage, 0.0, tr("progress.first_download", short=short))
     need_gb = APPROX_SIZE_GB.get(repo_id, 3.0)
     try:
         free_gb = shutil.disk_usage(target.parent).free / 1024 ** 3
@@ -123,14 +124,14 @@ def ensure_model(
         free_gb = None
     if free_gb is not None and free_gb < need_gb * 1.2:
         raise ModelDownloadError(
-            f"Недостаточно места на диске для модели {short}: нужно около {need_gb:.0f} ГБ, свободно {free_gb:.1f} ГБ.",
+            tr("err.disk_model", short=short, need=f"{need_gb:.0f}", free=f"{free_gb:.1f}"),
             url=hf_url(repo_id))
 
     if snapshot_download is None:
         try:
             from huggingface_hub import snapshot_download as _sd
         except ImportError as exc:
-            raise ModelDownloadError("Не найден компонент загрузки моделей. Переустановите программу.",
+            raise ModelDownloadError(tr("err.hub_missing"),
                                      url=hf_url(repo_id), details=str(exc)) from exc
         snapshot_download = _sd
     if revision is None:
@@ -156,7 +157,7 @@ def ensure_model(
     partial = target.with_name(target.name + ".partial")
     if partial.exists():
         shutil.rmtree(partial, ignore_errors=True)
-    tracker = _ByteProgress(lambda f: progress(stage, f, f"Скачиваю модель {short}: {int(f * 100)}%"))
+    tracker = _ByteProgress(lambda f: progress(stage, f, tr("progress.downloading", short=short, pct=int(f * 100))))
     def _download(rev: Optional[str]) -> None:
         kwargs: Dict[str, Any] = {"repo_id": repo_id, "local_dir": str(partial)}
         if rev:
@@ -180,19 +181,18 @@ def ensure_model(
     except Exception as exc:  # noqa: BLE001
         shutil.rmtree(partial, ignore_errors=True)
         raise ModelDownloadError(
-            f"Не удалось скачать модель {short}. Проверьте подключение к интернету и повторите. "
-            f"Модель можно скачать вручную: {hf_url(repo_id)}",
+            tr("err.download_failed", short=short, url=hf_url(repo_id)),
             url=hf_url(repo_id), details=f"{type(exc).__name__}: {exc}") from exc
     if not verify_local_model(partial):
         shutil.rmtree(partial, ignore_errors=True)
-        raise ModelDownloadError(f"Модель {short} скачалась не полностью. Повторите попытку.",
+        raise ModelDownloadError(tr("err.model_partial", short=short),
                                  url=hf_url(repo_id))
     if sha:
         (partial / ".revision").write_text(sha, encoding="utf-8")
     if target.exists():
         shutil.rmtree(target, ignore_errors=True)
     partial.rename(target)
-    progress(stage, 1.0, f"Модель {short} готова")
+    progress(stage, 1.0, tr("progress.model_done", short=short))
     return target
 
 

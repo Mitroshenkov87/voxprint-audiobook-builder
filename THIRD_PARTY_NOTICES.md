@@ -1,0 +1,355 @@
+# Third-party notices
+
+Voxprint (c) Aleksandr Mitroshenkov, built with AI assistance. Version 0.1.0.
+
+Voxprint stands on the open-source projects and models listed below. Every component keeps its own licence;
+the full licence texts are in the `licenses/` folder next to this file. This file is generated from
+`credits.json` by `tools/gen_notices.py` - edit `credits.json`, not this file.
+
+## Models (downloaded on first start; not part of the installer)
+
+### Qwen3-TTS-12Hz-1.7B-Base / 0.6B-Base
+
+* Purpose: Base text-to-speech models that your voice is trained on
+* Licence: Apache-2.0
+* Project: <https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base>
+* Status: downloaded on first start
+* Licence text: [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt)
+
+### Qwen3-ForcedAligner-0.6B
+
+* Purpose: Neural forced aligner: matches every word of the text to a moment in the recording
+* Licence: Apache-2.0
+* Project: <https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B>
+* Status: downloaded on first start
+* Licence text: [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt)
+
+### MMS-300M forced aligner (MahmoudAshraf/mms-300m-1130-forced-aligner)
+
+* Purpose: Optional backup aligner model (only if the optional ctc-forced-aligner package is installed). NON-COMMERCIAL licence!
+* Licence: CC-BY-NC-4.0
+* Project: <https://huggingface.co/MahmoudAshraf/mms-300m-1130-forced-aligner>
+* Status: optional, not bundled
+* Licence text: [`licenses/CC-BY-NC-4.0.txt`](licenses/CC-BY-NC-4.0.txt)
+
+## Libraries and programs shipped with Voxprint
+
+### qwen-tts
+
+* Purpose: Qwen3-TTS model code (speech synthesis and the audio tokenizer)
+* Licence: Apache-2.0
+* Project: <https://github.com/QwenLM/Qwen3-TTS>
+* Status: bundled
+* Licence text: [`licenses/qwen-tts.txt`](licenses/qwen-tts.txt)
+
+### qwen-asr
+
+* Purpose: Runs the Qwen3 forced aligner
+* Licence: Apache-2.0
+* Project: <https://github.com/QwenLM/Qwen3-ASR>
+* Status: bundled
+* Licence text: [`licenses/qwen-asr.txt`](licenses/qwen-asr.txt)
+
+### qwen-omni-utils
+
+* Purpose: Audio/media helpers required by qwen-asr
+* Licence: Apache-2.0
+* Project: <https://github.com/QwenLM/Qwen2-VL>
+* Status: bundled
+* Licence text: [`licenses/qwen-omni-utils.txt`](licenses/qwen-omni-utils.txt)
+
+### PyTorch (torch)
+
+* Purpose: Neural-network engine
+* Licence: BSD-3-Clause (plus bundled third-party components)
+* Project: <https://pytorch.org>
+* Status: bundled
+* Licence text: [`licenses/pytorch.txt`](licenses/pytorch.txt)
+
+### torchaudio
+
+* Purpose: Audio processing for PyTorch
+* Licence: BSD-2-Clause
+* Project: <https://github.com/pytorch/audio>
+* Status: bundled
+* Licence text: [`licenses/torchaudio.txt`](licenses/torchaudio.txt)
+
+### Transformers
+
+* Purpose: Loads and runs the models
+* Licence: Apache-2.0
+* Project: <https://github.com/huggingface/transformers>
+* Status: bundled
+* Licence text: [`licenses/transformers.txt`](licenses/transformers.txt)
+
+### PEFT
+
+* Purpose: LoRA voice adapters: training, saving and merging
+* Licence: Apache-2.0
+* Project: <https://github.com/huggingface/peft>
+* Status: bundled
+* Licence text: [`licenses/peft.txt`](licenses/peft.txt)
+
+### Accelerate
+
+* Purpose: Device and memory management
+* Licence: Apache-2.0
+* Project: <https://github.com/huggingface/accelerate>
+* Status: bundled
+* Licence text: [`licenses/accelerate.txt`](licenses/accelerate.txt)
+
+### huggingface_hub
+
+* Purpose: Downloads the models
+* Licence: Apache-2.0
+* Project: <https://github.com/huggingface/huggingface_hub>
+* Status: bundled
+* Licence text: [`licenses/huggingface_hub.txt`](licenses/huggingface_hub.txt)
+
+### safetensors
+
+* Purpose: Safe model weight files
+* Licence: Apache-2.0
+* Project: <https://github.com/huggingface/safetensors>
+* Status: bundled
+* Licence text: [`licenses/safetensors.txt`](licenses/safetensors.txt)
+
+### bitsandbytes
+
+* Purpose: 8-bit optimizer that saves video memory
+* Licence: MIT
+* Project: <https://github.com/bitsandbytes-foundation/bitsandbytes>
+* Status: optional, not bundled
+* Licence text: [`licenses/bitsandbytes.txt`](licenses/bitsandbytes.txt)
+
+### PySide6 / Qt for Python
+
+* Purpose: The window and all interface elements
+* Licence: LGPL-3.0-only (also available as GPL-2.0/3.0 or commercial; used under LGPL-3.0)
+* Project: <https://pyside.org>
+* Status: bundled
+* Licence text: [`licenses/qt-lgpl-3.0.txt`](licenses/qt-lgpl-3.0.txt), [`licenses/gpl-3.0.txt`](licenses/gpl-3.0.txt)
+* Note: Used unmodified and dynamically linked. Prefer the folder-type build (build.bat onedir) so the Qt/PySide6 libraries can be replaced. Source: https://code.qt.io and https://pyside.org.
+
+### NumPy
+
+* Purpose: Numerical arrays
+* Licence: BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0
+* Project: <https://numpy.org>
+* Status: bundled
+* Licence text: [`licenses/numpy.txt`](licenses/numpy.txt)
+
+### SciPy
+
+* Purpose: Signal processing (filtering, resampling)
+* Licence: BSD-3-Clause
+* Project: <https://scipy.org>
+* Status: bundled
+* Licence text: [`licenses/scipy.txt`](licenses/scipy.txt)
+
+### librosa
+
+* Purpose: Audio analysis
+* Licence: ISC
+* Project: <https://librosa.org>
+* Status: bundled
+* Licence text: [`licenses/librosa.txt`](licenses/librosa.txt)
+
+### python-soundfile
+
+* Purpose: Reading and writing WAV/FLAC files (uses libsndfile, LGPL, shipped in the wheel)
+* Licence: BSD-3-Clause
+* Project: <https://github.com/bastibe/python-soundfile>
+* Status: bundled
+* Licence text: [`licenses/soundfile.txt`](licenses/soundfile.txt)
+
+### pydub
+
+* Purpose: Opening MP3 and other audio formats
+* Licence: MIT
+* Project: <http://pydub.com>
+* Status: bundled
+* Licence text: [`licenses/pydub.txt`](licenses/pydub.txt)
+
+### imageio-ffmpeg
+
+* Purpose: Provides the ffmpeg program used to decode audio formats
+* Licence: BSD-2-Clause (wrapper)
+* Project: <https://github.com/imageio/imageio-ffmpeg>
+* Status: bundled
+* Licence text: [`licenses/imageio-ffmpeg.txt`](licenses/imageio-ffmpeg.txt)
+
+### FFmpeg (executable inside imageio-ffmpeg)
+
+* Purpose: Audio decoding (separate program, run as a subprocess)
+* Licence: GPL-3.0 build (--enable-gpl --enable-version3, verified in the Windows 7.1 binary of imageio-ffmpeg 0.6.0)
+* Project: <https://ffmpeg.org>
+* Status: bundled
+* Licence text: [`licenses/gpl-3.0.txt`](licenses/gpl-3.0.txt)
+* Note: Separate executable, not linked into Voxprint. Source code: https://ffmpeg.org/download.html#get-sources (build scripts of the binary: https://github.com/imageio/imageio-binaries). The GPL text is in licenses/gpl-3.0.txt.
+
+### einops
+
+* Purpose: Tensor reshaping used by the models
+* Licence: MIT
+* Project: <https://github.com/arogozhnikov/einops>
+* Status: bundled
+* Licence text: [`licenses/einops.txt`](licenses/einops.txt)
+
+### ONNX Runtime
+
+* Purpose: Neural-network runtime required by qwen-tts
+* Licence: MIT
+* Project: <https://onnxruntime.ai>
+* Status: bundled
+* Licence text: [`licenses/onnxruntime.txt`](licenses/onnxruntime.txt)
+
+### nagisa
+
+* Purpose: Japanese word segmentation required by qwen-asr
+* Licence: MIT
+* Project: <https://github.com/taishi-i/nagisa>
+* Status: bundled
+* Licence text: [`licenses/nagisa.txt`](licenses/nagisa.txt)
+
+### pysox
+
+* Purpose: Python wrapper required by qwen-tts (the SoX program itself is not shipped)
+* Licence: BSD-3-Clause
+* Project: <https://github.com/rabitt/pysox>
+* Status: bundled
+* Licence text: [`licenses/sox.txt`](licenses/sox.txt)
+
+### ru-normalizr
+
+* Purpose: Spelling out Russian numbers and abbreviations
+* Licence: MIT
+* Project: <https://github.com/NickZaitsev/ru-normalizr>
+* Status: bundled
+* Licence text: [`licenses/ru-normalizr.txt`](licenses/ru-normalizr.txt)
+
+### rutextnorm
+
+* Purpose: Backup Russian text normalization
+* Licence: MIT
+* Project: <https://github.com/shigabeev/russian_tts_normalization>
+* Status: bundled
+* Licence text: [`licenses/rutextnorm.txt`](licenses/rutextnorm.txt)
+
+### pymorphy3 (+ pymorphy3-dicts-ru)
+
+* Purpose: Russian morphology (word forms)
+* Licence: MIT
+* Project: <https://github.com/no-plagiarism/pymorphy3>
+* Status: bundled
+* Licence text: [`licenses/pymorphy3.txt`](licenses/pymorphy3.txt), [`licenses/pymorphy3-dicts-ru.txt`](licenses/pymorphy3-dicts-ru.txt)
+
+### num2words
+
+* Purpose: Numbers to words
+* Licence: LGPL-2.1
+* Project: <https://github.com/savoirfairelinux/num2words>
+* Status: bundled
+* Licence text: [`licenses/num2words.txt`](licenses/num2words.txt)
+* Note: Pure-Python library used unmodified; the LGPL allows replacing it with another version (it is a normal Python package).
+
+### roman
+
+* Purpose: Roman numerals
+* Licence: ZPL-2.1
+* Project: <https://github.com/zopefoundation/roman>
+* Status: bundled
+* Licence text: [`licenses/roman.txt`](licenses/roman.txt)
+
+### eng_to_ipa
+
+* Purpose: English words in Russian text
+* Licence: MIT (per the GitHub repository; the PyPI package has no licence field)
+* Project: <https://github.com/mphilli/English-to-IPA>
+* Status: bundled
+* Licence text: [`licenses/eng_to_ipa.txt`](licenses/eng_to_ipa.txt)
+
+### packaging
+
+* Purpose: Version comparison for updates
+* Licence: Apache-2.0 OR BSD-2-Clause
+* Project: <https://github.com/pypa/packaging>
+* Status: bundled
+* Licence text: [`licenses/packaging-apache.txt`](licenses/packaging-apache.txt), [`licenses/packaging-bsd.txt`](licenses/packaging-bsd.txt)
+
+### tqdm
+
+* Purpose: Progress bars
+* Licence: MPL-2.0 AND MIT
+* Project: <https://tqdm.github.io>
+* Status: bundled
+* Licence text: [`licenses/tqdm.txt`](licenses/tqdm.txt), [`licenses/MPL-2.0.txt`](licenses/MPL-2.0.txt)
+
+### ctc-forced-aligner
+
+* Purpose: Optional backup aligner; not bundled, installed by the user on request
+* Licence: BSD-2-Clause (upstream repository MahmoudAshraf97/ctc-forced-aligner)
+* Project: <https://github.com/MahmoudAshraf97/ctc-forced-aligner>
+* Status: optional, not bundled
+* Licence text: [`licenses/ctc-forced-aligner.txt`](licenses/ctc-forced-aligner.txt)
+* Note: The PyPI package of this name is published from a fork whose licence metadata is empty; check it before installing.
+
+## Assets
+
+### Tabler Icons
+
+* Purpose: The fingerprint icon of the application (modified)
+* Licence: MIT
+* Project: <https://tabler.io/icons>
+* Status: bundled
+* Licence text: [`licenses/tabler-icons.txt`](licenses/tabler-icons.txt)
+
+## Build tools (not shipped, except the PyInstaller bootloader and the Inno Setup installer runtime)
+
+### uv
+
+* Purpose: Installs packages when building (not shipped)
+* Licence: MIT OR Apache-2.0
+* Project: <https://github.com/astral-sh/uv>
+* Status: build time
+* Licence text: [`licenses/uv-mit.txt`](licenses/uv-mit.txt), [`licenses/uv-apache.txt`](licenses/uv-apache.txt)
+
+### PyInstaller
+
+* Purpose: Packs the program into an application (its bootloader is embedded; the exception allows distribution under any licence)
+* Licence: GPL-2.0-or-later with the bootloader exception
+* Project: <https://pyinstaller.org>
+* Status: build time
+* Licence text: [`licenses/pyinstaller.txt`](licenses/pyinstaller.txt)
+
+### Inno Setup
+
+* Purpose: Creates the installer
+* Licence: Inno Setup License (permissive, custom)
+* Project: <https://jrsoftware.org/isinfo.php>
+* Status: build time
+* Licence text: [`licenses/inno-setup.txt`](licenses/inno-setup.txt)
+
+## Important compliance notes
+
+* **Qt / PySide6 (LGPL-3.0).** Qt for Python is used unmodified and is linked dynamically (separate DLL/shared
+  files). You may replace these libraries with your own build of PySide6/Qt: use the folder-type build
+  (`build.bat onedir`), where the libraries are ordinary files. The LGPL-3.0 and GPL-3.0 texts are in
+  `licenses/qt-lgpl-3.0.txt` and `licenses/gpl-3.0.txt`; source code: <https://code.qt.io> and <https://pyside.org>.
+* **FFmpeg (GPL-3.0 build).** The ffmpeg program bundled inside the `imageio-ffmpeg` wheel is a GPL build
+  (`--enable-gpl --enable-version3`, verified in the Windows 7.1 binary of imageio-ffmpeg 0.6.0). It is a separate
+  executable started as a subprocess; it is not linked into Voxprint. Source code:
+  <https://ffmpeg.org/download.html#get-sources>; build scripts of the binary:
+  <https://github.com/imageio/imageio-binaries>. If you do not want to ship a GPL binary, remove it and ship an
+  LGPL build of ffmpeg or require ffmpeg on `PATH`.
+* **soynlp (GPLv3) is intentionally excluded.** `qwen-asr` imports it only inside the Korean-language branch of its
+  forced aligner. Voxprint does not install or bundle it; therefore **Korean alignment is unavailable**.
+* **Non-commercial model.** The optional backup aligner model `MahmoudAshraf/mms-300m-1130-forced-aligner` is
+  licensed CC-BY-NC-4.0 (non-commercial). It is used only when the user installs the optional `ctc-forced-aligner`
+  package. The default Qwen models are Apache-2.0.
+* **PyInstaller** is GPL-2.0-or-later with a special exception that allows distributing the embedded bootloader as
+  part of programs under any licence (`licenses/pyinstaller.txt`). **Inno Setup** is distributed under its own
+  permissive licence (`licenses/inno-setup.txt`).
+* Where a licence is stated as verified, it was read from the package metadata (PyPI), the project's repository
+  (GitHub) or the model card (Hugging Face) on 2026-10-03. Packages pulled in indirectly are listed in the
+  appendix of the build-time version of this file.

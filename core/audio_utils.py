@@ -1,6 +1,7 @@
 """Аудио: чтение через pydub/ffmpeg (с запасным soundfile), ресемплинг, запись WAV, энергия, тишина."""
 from __future__ import annotations
 
+from core.i18n import tr
 import math
 import os
 import shutil
@@ -91,7 +92,7 @@ def load_audio(path, target_sr: int = 16000) -> Tuple[np.ndarray, int]:
     """Читает любой аудиофайл -> (mono float32 [-1,1], sr). Сначала soundfile для wav/flac, иначе pydub."""
     p = Path(path)
     if not p.exists():
-        raise AudioReadError(f"Аудиофайл не найден: {p}")
+        raise AudioReadError(tr("err.audio_missing", path=p))
     errors: List[str] = []
     order = [_read_with_soundfile, _read_with_pydub] if p.suffix.lower() in (".wav", ".flac", ".ogg") else [
         _read_with_pydub, _read_with_soundfile]
@@ -99,12 +100,12 @@ def load_audio(path, target_sr: int = 16000) -> Tuple[np.ndarray, int]:
         try:
             x, sr = reader(p)
             if x.size == 0:
-                raise ValueError("пустое аудио")
+                raise ValueError("empty audio")
             return resample(x, sr, target_sr), target_sr
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{reader.__name__}: {exc}")
     raise AudioReadError(
-        "Не удалось прочитать аудиофайл. Попробуйте другой формат (WAV или MP3).",
+        tr("err.audio_unreadable"),
         details="; ".join(errors),
     )
 
@@ -113,7 +114,7 @@ def load_audio_multi(path, rates: Tuple[int, ...]) -> dict:
     """Читает файл один раз и возвращает {sr: samples} для нужных частот (без двойного ресемплинга)."""
     p = Path(path)
     if not p.exists():
-        raise AudioReadError(f"Аудиофайл не найден: {p}")
+        raise AudioReadError(tr("err.audio_missing", path=p))
     x, sr = None, 0
     errors: List[str] = []
     order = [_read_with_soundfile, _read_with_pydub] if p.suffix.lower() in (".wav", ".flac", ".ogg") else [
@@ -128,7 +129,7 @@ def load_audio_multi(path, rates: Tuple[int, ...]) -> dict:
             x = None
     if x is None or x.size == 0:
         raise AudioReadError(
-            "Не удалось прочитать аудиофайл. Попробуйте другой формат (WAV или MP3).",
+            tr("err.audio_unreadable"),
             details="; ".join(errors),
         )
     return {r: resample(x, sr, r) for r in rates}

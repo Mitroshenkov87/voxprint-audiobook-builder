@@ -3,18 +3,23 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
-from PySide6.QtWidgets import (QApplication, QFileDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QProgressBar,
-                               QPushButton, QSizePolicy, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QMessageBox,
+                               QProgressBar, QPushButton, QSizePolicy, QVBoxLayout, QWidget)
 
+from core import i18n, model_export
+from core.errors import DatasetMakerError
 from core.events import Stage
+from core.i18n import tr
 from infra import paths, platform_win
-from workers.pipeline_runner import KIND_DATASET, KIND_LORA, TaskRequest, plan_for, run_task
+from workers.pipeline_runner import (KIND_DATASET, KIND_LORA, KIND_MERGE, TaskRequest, last_adapter, plan_for,
+                                     run_task)
 from workers.process_worker import PrefetchWorker, ProcessWorker, UpdateWorker
 
 log = logging.getLogger("voxprint.ui")
@@ -50,15 +55,15 @@ QLabel#chip[state="done"] {{ color: rgba(242,242,245,200); background: rgba(255,
 QLabel#status {{ color: rgba(242,242,245,200); }}
 QLabel#ready {{ font-size: 22px; font-weight: 600; color: #86efac; }}
 QLabel#footer {{ color: rgba(242,242,245,120); font-size: 12px; }}
+QLabel#hint {{ color: rgba(242,242,245,150); font-size: 12px; padding-left: 4px; }}
+QComboBox {{ background: rgba(255,255,255,30); border: 1px solid rgba(255,255,255,50); border-radius: 8px;
+            padding: 6px 12px; min-width: 110px; }}
+QComboBox:disabled {{ color: rgba(242,242,245,90); }}
+QComboBox QAbstractItemView {{ background: #23232b; border: 1px solid rgba(255,255,255,50);
+                              selection-background-color: rgba(96,165,250,160); }}
+QDialog#root, QTextBrowser {{ color: #f2f2f5; }}
+QDialog#root {{ background: #17171c; }}
 """
-
-PRIVACY_FOOTER = "Используйте только свой собственный голос. Записи и результаты хранятся только на этом компьютере."
-PRIVACY_TITLE = "Конфиденциальность"
-PRIVACY_TEXT = (
-    "Используйте только свой собственный голос (или голос человека, который дал на это явное согласие).\n\n"
-    "Записи, текст и готовый голос хранятся только на вашем компьютере; программа ничего не отправляет "
-    "в интернет, кроме скачивания моделей и проверки обновлений.")
-
 
 def privacy_marker() -> Path:
     return paths.state_dir() / "privacy_ack"
@@ -116,8 +121,8 @@ class MainWindow(QWidget):
 
         self.setWindowTitle(APP_TITLE)
         self.setObjectName("root")
-        self.setMinimumSize(800, 620)
-        self.resize(820, 700)
+        self.setMinimumSize(800, 700)
+        self.resize(820, 780)
         self.setAcceptDrops(True)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -140,22 +145,32 @@ class MainWindow(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(28, 24, 28, 24)
         root.setSpacing(14)
+        head = QHBoxLayout()
         title = QLabel(APP_TITLE)
         title.setObjectName("title")
-        sub = QLabel("Ваш голос из записи — в один клик. Выберите запись и текст, который вы читали.")
-        sub.setObjectName("subtitle")
-        sub.setWordWrap(True)
-        root.addWidget(title)
-        root.addWidget(sub)
+        head.addWidget(title)
+        head.addStretch(1)
+        self.cmb_lang = QComboBox()
+        for code in i18n.LANGS:
+            self.cmb_lang.addItem(i18n.LANG_NAMES[code], code)
+        self.cmb_lang.setCurrentIndex(max(0, self.cmb_lang.findData(i18n.get_language())))
+        self.btn_about = QPushButton()
+        head.addWidget(self.cmb_lang)
+        head.addWidget(self.btn_about)
+        root.addLayout(head)
+        self.lbl_sub = QLabel()
+        self.lbl_sub.setObjectName("subtitle")
+        self.lbl_sub.setWordWrap(True)
+        root.addWidget(self.lbl_sub)
 
         card = self._card()
         cl = QVBoxLayout(card)
         cl.setContentsMargins(16, 14, 16, 14)
         cl.setSpacing(10)
-        self.btn_audio = QPushButton("Выбрать аудио")
-        self.lbl_audio = QLabel("Файл не выбран (можно перетащить в окно)")
-        self.btn_text = QPushButton("Выбрать текст")
-        self.lbl_text = QLabel("Файл не выбран (txt, UTF-8)")
+        self.btn_audio = QPushButton()
+        self.lbl_audio = QLabel()
+        self.btn_text = QPushButton()
+        self.lbl_text = QLabel()
         for b, l in ((self.btn_audio, self.lbl_audio), (self.btn_text, self.lbl_text)):
             row = QHBoxLayout()
             b.setMinimumWidth(170)
@@ -166,15 +181,24 @@ class MainWindow(QWidget):
             cl.addLayout(row)
         root.addWidget(card)
 
-        self.btn_lora = QPushButton("Создать голос (LoRA)")
+        self.btn_lora = QPushButton()
         self.btn_lora.setObjectName("primary")
-        self.btn_lora.setToolTip("Всё сразу: разметка записи, нарезка и обучение голоса")
         root.addWidget(self.btn_lora)
+        self.lbl_hint_lora = QLabel()
+        self.lbl_hint_lora.setObjectName("hint")
+        self.lbl_hint_lora.setWordWrap(True)
+        root.addWidget(self.lbl_hint_lora)
+
+        self.btn_merge = QPushButton()      # шестая кнопка: универсальная модель (~4 ГБ), только по нажатию
+        root.addWidget(self.btn_merge)
+        self.lbl_hint_merge = QLabel()
+        self.lbl_hint_merge.setObjectName("hint")
+        self.lbl_hint_merge.setWordWrap(True)
+        root.addWidget(self.lbl_hint_merge)
 
         row2 = QHBoxLayout()
-        self.btn_dataset = QPushButton("Создать датасет")
-        self.btn_dataset.setToolTip("Только подготовить датасет (без обучения)")
-        self.btn_update = QPushButton("Проверить обновления")
+        self.btn_dataset = QPushButton()
+        self.btn_update = QPushButton()
         row2.addWidget(self.btn_dataset)
         row2.addWidget(self.btn_update)
         root.addLayout(row2)
@@ -187,7 +211,7 @@ class MainWindow(QWidget):
         chips = QHBoxLayout()
         chips.setSpacing(6)
         for st in ALL_STAGES:
-            c = QLabel(st.label)
+            c = QLabel()
             c.setObjectName("chip")
             c.setProperty("state", "idle")
             self._chips[st] = c
@@ -195,23 +219,23 @@ class MainWindow(QWidget):
         chips.addStretch(1)
         root.addLayout(chips)
 
-        self.lbl_status = QLabel("Выберите аудио и текст — дальше всё сделаю сам.")
+        self.lbl_status = QLabel()
         self.lbl_status.setObjectName("status")
         self.lbl_status.setWordWrap(True)
         root.addWidget(self.lbl_status)
 
-        self.lbl_ready = QLabel("Готово")
+        self.lbl_ready = QLabel()
         self.lbl_ready.setObjectName("ready")
         self.lbl_ready.hide()
-        self.btn_open = QPushButton("Открыть папку с результатом")
+        self.btn_open = QPushButton()
         self.btn_open.hide()
-        self.btn_cancel = QPushButton("Отменить")
+        self.btn_cancel = QPushButton()
         self.btn_cancel.hide()
         root.addWidget(self.lbl_ready)
         root.addWidget(self.btn_open)
         root.addWidget(self.btn_cancel)
         root.addStretch(1)
-        self.lbl_privacy = QLabel(PRIVACY_FOOTER)
+        self.lbl_privacy = QLabel()
         self.lbl_privacy.setObjectName("footer")
         self.lbl_privacy.setWordWrap(True)
         root.addWidget(self.lbl_privacy)
@@ -220,9 +244,65 @@ class MainWindow(QWidget):
         self.btn_text.clicked.connect(self.choose_text)
         self.btn_dataset.clicked.connect(lambda: self.start(KIND_DATASET))
         self.btn_lora.clicked.connect(lambda: self.start(KIND_LORA))
+        self.btn_merge.clicked.connect(self.start_merge)
+        self.btn_about.clicked.connect(self.open_about)
+        self.cmb_lang.currentIndexChanged.connect(self._on_language_changed)
         self.btn_update.clicked.connect(self.check_updates)
         self.btn_open.clicked.connect(self.open_result)
         self.btn_cancel.clicked.connect(self.cancel)
+        self.retranslate()
+
+    # ------------------------------------------------------------------ язык
+    def retranslate(self) -> None:
+        """Подставляет тексты на текущем языке (вызывается при создании окна и при смене языка)."""
+        self.lbl_sub.setText(tr("ui.subtitle"))
+        self.btn_audio.setText(tr("ui.choose_audio"))
+        self.btn_text.setText(tr("ui.choose_text"))
+        self.lbl_audio.setText(self.audio.name if self.audio else tr("ui.audio_none"))
+        self.lbl_text.setText(self.text.name if self.text else tr("ui.text_none"))
+        self.btn_lora.setText(tr("ui.btn_lora"))
+        self.btn_lora.setToolTip(tr("ui.tip_lora"))
+        self.lbl_hint_lora.setText(tr("ui.hint_lora"))
+        self.btn_merge.setText(tr("ui.btn_merge"))
+        self.lbl_hint_merge.setText(tr("ui.hint_merge"))
+        self.btn_dataset.setText(tr("ui.btn_dataset"))
+        self.btn_dataset.setToolTip(tr("ui.tip_dataset"))
+        self.btn_update.setText(tr("ui.btn_update"))
+        self.btn_about.setText(tr("ui.about"))
+        self.btn_about.setToolTip(tr("ui.about_tip"))
+        self.cmb_lang.setToolTip(tr("ui.language"))
+        for st, chip in self._chips.items():
+            chip.setText(st.label)
+        self.lbl_ready.setText(tr("ui.ready"))
+        self.btn_open.setText(tr("ui.open_folder"))
+        self.btn_cancel.setText(tr("ui.cancel"))
+        self.lbl_privacy.setText(tr("ui.footer_privacy"))
+        if not self.busy and not self.lbl_ready.isVisible():
+            self.lbl_status.setText(tr("ui.status_idle"))
+        self._refresh_buttons()
+
+    def _on_language_changed(self, _index: int = 0) -> None:
+        code = self.cmb_lang.currentData()
+        if not code or self.busy:
+            return
+        i18n.set_language(str(code), persist=True)
+        self.retranslate()
+
+    def set_language(self, code: str) -> None:
+        """Программная смена языка (как выбор в списке)."""
+        idx = self.cmb_lang.findData(code)
+        if idx >= 0:
+            self.cmb_lang.setCurrentIndex(idx)
+
+    def open_about(self) -> None:
+        from ui.about_dialog import AboutDialog
+
+        dlg = AboutDialog(self)
+        self._about = dlg
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":  # в тестах не блокируем
+            dlg.show()
+            return
+        dlg.exec()
 
     # ------------------------------------------------------------------ окно/эффекты
     def showEvent(self, e) -> None:  # noqa: N802
@@ -248,12 +328,12 @@ class MainWindow(QWidget):
 
     def choose_audio(self) -> None:
         exts = " ".join(f"*{e}" for e in sorted(AUDIO_EXT))
-        f, _ = QFileDialog.getOpenFileName(self, "Выберите запись голоса", "", f"Аудио ({exts});;Все файлы (*.*)")
+        f, _ = QFileDialog.getOpenFileName(self, tr("ui.dlg_audio"), "", tr("ui.filter_audio", exts=exts))
         if f:
             self.set_audio(Path(f))
 
     def choose_text(self) -> None:
-        f, _ = QFileDialog.getOpenFileName(self, "Выберите текстовый файл", "", "Текст (*.txt);;Все файлы (*.*)")
+        f, _ = QFileDialog.getOpenFileName(self, tr("ui.dlg_text"), "", tr("ui.filter_text"))
         if f:
             self.set_text(Path(f))
 
@@ -280,6 +360,11 @@ class MainWindow(QWidget):
         ready = bool(self.audio and self.text) and not busy
         self.btn_audio.setEnabled(not busy)
         self.btn_text.setEnabled(not busy)
+        self.cmb_lang.setEnabled(not busy)
+        self.btn_about.setEnabled(True)
+        has_adapter = last_adapter() is not None
+        self.btn_merge.setEnabled(not busy and has_adapter)
+        self.btn_merge.setToolTip(tr("ui.tip_merge") if has_adapter else tr("ui.tip_merge_disabled"))
         self.btn_lora.setEnabled(ready)
         self.btn_dataset.setEnabled(ready)
         self.btn_update.setEnabled(not busy and not (self.update_worker and self.update_worker.isRunning()))
@@ -301,13 +386,42 @@ class MainWindow(QWidget):
     def start(self, kind: str, force_cpu: bool = False) -> None:
         if self.busy or not (self.audio and self.text):
             return
-        req = TaskRequest(kind=kind, audio=self.audio, text=self.text, force_cpu=force_cpu)
+        self._launch(TaskRequest(kind=kind, audio=self.audio, text=self.text, force_cpu=force_cpu))
+
+    def start_merge(self) -> bool:
+        """Кнопка «универсальная модель»: проверка места на диске, подтверждение, запуск. True - запущено."""
+        adapter = last_adapter()
+        if self.busy or adapter is None:
+            return False
+        try:
+            need, _repo = model_export.required_free_gb(adapter)
+            free = shutil.disk_usage(adapter).free / 1024 ** 3
+        except (DatasetMakerError, OSError) as exc:
+            self.on_failed("export", getattr(exc, "user_message", str(exc)), getattr(exc, "details", ""), "")
+            return False
+        if free < need:
+            self.on_failed("export", tr("err.export_disk", need=f"{need:.1f}", free=f"{free:.1f}"), "", "")
+            return False
+        if os.environ.get("QT_QPA_PLATFORM") != "offscreen":  # в тестах подтверждение пропускаем
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Icon.Question)
+            box.setWindowTitle(tr("ui.merge_confirm_title"))
+            box.setText(tr("ui.merge_confirm_text", need=f"{need:.1f}", free=f"{free:.1f}"))
+            yes = box.addButton(tr("ui.yes"), QMessageBox.ButtonRole.AcceptRole)
+            box.addButton(tr("ui.no"), QMessageBox.ButtonRole.RejectRole)
+            box.exec()
+            if box.clickedButton() is not yes:
+                return False
+        self._launch(TaskRequest(kind=KIND_MERGE, adapter_dir=adapter))
+        return True
+
+    def _launch(self, req: TaskRequest) -> None:
         self._last_request = req
         self.lbl_ready.hide()
         self.btn_open.hide()
         self.progress.setValue(0)
         self._reset_chips()
-        self.lbl_status.setText("Начинаю работу…")
+        self.lbl_status.setText(tr("ui.starting"))
         self.worker = ProcessWorker(req, self.runner, self)
         self.worker.progress.connect(self.on_progress)
         self.worker.done.connect(self.on_done)
@@ -319,7 +433,7 @@ class MainWindow(QWidget):
 
     def cancel(self) -> None:
         if self.worker:
-            self.lbl_status.setText("Останавливаю…")
+            self.lbl_status.setText(tr("ui.stopping"))
             self.worker.cancel()
 
     def on_progress(self, pct: int, stage_label: str, message: str) -> None:
@@ -331,12 +445,16 @@ class MainWindow(QWidget):
         self.progress.setValue(100)
         self._set_chip(Stage.SAVE.label)
         self.result_dir = Path(result.open_dir)
-        extra = ""
-        if getattr(result, "adapter_path", None):
-            extra = "\nГолосовой адаптер сохранён в папке output."
-        warn = ("\n" + "\n".join(result.warnings[-3:])) if getattr(result, "warnings", None) else ""
-        self.lbl_status.setText(f"Фрагментов в датасете: {result.n_segments}.{extra}{warn}"
-                                + (f"\n{result.update_summary}" if getattr(result, "update_summary", "") else ""))
+        if getattr(result, "kind", "") == KIND_MERGE:
+            self.lbl_status.setText(tr("ui.merge_done", path=result.merged_path) + "\n"
+                                    + tr("ui.merge_note", speaker=result.speaker))
+        else:
+            extra = ""
+            if getattr(result, "adapter_path", None):
+                extra = "\n" + tr("ui.adapter_saved")
+            warn = ("\n" + "\n".join(result.warnings[-3:])) if getattr(result, "warnings", None) else ""
+            self.lbl_status.setText(tr("ui.done_segments", n=result.n_segments) + f"{extra}{warn}"
+                                    + (f"\n{result.update_summary}" if getattr(result, "update_summary", "") else ""))
         self.lbl_ready.show()
         self.btn_open.show()
         self._refresh_buttons()
@@ -344,7 +462,7 @@ class MainWindow(QWidget):
             open_folder(self.result_dir)
 
     def on_cancelled(self) -> None:
-        self.lbl_status.setText("Отменено.")
+        self.lbl_status.setText(tr("ui.cancelled"))
         self.progress.setValue(0)
         self._reset_chips()
 
@@ -361,23 +479,23 @@ class MainWindow(QWidget):
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Icon.Warning)
         box.setWindowTitle(APP_TITLE)
-        titles = {"mismatch": "Запись и текст не совпадают", "oom": "Не хватило видеопамяти",
-                  "download": "Не удалось скачать модель", "text_read": "Проблема с текстовым файлом",
-                  "audio_read": "Проблема с аудиофайлом"}
-        box.setText(f"<b>{titles.get(kind, 'Не получилось')}</b>")
+        titles = {"mismatch": tr("ui.err_mismatch"), "oom": tr("ui.err_oom"),
+                  "download": tr("ui.err_download"), "text_read": tr("ui.err_text_read"),
+                  "audio_read": tr("ui.err_audio_read"), "export": tr("ui.err_export")}
+        box.setText(f"<b>{titles.get(kind, tr('ui.err_default'))}</b>")
         body = message
         if kind == "download" and url:
-            body += f'<br><br>Страница модели: <a href="{url}">{url}</a>'
+            body += f'<br><br>{tr("ui.model_page")} <a href="{url}">{url}</a>'
         elif details and kind == "other":
             body += f"<br><small>{details}</small>"
         box.setTextFormat(Qt.TextFormat.RichText)
         box.setInformativeText(body.replace("\n", "<br>"))
         retry_cpu = None
         if kind == "oom":
-            retry_cpu = box.addButton("Продолжить на процессоре (медленно)", QMessageBox.ButtonRole.AcceptRole)
-            box.addButton("Отмена", QMessageBox.ButtonRole.RejectRole)
+            retry_cpu = box.addButton(tr("ui.retry_cpu"), QMessageBox.ButtonRole.AcceptRole)
+            box.addButton(tr("ui.cancel"), QMessageBox.ButtonRole.RejectRole)
         else:
-            box.addButton("Понятно", QMessageBox.ButtonRole.AcceptRole)
+            box.addButton(tr("ui.ok"), QMessageBox.ButtonRole.AcceptRole)
         self._error_box = box
         box.setModal(True)
         box.finished.connect(lambda _=0: None)
@@ -392,7 +510,7 @@ class MainWindow(QWidget):
     def check_updates(self) -> None:
         if self.update_worker and self.update_worker.isRunning():
             return
-        self.lbl_status.setText("Проверяю обновления…")
+        self.lbl_status.setText(tr("upd.checking"))
         self.progress.setValue(0)
         self.update_worker = UpdateWorker(self.updater_factory, parent=self)
         self.update_worker.progress.connect(lambda p, s, m: (self.progress.setValue(p), self.lbl_status.setText(m)))
@@ -404,7 +522,7 @@ class MainWindow(QWidget):
 
     def _on_update_done(self, summary: str, changed: bool) -> None:
         self.progress.setValue(100 if changed else 0)
-        self.lbl_status.setText(summary or "Установлены проверенные версии.")
+        self.lbl_status.setText(summary or tr("upd.verified_installed") + ".")
 
     def _startup_checks(self) -> None:
         """Памятка о конфиденциальности (один раз), предупреждение об ОС (мягкое) и тихая еженедельная проверка."""
@@ -423,7 +541,7 @@ class MainWindow(QWidget):
         """Один раз при первом запуске. В тестах (offscreen) окно не показывается и отметка не ставится."""
         if privacy_acknowledged() or os.environ.get("QT_QPA_PLATFORM") == "offscreen":
             return False
-        QMessageBox.information(self, PRIVACY_TITLE, PRIVACY_TEXT)
+        QMessageBox.information(self, tr("ui.privacy_title"), tr("ui.privacy_text"))
         acknowledge_privacy()
         return True
 
@@ -434,7 +552,7 @@ class MainWindow(QWidget):
             return
         w = PrefetchWorker(self.prefetch_fn, parent=self)
         self.prefetch_worker = w
-        self.lbl_status.setText("Первый запуск: подготавливаю программу (скачиваю модели, это делается один раз)…")
+        self.lbl_status.setText(tr("ui.prefetch_start"))
         w.progress.connect(lambda p, m: (self.progress.setValue(p), self.lbl_status.setText(m)))
         w.done.connect(self._on_prefetch_done)
         w.failed.connect(self._on_prefetch_failed)
@@ -444,12 +562,11 @@ class MainWindow(QWidget):
 
     def _on_prefetch_done(self, downloaded: list) -> None:
         self.progress.setValue(0)
-        self.lbl_status.setText("Всё готово к работе. Выберите аудио и текст." if downloaded
-                                else "Выберите аудио и текст — дальше всё сделаю сам.")
+        self.lbl_status.setText(tr("ui.prefetch_done") if downloaded else tr("ui.status_idle"))
 
     def _on_prefetch_failed(self, message: str, url: str) -> None:
         self.progress.setValue(0)
-        self.lbl_status.setText(message + " Скачивание повторится автоматически при запуске работы.")
+        self.lbl_status.setText(message + " " + tr("ui.prefetch_failed"))
 
     def open_result(self) -> None:
         if self.result_dir:

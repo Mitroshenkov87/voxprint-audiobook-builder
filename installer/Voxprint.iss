@@ -40,6 +40,10 @@ Source: "..\dist\Voxprint\*"; DestDir: "{app}"; Flags: ignoreversion recursesubd
 #else
 Source: "..\dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 #endif
+; Лицензии третьих сторон (LGPL/GPL/Apache и др.): список компонентов и полные тексты лицензий.
+Source: "..\build\notices\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\credits.json"; DestDir: "{app}"; Flags: ignoreversion
 ; Необязательно: положите vc_redist.x64.exe в installer\redist, и он будет установлен тихо (нужен PyTorch).
 #ifexist "redist\vc_redist.x64.exe"
 Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall

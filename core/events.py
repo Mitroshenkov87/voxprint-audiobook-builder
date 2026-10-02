@@ -1,6 +1,7 @@
 """Этапы работы, колбэки прогресса и токен отмены (без зависимостей от Qt)."""
 from __future__ import annotations
 
+from core.i18n import tr
 import enum
 import threading
 from typing import Callable, Dict, Iterable, List
@@ -9,16 +10,17 @@ from core.errors import CancelledByUser
 
 
 class Stage(enum.Enum):
-    UPDATES = "Проверка обновлений"
-    MODEL = "Загрузка модели"
-    ALIGN = "Выравнивание"
-    SLICE = "Нарезка"
-    TRAIN = "Обучение LoRA"
-    SAVE = "Сохранение"
+    UPDATES = "updates"
+    MODEL = "model"
+    ALIGN = "align"
+    SLICE = "slice"
+    TRAIN = "train"
+    SAVE = "save"
 
     @property
     def label(self) -> str:
-        return self.value
+        """Название этапа на языке интерфейса (ключ stage.<значение> в locales/*.json)."""
+        return tr("stage." + self.value)
 
 
 #: progress(stage, fraction_inside_stage 0..1, message)

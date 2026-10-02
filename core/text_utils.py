@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+from core.i18n import tr
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -31,7 +32,7 @@ def decode_bytes(data: bytes) -> TextReadResult:
     """Декодирует байты; предпочитает UTF-8, при неудаче пробует типичные русские кодировки."""
     warnings: List[str] = []
     if data.startswith(b"\xff\xfe") or data.startswith(b"\xfe\xff"):
-        warnings.append("Текстовый файл в кодировке UTF-16. Рекомендуется сохранить его как UTF-8.")
+        warnings.append(tr("warn.text_utf16"))
         return TextReadResult(data.decode("utf-16"), "utf-16", warnings)
     if data.startswith(b"\xef\xbb\xbf"):
         return TextReadResult(data[3:].decode("utf-8"), "utf-8-sig", warnings)
@@ -45,11 +46,10 @@ def decode_bytes(data: bytes) -> TextReadResult:
         except UnicodeDecodeError:
             continue
         warnings.append(
-            f"Текстовый файл не в кодировке UTF-8 (похоже на {enc}). Я прочитал его, "
-            "но лучше сохранить текст как UTF-8, чтобы не было ошибок."
+            tr("warn.text_not_utf8", enc=enc)
         )
         return TextReadResult(text, enc, warnings)
-    warnings.append("Не удалось точно определить кодировку текста; часть символов могла исказиться.")
+    warnings.append(tr("warn.text_enc_unknown"))
     return TextReadResult(data.decode("utf-8", errors="replace"), "utf-8-replace", warnings)
 
 
@@ -60,13 +60,13 @@ def read_text_file(path) -> TextReadResult:
     try:
         data = p.read_bytes()
     except OSError as exc:
-        raise TextReadError(f"Не удаётся открыть текстовый файл: {p}", details=str(exc)) from exc
+        raise TextReadError(tr("err.text_open", path=p), details=str(exc)) from exc
     if not data.strip():
-        raise TextReadError("Текстовый файл пустой. Выберите файл с текстом, который вы читали.")
+        raise TextReadError(tr("err.text_empty"))
     res = decode_bytes(data)
     res.text = normalize_text(res.text)
     if not any(is_kept_char(c) for c in res.text):
-        raise TextReadError("В текстовом файле нет букв или цифр. Выберите правильный файл.")
+        raise TextReadError(tr("err.text_no_letters"))
     return res
 
 
@@ -258,8 +258,7 @@ def attach_spans(words: Sequence[WordTiming], text: str) -> List[str]:
         piece = stream[pos:pos + len(cw)]
         if piece != cw and piece.casefold() != cw.casefold():
             raise AlignmentError(
-                "Слова из выравнивателя не совпали с текстом. Возможно, выбран не тот текст "
-                "или файл повреждён.",
+                tr("err.words_mismatch"),
                 details=f"expected {cw!r} got {piece!r} at clean-pos {pos}",
             )
         w.char_start = kept_idx[pos]
@@ -269,10 +268,10 @@ def attach_spans(words: Sequence[WordTiming], text: str) -> List[str]:
         left = len(stream) - pos
         if left > max(5, int(0.02 * len(stream))):
             raise AlignmentError(
-                "Выравниватель обработал не весь текст. Проверьте, что аудио и текст соответствуют друг другу.",
+                tr("err.align_incomplete"),
                 details=f"{left} clean chars left of {len(stream)}",
             )
-        warnings.append(f"Не размечено {left} символов в конце текста.")
+        warnings.append(tr("warn.chars_unlabeled", left=left))
     # расширяем диапазоны на примыкающую пунктуацию и ставим sentence_end
     n = len(text)
     for w in words:

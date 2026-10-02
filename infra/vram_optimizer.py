@@ -1,6 +1,7 @@
 """Подбор параметров обучения LoRA под объём VRAM (чистая логика + необязательный мониторинг через torch)."""
 from __future__ import annotations
 
+from core.i18n import tr
 import logging
 import threading
 from dataclasses import dataclass, field, replace
@@ -89,13 +90,11 @@ def plan_training(gpu: GpuInfo, n_items: int, *, force_cpu: bool = False, langua
                   grad_accum=compute_grad_accum(n), gradient_checkpointing=True, language=language,
                   max_seconds_per_item=MAX_AUDIO_SECONDS)
     if n < 20:
-        warnings.append("Записи получилось мало (меньше 20 фрагментов): голос может получиться неточным. "
-                        "Лучше записать 10-15 минут.")
+        warnings.append(tr("warn.few_segments"))
 
     if force_cpu or not gpu.available:
         warnings.append(
-            "Видеокарта NVIDIA не используется: обучение пойдёт на процессоре и займёт много часов. "
-            "Для быстрого результата нужна видеокарта NVIDIA.")
+            tr("warn.no_gpu"))
         return TrainPlan(device="cpu", base_model=MODEL_0_6B, use_8bit_adam=False, dtype="float32",
                          epochs=compute_epochs(n, target_passes=250), warnings=warnings, **common)
 
@@ -104,10 +103,10 @@ def plan_training(gpu: GpuInfo, n_items: int, *, force_cpu: bool = False, langua
         model, use8 = MODEL_1_7B, False
     elif total >= 10:
         model, use8 = MODEL_1_7B, True
-        warnings.append("Видеопамяти немного: обучение будет медленнее обычного.")
+        warnings.append(tr("warn.low_vram"))
     elif total >= 6:
         model, use8 = MODEL_0_6B, True
-        warnings.append("Видеопамяти мало: использую облегчённую модель, качество голоса может быть ниже.")
+        warnings.append(tr("warn.very_low_vram"))
     else:
         return plan_training(GpuInfo(False), n_items, force_cpu=True, language=language)
     return TrainPlan(device="cuda:0", base_model=model, use_8bit_adam=use8, dtype="bfloat16",
@@ -121,10 +120,10 @@ def reduce_after_oom(plan: TrainPlan) -> Optional[TrainPlan]:
         return None
     if not plan.use_8bit_adam:
         return replace(plan, use_8bit_adam=True,
-                       warnings=plan.warnings + ["Из-за нехватки памяти включён экономный оптимизатор."])
+                       warnings=plan.warnings + [tr("warn.oom_8bit")])
     if plan.base_model == MODEL_1_7B:
         return replace(plan, base_model=MODEL_0_6B,
-                       warnings=plan.warnings + ["Из-за нехватки памяти выбрана облегчённая модель."])
+                       warnings=plan.warnings + [tr("warn.oom_small")])
     return None
 
 

@@ -1,0 +1,745 @@
+{
+ "app": {
+  "name": "Voxprint",
+  "version": "0.1.0",
+  "author": "Aleksandr Mitroshenkov"
+ },
+ "repo_url": "https://github.com/OWNER/voxprint",
+ "components": [
+  {
+   "id": "qwen3-tts",
+   "name": "Qwen3-TTS-12Hz-1.7B-Base / 0.6B-Base",
+   "kind": "model",
+   "ship": "download",
+   "license": "Apache-2.0",
+   "license_files": [
+    "Apache-2.0"
+   ],
+   "url": "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+   "purpose": {
+    "en": "Base text-to-speech models that your voice is trained on",
+    "de": "Basis-Sprachsynthesemodelle, auf denen Ihre Stimme trainiert wird",
+    "ru": "Базовые модели синтеза речи, на которых обучается ваш голос",
+    "uk": "Базові моделі синтезу мовлення, на яких навчається ваш голос",
+    "be": "Базавыя мадэлі сінтэзу маўлення, на якіх навучаецца ваш голас"
+   }
+  },
+  {
+   "id": "qwen3-forced-aligner",
+   "name": "Qwen3-ForcedAligner-0.6B",
+   "kind": "model",
+   "ship": "download",
+   "license": "Apache-2.0",
+   "license_files": [
+    "Apache-2.0"
+   ],
+   "url": "https://huggingface.co/Qwen/Qwen3-ForcedAligner-0.6B",
+   "purpose": {
+    "en": "Neural forced aligner: matches every word of the text to a moment in the recording",
+    "de": "Neuronaler Forced Aligner: ordnet jedes Wort des Textes einem Zeitpunkt der Aufnahme zu",
+    "ru": "Нейросетевой выравниватель: сопоставляет каждое слово текста с моментом записи",
+    "uk": "Нейромережевий вирівнювач: зіставляє кожне слово тексту з моментом запису",
+    "be": "Нейрасеткавы выраўноўвальнік: супастаўляе кожнае слова тэксту з момантам запісу"
+   }
+  },
+  {
+   "id": "mms-aligner",
+   "name": "MMS-300M forced aligner (MahmoudAshraf/mms-300m-1130-forced-aligner)",
+   "kind": "model",
+   "ship": "optional",
+   "license": "CC-BY-NC-4.0",
+   "license_files": [
+    "CC-BY-NC-4.0"
+   ],
+   "url": "https://huggingface.co/MahmoudAshraf/mms-300m-1130-forced-aligner",
+   "purpose": {
+    "en": "Optional backup aligner model (only if the optional ctc-forced-aligner package is installed). NON-COMMERCIAL licence!",
+    "de": "Optionales Ersatz-Ausrichtungsmodell (nur mit dem optionalen Paket ctc-forced-aligner). NICHT-KOMMERZIELLE Lizenz!",
+    "ru": "Необязательная запасная модель выравнивания (только при установленном пакете ctc-forced-aligner). Лицензия НЕКОММЕРЧЕСКАЯ!",
+    "uk": "Необов'язкова запасна модель вирівнювання (лише за встановленого пакета ctc-forced-aligner). Ліцензія НЕКОМЕРЦІЙНА!",
+    "be": "Неабавязковая запасная мадэль выраўноўвання (толькі пры ўсталяваным пакеце ctc-forced-aligner). Ліцэнзія НЕКАМЕРЦЫЙНАЯ!"
+   }
+  },
+  {
+   "id": "qwen-tts",
+   "name": "qwen-tts",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "Apache-2.0",
+   "license_files": [
+    "qwen-tts"
+   ],
+   "url": "https://github.com/QwenLM/Qwen3-TTS",
+   "purpose": {
+    "en": "Qwen3-TTS model code (speech synthesis and the audio tokenizer)",
+    "de": "Qwen3-TTS-Modellcode (Sprachsynthese und Audio-Tokenizer)",
+    "ru": "Код моделей Qwen3-TTS (синтез речи и аудио-токенизатор)",
+    "uk": "Код моделей Qwen3-TTS (синтез мовлення й аудіотокенізатор)",
+    "be": "Код мадэляў Qwen3-TTS (сінтэз маўлення і аўдыятокенізатар)"
+   }
+  },
+  {
+   "id": "qwen-asr",
+   "name": "qwen-asr",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "Apache-2.0",
+   "license_files": [
+    "qwen-asr"
+   ],
+   "url": "https://github.com/QwenLM/Qwen3-ASR",
+   "purpose": {
+    "en": "Runs the Qwen3 forced aligner",
+    "de": "Führt den Qwen3-Forced-Aligner aus",
+    "ru": "Запуск выравнивателя Qwen3",
+    "uk": "Запуск вирівнювача Qwen3",
+    "be": "Запуск выраўноўвальніка Qwen3"
+   }
+  },
+  {
+   "id": "qwen-omni-utils",
+   "name": "qwen-omni-utils",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "Apache-2.0",
+   "license_files": [
+    "qwen-omni-utils"
+   ],
+   "url": "https://github.com/QwenLM/Qwen2-VL",
+   "purpose": {
+    "en": "Audio/media helpers required by qwen-asr",
+    "de": "Audio-/Medien-Hilfsfunktionen für qwen-asr",
+    "ru": "Вспомогательные функции аудио/медиа для qwen-asr",
+    "uk": "Допоміжні функції аудіо/медіа для qwen-asr",
+    "be": "Дапаможныя функцыі аўдыё/медыя для qwen-asr"
+   }
+  },
+  {
+   "id": "pytorch",
+   "name": "PyTorch (torch)",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "BSD-3-Clause (plus bundled third-party components)",
+   "license_files": [
+    "pytorch"
+   ],
+   "url": "https://pytorch.org",
+   "purpose": {
+    "en": "Neural-network engine",
+    "de": "Engine für neuronale Netze",
+    "ru": "Движок нейросетей",
+    "uk": "Рушій нейромереж",
+    "be": "Рухавік нейрасетак"
+   }
+  },
+  {
+   "id": "torchaudio",
+   "name": "torchaudio",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "BSD-2-Clause",
+   "license_files": [
+    "torchaudio"
+   ],
+   "url": "https://github.com/pytorch/audio",
+   "purpose": {
+    "en": "Audio processing for PyTorch",
+    "de": "Audioverarbeitung für PyTorch",
+    "ru": "Обработка звука для PyTorch",
+    "uk": "Обробка звуку для PyTorch",
+    "be": "Апрацоўка гуку для PyTorch"
+   }
+  },
+  {
+   "id": "transformers",
+   "name": "Transformers",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "Apache-2.0",
+   "license_files": [
+    "transformers"
+   ],
+   "url": "https://github.com/huggingface/transformers",
+   "purpose": {
+    "en": "Loads and runs the models",
+    "de": "Lädt und führt die Modelle aus",
+    "ru": "Загрузка и запуск моделей",
+    "uk": "Завантаження й запуск моделей",
+    "be": "Загрузка і запуск мадэляў"
+   }
+  },
+  {
+   "id": "peft",
+   "name": "PEFT",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "Apache-2.0",
+   "license_files": [
+    "peft"
+   ],
+   "url": "https://github.com/huggingface/peft",
+   "purpose": {
+    "en": "LoRA voice adapters: training, saving and merging",
+    "de": "LoRA-Stimmadapter: Training, Speichern und Zusammenführen",
+    "ru": "Голосовые адаптеры LoRA: обучение, сохранение и слияние",
+    "uk": "Голосові адаптери LoRA: навчання, збереження й злиття",
+    "be": "Галасавыя адаптары LoRA: навучанне, захаванне і зліццё"
+   }
+  },
+  {
+   "id": "accelerate",
+   "name": "Accelerate",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "Apache-2.0",
+   "license_files": [
+    "accelerate"
+   ],
+   "url": "https://github.com/huggingface/accelerate",
+   "purpose": {
+    "en": "Device and memory management",
+    "de": "Geräte- und Speicherverwaltung",
+    "ru": "Управление устройствами и памятью",
+    "uk": "Керування пристроями й пам'яттю",
+    "be": "Кіраванне прыладамі і памяццю"
+   }
+  },
+  {
+   "id": "huggingface-hub",
+   "name": "huggingface_hub",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "Apache-2.0",
+   "license_files": [
+    "huggingface_hub"
+   ],
+   "url": "https://github.com/huggingface/huggingface_hub",
+   "purpose": {
+    "en": "Downloads the models",
+    "de": "Lädt die Modelle herunter",
+    "ru": "Скачивание моделей",
+    "uk": "Завантаження моделей",
+    "be": "Спампоўванне мадэляў"
+   }
+  },
+  {
+   "id": "safetensors",
+   "name": "safetensors",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "Apache-2.0",
+   "license_files": [
+    "safetensors"
+   ],
+   "url": "https://github.com/huggingface/safetensors",
+   "purpose": {
+    "en": "Safe model weight files",
+    "de": "Sichere Modellgewichts-Dateien",
+    "ru": "Безопасные файлы весов моделей",
+    "uk": "Безпечні файли ваг моделей",
+    "be": "Бяспечныя файлы вагаў мадэляў"
+   }
+  },
+  {
+   "id": "bitsandbytes",
+   "name": "bitsandbytes",
+   "kind": "library",
+   "ship": "optional",
+   "license": "MIT",
+   "license_files": [
+    "bitsandbytes"
+   ],
+   "url": "https://github.com/bitsandbytes-foundation/bitsandbytes",
+   "purpose": {
+    "en": "8-bit optimizer that saves video memory",
+    "de": "8-Bit-Optimierer, der Grafikspeicher spart",
+    "ru": "8-битный оптимизатор, экономящий видеопамять",
+    "uk": "8-бітний оптимізатор, що заощаджує відеопам'ять",
+    "be": "8-бітны аптымізатар, што эканоміць відэапамяць"
+   }
+  },
+  {
+   "id": "pyside6",
+   "name": "PySide6 / Qt for Python",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "LGPL-3.0-only (also available as GPL-2.0/3.0 or commercial; used under LGPL-3.0)",
+   "license_files": [
+    "qt-lgpl-3.0",
+    "gpl-3.0"
+   ],
+   "url": "https://pyside.org",
+   "purpose": {
+    "en": "The window and all interface elements",
+    "de": "Das Fenster und alle Oberflächenelemente",
+    "ru": "Окно и все элементы интерфейса",
+    "uk": "Вікно й усі елементи інтерфейсу",
+    "be": "Акно і ўсе элементы інтэрфейсу"
+   },
+   "note": {
+    "en": "Used unmodified and dynamically linked. Prefer the folder-type build (build.bat onedir) so the Qt/PySide6 libraries can be replaced. Source: https://code.qt.io and https://pyside.org.",
+    "de": "Unverändert und dynamisch gelinkt verwendet. Bevorzugen Sie den Ordner-Build (build.bat onedir), damit die Qt/PySide6-Bibliotheken ersetzt werden können. Quellcode: https://code.qt.io und https://pyside.org.",
+    "ru": "Используется без изменений, с динамической компоновкой. Лучше собирать «папкой» (build.bat onedir), чтобы библиотеки Qt/PySide6 можно было заменить. Исходный код: https://code.qt.io и https://pyside.org.",
+    "uk": "Використовується без змін, з динамічним компонуванням. Краще збирати «текою» (build.bat onedir), щоб бібліотеки Qt/PySide6 можна було замінити. Вихідний код: https://code.qt.io та https://pyside.org.",
+    "be": "Выкарыстоўваецца без змен, з дынамічнай кампаноўкай. Лепш збіраць «папкай» (build.bat onedir), каб бібліятэкі Qt/PySide6 можна было замяніць. Зыходны код: https://code.qt.io і https://pyside.org."
+   }
+  },
+  {
+   "id": "numpy",
+   "name": "NumPy",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0",
+   "license_files": [
+    "numpy"
+   ],
+   "url": "https://numpy.org",
+   "purpose": {
+    "en": "Numerical arrays",
+    "de": "Numerische Arrays",
+    "ru": "Числовые массивы",
+    "uk": "Числові масиви",
+    "be": "Лікавыя масівы"
+   }
+  },
+  {
+   "id": "scipy",
+   "name": "SciPy",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "BSD-3-Clause",
+   "license_files": [
+    "scipy"
+   ],
+   "url": "https://scipy.org",
+   "purpose": {
+    "en": "Signal processing (filtering, resampling)",
+    "de": "Signalverarbeitung (Filter, Resampling)",
+    "ru": "Обработка сигналов (фильтры, ресемплинг)",
+    "uk": "Обробка сигналів (фільтри, ресемплінг)",
+    "be": "Апрацоўка сігналаў (фільтры, рэсэмплінг)"
+   }
+  },
+  {
+   "id": "librosa",
+   "name": "librosa",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "ISC",
+   "license_files": [
+    "librosa"
+   ],
+   "url": "https://librosa.org",
+   "purpose": {
+    "en": "Audio analysis",
+    "de": "Audioanalyse",
+    "ru": "Анализ звука",
+    "uk": "Аналіз звуку",
+    "be": "Аналіз гуку"
+   }
+  },
+  {
+   "id": "soundfile",
+   "name": "python-soundfile",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "BSD-3-Clause",
+   "license_files": [
+    "soundfile"
+   ],
+   "url": "https://github.com/bastibe/python-soundfile",
+   "purpose": {
+    "en": "Reading and writing WAV/FLAC files (uses libsndfile, LGPL, shipped in the wheel)",
+    "de": "Lesen und Schreiben von WAV/FLAC-Dateien (nutzt libsndfile, LGPL, im Wheel enthalten)",
+    "ru": "Чтение и запись WAV/FLAC (использует libsndfile, LGPL, входит в пакет)",
+    "uk": "Читання й запис WAV/FLAC (використовує libsndfile, LGPL, входить до пакета)",
+    "be": "Чытанне і запіс WAV/FLAC (выкарыстоўвае libsndfile, LGPL, уваходзіць у пакет)"
+   }
+  },
+  {
+   "id": "pydub",
+   "name": "pydub",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "MIT",
+   "license_files": [
+    "pydub"
+   ],
+   "url": "http://pydub.com",
+   "purpose": {
+    "en": "Opening MP3 and other audio formats",
+    "de": "Öffnen von MP3 und anderen Audioformaten",
+    "ru": "Открытие MP3 и других аудиоформатов",
+    "uk": "Відкриття MP3 та інших аудіоформатів",
+    "be": "Адкрыццё MP3 і іншых аўдыяфарматаў"
+   }
+  },
+  {
+   "id": "imageio-ffmpeg",
+   "name": "imageio-ffmpeg",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "BSD-2-Clause (wrapper)",
+   "license_files": [
+    "imageio-ffmpeg"
+   ],
+   "url": "https://github.com/imageio/imageio-ffmpeg",
+   "purpose": {
+    "en": "Provides the ffmpeg program used to decode audio formats",
+    "de": "Stellt das Programm ffmpeg zum Dekodieren von Audioformaten bereit",
+    "ru": "Поставляет программу ffmpeg для декодирования аудиоформатов",
+    "uk": "Постачає програму ffmpeg для декодування аудіоформатів",
+    "be": "Пастаўляе праграму ffmpeg для дэкадавання аўдыяфарматаў"
+   }
+  },
+  {
+   "id": "ffmpeg",
+   "name": "FFmpeg (executable inside imageio-ffmpeg)",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "GPL-3.0 build (--enable-gpl --enable-version3, verified in the Windows 7.1 binary of imageio-ffmpeg 0.6.0)",
+   "license_files": [
+    "gpl-3.0"
+   ],
+   "url": "https://ffmpeg.org",
+   "purpose": {
+    "en": "Audio decoding (separate program, run as a subprocess)",
+    "de": "Audio-Dekodierung (eigenständiges Programm, als Unterprozess gestartet)",
+    "ru": "Декодирование звука (отдельная программа, запускается как подпроцесс)",
+    "uk": "Декодування звуку (окрема програма, запускається як підпроцес)",
+    "be": "Дэкадаванне гуку (асобная праграма, запускаецца як падпрацэс)"
+   },
+   "note": {
+    "en": "Separate executable, not linked into Voxprint. Source code: https://ffmpeg.org/download.html#get-sources (build scripts of the binary: https://github.com/imageio/imageio-binaries). The GPL text is in licenses/gpl-3.0.txt.",
+    "de": "Eigenständige ausführbare Datei, nicht in Voxprint eingebunden. Quellcode: https://ffmpeg.org/download.html#get-sources (Build-Skripte der Binärdatei: https://github.com/imageio/imageio-binaries). Der GPL-Text steht in licenses/gpl-3.0.txt.",
+    "ru": "Отдельный исполняемый файл, не скомпонован с Voxprint. Исходный код: https://ffmpeg.org/download.html#get-sources (скрипты сборки бинарника: https://github.com/imageio/imageio-binaries). Текст GPL: licenses/gpl-3.0.txt.",
+    "uk": "Окремий виконуваний файл, не скомпонований із Voxprint. Вихідний код: https://ffmpeg.org/download.html#get-sources (скрипти збирання бінарника: https://github.com/imageio/imageio-binaries). Текст GPL: licenses/gpl-3.0.txt.",
+    "be": "Асобны выканальны файл, не скампанаваны з Voxprint. Зыходны код: https://ffmpeg.org/download.html#get-sources (скрыпты зборкі бінарніка: https://github.com/imageio/imageio-binaries). Тэкст GPL: licenses/gpl-3.0.txt."
+   }
+  },
+  {
+   "id": "einops",
+   "name": "einops",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "MIT",
+   "license_files": [
+    "einops"
+   ],
+   "url": "https://github.com/arogozhnikov/einops",
+   "purpose": {
+    "en": "Tensor reshaping used by the models",
+    "de": "Tensor-Umformung, die von den Modellen genutzt wird",
+    "ru": "Преобразование тензоров в моделях",
+    "uk": "Перетворення тензорів у моделях",
+    "be": "Пераўтварэнне тэнзараў у мадэлях"
+   }
+  },
+  {
+   "id": "onnxruntime",
+   "name": "ONNX Runtime",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "MIT",
+   "license_files": [
+    "onnxruntime"
+   ],
+   "url": "https://onnxruntime.ai",
+   "purpose": {
+    "en": "Neural-network runtime required by qwen-tts",
+    "de": "Laufzeit für neuronale Netze, von qwen-tts benötigt",
+    "ru": "Среда выполнения нейросетей, нужная qwen-tts",
+    "uk": "Середовище виконання нейромереж, потрібне qwen-tts",
+    "be": "Асяроддзе выканання нейрасетак, патрэбнае qwen-tts"
+   }
+  },
+  {
+   "id": "nagisa",
+   "name": "nagisa",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "MIT",
+   "license_files": [
+    "nagisa"
+   ],
+   "url": "https://github.com/taishi-i/nagisa",
+   "purpose": {
+    "en": "Japanese word segmentation required by qwen-asr",
+    "de": "Japanische Wortsegmentierung, von qwen-asr benötigt",
+    "ru": "Разбиение японского текста на слова (нужно qwen-asr)",
+    "uk": "Розбиття японського тексту на слова (потрібне qwen-asr)",
+    "be": "Падзел японскага тэксту на словы (патрэбны qwen-asr)"
+   }
+  },
+  {
+   "id": "pysox",
+   "name": "pysox",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "BSD-3-Clause",
+   "license_files": [
+    "sox"
+   ],
+   "url": "https://github.com/rabitt/pysox",
+   "purpose": {
+    "en": "Python wrapper required by qwen-tts (the SoX program itself is not shipped)",
+    "de": "Python-Wrapper, von qwen-tts benötigt (das Programm SoX selbst wird nicht mitgeliefert)",
+    "ru": "Python-обёртка, нужная qwen-tts (сама программа SoX не поставляется)",
+    "uk": "Python-обгортка, потрібна qwen-tts (сама програма SoX не постачається)",
+    "be": "Python-абгортка, патрэбная qwen-tts (сама праграма SoX не пастаўляецца)"
+   }
+  },
+  {
+   "id": "ru-normalizr",
+   "name": "ru-normalizr",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "MIT",
+   "license_files": [
+    "ru-normalizr"
+   ],
+   "url": "https://github.com/NickZaitsev/ru-normalizr",
+   "purpose": {
+    "en": "Spelling out Russian numbers and abbreviations",
+    "de": "Ausschreiben russischer Zahlen und Abkürzungen",
+    "ru": "Раскрытие русских чисел и сокращений",
+    "uk": "Розкриття російських чисел і скорочень",
+    "be": "Раскрыццё рускіх лікаў і скарачэнняў"
+   }
+  },
+  {
+   "id": "rutextnorm",
+   "name": "rutextnorm",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "MIT",
+   "license_files": [
+    "rutextnorm"
+   ],
+   "url": "https://github.com/shigabeev/russian_tts_normalization",
+   "purpose": {
+    "en": "Backup Russian text normalization",
+    "de": "Russische Ersatz-Textnormalisierung",
+    "ru": "Запасная нормализация русского текста",
+    "uk": "Запасна нормалізація російського тексту",
+    "be": "Запасная нармалізацыя рускага тэксту"
+   }
+  },
+  {
+   "id": "pymorphy3",
+   "name": "pymorphy3 (+ pymorphy3-dicts-ru)",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "MIT",
+   "license_files": [
+    "pymorphy3",
+    "pymorphy3-dicts-ru"
+   ],
+   "url": "https://github.com/no-plagiarism/pymorphy3",
+   "purpose": {
+    "en": "Russian morphology (word forms)",
+    "de": "Russische Morphologie (Wortformen)",
+    "ru": "Русская морфология (формы слов)",
+    "uk": "Російська морфологія (форми слів)",
+    "be": "Руская марфалогія (формы слоў)"
+   }
+  },
+  {
+   "id": "num2words",
+   "name": "num2words",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "LGPL-2.1",
+   "license_files": [
+    "num2words"
+   ],
+   "url": "https://github.com/savoirfairelinux/num2words",
+   "purpose": {
+    "en": "Numbers to words",
+    "de": "Zahlen in Worte",
+    "ru": "Числа словами",
+    "uk": "Числа словами",
+    "be": "Лікі словамі"
+   },
+   "note": {
+    "en": "Pure-Python library used unmodified; the LGPL allows replacing it with another version (it is a normal Python package).",
+    "de": "Reine Python-Bibliothek, unverändert verwendet; die LGPL erlaubt den Austausch gegen eine andere Version (normales Python-Paket).",
+    "ru": "Чисто питоновская библиотека, используется без изменений; LGPL позволяет заменить её другой версией (обычный Python-пакет).",
+    "uk": "Суто питонівська бібліотека, використовується без змін; LGPL дозволяє замінити її іншою версією (звичайний Python-пакет).",
+    "be": "Чыста пітонаўская бібліятэка, выкарыстоўваецца без змен; LGPL дазваляе замяніць яе іншай версіяй (звычайны Python-пакет)."
+   }
+  },
+  {
+   "id": "roman",
+   "name": "roman",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "ZPL-2.1",
+   "license_files": [
+    "roman"
+   ],
+   "url": "https://github.com/zopefoundation/roman",
+   "purpose": {
+    "en": "Roman numerals",
+    "de": "Römische Zahlen",
+    "ru": "Римские цифры",
+    "uk": "Римські цифри",
+    "be": "Рымскія лічбы"
+   }
+  },
+  {
+   "id": "eng-to-ipa",
+   "name": "eng_to_ipa",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "MIT (per the GitHub repository; the PyPI package has no licence field)",
+   "license_files": [
+    "eng_to_ipa"
+   ],
+   "url": "https://github.com/mphilli/English-to-IPA",
+   "purpose": {
+    "en": "English words in Russian text",
+    "de": "Englische Wörter im russischen Text",
+    "ru": "Английские слова в русском тексте",
+    "uk": "Англійські слова в російському тексті",
+    "be": "Англійскія словы ў рускім тэксце"
+   }
+  },
+  {
+   "id": "packaging",
+   "name": "packaging",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "Apache-2.0 OR BSD-2-Clause",
+   "license_files": [
+    "packaging-apache",
+    "packaging-bsd"
+   ],
+   "url": "https://github.com/pypa/packaging",
+   "purpose": {
+    "en": "Version comparison for updates",
+    "de": "Versionsvergleich für Updates",
+    "ru": "Сравнение версий для обновлений",
+    "uk": "Порівняння версій для оновлень",
+    "be": "Параўнанне версій для абнаўленняў"
+   }
+  },
+  {
+   "id": "tqdm",
+   "name": "tqdm",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "MPL-2.0 AND MIT",
+   "license_files": [
+    "tqdm",
+    "MPL-2.0"
+   ],
+   "url": "https://tqdm.github.io",
+   "purpose": {
+    "en": "Progress bars",
+    "de": "Fortschrittsbalken",
+    "ru": "Индикаторы прогресса",
+    "uk": "Індикатори прогресу",
+    "be": "Індыкатары прагрэсу"
+   }
+  },
+  {
+   "id": "ctc-forced-aligner",
+   "name": "ctc-forced-aligner",
+   "kind": "library",
+   "ship": "optional",
+   "license": "BSD-2-Clause (upstream repository MahmoudAshraf97/ctc-forced-aligner)",
+   "license_files": [
+    "ctc-forced-aligner"
+   ],
+   "url": "https://github.com/MahmoudAshraf97/ctc-forced-aligner",
+   "purpose": {
+    "en": "Optional backup aligner; not bundled, installed by the user on request",
+    "de": "Optionaler Ersatz-Aligner; nicht enthalten, auf Wunsch vom Benutzer installiert",
+    "ru": "Необязательный запасной выравниватель; не входит в поставку, ставится пользователем по желанию",
+    "uk": "Необов'язковий запасний вирівнювач; не входить до поставки, встановлюється користувачем за бажанням",
+    "be": "Неабавязковы запасны выраўноўвальнік; не ўваходзіць у пастаўку, усталёўваецца карыстальнікам па жаданні"
+   },
+   "note": {
+    "en": "The PyPI package of this name is published from a fork whose licence metadata is empty; check it before installing.",
+    "de": "Das PyPI-Paket dieses Namens stammt aus einem Fork ohne Lizenzangabe; prüfen Sie dies vor der Installation.",
+    "ru": "Пакет с таким именем на PyPI опубликован из форка без сведений о лицензии; проверьте это перед установкой.",
+    "uk": "Пакет із такою назвою на PyPI опубліковано з форку без відомостей про ліцензію; перевірте це перед встановленням.",
+    "be": "Пакет з такой назвай на PyPI апублікаваны з форка без звестак пра ліцэнзію; праверце гэта перад усталяваннем."
+   }
+  },
+  {
+   "id": "uv",
+   "name": "uv",
+   "kind": "tool",
+   "ship": "build",
+   "license": "MIT OR Apache-2.0",
+   "license_files": [
+    "uv-mit",
+    "uv-apache"
+   ],
+   "url": "https://github.com/astral-sh/uv",
+   "purpose": {
+    "en": "Installs packages when building (not shipped)",
+    "de": "Installiert Pakete beim Erstellen (nicht enthalten)",
+    "ru": "Устанавливает пакеты при сборке (не поставляется)",
+    "uk": "Встановлює пакети під час збирання (не постачається)",
+    "be": "Усталёўвае пакеты пры зборцы (не пастаўляецца)"
+   }
+  },
+  {
+   "id": "pyinstaller",
+   "name": "PyInstaller",
+   "kind": "tool",
+   "ship": "build",
+   "license": "GPL-2.0-or-later with the bootloader exception",
+   "license_files": [
+    "pyinstaller"
+   ],
+   "url": "https://pyinstaller.org",
+   "purpose": {
+    "en": "Packs the program into an application (its bootloader is embedded; the exception allows distribution under any licence)",
+    "de": "Verpackt das Programm zu einer Anwendung (der Bootloader ist eingebettet; die Ausnahme erlaubt die Verbreitung unter beliebiger Lizenz)",
+    "ru": "Упаковывает программу в приложение (загрузчик встроен; исключение разрешает распространение под любой лицензией)",
+    "uk": "Пакує програму в застосунок (завантажувач вбудовано; виняток дозволяє розповсюдження під будь-якою ліцензією)",
+    "be": "Пакуе праграму ў праграмны пакет (загрузчык убудаваны; выключэнне дазваляе распаўсюд пад любой ліцэнзіяй)"
+   }
+  },
+  {
+   "id": "inno-setup",
+   "name": "Inno Setup",
+   "kind": "tool",
+   "ship": "build",
+   "license": "Inno Setup License (permissive, custom)",
+   "license_files": [
+    "inno-setup"
+   ],
+   "url": "https://jrsoftware.org/isinfo.php",
+   "purpose": {
+    "en": "Creates the installer",
+    "de": "Erstellt das Installationsprogramm",
+    "ru": "Создаёт установщик",
+    "uk": "Створює інсталятор",
+    "be": "Стварае ўсталёўшчык"
+   }
+  },
+  {
+   "id": "tabler-icons",
+   "name": "Tabler Icons",
+   "kind": "asset",
+   "ship": "bundled",
+   "license": "MIT",
+   "license_files": [
+    "tabler-icons"
+   ],
+   "url": "https://tabler.io/icons",
+   "purpose": {
+    "en": "The fingerprint icon of the application (modified)",
+    "de": "Das Fingerabdruck-Symbol der Anwendung (angepasst)",
+    "ru": "Значок-отпечаток приложения (изменён)",
+    "uk": "Значок-відбиток застосунку (змінено)",
+    "be": "Значок-адбітак праграмы (зменены)"
+   }
+  }
+ ]
+}

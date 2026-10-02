@@ -54,9 +54,9 @@ def test_run_task_lora_passes_language_and_warnings_to_trainer(tmp_path, monkeyp
                    lambda s, f, m: stages.append(s), updater=NotDueUpdater(), aligner_factory=TrueRateAligner)
     assert (res.dataset_dir / "ref.wav").exists() and (res.dataset_dir / "ref_text.txt").exists()
     assert not (res.dataset_dir / "train_24k").exists()
-    assert called["cpu"] is True and res.adapter_path == tmp_path / "out" / "output"
+    assert called["cpu"] is True and res.adapter_path == tmp_path / "out" / "output" / "Мой голос"
     assert called["lang"] == "russian" and "предупреждение обучения" in res.warnings
-    assert called["o"] == tmp_path / "out" / "output"
+    assert called["o"] == tmp_path / "out" / "output" / "Мой голос"
     assert Stage.SAVE not in stages  # SAVE показывает только тренер; запись датасета идёт под «Нарезка»
 
 
@@ -70,14 +70,14 @@ def test_cli_fake_aligner(tmp_path, capsys):
     wav, txt = _inputs(tmp_path, 25)
     assert cli_main([str(wav), str(txt), "--out", str(tmp_path / "ds"), "--fake-aligner"]) == 0
     assert (tmp_path / "ds" / "metadata.jsonl").exists()
-    assert "Готово" in capsys.readouterr().out
+    assert "Done" in capsys.readouterr().out
 
 
 def test_cli_friendly_error(tmp_path, capsys):
     t = tmp_path / "t.txt"
     t.write_text("текст", encoding="utf-8")
     assert cli_main([str(tmp_path / "nope.wav"), str(t), "--out", str(tmp_path / "o"), "--fake-aligner"]) == 2
-    assert "ОШИБКА" in capsys.readouterr().err
+    assert "ERROR" in capsys.readouterr().err
 
 
 @pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="нет ffmpeg")
