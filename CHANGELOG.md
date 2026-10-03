@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to Voxprint. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
-The project is not released yet; everything below is the history of the 0.1.0 development line.
+The first pre-release is v0.1.0-beta; everything below is the history of the 0.1.0 development line.
 
 ## [Unreleased]
 

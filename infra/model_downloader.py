@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from core.errors import ModelDownloadError
 from core.events import ProgressCallback, Stage, noop_progress
-from infra import modelscope_mirror, paths
+from infra import model_mirrors, modelscope_mirror, paths
 
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 log = logging.getLogger("voxprint.models")
@@ -228,6 +228,8 @@ def ensure_model(
     reuse_external: bool = True,
     mirror_download: Optional[Callable[..., Any]] = None,
     hf_probe: Optional[Callable[[str], bool]] = None,
+    hf_mirror_fetch: Optional[Callable[..., Any]] = None,
+    mirror_manifest: Optional[Path] = None,
 ) -> Path:
     """Return the path of the local model, downloading it on first use (automatically).
 
@@ -237,7 +239,8 @@ def ensure_model(
 
     ``revision`` is the HF commit; by default the verified revision from the "verified by Voxprint" manifest is used.
     If the pinned revision is unavailable the latest one is tried once (and logged).  Sources are tried in order
-    Hugging Face -> ModelScope (reversed when Hugging Face is slow/unreachable).  The result lands in ``<name>.partial``
+    Hugging Face -> ModelScope (reversed when Hugging Face is slow/unreachable); if both fail, the project's Hugging
+    Face backup mirror (:mod:`infra.model_mirrors`, every file verified by SHA-256) is the last resort.  The result lands in ``<name>.partial``
     first and is renamed only after verification.
     """
     target = local_dir_for(repo_id, root)
@@ -332,6 +335,19 @@ def ensure_model(
         # ModelScope has no commit sha: the revision is confirmed only when the sizes matched the pinned commit
         state["sha"] = revision if expected else None
 
+    def _from_hf_mirror() -> None:
+        """Last resort: the project's own backup mirror on Hugging Face; every file is verified against the SHA-256 manifest."""
+        entry = model_mirrors.entry_for(repo_id, mirror_manifest)
+        if entry is None:
+            raise ModelDownloadError("no backup mirror for this model", url=hf_url(repo_id))
+        if revision and revision != entry.source_revision:
+            raise ModelDownloadError(f"the backup mirror holds {entry.source_revision[:8]}, not the requested {revision[:8]}",
+                                     url=hf_url(repo_id))
+        progress(stage, 0.0, tr("progress.mirror_hf", short=short))
+        state["sha"] = model_mirrors.download(
+            entry, partial, lambda f: progress(stage, f, tr("progress.downloading", short=short, pct=int(f * 100))),
+            hf_mirror_fetch)
+
     mirror_ok = mirror_enabled() and root is None   # updates through the staging folder always go straight to Hugging Face
     if mirror_ok:
         mirror_download = mirror_download or _default_mirror_download
@@ -341,12 +357,17 @@ def ensure_model(
             log.warning("Hugging Face is slow or unreachable - trying ModelScope first for %s", repo_id)
     else:
         order = ["hf"]
+    if root is None and model_mirrors.entry_for(repo_id, mirror_manifest) is not None:
+        order.append("hfm")                     # the project's Hugging Face backup mirror, always last
     errors: List[str] = []
     ok_source = ""
     for src in order:
         try:
             if src == "hf":
                 _from_hf()
+            elif src == "hfm":
+                log.warning("download of %s from the original sources failed - trying the Hugging Face backup mirror", repo_id)
+                _from_hf_mirror()
             else:
                 if errors:
                     log.warning("download of %s from Hugging Face failed - trying ModelScope", repo_id)

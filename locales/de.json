@@ -345,6 +345,7 @@
  "progress.ffmpeg_ready": "ffmpeg ist bereit",
  "progress.first_download": "Erster Start: Modell {short} wird heruntergeladen (das geschieht nur einmal)…",
  "progress.merging": "Stimme wird in das Modell eingefügt…",
+ "progress.mirror_hf": "Die Originalquellen sind nicht erreichbar - {short} wird vom Hugging-Face-Backup-Spiegel des Projekts geladen (SHA-256 geprüft)…",
  "progress.mirror_modelscope": "Hugging Face ist langsam oder nicht erreichbar - {short} wird vom ModelScope-Spiegel (modelscope.cn) geladen…",
  "progress.model_done": "Modell {short} ist bereit",
  "progress.model_imported": "Modell {short} importiert",

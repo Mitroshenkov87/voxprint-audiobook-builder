@@ -345,6 +345,7 @@
  "progress.ffmpeg_ready": "ffmpeg готов",
  "progress.first_download": "Первый запуск: скачиваю модель {short} (это делается один раз)…",
  "progress.merging": "Встраиваю голос в модель…",
+ "progress.mirror_hf": "Оригинальные источники недоступны - скачиваю {short} с резервного зеркала проекта на Hugging Face (проверка SHA-256)…",
  "progress.mirror_modelscope": "Hugging Face медленный или недоступен - скачиваю {short} с зеркала ModelScope (modelscope.cn)…",
  "progress.model_done": "Модель {short} готова",
  "progress.model_imported": "Модель {short} импортирована",

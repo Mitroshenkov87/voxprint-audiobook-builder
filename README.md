@@ -16,7 +16,7 @@ The voice goes into your **voice library**; then pick a book (TXT, FB2, EPUB) an
 
 > ## Beta / experimental software (0.1.0)
 > Voxprint is **beta**: the whole pipeline (alignment, training, narration, installer) has been run end to end on a real RTX 4090 / Windows Server 2025 machine
-> (see [Tested on Windows](#tested-on-windows)), but there has been **no public release**, only one machine and one speaker were tested, voice *quality* is judged by ear of one person,
+> (see [Tested on Windows](#tested-on-windows)), but the only release so far is the pre-release [`v0.1.0-beta`](https://github.com/Mitroshenkov87/voxprint/releases/tag/v0.1.0-beta), only one machine and one speaker were tested, voice *quality* is judged by ear of one person,
 > and many settings are defaults that may change. Expect rough edges; back up your recordings and voices ([Backup](#backup-restore-and-existing-models)); report problems as issues.
 > Voices are personal data - read [Voice owner's consent](#voice-owners-consent-and-usage-scope) and the licence notes before sharing anything.
 
@@ -72,8 +72,6 @@ voice recording and a text file to ready output files you can load into a neural
 ## Screenshots
 Real screenshots of the current build on **Windows (RTX 4090 server, dark theme, English UI)**; Russian and German versions of the main windows are in [`docs/screenshots/ru/`](docs/screenshots/ru/) and [`docs/screenshots/de/`](docs/screenshots/de/).
 
-<p align="center"><img src="docs/screenshots/desktop_acrylic.png" alt="Voxprint Studio over a dark desktop (Acrylic)" width="720"></p>
-
 | Studio | Train: presets and the no-transcript mode |
 |---|---|
 | <img src="docs/screenshots/studio_home.png" width="300"> | <img src="docs/screenshots/train_notranscript.png" width="330"> |
@@ -86,9 +84,28 @@ Russian: [`studio_home`](docs/screenshots/ru/studio_home.png) · German: [`studi
 Screenshots that show voice lists are not included (they would show the maintainers' private voices); the voices window and the narration window with the mini player are described in the sections below.
 
 ## Installation
-There is no public release yet. Planned installer channels are listed in the [Roadmap](#roadmap). Today you have two options.
+The first pre-release is **[v0.1.0-beta](https://github.com/Mitroshenkov87/voxprint/releases/tag/v0.1.0-beta)** (marked *pre-release*). Planned installer channels are listed in the [Roadmap](#roadmap).
 
-### Option 1: the installer (built locally)
+### Download the installer (Windows 11 x64, NVIDIA GPU)
+The release has two builds of the **same program**; take either one:
+
+| File | Built by | Size |
+|---|---|---|
+| `Voxprint-Setup-github-build.exe` (+ `.sha256`) | the public **GitHub Actions** workflow `.github/workflows/build-installer.yml` from the tagged source - the build log is public, so you can see how it was made | about 1.96 GiB |
+| `Voxprint-Setup-grokbot-build.exe` (+ `.sha256`) | built by the maintainers' AI assistant on a Windows GPU server with the same `build.bat` and `installer\Voxprint.iss` (maximum LZMA2 compression); it is the build that was installed and tested end to end | about 1.86 GiB |
+
+Both are full installers (PyTorch with CUDA is inside, about 3.8 GB installed); the models (about 7 GB) are downloaded once on the first start. If in doubt, use the **github-build**.
+
+**Verify the download** (SHA-256). Each file has a `.sha256` file next to it with the expected hash. In PowerShell:
+```powershell
+Get-FileHash .\Voxprint-Setup-github-build.exe -Algorithm SHA256     # compare with the text in Voxprint-Setup-github-build.exe.sha256
+# or:  certutil -hashfile Voxprint-Setup-github-build.exe SHA256
+```
+Hashes of the current release assets: github-build `4e4bd86e48510fc7a908d4c25c7c58229b56f6007b82c13b001b174e7f57fdbd`, grokbot-build `c2f8f01dc02568a55b60a1c5ed1f456c2f0c03fa4468f27fdc54a93cb53ebc24`.
+
+**The installer is not code-signed.** Windows SmartScreen will show *"Windows protected your PC - Unknown publisher"*: click **More info -> Run anyway** (only after the SHA-256 above matches). The installer asks for administrator rights once (per-machine install). Antivirus programs may warn about large unsigned PyInstaller programs; the source is in this repository and you can build the installer yourself (below).
+
+### Build the installer locally
 `build.bat` produces `installer\Output\Voxprint-Setup.exe` (Inno Setup 6, per-machine install, Windows 11 x64; about 1.8 GB because PyTorch is inside).
 The installer does not contain the models: on first start Voxprint downloads about 7 GB once (internet needed).
 The wizard is available in **English, Russian and German** and has an optional page **"Existing models"** (right after the install folder): *Do you already have downloaded models from a previous install?* - choose the
@@ -96,7 +113,7 @@ folder or leave the field empty to skip. The installer **copies nothing**; it on
 models from there instead of downloading them (see [Backup, restore and existing models](#backup-restore-and-existing-models)). Silent install: `Voxprint-Setup.exe /VERYSILENT /ModelsDir="D:\old\models"`.
 Caveat: the installer runs elevated (per-machine); if the administrator account differs from the account that uses the program, `%LOCALAPPDATA%` is the administrator's - then set the folder in *Settings* instead.
 
-### Option 2: run from source (Windows)
+### Run from source (Windows)
 ```bat
 py -3.11 -m venv .venv && .venv\Scripts\activate
 pip install uv
@@ -108,7 +125,7 @@ python main.py
 ```
 **Never run `uv run` without `--no-sync`** - it re-syncs the environment and replaces CUDA torch with the CPU build. flash-attn is not needed on Windows.
 
-### Build the installer yourself
+### Build options
 ```bat
 build.bat              :: venv + torch (uv, CUDA auto-detect) + dependencies + notices + tests + dist\Voxprint.exe (--onefile) + installer if Inno Setup 6 exists
 build.bat onedir       :: dist\Voxprint\ folder (preferred: faster start, and Qt/PySide6 stay replaceable - see Licences)

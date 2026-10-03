@@ -1,0 +1,295 @@
+{
+ "date": "2026-10-03",
+ "models": {
+  "Qwen/Qwen3-ASR-0.6B": {
+   "files": {
+    ".gitattributes": {
+     "sha256": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361",
+     "size": 1519
+    },
+    "README.md": {
+     "card": true,
+     "original_sha256": "5058416891bc47a2051557765997e8c42f8eb78a0e33c3e775bd17d4b0ba4d50",
+     "sha256": "f5d39cfcd96693c61ba4cb9a3be41a76e919cb104cb292fce9268706840751fe",
+     "size": 58346
+    },
+    "chat_template.json": {
+     "sha256": "75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff",
+     "size": 1161
+    },
+    "config.json": {
+     "sha256": "76d3ae4601ce939830b2517f4a6cadb86cc51316c3900af6b020b051c21a478c",
+     "size": 6193
+    },
+    "generation_config.json": {
+     "sha256": "1da527824d81e07118facff437e03f2e24a23311e3bdeb2368973fe77e5f275c",
+     "size": 142
+    },
+    "merges.txt": {
+     "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+     "size": 1671853
+    },
+    "model.safetensors": {
+     "sha256": "79d6cbd4c98c7bbffe9db2edac07f56cd6637d0d5944b27f6c2b8353840323ea",
+     "size": 1876091704
+    },
+    "preprocessor_config.json": {
+     "sha256": "45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d",
+     "size": 330
+    },
+    "tokenizer_config.json": {
+     "sha256": "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c",
+     "size": 12487
+    },
+    "vocab.json": {
+     "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+     "size": 2776833
+    }
+   },
+   "license": "Apache-2.0",
+   "mirror_repo": "Mitroshenkov87/voxprint-mirror-qwen3-asr-0.6b",
+   "mirror_revision": "a1eb806fe1016adb0c292b036120412faa2f1403",
+   "source_repo": "Qwen/Qwen3-ASR-0.6B",
+   "source_revision": "5eb144179a02acc5e5ba31e748d22b0cf3e303b0"
+  },
+  "Qwen/Qwen3-ForcedAligner-0.6B": {
+   "files": {
+    ".gitattributes": {
+     "sha256": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361",
+     "size": 1519
+    },
+    "README.md": {
+     "card": true,
+     "original_sha256": "5058416891bc47a2051557765997e8c42f8eb78a0e33c3e775bd17d4b0ba4d50",
+     "sha256": "96adf0bd2f155165f545871771856d1f96467dd06e01af0bf596e3c1ec104642",
+     "size": 58396
+    },
+    "chat_template.json": {
+     "sha256": "75a8cfca24f00de72d796fbfed6858fc9614ef3dabd8696684cc3bc03a9c58ff",
+     "size": 1161
+    },
+    "config.json": {
+     "sha256": "d616c65d46c4b90bdc651b0a0963ea932732241140f337f9bb6b0335a9c8ef09",
+     "size": 5982
+    },
+    "generation_config.json": {
+     "sha256": "948d089b23bca1d214e768d59c4438365665f52ec6d33678f4062206b3fbbb8c",
+     "size": 115
+    },
+    "merges.txt": {
+     "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+     "size": 1671853
+    },
+    "model.safetensors": {
+     "sha256": "47831d0e82f96b20e9034dba01a075ee06436654719f6a68289e49f1b65ce0e7",
+     "size": 1835544544
+    },
+    "preprocessor_config.json": {
+     "sha256": "45e120a4eda2c20c5d7f2ea9354e63536bf35e27aa573fb7cdf78017b378770d",
+     "size": 330
+    },
+    "tokenizer_config.json": {
+     "sha256": "3ab80063f8511deb9566e6ad438d17b7a6277fcffd52d92854112f19d36bd81c",
+     "size": 12666
+    },
+    "vocab.json": {
+     "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+     "size": 2776833
+    }
+   },
+   "license": "Apache-2.0",
+   "mirror_repo": "Mitroshenkov87/voxprint-mirror-qwen3-forcedaligner-0.6b",
+   "mirror_revision": "8188c9f7e56cd8627aadc58f0eacb7a7d6f4f927",
+   "source_repo": "Qwen/Qwen3-ForcedAligner-0.6B",
+   "source_revision": "c7cbfc2048c462b0d63a45797104fc9db3ad62b7"
+  },
+  "Qwen/Qwen3-TTS-12Hz-0.6B-Base": {
+   "files": {
+    ".gitattributes": {
+     "sha256": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361",
+     "size": 1519
+    },
+    "README.md": {
+     "card": true,
+     "original_sha256": "181187b6057906bd960bc7f938d0b7a16652509776a0d52c4885b4ae5ccda0ea",
+     "sha256": "97328ff6ce77edf583238d9062eb47321214be98e60a079e0e7ab1b309c5c327",
+     "size": 4500
+    },
+    "config.json": {
+     "sha256": "2e714c787c8edb98b05432685cddb634add2de4d4e645f653d68251ef72ba011",
+     "size": 4494
+    },
+    "generation_config.json": {
+     "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa",
+     "size": 245
+    },
+    "merges.txt": {
+     "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+     "size": 1671839
+    },
+    "model.safetensors": {
+     "sha256": "180b3b10eb1c9f1b4db7806d5475bae3071c0243c299d49926bab1da3b6946f6",
+     "size": 1829344272
+    },
+    "preprocessor_config.json": {
+     "sha256": "efdde1022ea9d76928bf7a9cd53139138f5ba2e466e837f08f6105ab1af1c119",
+     "size": 127
+    },
+    "speech_tokenizer/config.json": {
+     "sha256": "ee65bb901c876664ab8707c487157aa1a6ee57c65969b28fb5ec9dc211e68167",
+     "size": 2336
+    },
+    "speech_tokenizer/configuration.json": {
+     "sha256": "6bc26d64eb5024b4d1dab5a52371958b429256d6c9d59787f1f5294a54e0cebd",
+     "size": 76
+    },
+    "speech_tokenizer/model.safetensors": {
+     "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
+     "size": 682293092
+    },
+    "speech_tokenizer/preprocessor_config.json": {
+     "sha256": "fcb3805e597e786d4067706e602f6688524640f8d3396790e2e09b5942fcbdfb",
+     "size": 234
+    },
+    "tokenizer_config.json": {
+     "sha256": "dc3c31c3bdaedd5016382bb3cbe07323026775ad51f5a4fb564505992ae4a670",
+     "size": 7344
+    },
+    "vocab.json": {
+     "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+     "size": 2776833
+    }
+   },
+   "license": "Apache-2.0",
+   "mirror_repo": "Mitroshenkov87/voxprint-mirror-qwen3-tts-12hz-0.6b-base",
+   "mirror_revision": "b434809f854b244a0d667f04d3217dc4c096b3d6",
+   "source_repo": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+   "source_revision": "5d83992436eae1d760afd27aff78a71d676296fc"
+  },
+  "Qwen/Qwen3-TTS-12Hz-1.7B-Base": {
+   "files": {
+    ".gitattributes": {
+     "sha256": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361",
+     "size": 1519
+    },
+    "README.md": {
+     "card": true,
+     "original_sha256": "621b7e88f1867bc03d817176fc1f7f55f4b5a70654b2a07fdcda1e169efb024b",
+     "sha256": "c4050867e7497c33fb817b52d1e0df52dcc1389f613853c82a0397720cf1f10b",
+     "size": 58800
+    },
+    "config.json": {
+     "sha256": "b4f01752d15a488abde3e1ab44723ae4f4b9e68a4037257b098b3737893cc1f9",
+     "size": 4494
+    },
+    "generation_config.json": {
+     "sha256": "f1b90b4513f3b34c62851049e2492d7b4c5940daf1276f89c82b8ef04127f3aa",
+     "size": 245
+    },
+    "merges.txt": {
+     "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+     "size": 1671839
+    },
+    "model.safetensors": {
+     "sha256": "38fc7fc51c5e776e840414b6fd443962e9411b9654888fd7913e4da643cb857c",
+     "size": 3857413744
+    },
+    "preprocessor_config.json": {
+     "sha256": "efdde1022ea9d76928bf7a9cd53139138f5ba2e466e837f08f6105ab1af1c119",
+     "size": 127
+    },
+    "speech_tokenizer/config.json": {
+     "sha256": "ee65bb901c876664ab8707c487157aa1a6ee57c65969b28fb5ec9dc211e68167",
+     "size": 2336
+    },
+    "speech_tokenizer/configuration.json": {
+     "sha256": "6bc26d64eb5024b4d1dab5a52371958b429256d6c9d59787f1f5294a54e0cebd",
+     "size": 76
+    },
+    "speech_tokenizer/model.safetensors": {
+     "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
+     "size": 682293092
+    },
+    "speech_tokenizer/preprocessor_config.json": {
+     "sha256": "fcb3805e597e786d4067706e602f6688524640f8d3396790e2e09b5942fcbdfb",
+     "size": 234
+    },
+    "tokenizer_config.json": {
+     "sha256": "dc3c31c3bdaedd5016382bb3cbe07323026775ad51f5a4fb564505992ae4a670",
+     "size": 7344
+    },
+    "vocab.json": {
+     "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+     "size": 2776833
+    }
+   },
+   "license": "Apache-2.0",
+   "mirror_repo": "Mitroshenkov87/voxprint-mirror-qwen3-tts-12hz-1.7b-base",
+   "mirror_revision": "9ec3906f710ea54ff3ae32d89d027a0210527404",
+   "source_repo": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+   "source_revision": "fd4b254389122332181a7c3db7f27e918eec64e3"
+  },
+  "ai-forever/sage-fredt5-distilled-95m": {
+   "files": {
+    ".gitattributes": {
+     "sha256": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361",
+     "size": 1519
+    },
+    ".gitignore": {
+     "sha256": "cf237c7aff44efbe6e502e645c3e06da03a69d7bdeb43392108ef3348143417e",
+     "size": 10
+    },
+    "README.md": {
+     "card": true,
+     "original_sha256": "30b784cc6359336aa8c16447df27d247b116a11d04db33ed23cd558282b89785",
+     "sha256": "23ea25878a65ff1b7c9173109fe372244ee431c5a5decb940c64919b7a1fcc94",
+     "size": 8475
+    },
+    "added_tokens.json": {
+     "sha256": "72eb0881ed66d14bf9bdef9a7d2e349feac12192b637cea434eb8d613363d096",
+     "size": 2718
+    },
+    "config.json": {
+     "sha256": "72b90b12d36ff093addc0a9ebb5a787d66f9d63179c26eaba0403e18af04495d",
+     "size": 789
+    },
+    "generation_config.json": {
+     "sha256": "5acde765853e2cb8bcbd8cb58b2ee4576a68169db358ec3ece84034d13f753cb",
+     "size": 184
+    },
+    "images/sage_banner.jpg": {
+     "sha256": "041a946c6a1e3f0bea74bec36fd8b4345166ae47fa86235be950888eb3af8af8",
+     "size": 44852
+    },
+    "merges.txt": {
+     "sha256": "bd05ba8658a199897510cd84cd98ec1424c812259db6e03319c33a5bfcac2b90",
+     "size": 1270925
+    },
+    "model.safetensors": {
+     "sha256": "e005b48ae460cbf5f82f0f3da8b13d5df7c2c98eb1e02ed8a7d525d3de7a9bfe",
+     "size": 382561704
+    },
+    "special_tokens_map.json": {
+     "sha256": "b0f214e9f7abc4670a0a45ebd82a0695eb9555848fe719dc52dc66b83604d827",
+     "size": 689
+    },
+    "tokenizer_config.json": {
+     "sha256": "f3cdf7bc5498f4698b6822de7c9c5bef60e76cd9aec7db8d0d3f26c09945d713",
+     "size": 20309
+    },
+    "vocab.json": {
+     "sha256": "a1bbb734326805d8ef4c6ff183cc6b7bbaa382e666f5eaa2c9b2381c4ea89378",
+     "size": 1813640
+    }
+   },
+   "license": "MIT",
+   "mirror_repo": "Mitroshenkov87/voxprint-mirror-sage-fredt5-distilled-95m",
+   "mirror_revision": "0293029610771bb7310ce5b4b210f40ac8c024f7",
+   "source_repo": "ai-forever/sage-fredt5-distilled-95m",
+   "source_revision": "ed51b4a46603931380951a3d8456685c9215864f"
+  }
+ },
+ "name": "Voxprint model mirrors (Hugging Face backup)",
+ "note": "Byte-identical copies of permissively licensed models under the project owner's Hugging Face account, used as the last download fallback. SHA-256 of every file; README.md of a mirror is its own model card (flag 'card'). Visibility of the mirror repos must be public for users without a token.",
+ "schema": 1
+}
