@@ -142,7 +142,10 @@ def shot_path(name: str, lang: str):
     raise FileNotFoundError(name)
 
 
-def render(lang: str, out_dir: Path, theme: str = "dark") -> Path:
+CAPTIONS: list = []        # captions of the figures of the last rendering, in document order (used by fit())
+
+
+def render(lang: str, out_dir: Path, theme: str = "dark", fig_h: int = 105, gap: float = 1.0, fig_over: dict = None) -> Path:
     m = META[lang]
     ui = json.loads((ROOT / "locales" / f"{lang}.json").read_text(encoding="utf-8"))
     src = (HERE / "src" / f"manual_{lang}.md").read_text(encoding="utf-8")
@@ -191,8 +194,12 @@ def render(lang: str, out_dir: Path, theme: str = "dark") -> Path:
         return f'<h{lvl}{attrs}><span class="num">{num}</span> {text}</h{lvl}>'
     body = re.sub(r"<h([12])([^>]*)>(.*?)</h\1>", head, body, flags=re.S)
     # figures: a paragraph that holds only an image becomes <figure> with a caption
-    body = re.sub(r'<p>\s*<img alt="([^"]*)" src="([^"]+)"[^>]*?/?>\s*</p>',
-                  lambda mo: f'<figure><img src="{mo.group(2)}" alt=""/><figcaption>{mo.group(1)}</figcaption></figure>', body)
+    CAPTIONS.clear()
+
+    def fig(mo):
+        CAPTIONS.append(re.sub(r"<[^>]+>", "", mo.group(1)))
+        return f'<figure id="fig{len(CAPTIONS) - 1}"><img src="{mo.group(2)}" alt=""/><figcaption>{mo.group(1)}</figcaption></figure>'
+    body = re.sub(r'<p>\s*<img alt="([^"]*)" src="([^"]+)"[^>]*?/?>\s*</p>', fig, body)
     toc_html = ['<nav class="toc"><h1 class="nonum toc-title">%s</h1><ul>' % m["contents"]]
     for lvl, num, text, hid in toc:
         toc_html.append(f'<li class="l{lvl}"><a href="#{hid}"><span class="n">{num}</span> {text}</a></li>')
@@ -200,7 +207,10 @@ def render(lang: str, out_dir: Path, theme: str = "dark") -> Path:
     cover = (f'<section class="cover"><div class="logo">{logo_svg(theme)}<div class="brand">Vox<b>print</b></div></div><h1 class="nonum cover-title">{m["title"]}</h1>'
              f'<div class="cover-sub">{m["sub"]}</div><div class="cover-rule"></div><div class="cover-ver">{m["ver"]}</div>'
              f'<div class="cover-lic">Apache-2.0 · © 2026 Aleksandr Mitroshenkov</div></section>')
-    css = page_css(theme) + (HERE / "manual.css").read_text(encoding="utf-8")
+    tune = (f"figure img{{max-height:{fig_h}mm}} p{{margin:{4 * gap:.1f}pt 0 {6 * gap:.1f}pt 0}} li{{margin:{1.5 * gap:.1f}pt 0}} "
+            f"{''.join(f'#fig{i} img{{max-height:{h}mm}}' for i, h in (fig_over or {}).items())}"
+            f"h2{{margin-top:{16 * gap:.1f}pt}} h3{{margin-top:{11 * gap:.1f}pt}} table{{margin:{6 * gap:.1f}pt 0 {9 * gap:.1f}pt 0}}")
+    css = page_css(theme) + (HERE / "manual.css").read_text(encoding="utf-8") + tune
     html = (f'<!doctype html><html lang="{m["html"]}"><head><meta charset="utf-8"><title>{m["title"]} — {m["sub"]}</title>'
             f'<meta name="author" content="Aleksandr Mitroshenkov"><style>{css}</style></head><body>'
             f'{cover}{"".join(toc_html)}<main>{body}</main></body></html>')
@@ -211,10 +221,67 @@ def render(lang: str, out_dir: Path, theme: str = "dark") -> Path:
     return pdf
 
 
+FIT_GAPS = (1.0, 0.95, 1.05, 0.9, 1.1)
+FIG_MIN, FIG_STEP, FIG_DEFAULT = 55, 10, 105
+
+
+def _figure_after(pdf: Path, page: int, captions: list):
+    """Index of the first figure whose caption is on page+1 or page+2 (the figure that did not fit on the low page)."""
+    import subprocess
+    for pg in (page + 1, page + 2):
+        txt = " ".join(subprocess.run(["pdftotext", "-f", str(pg), "-l", str(pg), str(pdf), "-"], capture_output=True, text=True).stdout.split())
+        hits = [i for i, c in enumerate(captions) if " ".join(c.split())[:18] in txt]
+        if hits:
+            return min(hits)
+    return None
+
+
+def fit(lang: str, out_dir: Path, themes=("dark", "print")) -> list:
+    """Build both themes of one language so that :mod:`check_pagination` passes (no page below 70 % filled, no stub lines).
+
+    Greedy search: render, find the first page that is too empty, shrink the screenshot that did not fit on it (by 10 mm, down to
+    55 mm), repeat; the paragraph spacing is varied if that gets stuck.  The best attempt is used if nothing passes."""
+    import shutil, tempfile
+    sys.path.insert(0, str(HERE))
+    import check_pagination as cp
+    best = None
+    for gap in FIT_GAPS:
+        over, stuck = {}, set()
+        for _ in range(40):
+            with tempfile.TemporaryDirectory() as d:
+                pdf = render(lang, Path(d), themes[0], FIG_DEFAULT, gap, over)
+                ok, rep = cp.check(pdf)
+                nbad = len(rep["low_pages"]) + len(rep["stubs"])
+                if best is None or nbad < best[0]:
+                    best = (nbad, gap, dict(over))
+                if ok:
+                    outs = []
+                    for th in themes:
+                        p = render(lang, Path(d), th, FIG_DEFAULT, gap, over)
+                        shutil.copy(p, out_dir / p.name)
+                        outs.append(out_dir / p.name)
+                    print(f"  {lang}: spacing x{gap}, {len(over)} screenshots resized: pagination OK (min fill {rep['min_fill']}, avg {rep['avg_fill']})")
+                    return outs
+                todo = None
+                for pg, _f in rep["low_pages"]:
+                    i = _figure_after(pdf, pg, CAPTIONS)
+                    if i is not None and over.get(i, FIG_DEFAULT) - FIG_STEP >= FIG_MIN and (i, over.get(i, FIG_DEFAULT)) not in stuck:
+                        todo = i
+                        break
+                if todo is None:
+                    break
+                stuck.add((todo, over.get(todo, FIG_DEFAULT)))
+                over[todo] = over.get(todo, FIG_DEFAULT) - FIG_STEP
+    nbad, gap, over = best
+    print(f"  {lang}: no combination passed; using the best (spacing x{gap}, {nbad} problem pages)")
+    return [render(lang, out_dir, th, FIG_DEFAULT, gap, over) for th in themes]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(HERE))
     ap.add_argument("--theme", choices=("dark", "print", "both"), default="both")
+    ap.add_argument("--no-fit", action="store_true", help="skip the pagination search (default settings)")
     ap.add_argument("langs", nargs="*", default=list(LANGS))
     a = ap.parse_args()
     (HERE / "build").mkdir(exist_ok=True)
@@ -223,9 +290,14 @@ def main() -> int:
         print("contrast check FAILED:", bad)
         return 1
     make_crops("en")
+    Path(a.out).mkdir(parents=True, exist_ok=True)
     for l in a.langs:
-        for th in (("dark", "print") if a.theme == "both" else (a.theme,)):
-            print(render(l, Path(a.out), th))
+        if a.theme == "both" and not a.no_fit:
+            for p in fit(l, Path(a.out)):
+                print(p)
+        else:
+            for th in (("dark", "print") if a.theme == "both" else (a.theme,)):
+                print(render(l, Path(a.out), th))
     return 0
 
 

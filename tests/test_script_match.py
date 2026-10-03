@@ -1,5 +1,8 @@
 """Recording script v3 markup + tolerant matching of recognised clips to script lines (stumbles, re-read sentences)."""
+import re
 from pathlib import Path
+
+import pytest
 
 import numpy as np
 
@@ -35,10 +38,10 @@ def test_parse_skips_headers_brackets_hints_and_labels():
 
 
 def test_v3_script_markup_and_blocks():
-    for title in ("БЛОК 16. НЕОБЯЗАТЕЛЬНО: БЛОК ТЕРМИНОВ", "БЛОК 17. НЕОБЯЗАТЕЛЬНО: НЕНОРМАТИВНАЯ ЛЕКСИКА", "БЛОК 18. СОГЛАСИЕ"):
+    for title in ("БЛОК 16. НЕОБЯЗАТЕЛЬНО: БЛОК ТЕРМИНОВ", "БЛОК 17. СОГЛАСИЕ"):
         assert title in V3
     lines = parse_script_lines(V3)
-    assert 150 <= len(lines) <= 260                          # about the coverage of v2
+    assert 140 <= len(lines) <= 260                          # about the coverage of v2
     assert len(parse_script_lines(V2)) > 40                  # the v2 markup (hints in round brackets) still parses
     assert all("[" not in s and "===" not in s for s in lines)
     assert "Человек, живо" not in " ".join(lines) and "Программа, ровно" not in " ".join(lines)   # speaker labels are never read
@@ -100,3 +103,36 @@ def test_consent_header_stops_parsing_in_ru_en_de_any_case():
         assert parse_script_lines("Первая строка текста.\n" + head + "\nЯ разрешаю использовать мой голос.\n") == ["Первая строка текста."], head
     # an ordinary header is skipped, not a stop
     assert parse_script_lines("=== Block 2 ===\nПервая строка.\nВторая строка.\n") == ["Первая строка.", "Вторая строка."]
+
+
+# ------------------------------------------------------------------ recording scripts v4 (docs/recording-scripts/)
+V4_LANGS = ("ru", "en", "de")
+_PROFANE = re.compile(r"^(ху[йяеи]|хуе|пизд|бля|ебан|ебат|ебл|ёб|заеб|уеб|наеб|мудак|мудил|говн|жоп|дерьм|хер|хрен|охр|нахр|сук[аиу]$|шлюх|"
+                      r"fuck|shit|bitch|cunt|dick|piss|bastard|wank|asshole|scheiß|scheiss|arsch|fick|wichs|hure|schlampe|kacke)", re.I)
+
+
+def _v4(lang):
+    return (ROOT / "docs" / "recording-scripts" / f"Voxprint-RecordingScript-v4-{lang}.txt").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("lang", V4_LANGS)
+def test_v4_scripts_have_no_profanity_and_parse_with_consent_at_the_end(lang):
+    text = _v4(lang)
+    words = re.findall(r"[\wёÄÖÜäöüß]+", text)
+    assert not [w for w in words if _PROFANE.match(w)]
+    lines = parse_script_lines(text)
+    assert 80 <= len(lines) <= 140
+    assert all("[" not in s and "===" not in s for s in lines)
+    assert not any(k in " ".join(lines).lower() for k in ("разрешаю", "give permission", "erlaube heute"))   # the consent block is not training text
+
+
+@pytest.mark.parametrize("lang", V4_LANGS)
+def test_v4_scripts_contain_only_their_own_consent_templates(lang):
+    flat = " ".join(_v4(lang).split())
+    for scope, tpl in TEMPLATES[lang].items():
+        assert " ".join(tpl.split("{name}")[0].split()) in flat
+        assert " ".join(tpl.split("{date}")[1].split())[:40] in flat
+    for other in V4_LANGS:
+        if other != lang:
+            for tpl in TEMPLATES[other].values():
+                assert " ".join(tpl.split("{name}")[0].split()) not in flat

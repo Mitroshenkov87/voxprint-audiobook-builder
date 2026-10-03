@@ -24,6 +24,8 @@ The voice goes into your **voice library**; then pick a book (TXT, FB2, EPUB) an
 
 **User manual (PDF, same structure in three languages):** [English](docs/manual/Voxprint-Manual-en.pdf) · [Русский](docs/manual/Voxprint-Manual-ru.pdf) · [Deutsch](docs/manual/Voxprint-Manual-de.pdf) - every screen, button and field, recording the voice, consent, presets, narration, voice library and licences, glossary, FAQ (sources and build script: [`docs/manual/`](docs/manual/)).
 
+**Recording scripts (ru / en / de, TXT + PDF dark and print):** ready-made texts to read when you record a voice, with emotion blocks, computer stories, a reading guide and the consent sentence, no profanity - [`docs/recording-scripts/`](docs/recording-scripts/).
+
 ## Contents
 [Concept](#concept-and-philosophy) · [Features](#features) · [Screenshots](#screenshots) · [Installation](#installation) ·
 [Using Voxprint](#using-voxprint) · [Narrate a book](#narrate-a-book) · [My voices](#my-voices-and-licences) · [AAC / M4B notice](#aac--m4b-patents-please-read) ·

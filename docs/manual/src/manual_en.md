@@ -180,7 +180,7 @@ The quality of the voice depends mostly on the recording. Plan **5 to 15 minutes
 
 **Before you record:** a quiet room, the microphone about a hand's width from the mouth, no sound "enhancements" (noise suppression, equaliser, reverb), even volume.
 
-**The recording script.** The repository contains a ready-made script, `docs/voice-script-ru-v3.txt` (Russian; it also has English and German passages). It has 18 blocks: greeting, numbers and dates, sounds of the language, neutral reading, calm, joy, sadness, irritation, surprise, whisper and loud speech, three short stories, optional English, optional technical terms, an optional adults-only block, and – at the very end – the consent statement. The script itself states three simple rules:
+**The recording script.** The repository contains ready-made scripts in `docs/recording-scripts/`, written separately in Russian, English and German (TXT and PDF, dark and print). Each has 17 blocks: greeting, the story of the idea, numbers and dates, smooth sentences for the sounds of the language, neutral reading, calm, joy, sadness, irritation, surprise, whisper and loud speech, three short computer stories, an optional "bad day" story with mild colour words (no profanity), optional technical terms, and – at the very end – the consent statement in the language of the file. The PDFs add a reading guide (tempo, pauses, emotions, breaks). The script itself states three simple rules:
 
 1. **Read only ordinary lines.** Everything in square brackets and every line with `===` is a hint – do not read it aloud.
 2. **One line – one sentence.** Read it, breathe, stay silent for a second, then read the next line.

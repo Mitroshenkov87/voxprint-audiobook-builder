@@ -13,7 +13,7 @@ a { color: var(--accent); text-decoration: none; }
 .cover-rule { width: 40mm; height: 1.2mm; background: var(--accent); margin-top: 10mm; }
 .cover-ver { margin-top: 70mm; font-size: 11pt; color: var(--muted); }
 .cover-lic { margin-top: 3mm; font-size: 9pt; color: var(--muted); }
-nav.toc { page-break-after: always; }
+nav.toc { margin-bottom: 14pt; }
 nav.toc ul { list-style: none; padding: 0; margin: 0; }
 nav.toc li { margin: 0; padding: 1.2pt 0; }
 nav.toc li.l1 { font-weight: bold; margin-top: 6pt; font-size: 10.5pt; }
@@ -21,13 +21,15 @@ nav.toc li.l2 { margin-left: 8mm; font-size: 9.5pt; }
 nav.toc a { color: var(--text); text-decoration: none; display: block; }
 nav.toc a::after { content: leader('.') " " target-counter(attr(href), page); }
 nav.toc .n { display: inline-block; min-width: 9mm; color: var(--accent); }
-h1 { font-size: 21pt; color: var(--head); border-bottom: 2px solid var(--head); padding-bottom: 3pt; margin: 0 0 8pt 0; page-break-before: always; page-break-after: avoid; }
-nav.toc h1, .cover h1 { page-break-before: auto; }
-h2 { font-size: 14pt; color: var(--head); margin: 16pt 0 5pt 0; page-break-after: avoid; }
-h3 { font-size: 11pt; color: var(--h3); margin: 11pt 0 3pt 0; page-break-after: avoid; }
+h1 { font-size: 21pt; color: var(--head); border-bottom: 2px solid var(--head); padding-bottom: 3pt; margin: 22pt 0 8pt 0; break-before: auto; break-after: avoid; }
+nav.toc h1, .cover h1 { margin-top: 0; }
+main > h1:first-child, main > :first-child { margin-top: 0; }
+h2 { font-size: 14pt; color: var(--head); margin: 16pt 0 5pt 0; break-after: avoid; }
+h3 { font-size: 11pt; color: var(--h3); margin: 11pt 0 3pt 0; break-after: avoid; }
 .num { color: var(--num); margin-right: 3pt; }
 p { margin: 4pt 0 6pt 0; orphans: 3; widows: 3; }
-ul, ol { margin: 3pt 0 6pt 0; padding-left: 18pt; } li { margin: 1.5pt 0; }
+p:has(+ ul), p:has(+ ol), p:has(+ table) { break-after: avoid; }
+ul, ol { margin: 3pt 0 6pt 0; padding-left: 18pt; } li { margin: 1.5pt 0; break-inside: avoid; orphans: 3; widows: 3; }
 code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.6pt; background: var(--panel); color: var(--code-text); border: 0.5pt solid var(--border); padding: 0 2pt; border-radius: 2pt; }
 pre { font-family: "DejaVu Sans Mono", monospace; font-size: 8pt; background: var(--panel); color: var(--code-text); border: 0.8pt solid var(--border); padding: 6pt; border-radius: 3pt; white-space: pre-wrap; }
 pre code { background: none; border: none; padding: 0; }
@@ -40,10 +42,10 @@ tbody tr:nth-child(even) td { background: var(--panel2); }
 blockquote { margin: 7pt 0; padding: 5pt 9pt; background: var(--warn-bg); color: var(--text); border: 0.6pt solid var(--warn-line); border-left: 3pt solid var(--warn-line); page-break-inside: avoid; }
 blockquote p { margin: 2pt 0; }
 blockquote.tip, .tip { background: var(--tip-bg); border-color: var(--tip-line); border-left-color: var(--tip-line); }
-figure { margin: 8pt auto; text-align: center; page-break-inside: avoid; }
-figure img { max-width: 100%; max-height: 150mm; border: 0.8pt solid var(--img-border); border-radius: 3pt; }
+figure { margin: 8pt auto; text-align: center; break-inside: avoid; }
+figure img { max-width: 100%; max-height: 105mm; border: 0.8pt solid var(--img-border); border-radius: 3pt; }
 figcaption { font-size: 8.5pt; color: var(--muted); font-style: italic; margin-top: 3pt; }
-.wide figure img, figure.wide img { max-height: 120mm; }
+.wide figure img, figure.wide img { max-height: 105mm; }
 .glossary dt { font-weight: bold; margin-top: 6pt; color: var(--head); }
 dl dt { font-weight: bold; margin-top: 6pt; color: var(--head); } dl dd { margin: 0 0 0 10mm; }
 hr { border: none; border-top: 0.6pt solid var(--border); margin: 10pt 0; }

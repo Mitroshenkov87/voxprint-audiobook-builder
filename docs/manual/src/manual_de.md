@@ -180,7 +180,7 @@ Die Qualität der Stimme hängt vor allem von der Aufnahme ab. Planen Sie **5 bi
 
 **Vor der Aufnahme:** ein ruhiger Raum, das Mikrofon etwa eine Handbreit vom Mund entfernt, keine Klang-„Verbesserungen“ (Rauschunterdrückung, Equalizer, Hall), gleichmäßige Lautstärke.
 
-**Das Aufnahmeskript.** Das Repository enthält ein fertiges Skript, `docs/voice-script-ru-v3.txt` (Russisch; es hat auch englische und deutsche Passagen). Es besteht aus 18 Blöcken: Begrüßung, Zahlen und Daten, Laute der Sprache, neutrales Lesen, Ruhe, Freude, Traurigkeit, Ärger, Überraschung, Flüstern und Lautes, drei kurze Geschichten, optional Englisch und ein Fachbegriff-Block, ein optionaler Block nur für Erwachsene und – ganz am Ende – die Einverständniserklärung. Das Skript selbst nennt drei einfache Regeln:
+**Das Aufnahmeskript.** Das Repository enthält fertige Skripte im Ordner `docs/recording-scripts/`, jeweils eigenständig auf Russisch, Englisch und Deutsch geschrieben (TXT und PDF, dunkel und zum Drucken). Jedes hat 17 Blöcke: Begrüßung, die Geschichte der Idee, Zahlen und Daten, fließende Sätze für die Laute der Sprache, neutrales Lesen, Ruhe, Freude, Traurigkeit, Ärger, Überraschung, Flüstern und Lautes, drei kurze Computergeschichten, optional eine Geschichte über einen missratenen Tag mit milden Kraftausdrücken (ohne Flüche), optional Fachbegriffe und – ganz am Ende – die Einverständniserklärung in der Sprache der Datei. Die PDFs enthalten Lesehinweise (Tempo, Pausen, Gefühle, Pausen zum Ausruhen). Das Skript selbst nennt drei einfache Regeln:
 
 1. **Lesen Sie nur gewöhnliche Zeilen.** Alles in eckigen Klammern und alle Zeilen mit `===` sind Hinweise – nicht vorlesen.
 2. **Eine Zeile – ein Satz.** Lesen, atmen, eine Sekunde schweigen, dann die nächste Zeile.
