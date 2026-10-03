@@ -121,8 +121,15 @@ def _audio_key(x16: np.ndarray) -> str:
 
 
 def build_from_audio(files: Sequence, out_dir, asr: BaseASR, cfg: Optional[AsrConfig] = None,
-                     progress: ProgressCallback = noop_progress, cancel: Optional[CancelToken] = None) -> BuildResult:
-    """Recognise ``files`` (audio files or folders), filter and write one dataset into ``out_dir``."""
+                     progress: ProgressCallback = noop_progress, cancel: Optional[CancelToken] = None,
+                     script_text: Optional[str] = None) -> BuildResult:
+    """Recognise ``files`` (audio files or folders), filter and write one dataset into ``out_dir``.
+
+    ``script_text`` (optional): the recording script that was read aloud.  Every recognised piece is then matched to the script
+    lines (:mod:`core.script_match`): stumbles and re-read sentences are tolerated - the best reading of each line is kept,
+    pieces that match no line (stumbles, the spoken consent statement, chatter) are dropped, and a kept piece gets the clean
+    script line as its transcript.
+    """
     cfg = cfg or AsrConfig()
     cancel = cancel or CancelToken()
     paths = expand_inputs(files)
@@ -198,6 +205,19 @@ def build_from_audio(files: Sequence, out_dir, asr: BaseASR, cfg: Optional[AsrCo
         clips = [c for c, ok in zip(clips, keep) if ok]
         if not clips:
             raise AlignmentError(tr("err.all_dropped"))
+    if script_text is not None:
+        from core.script_match import match_clips, parse_script_lines
+        matches = match_clips([c["text"] for c in clips], parse_script_lines(script_text))
+        kept_clips = []
+        for c, m in zip(clips, matches):
+            if m.status == "matched":
+                c["text"], c["conf"] = m.text, min(1.0, m.ratio)
+                kept_clips.append(c)
+            else:
+                rep.drop("repeat" if m.status == "repeat" else "not_in_script")
+        clips = kept_clips
+        if not clips:
+            raise AlignmentError(tr("err.asr_nothing_kept"))
     texts = " ".join(c["text"] for c in clips)
     language = detect_language(texts)
 

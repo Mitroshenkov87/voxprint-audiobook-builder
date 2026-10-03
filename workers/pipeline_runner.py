@@ -360,8 +360,12 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
             asr = asr_factory()
         else:
             asr = make_default_asr(str(md.ensure_model(md.ASR_REPO, progress)), "cpu" if req.force_cpu else "auto")
+        script_text = None
+        if req.text:   # an optional script next to the audio: matched tolerantly (stumbles / re-read lines), see core.script_match
+            from core.text_utils import read_text_file
+            script_text = read_text_file(req.text).text
         build = build_from_audio(req.audio_files or [req.audio], dataset_dir, asr, AsrConfig(language=req.asr_language),
-                                 progress, cancel)
+                                 progress, cancel, script_text=script_text)
     else:
         if aligner_factory is not None:
             aligner = aligner_factory()
