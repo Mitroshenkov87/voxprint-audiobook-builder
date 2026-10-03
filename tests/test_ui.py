@@ -166,7 +166,38 @@ def test_os_check_and_backdrop_plain_on_linux():
 
 def test_style_modes():
     from ui.main_window import build_style
-    assert "rgba(20,20,26,110)" in build_style(True) and "#17171c" in build_style(False)
+    from ui import main_window as mw
+    assert mw.ROOT_GLASS in build_style(True) and mw.ROOT_PLAIN in build_style(False)
+    assert mw.CARD_GLASS in build_style(True) and mw.CARD_PLAIN in build_style(False)
+    assert mw.ROOT_GLASS not in build_style(False)
+
+
+def _lum(hex_color):
+    rgb = [int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    lin = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def _contrast(fg, bg):
+    hi, lo = sorted((_lum(fg), _lum(bg)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _over_white(rgba):
+    """Composite 'rgba(r,g,b,a)' over a pure white desktop (the worst case behind an Acrylic window)."""
+    r, g, b, a = [int(v) for v in rgba[5:-1].split(",")]
+    return "#%02x%02x%02x" % tuple(round(c * a / 255 + 255 * (1 - a / 255)) for c in (r, g, b))
+
+
+def test_theme_contrast():
+    """All readable text keeps WCAG AA (4.5:1), also over the glass tint on a white backdrop."""
+    from ui import main_window as mw
+    for fg, bg in mw.CONTRAST_PAIRS:
+        assert _contrast(fg, bg) >= 4.5, (fg, bg, _contrast(fg, bg))
+    for glass in (mw.ROOT_GLASS, mw.CARD_GLASS):
+        worst = _over_white(glass)
+        for fg in (mw.TEXT, mw.TEXT_MUTED, mw.TEXT_FAINT):
+            assert _contrast(fg, worst) >= 4.5, (fg, glass, worst)
 
 
 def test_first_run_prefetch_message_and_buttons(app, tmp_path):

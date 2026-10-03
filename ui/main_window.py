@@ -32,51 +32,83 @@ AUDIO_EXT = {".wav", ".mp3", ".flac", ".m4a", ".ogg", ".aac", ".wma", ".opus", "
 TEXT_EXT = {".txt"}
 ALL_STAGES: List[Stage] = [Stage.UPDATES, Stage.MODEL, Stage.ALIGN, Stage.SLICE, Stage.TRAIN, Stage.SAVE]
 
-# Тёмная тема. В режиме Acrylic фон полупрозрачный (сквозь него виден размытый рабочий стол).
+# Dark theme.  Design rules (WCAG AA, i.e. >= 4.5:1 for all readable text, see tests/test_ui.py::test_theme_contrast):
+#  * every text colour is OPAQUE - translucent text would take on whatever the blurred desktop behind it looks like;
+#  * panels/buttons/inputs are (almost) solid dark fills, so the contrast does not depend on the backdrop;
+#  * only the window background itself is translucent in Acrylic mode, with a strong dark tint (~87 % opaque),
+#    which keeps a subtle glass feel while the worst case (a white desktop) still ends up dark.
+# ``{root_bg}`` / ``{card_bg}`` are the only parts that differ between the Acrylic and the plain fallback look.
+TEXT = "#f2f2f5"            # primary text
+TEXT_MUTED = "#c4c4d0"      # secondary text (subtitle, file name, status)
+TEXT_FAINT = "#a8a8b8"      # tertiary text (hints, footer, inactive stage chips)
+TEXT_DISABLED = "#8e8e9e"   # disabled controls (exempt from WCAG, still legible)
+TEXT_ON_ACCENT = "#0b1220"  # dark text on the light-blue accent
+ACCENT = "#60a5fa"
+ACCENT_HOVER = "#7db9ff"
+ACCENT_SOFT = "#93c5fd"
+ACCENT_STRONG = "#2563eb"   # progress chunk / selection: white text on it passes AA
+ROOT_PLAIN = "#17171c"
+ROOT_GLASS = "rgba(16,16,22,222)"
+CARD_PLAIN = "#202029"
+CARD_GLASS = "rgba(34,34,44,238)"
+CONTROL_BG = "#2c2c38"      # buttons, combo boxes, line edits
+CONTROL_HOVER = "#383846"
+CONTROL_BORDER = "#4b4b5c"
+
 STYLE_TEMPLATE = """
-* {{ font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif; font-size: 14px; color: #f2f2f5; }}
-QWidget#root {{ background: {root_bg}; }}
-QLabel#title {{ font-size: 26px; font-weight: 600; }}
-QLabel#subtitle {{ color: rgba(242,242,245,170); }}
-QFrame#card {{ background: rgba(255,255,255,{card_a}); border: 1px solid rgba(255,255,255,40); border-radius: 12px; }}
-QLabel#fileLabel {{ color: rgba(242,242,245,190); }}
-QPushButton {{ background: rgba(255,255,255,30); border: 1px solid rgba(255,255,255,50); border-radius: 8px;
-              padding: 8px 16px; }}
-QPushButton:hover {{ background: rgba(255,255,255,55); }}
-QPushButton:pressed {{ background: rgba(255,255,255,20); }}
-QPushButton:disabled {{ color: rgba(242,242,245,90); background: rgba(255,255,255,12); border-color: rgba(255,255,255,20); }}
-QPushButton#primary {{ background: rgba(96,165,250,200); border: 1px solid rgba(147,197,253,220); font-size: 17px;
-                      font-weight: 600; padding: 14px 20px; color: #0b1220; }}
-QPushButton#primary:hover {{ background: rgba(125,185,255,230); }}
-QPushButton#primary:disabled {{ background: rgba(96,165,250,60); color: rgba(242,242,245,110); border-color: rgba(147,197,253,60); }}
-QProgressBar {{ background: rgba(255,255,255,25); border: 1px solid rgba(255,255,255,40); border-radius: 8px;
-               height: 16px; text-align: center; }}
-QProgressBar::chunk {{ background: rgba(96,165,250,220); border-radius: 7px; }}
-QLabel#chip {{ color: rgba(242,242,245,110); padding: 3px 8px; border-radius: 10px; font-size: 12px; }}
-QLabel#chip[state="active"] {{ color: #0b1220; background: rgba(147,197,253,230); font-weight: 600; }}
-QLabel#chip[state="done"] {{ color: rgba(242,242,245,200); background: rgba(255,255,255,35); }}
-QLabel#status {{ color: rgba(242,242,245,200); }}
-QLabel#ready {{ font-size: 22px; font-weight: 600; color: #86efac; }}
-QLabel#footer {{ color: rgba(242,242,245,120); font-size: 12px; }}
-QLabel#hint {{ color: rgba(242,242,245,150); font-size: 12px; padding-left: 4px; }}
-QComboBox {{ background: rgba(255,255,255,30); border: 1px solid rgba(255,255,255,50); border-radius: 8px;
-            padding: 6px 12px; min-width: 110px; }}
-QComboBox:disabled {{ color: rgba(242,242,245,90); }}
-QComboBox QAbstractItemView {{ background: #23232b; border: 1px solid rgba(255,255,255,50);
-                              selection-background-color: rgba(96,165,250,160); }}
-QLineEdit {{ background: rgba(255,255,255,30); border: 1px solid rgba(255,255,255,50); border-radius: 8px;
-            padding: 6px 12px; selection-background-color: rgba(96,165,250,160); }}
-QPushButton#gear {{ padding: 6px 12px; font-size: 18px; }}
-QScrollArea {{ background: transparent; border: none; }}
-QWidget#content {{ background: transparent; }}
-QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}
-QScrollBar::handle:vertical {{ background: rgba(255,255,255,70); border-radius: 4px; min-height: 30px; }}
-QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 2px; }}
-QScrollBar::handle:horizontal {{ background: rgba(255,255,255,70); border-radius: 4px; min-width: 30px; }}
-QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; }}
-QDialog#root, QTextBrowser {{ color: #f2f2f5; }}
-QDialog#root {{ background: #17171c; }}
-"""
+* {{{{ font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif; font-size: 14px; color: {text}; }}}}
+QWidget#root {{{{ background: {{root_bg}}; }}}}
+QLabel#title {{{{ font-size: 26px; font-weight: 600; }}}}
+QLabel#subtitle {{{{ color: {muted}; }}}}
+QFrame#card {{{{ background: {{card_bg}}; border: 1px solid {border}; border-radius: 12px; }}}}
+QLabel#fileLabel {{{{ color: {muted}; }}}}
+QPushButton {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px; padding: 8px 16px; }}}}
+QPushButton:hover {{{{ background: {hover}; }}}}
+QPushButton:pressed {{{{ background: #23232d; }}}}
+QPushButton:disabled {{{{ color: {disabled}; background: #1f1f28; border-color: #34343f; }}}}
+QPushButton#primary {{{{ background: {accent}; border: 1px solid {soft}; font-size: 17px;
+                      font-weight: 600; padding: 14px 20px; color: {on_accent}; }}}}
+QPushButton#primary:hover {{{{ background: {accent_hover}; }}}}
+QPushButton#primary:disabled {{{{ background: #2a3a55; color: #9db0cc; border-color: #3a4d6e; }}}}
+QProgressBar {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px;
+               height: 16px; text-align: center; }}}}
+QProgressBar::chunk {{{{ background: {strong}; border-radius: 7px; }}}}
+QLabel#chip {{{{ color: {faint}; padding: 3px 8px; border-radius: 10px; font-size: 12px; }}}}
+QLabel#chip[state="active"] {{{{ color: {on_accent}; background: {soft}; font-weight: 600; }}}}
+QLabel#chip[state="done"] {{{{ color: #dcdce4; background: #34343f; }}}}
+QLabel#status {{{{ color: {muted}; }}}}
+QLabel#ready {{{{ font-size: 22px; font-weight: 600; color: #86efac; }}}}
+QLabel#footer {{{{ color: {faint}; font-size: 12px; }}}}
+QLabel#hint {{{{ color: {faint}; font-size: 12px; padding-left: 4px; }}}}
+QComboBox {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px;
+            padding: 6px 12px; min-width: 110px; }}}}
+QComboBox:disabled {{{{ color: {disabled}; }}}}
+QComboBox QAbstractItemView {{{{ background: #23232b; border: 1px solid {border};
+                              selection-background-color: {strong}; }}}}
+QLineEdit {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px;
+            padding: 6px 12px; selection-background-color: {strong}; }}}}
+QPushButton#gear {{{{ padding: 6px 12px; font-size: 18px; }}}}
+QScrollArea {{{{ background: transparent; border: none; }}}}
+QWidget#content {{{{ background: transparent; }}}}
+QScrollBar:vertical {{{{ background: transparent; width: 10px; margin: 2px; }}}}
+QScrollBar::handle:vertical {{{{ background: #5a5a6c; border-radius: 4px; min-height: 30px; }}}}
+QScrollBar:horizontal {{{{ background: transparent; height: 10px; margin: 2px; }}}}
+QScrollBar::handle:horizontal {{{{ background: #5a5a6c; border-radius: 4px; min-width: 30px; }}}}
+QScrollBar::add-line, QScrollBar::sub-line {{{{ width: 0; height: 0; }}}}
+QDialog#root, QTextBrowser {{{{ color: {text}; }}}}
+QDialog#root {{{{ background: {root_plain}; }}}}
+""".format(text=TEXT, muted=TEXT_MUTED, faint=TEXT_FAINT, disabled=TEXT_DISABLED, on_accent=TEXT_ON_ACCENT,
+           accent=ACCENT, accent_hover=ACCENT_HOVER, soft=ACCENT_SOFT, strong=ACCENT_STRONG,
+           control=CONTROL_BG, hover=CONTROL_HOVER, border=CONTROL_BORDER, root_plain=ROOT_PLAIN)
+
+# (foreground, background) pairs that must keep >= 4.5:1; checked by tests/test_ui.py::test_theme_contrast.
+CONTRAST_PAIRS = [
+    (TEXT, ROOT_PLAIN), (TEXT, CARD_PLAIN), (TEXT, CONTROL_BG), (TEXT, CONTROL_HOVER),
+    (TEXT_MUTED, ROOT_PLAIN), (TEXT_MUTED, CARD_PLAIN), (TEXT_FAINT, ROOT_PLAIN), (TEXT_FAINT, CARD_PLAIN),
+    (TEXT_ON_ACCENT, ACCENT), (TEXT_ON_ACCENT, ACCENT_HOVER), (TEXT_ON_ACCENT, ACCENT_SOFT),
+    (TEXT, ACCENT_STRONG), ("#dcdce4", "#34343f"), ("#86efac", CARD_PLAIN),
+]
+
 
 def privacy_marker() -> Path:
     return paths.state_dir() / "privacy_ack"
@@ -95,9 +127,10 @@ def acknowledge_privacy() -> None:
 
 
 def build_style(glass: bool) -> str:
+    """Return the stylesheet: ``glass`` = Acrylic backdrop behind a translucent window, else the solid fallback."""
     if glass:
-        return STYLE_TEMPLATE.format(root_bg="rgba(20,20,26,110)", card_a=18)
-    return STYLE_TEMPLATE.format(root_bg="#17171c", card_a=10)
+        return STYLE_TEMPLATE.format(root_bg=ROOT_GLASS, card_bg=CARD_GLASS)
+    return STYLE_TEMPLATE.format(root_bg=ROOT_PLAIN, card_bg=CARD_PLAIN)
 
 
 def open_folder(path: Path) -> None:
