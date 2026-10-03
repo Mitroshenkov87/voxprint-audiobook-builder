@@ -38,3 +38,14 @@ def test_cli_verify_prints_and_main_printer_writes_a_log(monkeypatch, tmp_path):
     p2 = main._cli_printer("verify_install")           # a new run starts the file over
     p2("fresh")
     assert (tmp_path / "verify_install.txt").read_text(encoding="utf-8").splitlines() == ["fresh"]
+
+
+def test_sox_warning_is_dropped_from_the_log():
+    import logging
+
+    import main
+
+    mk = lambda name, msg: logging.LogRecord(name, logging.WARNING, "f", 1, msg, None, None)   # noqa: E731
+    assert not main._drop_sox_warning(mk("sox", "SoX could not be found!\n\n If you do not have SoX"))
+    assert main._drop_sox_warning(mk("sox", "another sox message"))
+    assert main._drop_sox_warning(mk("voxprint", "SoX could not be found"))

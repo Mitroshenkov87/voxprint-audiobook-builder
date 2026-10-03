@@ -24,6 +24,14 @@ def _setup_logging() -> None:
                             format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     except OSError:
         logging.basicConfig(level=logging.INFO)
+    for handler in logging.getLogger().handlers:
+        handler.addFilter(_drop_sox_warning)
+
+
+def _drop_sox_warning(record: logging.LogRecord) -> bool:
+    """The TTS package warns "SoX could not be found" on every import (a level set on the logger is overridden by the package);
+    Voxprint never uses SoX, so the line is only noise in the log."""
+    return not (record.name == "sox" and "SoX could not be found" in record.getMessage())
 
 
 def _selftest_imports() -> int:
