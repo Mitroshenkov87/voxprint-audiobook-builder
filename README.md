@@ -85,7 +85,7 @@ Real screenshots of the current build on **Windows (RTX 4090 server, dark theme,
 | <img src="docs/screenshots/train_preview.png" width="300"> | <img src="docs/screenshots/train_consent.png" width="300"> | <img src="docs/screenshots/settings.png" width="240"> |
 
 Russian: [`studio_home`](docs/screenshots/ru/studio_home.png), [`voices`](docs/screenshots/ru/voices.png), [`narrate`](docs/screenshots/ru/narrate.png) · German: [`studio_home`](docs/screenshots/de/studio_home.png), [`voices`](docs/screenshots/de/voices.png), [`narrate`](docs/screenshots/de/narrate.png).
-The voices in the screenshots are demo entries; "Alexander" is the real metadata of the original voice package.
+The voices in the screenshots are demo entries.
 
 ## Installation
 There is no public release yet. Planned installer channels are listed in the [Roadmap](#roadmap). Today you have two options.
@@ -249,7 +249,7 @@ adapter files, size limits). A voice without a declared licence is treated as `c
 | CC0-1.0, CC-BY-4.0, CC-BY-SA-4.0 | allowed (attribution / share-alike per the licence) |
 | CC-BY-NC-4.0, CC-BY-NC-SA-4.0 | not allowed |
 | custom/personal-only (default) | not allowed |
-| custom/voxprint-original-test-only (the original voice) | not allowed; test use only, no public release of the audio |
+| custom/test-use-only (voices meant for testing) | not allowed; test use only, no public release of the audio |
 
 `commercial_use` in `voice.json` is always derived from the licence, never trusted from a file you import. The badge is information, not legal advice.
 
@@ -263,20 +263,19 @@ are handled with friendly messages. Downloads are HTTPS-only, size-capped, **res
   "names": {"ru": "Анна", "en": "Anna", "de": "Anna"}, "descriptions": {"ru": "...", "en": "...", "de": "..."}}]}
 ```
 `names` / `descriptions` are optional: the UI shows the entry for the current UI language and falls back to `name` / `description`. The same two maps may be in `voice.json`
-(a downloaded voice keeps them, so "Александр" becomes "Alexander" when you switch the language; the stored `name` is never rewritten).
+(a downloaded voice keeps them, so a voice can show a different name per UI language; the stored `name` is never rewritten).
 
 **Online voices appear by themselves.** *My voices* and the voice list of *Narrate a book* merge the local library with the index (refreshed when the window opens; *Refresh list* in My voices): an online voice
 that is not installed yet is a card with the licence and scope badges, the size and a **Download** button; in *Narrate* it is listed as "<name> (to download, N MB)" and is downloaded and verified automatically when you press
 Start. A downloaded voice remembers its index id (`repo_id`) and is then shown once, as a local voice. A voice added to the index later shows up after the next refresh - no program update needed.
 
-**The original voice "Alexander" (Александр).** The first voice ever trained with Voxprint (10 minutes of the author's own recording). It is **not in this repository and not in the installer**; it is published in the voices
-repository as `alexander.zip` (SHA-256 in the index) under the licence **`custom/voxprint-original-test-only`** - *Voxprint Original Voice - test use only, no public release of generated audio, no commercial use*.
-Its `voice.json` carries `names` (ru Александр, en Alexander, de Alexander), localized `descriptions` and a consent block with `method: "owner"` (the owner of the voice is the publisher; scope `private_only`).
-The programme shows a "test use only" reminder on its card, in Narrate and when an audiobook made with it is ready. To publish a voice package yourself:
+**Voice packages.** A voice package is a zip with the LoRA adapter and a `voice.json` (name, localized `names` / `descriptions`, licence, consent block). Packages are **not** part of this repository or the installer;
+they are hosted separately (a model host or a release asset) and listed in the voices index. Voices meant for testing carry the licence **`custom/test-use-only`** - *Test use only - no public release of generated audio, no commercial use*;
+their consent block has `method: "owner"` (the publisher owns the voice). The programme shows a "test use only" reminder on its card, in Narrate and when an audiobook made with it is ready. To publish a voice package yourself:
 ```
-python tools/make_voice_package.py --adapter <trained voice folder> --spec tools/voice_specs/alexander.json --out dist_voices --url https://huggingface.co/<user>/voxprint-voices/resolve/main/alexander.zip
+python tools/make_voice_package.py --adapter <trained voice folder> --spec tools/voice_specs/example-open-voice.json --out dist_voices --url https://huggingface.co/<user>/voxprint-voices/resolve/main/open-voice.zip
 ```
-It writes the folder, `alexander.zip` and `alexander.index-entry.json` (one object for the `voices` list, with SHA-256 and size). Upload the zip to a model host or a release asset and add the entry to `index.json`.
+It writes the folder, `open-voice.zip` and `open-voice.index-entry.json` (one object for the `voices` list, with SHA-256 and size). Upload the zip to a model host or a release asset and add the entry to `index.json`.
 
 ### AAC / M4B: patents (please read)
 > The **M4B (AAC)** export exists only as a convenience for **Apple Books compatibility**. The **AAC codec is patent-encumbered** and not fully open. **This project does not provide a patent licence** for it.
@@ -525,8 +524,7 @@ packages (`tools\gen_notices.py --with-installed`, called by `build.bat`). Voxpr
 * **Models and voices have their own licences** - the Apache licence of the code does *not* cover them:
   * the models Voxprint downloads (Qwen3-TTS, Qwen3-ASR and the optional text models) keep the licences of their authors;
   * every **voice** carries its own licence in `voice.json` (see *My voices and licences*). Voices you train are `custom/personal-only` until you decide otherwise;
-  * the original voice **Alexander / Александр** is not part of this repository or the installer. It is published separately in the voices repository under
-    **"Voxprint Original Voice - test use only"**: use it to try the program; do not publish audio made with it and do not use it commercially.
+  * voice packages are not part of this repository or the installer; a voice marked **"test use only"** (`custom/test-use-only`) may be used to try the program only: do not publish audio made with it and do not use it commercially.
 * Third-party components: `THIRD_PARTY_NOTICES.md` and `licenses\`.
 
 ## What was verified against primary sources

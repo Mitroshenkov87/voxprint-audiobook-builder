@@ -539,7 +539,7 @@
  "voices.rights_note": "Die Lizenz gilt nur für das Stimmenmodell. Verwenden Sie eine Stimme nur mit Erlaubnis ihres Inhabers und im Rahmen ihrer Lizenz (z. B. CC BY-NC = nur private Nutzung); für die rechtmäßige Verwendung sind Sie verantwortlich.",
  "voices.save": "Speichern",
  "voices.stop": "Stopp",
- "voices.test_only_note": "Nur zum Testen: die Original-Stimme von Voxprint. Das erzeugte Audio nicht veröffentlichen und nicht kommerziell nutzen.",
+ "voices.test_only_note": "Nur zum Testen: das erzeugte Audio nicht veröffentlichen und nicht kommerziell nutzen.",
  "voices.title": "Meine Stimmen",
  "warn.adam8_unavailable": "Der 8-Bit-Optimierer ist nicht verfügbar, der normale wird verwendet (etwas mehr Speicher nötig).",
  "warn.align_inexact": "Einige Wörter wurden ungenau ausgerichtet; die Schnittqualität kann etwas geringer sein.",

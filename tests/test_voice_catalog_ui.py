@@ -60,13 +60,13 @@ def test_my_voices_shows_remote_cards_with_badges_size_and_a_download_button(app
     rc = cards(w, RemoteCard)
     assert len(cards(w, VoiceCard)) == 1 and len(rc) == 1
     r = rc[0]
-    assert r.lbl_name.text() == "Alexander" and r.badge.text() and r.scope_badge.text()
+    assert r.lbl_name.text() == "Open Voice" and r.badge.text() and r.scope_badge.text()
     assert "MB" in r.lbl_meta.text() or "kB" in r.lbl_meta.text() or r.lbl_meta.text()
     assert "Test use only" in r.lbl_note.text() and r.btn_download.isEnabled() and r.lbl_state.text() == "Not downloaded yet"
     assert not w.empty.isVisibleTo(w)
     i18n.set_language("ru")
     w.retranslate()
-    assert cards(w, RemoteCard)[0].lbl_name.text() == "Александр" and "Только для тестов" in cards(w, RemoteCard)[0].lbl_note.text()
+    assert cards(w, RemoteCard)[0].lbl_name.text() == "Открытый голос" and "Только для тестов" in cards(w, RemoteCard)[0].lbl_note.text()
     i18n.set_language("de")
     w.retranslate()
     assert cards(w, RemoteCard)[0].btn_download.text() == "Herunterladen"
@@ -81,9 +81,9 @@ def test_download_button_fetches_and_the_card_becomes_a_local_voice(app, lib, tm
     w.refresh()
     cards(w, RemoteCard)[0].btn_download.click()
     assert wait_for(lambda: not cards(w, RemoteCard) and len(cards(w, VoiceCard)) == 1)
-    assert calls == ["alexander"] and changed and "Downloaded" in w.lbl_status.text()
+    assert calls == ["open-voice"] and changed and "Downloaded" in w.lbl_status.text()
     local = cards(w, VoiceCard)[0]
-    assert local.lbl_name.text() == "Alexander" and local.lbl_note is not None and "Test use only" in local.lbl_note.text()
+    assert local.lbl_name.text() == "Open Voice" and local.lbl_note is not None and "Test use only" in local.lbl_note.text()
 
 
 def test_list_refresh_uses_the_index_and_reports_offline_cache(app, lib, tmp_path, entries):
@@ -108,7 +108,7 @@ def test_edit_dialog_keeps_the_stored_name_and_explains_the_test_only_licence(ap
     i18n.set_language("en")
     rec = fake_download(tmp_path)(entries[0], lib)
     dlg = VoiceEditDialog(rec)
-    assert dlg.edt_name.text() == "Александр"                          # not the localized display name
+    assert dlg.edt_name.text() == "Open Voice"                          # not the localized display name
     dlg.cmb_license.setCurrentIndex(dlg.cmb_license.findData(voice_info.LICENSE_TEST_ONLY))
     assert "Test use only" in dlg.lbl_license_note.text()
 
@@ -129,17 +129,17 @@ def test_narrate_lists_online_voices_and_downloads_the_selected_one_on_start(app
     n.entries = entries
     n.refresh_voices()
     items = [n.cmb_voice.itemText(i) for i in range(n.cmb_voice.count())]
-    assert items[0] == "Anna" and items[1].startswith("Alexander (to download,")
-    n.select_voice("repo:alexander")
+    assert items[0] == "Anna" and items[1].startswith("Open Voice (to download,")
+    n.select_voice("repo:open-voice")
     assert "downloaded (and verified) when you start" in n.lbl_voice_info.text() and "Test use only" in n.lbl_voice_info.text()
     assert n.badge_box.count() == 2
     n.load_book_file(write_book(tmp_path))
     assert n.btn_start.isEnabled() and n.start()
     assert wait_for(lambda: bool(jobs) and not n.busy and n.result is not None)
-    assert calls == ["alexander"] and jobs[0].voice.info["repo_id"] == "alexander"
+    assert calls == ["open-voice"] and jobs[0].voice.info["repo_id"] == "open-voice"
     assert n.selected_voice_id() == jobs[0].voice.id and not n.selected_voice_id().startswith("repo:")
     assert "test use only" in n.lbl_status.text()                     # the reminder after the run
-    assert sorted(n.cmb_voice.itemText(i) for i in range(n.cmb_voice.count())) == ["Alexander", "Anna"]     # installed: no "to download"
+    assert sorted(n.cmb_voice.itemText(i) for i in range(n.cmb_voice.count())) == ["Anna", "Open Voice"]     # installed: no "to download"
     n.shutdown()
 
 
@@ -154,10 +154,10 @@ def test_failed_voice_download_does_not_start_and_keeps_the_remote_choice(app, l
     n.entries = entries
     n.refresh_voices()
     n.load_book_file(write_book(tmp_path))
-    n.select_voice("repo:alexander")
+    n.select_voice("repo:open-voice")
     assert n.start()
     assert wait_for(lambda: "damaged" in n.lbl_status.text() and n._dl_worker is not None and not n._dl_worker.isRunning())
-    assert not jobs and n.selected_voice_id() == "repo:alexander" and n.btn_start.isEnabled()
+    assert not jobs and n.selected_voice_id() == "repo:open-voice" and n.btn_start.isEnabled()
     n.shutdown()
 
 

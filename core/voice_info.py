@@ -38,11 +38,11 @@ MAX_NAME_CHARS = 80
 
 #: Licence used for a freshly trained voice: the safe default is "only for me".
 DEFAULT_LICENSE = "custom/personal-only"
-#: Licence of the original Voxprint voice (the first voice trained with this software, distributed separately from the program).
-LICENSE_TEST_ONLY = "custom/voxprint-original-test-only"
+#: Licence for voices meant for testing only (distributed separately from the program).
+LICENSE_TEST_ONLY = "custom/test-use-only"
 #: Human-readable text of the custom licences (English; the UI shows a localized reminder).
 LICENSE_TEXTS = {
-    LICENSE_TEST_ONLY: "Voxprint Original Voice - test use only, no public release of generated audio, no commercial use",
+    LICENSE_TEST_ONLY: "Test use only - no public release of generated audio, no commercial use",
 }
 
 #: Known licences: id -> (commercial use allowed, canonical URL).  Order = order in the UI.
@@ -178,7 +178,7 @@ def normalize_info(data: Dict[str, Any], fallback_id: str = "") -> Dict[str, Any
         out["repo_id"] = clean_line(str(data["repo_id"]))   # id in the online voices index: the voice was downloaded from there
     names = clean_names(data.get("names"))
     if names:
-        out["names"] = names       # shown instead of ``name`` when the UI language has an entry (e.g. Александр / Alexander)
+        out["names"] = names       # shown instead of ``name`` when the UI language has an entry (e.g. a different name per UI language)
     descs = clean_names(data.get("descriptions"), clean_description)
     if descs:
         out["descriptions"] = descs     # localized description, like ``names``

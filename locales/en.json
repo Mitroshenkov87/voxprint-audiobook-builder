@@ -539,7 +539,7 @@
  "voices.rights_note": "The licence covers the voice model only. Use a voice only with its owner's permission and within its licence (for example CC BY-NC = personal use only); you are responsible for lawful use.",
  "voices.save": "Save",
  "voices.stop": "Stop",
- "voices.test_only_note": "Test use only: the original Voxprint voice. Do not publish the generated audio and do not use it commercially.",
+ "voices.test_only_note": "Test use only: do not publish the generated audio and do not use it commercially.",
  "voices.title": "My voices",
  "warn.adam8_unavailable": "The 8-bit optimizer is unavailable, using the regular one (slightly more memory is needed).",
  "warn.align_inexact": "Some words were aligned inexactly; the slicing quality may be slightly lower.",

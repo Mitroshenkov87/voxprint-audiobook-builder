@@ -1,7 +1,7 @@
 """Build a distributable voice package for the online voices index.
 
-    python tools/make_voice_package.py --adapter <trained voice folder> --spec tools/voice_specs/alexander.json \\
-        --out dist_voices --url https://huggingface.co/<user>/<repo>/resolve/main/alexander.zip
+    python tools/make_voice_package.py --adapter <trained voice folder> --spec tools/voice_specs/example-open-voice.json \\
+        --out dist_voices --url https://huggingface.co/<user>/<repo>/resolve/main/open-voice.zip
 
 Writes ``<out>/<id>/`` (the files the app needs, with the final ``voice.json``), ``<out>/<id>.zip``, and
 ``<out>/<id>.index-entry.json`` - one object for the ``voices`` list of the repository's ``index.json`` (with SHA-256 and

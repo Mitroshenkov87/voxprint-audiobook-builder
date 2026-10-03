@@ -178,7 +178,7 @@ def clean_consent(data: Any) -> Optional[Dict[str, Any]]:
         "statement": str(data.get("statement") or "")[:1500],
         "clip": str(data.get("clip") or "")[:80],
     }
-    if data.get("owner_confirmed"):        # only the "owner" method (the original voice) carries this mark
+    if data.get("owner_confirmed"):        # only the "owner" method (test-only voices) carries this mark
         out["owner_confirmed"] = True
     return out
 

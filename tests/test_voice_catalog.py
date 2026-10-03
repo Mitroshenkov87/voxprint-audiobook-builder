@@ -23,15 +23,18 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import make_voice_package as mvp  # noqa: E402
 
-SPEC = json.loads((ROOT / "tools" / "voice_specs" / "alexander.json").read_text(encoding="utf-8"))
-URL = "https://host.example/alexander.zip"
+SPEC = json.loads((ROOT / "tools" / "voice_specs" / "example-open-voice.json").read_text(encoding="utf-8"))     # the open placeholder entry
+#: A restricted variant: a voice shared for tests only (owner is the publisher, no consent clip).
+TEST_ONLY_SPEC = {**SPEC, "license": voice_info.LICENSE_TEST_ONLY, "author": "Owner",
+                  "consent": {"scope": "private_only", "name": "Owner", "date": "2026-10-03", "method": "owner", "owner_confirmed": True, "confirmed": True}}
+URL = "https://host.example/open-voice.zip"
 
 
 def package(tmp_path, spec=None):
-    """Build the Alexander package from a fake adapter; returns (zip bytes, index entry)."""
-    ad = make_adapter(tmp_path / "ad", name="Alexander", with_voice_json=True)
-    entry = mvp.build(ad, spec or SPEC, tmp_path / "dist", URL)
-    return (tmp_path / "dist" / "alexander.zip").read_bytes(), entry
+    """Build a package from a fake adapter (default: the test-only variant); returns (zip bytes, index entry)."""
+    ad = make_adapter(tmp_path / "ad", name="Open Voice", with_voice_json=True)
+    entry = mvp.build(ad, spec or TEST_ONLY_SPEC, tmp_path / "dist", URL)
+    return (tmp_path / "dist" / "open-voice.zip").read_bytes(), entry
 
 
 def index_for(entry):
@@ -41,18 +44,18 @@ def index_for(entry):
 # ----------------------------------------------------------------------------- package -> index -> library
 def test_package_builder_writes_final_voice_json_zip_and_entry(tmp_path):
     data, entry = package(tmp_path)
-    info = json.loads((tmp_path / "dist" / "alexander" / "voice.json").read_text(encoding="utf-8"))
-    assert info["names"] == {"ru": "Александр", "en": "Alexander", "de": "Alexander"}
+    info = json.loads((tmp_path / "dist" / "open-voice" / "voice.json").read_text(encoding="utf-8"))
+    assert info["names"] == {"ru": "Открытый голос", "en": "Open Voice", "de": "Offene Stimme"}
     assert info["license"] == voice_info.LICENSE_TEST_ONLY and info["commercial_use"] is False
     assert info["consent"]["method"] == "owner" and info["consent"]["owner_confirmed"] and info["consent"]["scope"] == c.PRIVATE
-    assert info["consent"]["confirmed"] and not info["consent"]["recorded_statement"] and info["author"] == "Aleksandr Mitroshenkov"
+    assert info["consent"]["confirmed"] and not info["consent"]["recorded_statement"] and info["author"] == "Owner"
     assert entry["sha256"] == hashlib.sha256(data).hexdigest() and entry["size_bytes"] == len(data) and entry["url"] == URL
     names = zipfile.ZipFile(io.BytesIO(data)).namelist()
-    assert "alexander/voice.json" in names and "alexander/adapter_model.safetensors" in names
-    assert not (tmp_path / "dist" / "alexander" / "consent_statement.wav").exists()
+    assert "open-voice/voice.json" in names and "open-voice/adapter_model.safetensors" in names
+    assert not (tmp_path / "dist" / "open-voice" / "consent_statement.wav").exists()
     parsed = repo.parse_index(index_for(entry))
-    assert parsed[0].names["ru"] == "Александр" and parsed[0].license == voice_info.LICENSE_TEST_ONLY
-    assert parsed[0].descriptions["de"].startswith("Die Original")
+    assert parsed[0].names["ru"] == "Открытый голос" and parsed[0].license == voice_info.LICENSE_TEST_ONLY
+    assert parsed[0].descriptions["de"].startswith("Eine vollständig")
 
 
 def test_download_imports_the_package_with_names_licence_and_owner_consent(tmp_path):
@@ -60,7 +63,7 @@ def test_download_imports_the_package_with_names_licence_and_owner_consent(tmp_p
     ent = repo.parse_index(index_for(entry))[0]
     lib = VoiceLibrary(tmp_path / "lib")
     rec = repo.download_voice(ent, lib, opener=opener_for({URL: data}))
-    assert rec.info["repo_id"] == "alexander" and rec.test_only and rec.scope == c.PRIVATE and not rec.commercial_use
+    assert rec.info["repo_id"] == "open-voice" and rec.test_only and rec.scope == c.PRIVATE and not rec.commercial_use
     assert rec.info["consent"]["method"] == "owner"
     assert (rec.path / "adapter_model.safetensors").is_file() and not (rec.path / c.CLIP_NAME).exists()
 
@@ -70,18 +73,18 @@ def test_names_and_descriptions_follow_the_ui_language_with_fallback(tmp_path):
     lib = VoiceLibrary(tmp_path / "lib")
     rec = repo.download_voice(repo.parse_index(index_for(entry))[0], lib, opener=opener_for({URL: data}))
     ent = repo.parse_index(index_for(entry))[0]
-    for lang, name in (("ru", "Александр"), ("en", "Alexander"), ("de", "Alexander")):
+    for lang, name in (("ru", "Открытый голос"), ("en", "Open Voice"), ("de", "Offene Stimme")):
         i18n.set_language(lang)
         assert rec.name == name and ent.display_name == name
     i18n.set_language("ru")
-    assert rec.description.startswith("Оригинальный голос") and ent.display_description.startswith("Оригинальный голос")
+    assert rec.description.startswith("Полностью открытый") and ent.display_description.startswith("Полностью открытый")
     i18n.set_language("en")
-    assert rec.description.startswith("The original Voxprint voice")
-    assert rec.info["name"] == "Александр"                      # the stored default stays untouched
+    assert rec.description.startswith("A fully open")
+    assert rec.info["name"] == "Open Voice"                      # the stored default stays untouched
     plain = lib.add_from_adapter(make_adapter(tmp_path / "p", name="Anna"))
     assert plain.name == "Anna" and plain.description == plain.info["description"]    # no table: the default
-    rec.info["names"] = {"fr": "Alexandre"}                     # no entry for the UI language: the default name
-    assert rec.name == "Александр"
+    rec.info["names"] = {"fr": "Exemple"}                     # no entry for the UI language: the default name
+    assert rec.name == "Open Voice"
     i18n.set_language("ru")
 
 
@@ -103,8 +106,8 @@ def test_catalog_lists_local_voices_then_remote_ones_and_hides_installed_downloa
     lib = VoiceLibrary(tmp_path / "lib")
     lib.add_from_adapter(make_adapter(tmp_path / "own", name="Anna"))
     items = cat.build(lib, entries)
-    assert [(i.name, i.installed) for i in items] == [("Anna", True), ("Александр", False), ("Bob", False)]
-    assert items[1].key == "repo:alexander" and items[1].scope == c.PRIVATE and items[2].scope == c.COMMERCIAL
+    assert [(i.name, i.installed) for i in items] == [("Anna", True), ("Открытый голос", False), ("Bob", False)]
+    assert items[1].key == "repo:open-voice" and items[1].scope == c.PRIVATE and items[2].scope == c.COMMERCIAL
     assert items[1].remote and items[1].size_bytes == entry["size_bytes"]
     rec = repo.download_voice(entries[0], lib, opener=opener_for({URL: data}))
     items = cat.build(lib, entries)
@@ -121,7 +124,7 @@ def test_ensure_local_downloads_a_remote_key_and_passes_local_ones_through(tmp_p
     local = lib.add_from_adapter(make_adapter(tmp_path / "own", name="Anna"))
     assert cat.ensure_local(local.id, lib, entries, download=lambda *a, **k: pytest.fail("no download")).id == local.id
     assert cat.ensure_local("repo:nope", lib, entries) is None
-    got = cat.ensure_local("repo:alexander", lib, entries, opener=opener_for({URL: data}))
+    got = cat.ensure_local("repo:open-voice", lib, entries, opener=opener_for({URL: data}))
     assert got.id and lib.get(got.id) is not None
 
 
@@ -155,7 +158,7 @@ def test_interrupted_download_resumes_and_is_verified(tmp_path, ignore):
     (part_dir / f"{ent.sha256}.part").write_bytes(data[:1000])          # what a previous, cut-off try left behind
     op = RangeOpener(data, ignore_range=ignore)
     rec = repo.download_voice(ent, lib, opener=op)
-    assert op.ranges == ["bytes=1000-"] and rec.info["repo_id"] == "alexander"
+    assert op.ranges == ["bytes=1000-"] and rec.info["repo_id"] == "open-voice"
     assert not list(part_dir.iterdir())                                   # the partial file is gone after the import
 
 
@@ -178,8 +181,8 @@ def test_offline_index_falls_back_to_the_last_good_one(tmp_path):
     good = repo.fetch_index(url, opener=opener_for({url: json.dumps(index_for(entry)).encode()}))
     assert good.voices and not good.offline
     off = repo.fetch_index(url, opener=opener_for({}))
-    assert off.offline and [v.id for v in off.voices] == ["alexander"] and off.error == "unreachable"
-    assert [v.id for v in repo.load_cache()] == ["alexander"]
+    assert off.offline and [v.id for v in off.voices] == ["open-voice"] and off.error == "unreachable"
+    assert [v.id for v in repo.load_cache()] == ["open-voice"]
     bad = repo.fetch_index(url, opener=opener_for({url: b"<html>"}))
     assert bad.offline and bad.voices                                     # a broken index must not wipe the list
-    assert repo.fetch_index(url, opener=opener_for({url: json.dumps(index_for(entry)).encode()})).voices[0].id == "alexander"
+    assert repo.fetch_index(url, opener=opener_for({url: json.dumps(index_for(entry)).encode()})).voices[0].id == "open-voice"

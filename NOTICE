@@ -6,7 +6,6 @@ The source code of this program is licensed under the Apache License, Version 2.
 Not covered by that licence (each has its own terms):
   * Third-party software and models that Voxprint uses or downloads - see THIRD_PARTY_NOTICES.md and the licenses/ folder.
   * Voice packages (trained LoRA adapters with their reference sample). Every voice carries its own licence in its voice.json.
-    The original Voxprint voice "Alexander" ("Александр", "Alexander" in English and German) is distributed separately from
-    this repository under the "Voxprint Original Voice - test use only" terms: test use only, no public release of audio
-    generated with it, no commercial use.
+    Voices meant for testing carry the "test use only" licence (custom/test-use-only): test use only, no public release of
+    audio generated with them, no commercial use.
   * The models downloaded at run time (for example Qwen3-TTS, Qwen3-ASR) - see their model cards for their licences.

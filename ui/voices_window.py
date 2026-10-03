@@ -167,7 +167,7 @@ class VoiceCard(QFrame):
         self.lbl_desc.setVisible(bool(rec.description))
         lay.addWidget(self.lbl_desc)
         self.lbl_note = None
-        if rec.test_only:      # the original Voxprint voice: always remind of its terms
+        if rec.test_only:      # test-only voice: always remind of its terms
             self.lbl_note = QLabel(tr("voices.test_only_note"))
             self.lbl_note.setObjectName("hint")
             self.lbl_note.setWordWrap(True)

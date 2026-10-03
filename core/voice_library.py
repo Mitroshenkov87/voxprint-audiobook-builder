@@ -82,7 +82,7 @@ class VoiceRecord:
 
     @property
     def test_only(self) -> bool:
-        """True for the original Voxprint voice: test/demo use only, no public release of the audio, no commercial use."""
+        """True for test-only voices: test/demo use only, no public release of the audio, no commercial use."""
         return self.license == voice_info.LICENSE_TEST_ONLY
 
     @property
