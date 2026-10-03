@@ -20,15 +20,16 @@ from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QSpinBox, QToolButton, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
-from core import i18n, model_export, voice_info
+from core import i18n, model_export, train_presets, voice_info
 from core.appinfo import APP_DISPLAY_NAME
 from core.errors import DatasetMakerError
 from core.events import Stage
 from core.i18n import tr
 from infra import paths, platform_win
+from infra.vram_optimizer import detect_gpu
 from workers.pipeline_runner import (KIND_DATASET, KIND_LORA, KIND_MERGE, TaskRequest, last_adapter, plan_for,
                                      run_task)
 from ui.settings_dialog import SettingsDialog
@@ -196,6 +197,17 @@ def build_style(glass: bool) -> str:
     return STYLE_TEMPLATE.format(root_bg=ROOT_PLAIN, card_bg=CARD_PLAIN)
 
 
+def audio_seconds(path: Path) -> Optional[float]:
+    """Duration of an audio file from its header (no decoding); None when it cannot be read quickly (e.g. some AAC/M4A files)."""
+    try:
+        import soundfile as sf
+
+        info = sf.info(str(path))
+        return float(info.frames) / float(info.samplerate)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def open_folder(path: Path) -> None:
     """Open a folder in Explorer (Windows) or the default file manager."""
     p = str(path)
@@ -234,7 +246,7 @@ class MainWindow(QWidget):
                  prefetch_fn: Optional[Callable[..., Any]] = None, prefetch: bool = False,
                  health_fn: Optional[Callable[[], list]] = None,
                  model_states_fn: Optional[Callable[[], dict]] = None,
-                 repair_fn: Optional[Callable[..., Any]] = None) -> None:
+                 repair_fn: Optional[Callable[..., Any]] = None, gpu_fn: Optional[Callable[[], Any]] = None) -> None:
         """Build the window.
 
         ``runner`` executes tasks (default :func:`run_task`); ``updater_factory``, ``prefetch_fn``, ``health_fn``,
@@ -246,6 +258,8 @@ class MainWindow(QWidget):
         self.updater_factory = updater_factory
         self.auto_open_folder = auto_open_folder
         self.audio: Optional[Path] = None
+        self._gpu = None
+        self.gpu_fn = gpu_fn or detect_gpu
         self.audio_files: List[Path] = []      # no-transcript mode: several files and/or folders
         self.text: Optional[Path] = None
         self.result_dir: Optional[Path] = None
@@ -377,6 +391,58 @@ class MainWindow(QWidget):
         cl.addWidget(self.asr_box)
         root.addWidget(card)
 
+        # Training presets (Fast / Balanced / Maximum / Manual) with a time estimate and a collapsed advanced panel
+        pcard = self._card()
+        pl = QVBoxLayout(pcard)
+        pl.setContentsMargins(16, 12, 16, 12)
+        pl.setSpacing(8)
+        prow = QHBoxLayout()
+        self.lbl_preset = QLabel()
+        self.cmb_preset = QComboBox()
+        for code in train_presets.PRESETS:
+            self.cmb_preset.addItem("", code)
+        self.cmb_preset.setCurrentIndex(train_presets.PRESETS.index(train_presets.DEFAULT_PRESET))
+        prow.addWidget(self.lbl_preset)
+        prow.addWidget(self.cmb_preset, 1)
+        pl.addLayout(prow)
+        self.lbl_preset_desc = QLabel()
+        self.lbl_preset_desc.setObjectName("hint")
+        self.lbl_preset_desc.setWordWrap(True)
+        pl.addWidget(self.lbl_preset_desc)
+        self.lbl_estimate = QLabel()
+        self.lbl_estimate.setWordWrap(True)
+        pl.addWidget(self.lbl_estimate)
+        self.btn_adv = QToolButton()
+        self.btn_adv.setCheckable(True)
+        self.btn_adv.setObjectName("expander")
+        pl.addWidget(self.btn_adv)
+        self.adv_box = QWidget()
+        self.adv_box.hide()
+        gl = QVBoxLayout(self.adv_box)
+        gl.setContentsMargins(0, 0, 0, 0)
+        gl.setSpacing(6)
+        self.sp_epochs, self.sp_rank, self.sp_alpha, self.sp_accum = QSpinBox(), QSpinBox(), QSpinBox(), QSpinBox()
+        for sp, lo, hi in ((self.sp_epochs, 1, 100), (self.sp_rank, 1, 256), (self.sp_alpha, 1, 1024), (self.sp_accum, 1, 32)):
+            sp.setRange(lo, hi)
+        self.sp_lr = QDoubleSpinBox()
+        self.sp_lr.setDecimals(7)
+        self.sp_lr.setRange(1e-7, 1e-4)
+        self.sp_lr.setSingleStep(5e-7)
+        self.adv_rows = []
+        for sp in (self.sp_epochs, self.sp_rank, self.sp_alpha, self.sp_lr, self.sp_accum):
+            row = QHBoxLayout()
+            lab = QLabel()
+            row.addWidget(lab, 1)
+            row.addWidget(sp)
+            gl.addLayout(row)
+            self.adv_rows.append(lab)
+        self.lbl_adv_hint = QLabel()
+        self.lbl_adv_hint.setObjectName("hint")
+        self.lbl_adv_hint.setWordWrap(True)
+        gl.addWidget(self.lbl_adv_hint)
+        pl.addWidget(self.adv_box)
+        root.addWidget(pcard)
+
         self.btn_lora = QPushButton()
         self.btn_lora.setObjectName("primary")
         root.addWidget(self.btn_lora)
@@ -466,6 +532,10 @@ class MainWindow(QWidget):
         self.btn_audio.clicked.connect(self.choose_audio)
         self.btn_text.clicked.connect(self.choose_text)
         self.btn_folder.clicked.connect(self.choose_folder)
+        self.cmb_preset.currentIndexChanged.connect(self._on_preset)
+        self.btn_adv.toggled.connect(self._on_adv_toggled)
+        for sp in (self.sp_epochs, self.sp_rank, self.sp_alpha, self.sp_accum, self.sp_lr):
+            sp.valueChanged.connect(lambda _v: self.refresh_estimate())
         self.chk_no_text.toggled.connect(self.set_no_transcript)
         self.chk_asr_ok.toggled.connect(lambda _on: self._refresh_buttons())
         self.btn_dataset.clicked.connect(lambda: self.start(KIND_DATASET))
@@ -488,6 +558,14 @@ class MainWindow(QWidget):
         self.lbl_sub.setText(tr("ui.subtitle"))
         self.btn_audio.setText(tr("ui.choose_audio"))
         self.btn_text.setText(tr("ui.choose_text"))
+        self.lbl_preset.setText(tr("preset.label"))
+        for i, code in enumerate(train_presets.PRESETS):
+            self.cmb_preset.setItemText(i, tr("preset." + code))
+        self.btn_adv.setText(("\u25be " if self.btn_adv.isChecked() else "\u25b8 ") + tr("preset.advanced"))
+        for lab, key in zip(self.adv_rows, ("epochs", "rank", "alpha", "lr", "accum")):
+            lab.setText(tr("preset.adv_" + key))
+        self.lbl_adv_hint.setText(tr("preset.adv_hint"))
+        self.refresh_estimate()
         self.chk_no_text.setText(tr("asr.checkbox"))
         self.btn_folder.setText(tr("asr.choose_folder"))
         self.lbl_asr_warning.setText(tr("asr.warning"))
@@ -590,6 +668,7 @@ class MainWindow(QWidget):
         self.audio = Path(path)
         self.lbl_audio.setText(self.audio.name)
         self.lbl_audio.setToolTip(str(self.audio))
+        self._on_preset()
         self._refresh_buttons()
 
     def set_text(self, path: Path) -> None:
@@ -598,6 +677,71 @@ class MainWindow(QWidget):
         self.lbl_text.setText(self.text.name)
         self.lbl_text.setToolTip(str(self.text))
         self._refresh_buttons()
+
+    # ------------------------------------------------------------------ training presets
+    def gpu(self):
+        """The detected GPU (cached; ``self.gpu_fn`` is replaced in tests)."""
+        if self._gpu is None:
+            try:
+                self._gpu = self.gpu_fn()
+            except Exception:  # noqa: BLE001 - an estimate must never break the window
+                from infra.vram_optimizer import GpuInfo
+
+                self._gpu = GpuInfo(False)
+        return self._gpu
+
+    @property
+    def preset(self) -> str:
+        return str(self.cmb_preset.currentData() or train_presets.DEFAULT_PRESET)
+
+    def manual_values(self) -> train_presets.Manual:
+        return train_presets.Manual(self.sp_epochs.value(), self.sp_rank.value(), self.sp_alpha.value(),
+                                    self.sp_lr.value(), self.sp_accum.value())
+
+    def _expected_clips(self) -> tuple:
+        """(number of clips to expect, whether it is a real estimate for the chosen audio or a 10-minute example)."""
+        secs = 0.0
+        if self.no_transcript:
+            from core.asr_dataset import expand_inputs
+
+            for p in expand_inputs(self.audio_files)[:200]:
+                secs += audio_seconds(p) or 0.0
+        elif self.audio:
+            secs = audio_seconds(self.audio) or 0.0
+        return (train_presets.clips_from_audio(secs), True) if secs > 0 else (train_presets.clips_from_audio(600), False)
+
+    def _on_adv_toggled(self, on: bool) -> None:
+        self.adv_box.setVisible(on)
+        self.btn_adv.setText(("\u25be " if on else "\u25b8 ") + tr("preset.advanced"))
+
+    def _on_preset(self, _i: int = 0) -> None:
+        """Show the values of the chosen preset in the advanced panel (editable only for Manual) and refresh the estimate."""
+        n, _real = self._expected_clips()
+        plan = train_presets.build_plan(self.preset if self.preset != train_presets.MANUAL else train_presets.BALANCED,
+                                        self.gpu(), n)
+        if self.preset != train_presets.MANUAL:
+            for sp, v in ((self.sp_epochs, plan.epochs), (self.sp_rank, plan.lora_r), (self.sp_alpha, plan.lora_alpha),
+                          (self.sp_accum, plan.grad_accum)):
+                sp.blockSignals(True); sp.setValue(v); sp.blockSignals(False)
+            self.sp_lr.blockSignals(True); self.sp_lr.setValue(plan.lr); self.sp_lr.blockSignals(False)
+        for sp in (self.sp_epochs, self.sp_rank, self.sp_alpha, self.sp_accum, self.sp_lr):
+            sp.setEnabled(self.preset == train_presets.MANUAL)
+        if self.preset == train_presets.MANUAL:
+            self.btn_adv.setChecked(True)
+        self.refresh_estimate()
+
+    def refresh_estimate(self) -> None:
+        """Description + estimated training time of the chosen preset on this GPU for the chosen audio."""
+        preset = self.preset
+        self.lbl_preset_desc.setText(tr("preset.desc_" + preset))
+        n, real = self._expected_clips()
+        gpu = self.gpu()
+        plan = train_presets.build_plan(preset, gpu, n, manual=self.manual_values() if preset == train_presets.MANUAL else None)
+        dur = train_presets.format_duration(train_presets.estimate_seconds(plan, n, gpu), tr("preset.unit_min"),
+                                            tr("preset.unit_sec"), tr("preset.unit_hour"))
+        where = gpu.name if gpu.available else tr("preset.cpu")
+        fmt = dict(time=dur, epochs=plan.epochs, rank=plan.lora_r, n=n, gpu=where)
+        self.lbl_estimate.setText(tr("preset.estimate", **fmt) if real else tr("preset.estimate_example", **fmt))
 
     @property
     def no_transcript(self) -> bool:
@@ -623,6 +767,7 @@ class MainWindow(QWidget):
         self.audio_files = [Path(p) for p in paths]
         self._audio_count = len(expand_inputs(self.audio_files))
         self._show_audio_label()
+        self._on_preset()
         self._refresh_buttons()
 
     def _show_audio_label(self) -> None:
@@ -741,13 +886,15 @@ class MainWindow(QWidget):
                 return
             self._launch(TaskRequest(kind=kind, no_transcript=True, audio_files=list(self.audio_files), force_cpu=force_cpu,
                                      voice_type=str(self.cmb_voice_type.currentData() or ""),
-                                     voice_description=self.edt_voice_desc.text().strip()))
+                                     voice_description=self.edt_voice_desc.text().strip(),
+                                     preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None))
             return
         if self.busy or not (self.audio and self.text):
             return
         self._launch(TaskRequest(kind=kind, audio=self.audio, text=self.text, force_cpu=force_cpu,
                                  voice_type=str(self.cmb_voice_type.currentData() or ""),
-                                 voice_description=self.edt_voice_desc.text().strip()))
+                                 voice_description=self.edt_voice_desc.text().strip(),
+                                 preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None))
 
     def start_merge(self) -> bool:
         """"Universal model" button: check free disk space, ask for confirmation, start.  True if started.

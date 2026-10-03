@@ -50,10 +50,13 @@ def test_every_key_used_in_code_exists():
     used |= {f"about.step{i}" for i in range(1, 6)} | {f"stage.{s}" for s in
                                                       ("updates", "model", "align", "slice", "train", "save")}
     used |= {f"about.kind_{k}" for k in ("model", "library", "tool", "asset")}
+    used |= {f"preset.{c}" for c in ("fast", "balanced", "maximum", "manual")} | {f"preset.desc_{c}" for c in ("fast", "balanced", "maximum", "manual")}
+    used |= {f"preset.adv_{c}" for c in ("epochs", "rank", "alpha", "lr", "accum")}     # dynamic keys of the Train window presets
     from infra.install_state import ALL_CODES
     used |= {f"health.{c}" for c in ALL_CODES}          # install-check reason codes (dynamic key)
     en = _cat("en")
-    used.discard("stage.")             # prefix of the dynamic keys stage.<stage>
+    used.discard("stage.")
+    used -= {"preset.", "preset.desc_", "preset.adv_"}             # prefix of the dynamic keys stage.<stage>
     assert used and not (used - set(en)), used - set(en)
     unused = set(en) - used
     assert not unused, unused            # no unused keys in the catalog

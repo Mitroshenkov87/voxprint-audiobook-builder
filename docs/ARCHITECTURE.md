@@ -43,12 +43,12 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 | `text_cleanup.py` | optional neural clean-up: `CleanupEngine` protocol (`correct`), the **validator** (`validate`: only close spelling fixes, `е`->`ё`, inserted commas; everything else rejected), `BlockCache` (JSON per paragraph), `cleanup_book` (progress / cancel / resume), `SageEngine` (lazy transformers, **not run on real hardware**) |
 | `book_prep.py` | `PrepPlan` (rule options + neural step keys + `engine_factory`) and `run_preparation`: rules -> clean-up -> `.debug/prepared_text.txt` + `prep_report.json` |
 | `chunker.py` | chapter text -> sentence-sized chunks (reuses the clause splitter), pause lengths |
+| `asr.py` | speech recognition interface (`Qwen3ASR`, `FakeASR`), `plausibility()` (confidence proxy), `split_at_pauses()` |
+| `asr_dataset.py` | no-transcript mode: many audio files -> ASR -> gates -> the same dataset files as `DatasetBuilder` (clips are recognised individually, no forced alignment) |
+| `train_presets.py` | Fast/Balanced/Maximum/Manual `TrainPlan`s on top of `plan_training`, `estimate_seconds` (4090-calibrated, scaled per GPU) |
 | `narration.py` | `narrate_book`: `TTSEngine` protocol, `ChunkCache` (atomic per-chunk FLAC, key = sha256(engine tag + text)), `synthesize_chunks` (lazy engine, retry, ETA), `assemble_chapters`, `PauseToken`, `NarrationOptions` (formats, bitrates, `allow_aac`, `preprocessors`) |
 | `tts_engine.py` | the real engine `Qwen3AdapterEngine` (qwen-tts + PEFT adapter, voice-clone prompt from `ref_sample.wav`) - **not yet run on a GPU** |
 | `audiobook_export.py` | format registry, file naming, `ffmetadata` chapters, `.m3u8`, ffmpeg command builders, encoder pre-check, `export_formats` (injectable `run`) |
-
-- `asr.py` - speech recognition interface (`Qwen3ASR`, `FakeASR`), `plausibility()` (confidence proxy), `split_at_pauses()`.
-- `asr_dataset.py` - no-transcript mode: many audio files -> ASR -> gates -> the same dataset files as `DatasetBuilder` (clips are recognised individually, so no forced alignment is needed).
 
 ### `infra/`
 | Module | Purpose |

@@ -59,6 +59,8 @@ class TaskRequest:
     no_transcript: bool = False          # audio only: the app recognises the speech itself (see core.asr_dataset)
     audio_files: List[Path] = field(default_factory=list)   # no_transcript: files and/or folders (many clips)
     asr_language: Optional[str] = None   # no_transcript: "Russian" / "English" ... or None = automatic
+    preset: str = "balanced"             # training preset: fast / balanced / maximum / manual (core.train_presets)
+    manual: Optional[object] = None      # core.train_presets.Manual for the "manual" preset
 
     def voice_name(self) -> str:
         """Voice name = the recording's file name (or the adapter folder's name); also the result folder name in ``output/``."""
@@ -240,8 +242,15 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
     if lora:
         from core.lora_trainer import train_lora_from_dataset
 
+        kw = {}
+        if req.preset != "balanced":   # Balanced is the automatic plan (what train_lora_from_dataset chooses itself)
+            from core.train_presets import build_plan
+            from infra.vram_optimizer import detect_gpu
+
+            kw["plan"] = build_plan(req.preset, detect_gpu(), build.n_segments, force_cpu=req.force_cpu,
+                                    language=build.training_language, manual=req.manual)
         res.adapter_path = train_lora_from_dataset(dataset_dir, output_dir, progress, cancel, req.force_cpu,
-                                                   language=build.training_language, warnings_out=res.warnings)
+                                                   language=build.training_language, warnings_out=res.warnings, **kw)
         remember_adapter(res.adapter_path, req.voice_name())
         info = _write_voice_json(req, res.adapter_path, build.language, build.total_seconds)
         res.voice_id = _register_voice(res.adapter_path, info, voice_library)

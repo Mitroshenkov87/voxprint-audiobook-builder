@@ -152,6 +152,15 @@ Use **← Studio** in any window to come back; the gear (top right) opens Settin
 
 Use voices responsibly: only with the voice owner's permission, in line with the voice's licence (see *Privacy* below).
 
+### Training presets
+
+The Train window offers **Fast / Balanced (default) / Maximum / Manual**, each with a short meaning and an **estimated training time for your graphics card and recording**.
+Balanced is the automatic plan. Fast uses about half the passes (epochs) and a half-size adapter (LoRA rank 16); Maximum about twice the passes and rank 64; Manual opens the *Advanced* panel
+(epochs, rank, alpha, learning rate, gradient accumulation). The learning rate is never raised by a preset: in our first real GPU test, 15 epochs at 3e-6 and 8e-6 gave a lower training loss
+but a voice that babbled and never stopped, so the loss alone is not a quality signal.
+The estimate is calibrated on a measured run (RTX 4090: 24 s per epoch for 70 clips, 12 s model load; other cards are scaled by a table, unknown ones by VRAM, a CPU is roughly 40x slower and is not measured);
+read it as "about".
+
 ### No transcript? (audio only)
 
 Tick **I have no transcript** in the Train window and the program recognises the speech itself (Qwen3-ASR, offline; the model, ~1.9 GB, is downloaded on first use).
