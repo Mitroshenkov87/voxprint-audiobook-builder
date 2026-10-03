@@ -25,6 +25,25 @@ from core.voice_library import VoiceRecord
 log = logging.getLogger("voxprint.tts")
 
 
+#: The 12 Hz speech tokenizer produces ~12.5 codec frames per second of audio.
+FRAMES_PER_SECOND = 12.5
+#: Narration speed is ~11-16 characters per second; allow generous slack, but never let a chunk run away.
+MAX_SECONDS_PER_CHAR = 0.19
+MIN_TOKENS = 48
+MAX_TOKENS = 2048
+
+
+def max_tokens_for(text: str) -> int:
+    """Upper bound of codec frames for ``text``.
+
+    Without a bound the model may fail to emit its end-of-speech token (typical for very short chunks such as a one-word
+    chapter title) and keep generating up to the library default of 2048 frames (~160 s of babble, ~9 minutes of GPU
+    time).  Found in the first real narration test on an RTX 4090.
+    """
+    seconds = 3.0 + MAX_SECONDS_PER_CHAR * len(text.strip())
+    return max(MIN_TOKENS, min(MAX_TOKENS, int(round(seconds * FRAMES_PER_SECOND))))
+
+
 def engine_tag(voice: VoiceRecord) -> str:
     """Identity of voice + adapter weights + base model: a retrained or replaced adapter invalidates cached audio."""
     adapter = voice.path / "adapter_model.safetensors"
@@ -70,7 +89,8 @@ class Qwen3AdapterEngine:
         import torch
 
         with torch.inference_mode():
-            wavs, sr = self._q.generate_voice_clone(text=text, language=self.language, voice_clone_prompt=self._prompt)
+            wavs, sr = self._q.generate_voice_clone(text=text, language=self.language, voice_clone_prompt=self._prompt,
+                                                    max_new_tokens=max_tokens_for(text))
         self.sample_rate = int(sr)
         return np.asarray(wavs[0], dtype=np.float32).reshape(-1)
 

@@ -472,3 +472,14 @@ def test_engine_tag_changes_with_the_adapter(tmp_path):
     t1 = tts_engine.engine_tag(rec)
     (d / "adapter_model.safetensors").write_bytes(b"a" * 11)
     assert tts_engine.engine_tag(rec) != t1 and tts_engine.engine_tag(VoiceRecord("w", d, {"base_model": "Qwen/B"})) != tts_engine.engine_tag(rec)
+
+
+def test_max_tokens_is_bounded_by_the_text_length():
+    """A one-word chapter title must not be allowed to run to the library default of 2048 frames (found on the GPU)."""
+    from core import tts_engine as te
+
+    assert te.max_tokens_for("Знакомство") < 100
+    assert te.max_tokens_for("") == te.MIN_TOKENS
+    assert te.max_tokens_for("а" * 260) == round((3 + 0.19 * 260) * 12.5)
+    assert te.max_tokens_for("а" * 100000) == te.MAX_TOKENS
+    assert te.max_tokens_for("a" * 20) < te.max_tokens_for("a" * 200)
