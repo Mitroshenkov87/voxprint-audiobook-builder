@@ -132,19 +132,33 @@ class MainWindow(QWidget):
 
         self.setWindowTitle(APP_TITLE)
         self.setObjectName("root")
-        self.setMinimumSize(800, 700)
-        self.resize(820, 780)
         self.setAcceptDrops(True)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._build()
         self.setStyleSheet(build_style(False))
+        self._fit_to_screen()
         self._refresh_buttons()
         self._os_check = platform_win.check_os()
         if prefetch:
             QTimer.singleShot(300, self.start_prefetch)
         if autocheck:
             QTimer.singleShot(1500, self._startup_checks)
+
+    def _fit_to_screen(self) -> None:
+        """Размер по умолчанию 820x780, но не больше ~90% рабочей области экрана (логические пиксели, т.е. с учётом
+        масштаба 125%/150%); ниже минимума раскладки не опускаем (около 720x610, зависит от языка)."""
+        need = self.layout().minimumSize() if self.layout() is not None else None
+        min_w, min_h = (need.width(), need.height()) if need is not None else (640, 560)
+        w, h = 820, 780
+        try:
+            scr = self.screen() or QApplication.primaryScreen()
+            avail = scr.availableGeometry()
+            w, h = min(w, int(avail.width() * 0.94)), min(h, int(avail.height() * 0.90))
+        except Exception:  # noqa: BLE001 - без экрана (тесты) остаётся размер по умолчанию
+            pass
+        self.setMinimumSize(min_w, min_h)
+        self.resize(max(w, min_w), max(h, min_h))
 
     # ------------------------------------------------------------------ интерфейс
     def _card(self) -> QFrame:

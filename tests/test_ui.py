@@ -211,3 +211,15 @@ def test_privacy_footer_and_one_time_notice(app, tmp_path):
     assert not mw.privacy_acknowledged()
     mw.acknowledge_privacy()
     assert mw.privacy_acknowledged() and mw.privacy_marker().parent == mw.paths.state_dir()
+
+
+def test_window_size_adapts_to_small_screens(app):
+    from ui.main_window import MainWindow
+    w = MainWindow(runner=lambda *a: None, autocheck=False, auto_open_folder=False)
+    need = w.layout().minimumSize()
+    assert w.minimumWidth() == need.width() and w.minimumHeight() == need.height()
+    assert w.width() >= need.width() and w.height() >= need.height()
+    avail = w.screen().availableGeometry()
+    assert w.width() <= max(need.width(), 820) and w.height() <= max(need.height(), 780)
+    assert w.height() <= max(need.height(), int(avail.height() * 0.90)) + 1
+    w.close()
