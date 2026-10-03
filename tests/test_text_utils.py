@@ -56,3 +56,10 @@ def test_attach_spans_keeps_punctuation_and_hyphen():
     assert text_for_words(text, words[:3]) == "«Привет», — сказал он."  or text_for_words(text, words[:3]).endswith("сказал он.")
     assert text_for_words(text, words[3:]) == "Это тест-кейс!"
     assert words[2].sentence_end and words[4].sentence_end and not words[0].sentence_end
+
+
+def test_split_clauses_wraps_unpunctuated_text():
+    words = [f"w{i}" for i in range(100)]
+    units = split_clauses(" ".join(words))        # no punctuation at all: still many small units
+    assert len(units) >= 7 and all(len(u.split()) <= 14 for u in units)
+    assert " ".join(units).split() == words

@@ -233,8 +233,23 @@ def split_clauses(text: str) -> List[str]:
     out: List[str] = []
     for sent in split_sentences(text):
         parts = [p.strip() for p in _CLAUSE_RE.split(sent) if p and p.strip()]
-        out.extend(parts if parts else [sent])
+        for part in (parts if parts else [sent]):
+            out.extend(_wrap_words(part))
     return out
+
+
+#: Клауза длиннее этого числа слов делится на равные части: текст без знаков препинания (расшифровки, субтитры)
+#: иначе остался бы одной «клаузой», и длинную запись нельзя было бы разрезать на куски для выравнивателя.
+MAX_CLAUSE_WORDS = 14
+
+
+def _wrap_words(part: str, limit: int = MAX_CLAUSE_WORDS) -> List[str]:
+    words = part.split()
+    if len(words) <= limit:
+        return [part]
+    n = -(-len(words) // limit)                      # число частей (округление вверх)
+    size = -(-len(words) // n)
+    return [" ".join(words[i:i + size]) for i in range(0, len(words), size)]
 
 
 # --------------------------------------------------------------------------- привязка слов
