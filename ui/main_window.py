@@ -1,4 +1,14 @@
-"""Главное окно Voxprint (PySide6): выбрать аудио, выбрать текст, одна кнопка - и всё остальное автоматически."""
+"""Voxprint main window (PySide6): choose the audio, choose the text, press one button - the rest is automatic.
+
+The main screen keeps only the core workflow (file pickers, "Create voice", optional voice type/description, the
+universal-model and dataset buttons, progress, stage chips, status).  Service items (language, updates, model/data
+folders, repair, About) live in the Settings dialog (:mod:`ui.settings_dialog`) behind the gear button.  The whole UI
+sits in a scroll area so the window stays usable on short screens (e.g. 1366x768 at 150% scaling).
+
+The window never does heavy work itself: tasks run in the QThread workers of :mod:`workers.process_worker`; the
+window only reacts to their signals.  Almost every collaborator (runner, updater, health check ...) is injectable
+through the constructor, which is how the tests drive it without a GPU, network or real dialogs.
+"""
 from __future__ import annotations
 
 import logging
@@ -111,14 +121,17 @@ CONTRAST_PAIRS = [
 
 
 def privacy_marker() -> Path:
+    """State file whose existence means the user has seen the privacy notice."""
     return paths.state_dir() / "privacy_ack"
 
 
 def privacy_acknowledged() -> bool:
+    """True if the first-run privacy notice was already shown."""
     return privacy_marker().exists()
 
 
 def acknowledge_privacy() -> None:
+    """Remember that the privacy notice was shown (failure to write is only logged)."""
     try:
         privacy_marker().write_text("1", encoding="utf-8")
     except OSError:
@@ -134,7 +147,7 @@ def build_style(glass: bool) -> str:
 
 
 def open_folder(path: Path) -> None:
-    """Открывает папку в Проводнике (Windows) или файловом менеджере."""
+    """Open a folder in Explorer (Windows) or the default file manager."""
     p = str(path)
     if sys.platform == "win32":
         try:
@@ -146,12 +159,19 @@ def open_folder(path: Path) -> None:
 
 
 class MainWindow(QWidget):
+    """The application window.  Public attributes (buttons, labels, ``audio``/``text``) are what the tests inspect."""
     def __init__(self, runner: Callable[..., Any] = run_task, updater_factory: Optional[Callable[[], Any]] = None,
                  autocheck: bool = True, auto_open_folder: bool = True,
                  prefetch_fn: Optional[Callable[..., Any]] = None, prefetch: bool = False,
                  health_fn: Optional[Callable[[], list]] = None,
                  model_states_fn: Optional[Callable[[], dict]] = None,
                  repair_fn: Optional[Callable[..., Any]] = None) -> None:
+        """Build the window.
+
+        ``runner`` executes tasks (default :func:`run_task`); ``updater_factory``, ``prefetch_fn``, ``health_fn``,
+        ``model_states_fn`` and ``repair_fn`` replace the real implementations in tests.  ``autocheck`` enables the quiet
+        start-up checks, ``prefetch`` the first-run model download, ``auto_open_folder`` opens the result folder when done.
+        """
         super().__init__()
         self.runner = runner
         self.updater_factory = updater_factory
@@ -210,13 +230,15 @@ class MainWindow(QWidget):
         self.setMinimumSize(MIN_WINDOW_W, MIN_WINDOW_H)
         self.resize(max(w, MIN_WINDOW_W), max(h, MIN_WINDOW_H))
 
-    # ------------------------------------------------------------------ интерфейс
+    # ------------------------------------------------------------------ interface
     def _card(self) -> QFrame:
+        """A rounded panel (``QFrame#card``) used to group related widgets."""
         f = QFrame()
         f.setObjectName("card")
         return f
 
     def _build(self) -> None:
+        """Create all widgets and layouts, then connect the signals.  Texts are filled by :meth:`retranslate`."""
         # The window is a thin shell around a scroll area; all widgets live in ``self.content``.
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -283,7 +305,7 @@ class MainWindow(QWidget):
         vrow.addWidget(self.edt_voice_desc, 1)
         root.addLayout(vrow)
 
-        self.btn_merge = QPushButton()      # шестая кнопка: универсальная модель (~4 ГБ), только по нажатию
+        self.btn_merge = QPushButton()      # universal (merged) model, ~4 GB; only on an explicit click
         root.addWidget(self.btn_merge)
         self.lbl_hint_merge = QLabel()
         self.lbl_hint_merge.setObjectName("hint")
@@ -360,9 +382,9 @@ class MainWindow(QWidget):
         self.btn_repair.clicked.connect(self.start_repair)
         self.retranslate()
 
-    # ------------------------------------------------------------------ язык
+    # ------------------------------------------------------------------ language
     def retranslate(self) -> None:
-        """Подставляет тексты на текущем языке (вызывается при создании окна и при смене языка)."""
+        """Apply the texts of the current language (called on creation and whenever the language changes)."""
         self.lbl_sub.setText(tr("ui.subtitle"))
         self.btn_audio.setText(tr("ui.choose_audio"))
         self.btn_text.setText(tr("ui.choose_text"))
@@ -431,17 +453,19 @@ class MainWindow(QWidget):
         open_folder(paths.app_home())
 
     def open_about(self) -> None:
+        """Show the About dialog (non-blocking under the offscreen test platform)."""
         from ui.about_dialog import AboutDialog
 
         dlg = AboutDialog(self)
         self._about = dlg
-        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":  # в тестах не блокируем
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":  # do not block in tests
             dlg.show()
             return
         dlg.exec()
 
-    # ------------------------------------------------------------------ окно/эффекты
+    # ------------------------------------------------------------------ window / effects
     def showEvent(self, e) -> None:  # noqa: N802
+        """On Windows, enable the Acrylic backdrop once the native window exists; otherwise stay on the plain dark look."""
         super().showEvent(e)
         if sys.platform == "win32" and self.backdrop == "plain":
             self.backdrop = platform_win.apply_backdrop(int(self.winId()))
@@ -449,35 +473,41 @@ class MainWindow(QWidget):
             if self.backdrop != "acrylic":
                 self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
 
-    # ------------------------------------------------------------------ выбор файлов
+    # ------------------------------------------------------------------ file selection
     def set_audio(self, path: Path) -> None:
+        """Remember the chosen recording and update the label and button states."""
         self.audio = Path(path)
         self.lbl_audio.setText(self.audio.name)
         self.lbl_audio.setToolTip(str(self.audio))
         self._refresh_buttons()
 
     def set_text(self, path: Path) -> None:
+        """Remember the chosen text file and update the label and button states."""
         self.text = Path(path)
         self.lbl_text.setText(self.text.name)
         self.lbl_text.setToolTip(str(self.text))
         self._refresh_buttons()
 
     def choose_audio(self) -> None:
+        """File dialog for the recording."""
         exts = " ".join(f"*{e}" for e in sorted(AUDIO_EXT))
         f, _ = QFileDialog.getOpenFileName(self, tr("ui.dlg_audio"), "", tr("ui.filter_audio", exts=exts))
         if f:
             self.set_audio(Path(f))
 
     def choose_text(self) -> None:
+        """File dialog for the text."""
         f, _ = QFileDialog.getOpenFileName(self, tr("ui.dlg_text"), "", tr("ui.filter_text"))
         if f:
             self.set_text(Path(f))
 
     def dragEnterEvent(self, e: QDragEnterEvent) -> None:  # noqa: N802
+        """Accept drags that carry files."""
         if e.mimeData().hasUrls():
             e.acceptProposedAction()
 
     def dropEvent(self, e: QDropEvent) -> None:  # noqa: N802
+        """Dropped ``.txt`` files become the text, known audio extensions become the recording."""
         for url in e.mimeData().urls():
             p = Path(url.toLocalFile())
             if p.suffix.lower() in TEXT_EXT:
@@ -485,9 +515,10 @@ class MainWindow(QWidget):
             elif p.suffix.lower() in AUDIO_EXT:
                 self.set_audio(p)
 
-    # ------------------------------------------------------------------ состояние
+    # ------------------------------------------------------------------ state
     @property
     def busy(self) -> bool:
+        """True while a task or the first-run download is running (the file/voice inputs are then locked)."""
         return bool((self.worker and self.worker.isRunning()) or
                     (self.prefetch_worker and self.prefetch_worker.isRunning()))
 
@@ -502,6 +533,7 @@ class MainWindow(QWidget):
         return bool(self.repair_worker and self.repair_worker.isRunning())
 
     def _refresh_buttons(self) -> None:
+        """Enable/disable controls according to the current state (files chosen, busy, adapter available ...)."""
         busy = self.busy
         ready = bool(self.audio and self.text) and not busy
         self.btn_audio.setEnabled(not busy)
@@ -519,6 +551,7 @@ class MainWindow(QWidget):
         self.btn_cancel.setVisible(bool(self.worker and self.worker.isRunning()))
 
     def _set_chip(self, stage_label: str) -> None:
+        """Highlight the active stage chip and mark the earlier ones as done."""
         active_idx = next((i for i, s in enumerate(ALL_STAGES) if s.label == stage_label), -1)
         for i, s in enumerate(ALL_STAGES):
             chip = self._chips[s]
@@ -528,10 +561,12 @@ class MainWindow(QWidget):
             chip.style().polish(chip)
 
     def _reset_chips(self) -> None:
+        """Reset all stage chips to idle."""
         self._set_chip("")
 
-    # ------------------------------------------------------------------ запуск
+    # ------------------------------------------------------------------ running a task
     def start(self, kind: str, force_cpu: bool = False) -> None:
+        """Start a ``dataset`` or ``lora`` task for the chosen files (with the optional voice type/description)."""
         if self.busy or not (self.audio and self.text):
             return
         self._launch(TaskRequest(kind=kind, audio=self.audio, text=self.text, force_cpu=force_cpu,
@@ -539,7 +574,10 @@ class MainWindow(QWidget):
                                  voice_description=self.edt_voice_desc.text().strip()))
 
     def start_merge(self) -> bool:
-        """Кнопка «универсальная модель»: проверка места на диске, подтверждение, запуск. True - запущено."""
+        """"Universal model" button: check free disk space, ask for confirmation, start.  True if started.
+
+        Under the offscreen test platform the confirmation box is skipped.
+        """
         adapter = last_adapter()
         if self.busy or adapter is None:
             return False
@@ -552,7 +590,7 @@ class MainWindow(QWidget):
         if free < need:
             self.on_failed("export", tr("err.export_disk", need=f"{need:.1f}", free=f"{free:.1f}"), "", "")
             return False
-        if os.environ.get("QT_QPA_PLATFORM") != "offscreen":  # в тестах подтверждение пропускаем
+        if os.environ.get("QT_QPA_PLATFORM") != "offscreen":  # tests skip the confirmation
             box = QMessageBox(self)
             box.setIcon(QMessageBox.Icon.Question)
             box.setWindowTitle(tr("ui.merge_confirm_title"))
@@ -566,6 +604,7 @@ class MainWindow(QWidget):
         return True
 
     def _launch(self, req: TaskRequest) -> None:
+        """Reset the progress UI and run ``req`` in a :class:`ProcessWorker`."""
         self._last_request = req
         self.lbl_ready.hide()
         self.btn_open.hide()
@@ -582,16 +621,19 @@ class MainWindow(QWidget):
         self._refresh_buttons()
 
     def cancel(self) -> None:
+        """Ask the running task to stop."""
         if self.worker:
             self.lbl_status.setText(tr("ui.stopping"))
             self.worker.cancel()
 
     def on_progress(self, pct: int, stage_label: str, message: str) -> None:
+        """Worker signal: update the bar, the active chip and the status line."""
         self.progress.setValue(pct)
         self._set_chip(stage_label)
         self.lbl_status.setText(message)
 
     def on_done(self, result: Any) -> None:
+        """Worker signal: show the result summary (and open the result folder if enabled)."""
         self.progress.setValue(100)
         self._set_chip(Stage.SAVE.label)
         self.result_dir = Path(result.open_dir)
@@ -612,11 +654,13 @@ class MainWindow(QWidget):
             open_folder(self.result_dir)
 
     def on_cancelled(self) -> None:
+        """Worker signal: the user cancelled the task."""
         self.lbl_status.setText(tr("ui.cancelled"))
         self.progress.setValue(0)
         self._reset_chips()
 
     def on_failed(self, kind: str, message: str, details: str, url: str) -> None:
+        """Worker signal: remember and show the error."""
         self.last_error_text = message
         self.progress.setValue(0)
         self._reset_chips()
@@ -624,8 +668,9 @@ class MainWindow(QWidget):
         log.error("task failed: kind=%s msg=%s details=%s", kind, message, details)
         self.show_error(kind, message, details, url)
 
-    # ------------------------------------------------------------------ дружелюбные ошибки
+    # ------------------------------------------------------------------ friendly error messages
     def show_error(self, kind: str, message: str, details: str = "", url: str = "") -> None:
+        """Friendly message box per error kind; for out-of-memory it offers a retry on the CPU."""
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Icon.Warning)
         box.setWindowTitle(APP_TITLE)
@@ -649,15 +694,16 @@ class MainWindow(QWidget):
         self._error_box = box
         box.setModal(True)
         box.finished.connect(lambda _=0: None)
-        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":  # в тестах не блокируем
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":  # do not block in tests
             self._retry_cpu_button = retry_cpu
             return
         box.exec()
         if retry_cpu is not None and box.clickedButton() is retry_cpu and self._last_request:
             self.start(self._last_request.kind, force_cpu=True)
 
-    # ------------------------------------------------------------------ обновления
+    # ------------------------------------------------------------------ updates
     def check_updates(self) -> None:
+        """Start a manual update check in the background (called from the Settings dialog)."""
         if self.update_worker and self.update_worker.isRunning():
             return
         self.lbl_status.setText(tr("upd.checking"))
@@ -672,6 +718,7 @@ class MainWindow(QWidget):
         self._refresh_buttons()
 
     def _on_update_done(self, summary: str, changed: bool) -> None:
+        """Show the result of an update check."""
         self.progress.setValue(100 if changed else 0)
         self.lbl_status.setText(summary or tr("upd.verified_installed") + ".")
 
@@ -684,7 +731,7 @@ class MainWindow(QWidget):
         dlg.decided.connect(worker.answer)
         dlg.open()
 
-    # ------------------------------------------------------------------ состояние установки и моделей
+    # ------------------------------------------------------------------ install health and model state
     def refresh_status(self) -> None:
         """Health of Voxprint's own install + per-model state, computed off the GUI thread."""
         if self.status_worker and self.status_worker.isRunning():
@@ -695,11 +742,13 @@ class MainWindow(QWidget):
         w.start()
 
     def _on_status(self, reasons: list, states: dict) -> None:
+        """StatusWorker result: store the health reasons and model states and redraw."""
         self._health_reasons = list(reasons)
         self._model_states = dict(states)
         self._render_status()
 
     def _render_status(self) -> None:
+        """Show/hide the repair banner and the one-line model state summary."""
         if self._health_reasons:
             self.lbl_health.setText(tr("ui.repair_offer", reasons="; ".join(self._health_reasons)))
         self.health_row.setVisible(bool(self._health_reasons))
@@ -716,6 +765,7 @@ class MainWindow(QWidget):
         self.lbl_models.setVisible(bool(items))
 
     def start_repair(self) -> None:
+        """Rebuild Voxprint's own environment in the background (the banner / Settings button)."""
         if self.busy or (self.repair_worker and self.repair_worker.isRunning()):
             return
         w = RepairWorker(self.repair_fn, parent=self)
@@ -728,6 +778,7 @@ class MainWindow(QWidget):
         w.start()
 
     def _on_repair_done(self, rc: int, text: str) -> None:
+        """Repair finished: show the text and re-check the install state."""
         self.progress.setValue(0)
         self.lbl_status.setText(text)
         self.btn_repair.setEnabled(True)
@@ -737,7 +788,7 @@ class MainWindow(QWidget):
         self.refresh_status()
 
     def _startup_checks(self) -> None:
-        """Памятка о конфиденциальности (один раз), предупреждение об ОС (мягкое) и тихая еженедельная проверка."""
+        """Privacy notice (once), a soft OS warning, then the quiet weekly update check."""
         self.maybe_show_privacy_notice()
         if not self._os_check.ok and self._os_check.message and \
                 os.environ.get("QT_QPA_PLATFORM") != "offscreen":
@@ -753,16 +804,16 @@ class MainWindow(QWidget):
         w.start()
 
     def maybe_show_privacy_notice(self) -> bool:
-        """Один раз при первом запуске. В тестах (offscreen) окно не показывается и отметка не ставится."""
+        """Show the privacy notice on the very first run.  Under offscreen (tests) nothing is shown or stored."""
         if privacy_acknowledged() or os.environ.get("QT_QPA_PLATFORM") == "offscreen":
             return False
         QMessageBox.information(self, tr("ui.privacy_title"), tr("ui.privacy_text"))
         acknowledge_privacy()
         return True
 
-    # ------------------------------------------------------------------ первый запуск
+    # ------------------------------------------------------------------ first run
     def start_prefetch(self) -> None:
-        """Автоматическая докачка моделей при первом запуске (без вопросов пользователю)."""
+        """Download the required models automatically on the first run (no questions asked)."""
         if self.busy:
             return
         w = PrefetchWorker(self.prefetch_fn, parent=self)
@@ -776,19 +827,23 @@ class MainWindow(QWidget):
         self._refresh_buttons()
 
     def _on_prefetch_done(self, downloaded: list) -> None:
+        """First-run download finished."""
         self.progress.setValue(0)
         self.lbl_status.setText(tr("ui.prefetch_done") if downloaded else tr("ui.status_idle"))
         self.refresh_status()
 
     def _on_prefetch_failed(self, message: str, url: str) -> None:
+        """First-run download failed: show the message; the app stays usable and retries next time."""
         self.progress.setValue(0)
         self.lbl_status.setText(message + " " + tr("ui.prefetch_failed"))
 
     def open_result(self) -> None:
+        """Open the folder with the result."""
         if self.result_dir:
             open_folder(self.result_dir)
 
     def closeEvent(self, e) -> None:  # noqa: N802
+        """Decline any pending upgrade offer, cancel a running task and wait for it, then close."""
         if self.upgrade_dialog is not None:      # an unanswered offer = «Not now» (the worker must not wait)
             self.upgrade_dialog.reject()
         if self.worker and self.worker.isRunning():

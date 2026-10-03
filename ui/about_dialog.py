@@ -1,4 +1,7 @@
-"""Окно «О программе / Справка»: что делает Voxprint, шаги, требования, приватность, авторы и список компонентов."""
+""""About / Help" dialog: what Voxprint does, the steps, requirements, privacy, authors and the component list.
+
+All texts come from the locale files; the component list is read from ``credits.json`` through :mod:`core.appinfo`.
+"""
 from __future__ import annotations
 
 import html
@@ -15,15 +18,18 @@ from core.i18n import get_language, tr
 
 
 def _open_url_default(url: QUrl) -> bool:
+    """Open a URL in the system's default browser/application."""
     return QDesktopServices.openUrl(url)
 
 
 class AboutDialog(QDialog):
+    """Modal About dialog with a scrollable rich-text body and buttons for the licence notices and the repository."""
     def __init__(self, parent: Optional[QWidget] = None, repo_url: Optional[str] = None,
                  open_url: Callable[[QUrl], bool] = _open_url_default) -> None:
+        """``open_url`` is injectable so tests never launch a real browser."""
         super().__init__(parent)
         self._open_url = open_url
-        self.repo_link = appinfo.public_repo_url(repo_url)   # None, пока адрес - заглушка (OWNER)
+        self.repo_link = appinfo.public_repo_url(repo_url)   # None while the address is still the OWNER placeholder
         self.setWindowTitle(tr("about.title"))
         self.setObjectName("root")
         self.setMinimumSize(640, 600)
@@ -61,8 +67,9 @@ class AboutDialog(QDialog):
         self.btn_repo.clicked.connect(self.open_repo)
         self.btn_close.clicked.connect(self.accept)
 
-    # ------------------------------------------------------------------ содержимое
+    # ------------------------------------------------------------------ content
     def _build_html(self) -> str:
+        """Build the HTML body (what/concept/steps/requirements/privacy/authors/components); all values are escaped."""
         e = html.escape
         lang = get_language()
         steps = "".join(f"<li>{e(tr(f'about.step{i}'))}</li>" for i in range(1, 6))
@@ -86,14 +93,15 @@ class AboutDialog(QDialog):
         parts.append(f"<p>{e(tr('about.lgpl'))}</p>")
         return "<html><body style='font-size:13px'>" + "".join(parts) + "</body></html>"
 
-    # ------------------------------------------------------------------ действия
+    # ------------------------------------------------------------------ actions
     def open_repo(self) -> bool:
-        """Открывает репозиторий в браузере по умолчанию (если адрес задан)."""
+        """Open the repository in the default browser (only if a real address is configured)."""
         if not self.repo_link:
             return False
         return bool(self._open_url(QUrl(self.repo_link)))
 
     def open_notices(self) -> bool:
+        """Open the bundled THIRD_PARTY_NOTICES file; show a message (outside the offscreen platform) if it is missing."""
         path = appinfo.notices_path()
         if path.exists():
             return bool(self._open_url(QUrl.fromLocalFile(str(path))))

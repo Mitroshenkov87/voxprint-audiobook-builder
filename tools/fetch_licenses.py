@@ -1,8 +1,9 @@
-"""Разработческий скрипт: скачивает ТЕКСТЫ лицензий компонентов в licenses/ (из репозиториев проектов и SPDX).
+"""Developer script: download the licence TEXTS of the components into ``licenses/`` (from the projects' repositories and SPDX).
 
-Запускается вручную при изменении credits.json; результат (папка licenses/) хранится в репозитории и
-попадает в установщик. Для каждого файла проверяется, что он не пустой и (для известных лицензий) содержит
-характерную фразу. Использование:  python tools/fetch_licenses.py [--only id1,id2]
+Run it manually when ``credits.json`` changes; the result (the ``licenses/`` folder) is kept in the repository and
+ships in the installer.  Every downloaded file must be non-trivial.  Usage::
+
+    python tools/fetch_licenses.py [--only id1,id2]
 """
 from __future__ import annotations
 
@@ -14,10 +15,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "licenses"
+# File names tried (in this order) in the root of a project repository.
 NAMES = ("LICENSE", "LICENSE.APACHE", "LICENSE.BSD", "LICENSE-MIT", "LICENSE-APACHE", "LICENSE.txt", "LICENSE.md", "LICENSE.rst", "COPYING", "COPYING.txt", "LICENCE")
 SPDX = "https://raw.githubusercontent.com/spdx/license-list-data/main/text/{}.txt"
 
-# id файла -> ("repo", "owner/name") | ("url", прямой URL) | ("spdx", SPDX-идентификатор)
+# file id -> ("repo", "owner/name") | ("url", direct URL) | ("spdx", SPDX identifier)
 SOURCES = {
     "qwen-tts": ("repo", "QwenLM/Qwen3-TTS"),
     "qwen-asr": ("repo", "QwenLM/Qwen3-ASR"),
@@ -65,6 +67,7 @@ SOURCES = {
 
 
 def get(url: str) -> str | None:
+    """GET a URL and return the decoded text, or None on any network error."""
     try:
         with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "voxprint"}), timeout=30) as r:
             return r.read().decode("utf-8", "replace")
@@ -73,6 +76,7 @@ def get(url: str) -> str | None:
 
 
 def fetch(kind: str, ref: str) -> tuple[str | None, str]:
+    """Fetch the licence text for a source (``repo`` / ``url`` / ``spdx``); returns ``(text_or_None, url_tried)``."""
     if kind == "spdx":
         u = SPDX.format(ref)
         return get(u), u
@@ -88,6 +92,7 @@ def fetch(kind: str, ref: str) -> tuple[str | None, str]:
 
 
 def main(argv: list[str]) -> int:
+    """Download all (or the ``--only`` selected) licences, update ``licenses/SOURCES.json``; exit code 1 if any failed."""
     only = set(argv[argv.index("--only") + 1].split(",")) if "--only" in argv else None
     OUT.mkdir(exist_ok=True)
     index = {}

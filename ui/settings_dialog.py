@@ -28,6 +28,7 @@ class SettingsDialog(QDialog):
     """Non-blocking-friendly settings window; one instance is kept by the main window and re-shown on demand."""
 
     def __init__(self, window: "MainWindow", parent: Optional[QWidget] = None) -> None:
+        """Build the dialog for ``window``; the buttons call the matching :class:`MainWindow` methods."""
         super().__init__(parent or window)
         self._win = window
         self.setObjectName("root")
@@ -108,6 +109,7 @@ class SettingsDialog(QDialog):
         self.cmb_lang.blockSignals(False)
 
     def _on_language_changed(self, _index: int = 0) -> None:
+        """The combo box selection changed: switch the whole UI to that language."""
         code = self.cmb_lang.currentData()
         if code:
             self._win.set_language(str(code))

@@ -1,7 +1,8 @@
-"""Точка входа Voxprint (Windows 11).
+"""Voxprint entry point (Windows 11; the code also runs on Linux for development and tests).
 
-Флаги: --prefetch (принудительно докачать модели; ставится установщиком), --selftest (запуск и выход),
---verify-install (проверка установки, коды причин), --repair (восстановить только собственное окружение Voxprint).
+Flags: ``--prefetch`` (force-download the models; used by the installer), ``--selftest`` (start and quit),
+``--selftest-imports`` (import every heavy library - checks that a PyInstaller build is complete),
+``--verify-install`` (install check with reason codes), ``--repair`` (rebuild only Voxprint's own environment).
 """
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ import sys
 
 
 def _setup_logging() -> None:
+    """Log to ``logs/voxprint.log`` (rotating); fall back to the console if the file cannot be opened."""
     try:
         from infra import paths
 
@@ -23,8 +25,11 @@ def _setup_logging() -> None:
 
 
 def _selftest_imports() -> int:
-    """`--selftest-imports`: импортирует все тяжёлые библиотеки (проверка, что в сборке PyInstaller всё упаковано).
-    Результат печатается и пишется в <логи>/selftest_imports.txt (в оконной сборке консоли нет). 0 - всё в порядке."""
+    """``--selftest-imports``: import all heavy libraries (checks that a PyInstaller build packed everything).
+
+    The result is printed and also written to ``<logs>/selftest_imports.txt`` (a windowed build has no console).
+    Returns 0 when everything is fine.
+    """
     import importlib
     import time
 
@@ -37,7 +42,7 @@ def _selftest_imports() -> int:
             mod = importlib.import_module(name)
             lines.append(f"OK    {name} {getattr(mod, '__version__', '')} ({time.time() - t:.1f}s)")
         except Exception as exc:  # noqa: BLE001
-            if name == "bitsandbytes":          # необязателен: без него обучение идёт на обычном AdamW
+            if name == "bitsandbytes":          # optional: without it training uses plain AdamW
                 lines.append(f"WARN  {name} (optional): {type(exc).__name__}: {exc}")
                 continue
             bad += 1
@@ -65,19 +70,20 @@ def _selftest_imports() -> int:
         pass
     try:
         print(text)
-    except (OSError, ValueError):      # оконная сборка без stdout
+    except (OSError, ValueError):      # windowed build without stdout
         pass
     return 1 if bad else 0
 
 
 def main(argv=None) -> int:
+    """Start the application (or run one of the CLI maintenance flags); returns the process exit code."""
     argv = list(sys.argv if argv is None else argv)
-    # обновлённые пакеты - до импорта тяжёлых библиотек
+    # updated packages must be on sys.path BEFORE the heavy libraries are imported
     from infra.updater import activate_overlay
 
     activate_overlay()
     _setup_logging()
-    try:   # настройки прежней установки Voxprint (копируются, если ещё нет; старая папка не меняется)
+    try:   # settings of an earlier Voxprint install (copied if not present yet; the old folder is left untouched)
         from infra import paths
 
         adopted = paths.adopt_previous_settings()
@@ -95,7 +101,7 @@ def main(argv=None) -> int:
         return install_state.cli_verify()
     if "--selftest-imports" in argv:
         return _selftest_imports()
-    selftest = "--selftest" in argv  # запуск и автоматический выход (проверка в offscreen)
+    selftest = "--selftest" in argv  # start and quit automatically (used for the offscreen smoke check)
 
     from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
@@ -104,7 +110,7 @@ def main(argv=None) -> int:
 
     app = QApplication.instance() or QApplication(argv)
     app.setApplicationName("Voxprint")
-    try:   # значок окна/панели задач (файл поставляется в assets/, в сборке - рядом с ресурсами)
+    try:   # window / taskbar icon (the file ships in assets/, next to the other resources in a build)
         from PySide6.QtGui import QIcon
 
         from infra import paths
@@ -112,7 +118,7 @@ def main(argv=None) -> int:
         ico = paths.resource_dir() / "assets" / "voxprint.ico"
         if ico.is_file():
             app.setWindowIcon(QIcon(str(ico)))
-    except Exception:  # noqa: BLE001 - значок необязателен
+    except Exception:  # noqa: BLE001 - the icon is optional
         pass
     from workers.pipeline_runner import models_missing
 
@@ -120,7 +126,7 @@ def main(argv=None) -> int:
     if not selftest:
         try:
             first_run = bool(models_missing())
-        except Exception:  # noqa: BLE001 - не мешаем запуску
+        except Exception:  # noqa: BLE001 - never get in the way of starting up
             first_run = False
     win = MainWindow(autocheck=not selftest, prefetch=first_run or "--prefetch" in argv)
     win.show()

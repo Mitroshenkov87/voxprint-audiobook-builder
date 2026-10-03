@@ -1,6 +1,7 @@
-"""Сценарии работы приложения без Qt: «датасет», «голос (LoRA)», «обновления».
+"""Application scenarios without Qt: "dataset", "voice (LoRA)", "universal model" and the first-run model prefetch.
 
-Один вызов = вся цепочка этапов. Ошибки - исключения DatasetMakerError с понятным текстом (UI их показывает).
+One call runs the whole chain of stages.  Failures are :class:`DatasetMakerError` exceptions with a user-readable
+message (the UI shows them).  Everything here is plain Python so it can be driven from the GUI worker, the CLI and tests.
 """
 from __future__ import annotations
 
@@ -24,36 +25,40 @@ log = logging.getLogger("voxprint.runner")
 
 KIND_DATASET = "dataset"
 KIND_LORA = "lora"
-KIND_MERGE = "merge"   # универсальная модель из уже обученного адаптера (только по кнопке)
+KIND_MERGE = "merge"   # universal (merged) model from an already trained adapter (button only)
 
+#: Stages of each scenario, used to turn per-stage progress into one overall percentage.
 PLAN_DATASET: List[Stage] = [Stage.UPDATES, Stage.MODEL, Stage.ALIGN, Stage.SLICE, Stage.SAVE]
 PLAN_LORA: List[Stage] = [Stage.UPDATES, Stage.MODEL, Stage.ALIGN, Stage.SLICE, Stage.TRAIN, Stage.SAVE]
 PLAN_MERGE: List[Stage] = [Stage.MODEL, Stage.SAVE]
 
 
 def plan_for(kind: str) -> List[Stage]:
+    """The ordered list of stages a task kind goes through (for the overall progress percentage)."""
     if kind == KIND_MERGE:
         return PLAN_MERGE
     return PLAN_LORA if kind == KIND_LORA else PLAN_DATASET
 
 
 def safe_name(value: str) -> str:
+    """Make ``value`` safe as a folder name (letters, digits, ``-._`` and spaces are kept; falls back to ``voice``)."""
     return re.sub(r"[^\w\-. ]", "_", value).strip() or "voice"
 
 
 @dataclass
 class TaskRequest:
+    """What the user asked for: the task kind, input files, output folder, CPU switch and optional voice metadata."""
     kind: str
     audio: Optional[Path] = None
     text: Optional[Path] = None
     out_root: Optional[Path] = None
     force_cpu: bool = False
-    adapter_dir: Optional[Path] = None   # только для KIND_MERGE: папка обученного адаптера
+    adapter_dir: Optional[Path] = None   # KIND_MERGE only: folder of the trained adapter
     voice_type: str = ""                 # optional, goes to voice.json: male / female / child / other
     voice_description: str = ""          # optional free text, goes to voice.json
 
     def voice_name(self) -> str:
-        """Имя голоса = имя файла записи (или папки адаптера). Это и имя папки результата в output/."""
+        """Voice name = the recording's file name (or the adapter folder's name); also the result folder name in ``output/``."""
         if self.audio:
             return safe_name(Path(self.audio).stem)
         if self.adapter_dir:
@@ -61,6 +66,7 @@ class TaskRequest:
         return "voice"
 
     def resolved_root(self) -> Path:
+        """Result folder: ``out_root`` if given, else ``<audio folder>/<voice>_Voxprint``."""
         if self.out_root:
             return Path(self.out_root)
         if self.audio is None:
@@ -70,6 +76,7 @@ class TaskRequest:
 
 @dataclass
 class TaskResult:
+    """What a finished task produced: folders, number of segments, warnings and (for LoRA/merge) the artifact paths."""
     kind: str
     root_dir: Path
     dataset_dir: Path
@@ -77,16 +84,17 @@ class TaskResult:
     n_segments: int = 0
     warnings: List[str] = field(default_factory=list)
     update_summary: str = ""
-    merged_path: Optional[Path] = None   # папка универсальной модели (KIND_MERGE)
-    speaker: str = ""                   # имя голоса внутри модели
+    merged_path: Optional[Path] = None   # folder of the universal model (KIND_MERGE)
+    speaker: str = ""                   # voice (speaker) name inside the model
 
     @property
     def open_dir(self) -> Path:
+        """Folder the UI opens when the task is done."""
         return self.root_dir
 
 
 def safe_auto_update(progress: ProgressCallback, updater: Optional[Updater] = None) -> str:
-    """Еженедельная авто-проверка. Любая ошибка проглатывается: обновления не должны мешать работе."""
+    """Weekly automatic update check.  Any error is swallowed: updates must never get in the way of the work."""
     try:
         u = updater or Updater()
         if not u.should_autocheck():
@@ -100,15 +108,16 @@ def safe_auto_update(progress: ProgressCallback, updater: Optional[Updater] = No
         return ""
 
 
-# --------------------------------------------------------------------------- последний адаптер
+# --------------------------------------------------------------------------- last adapter
 
 
 def _last_adapter_file() -> Path:
+    """State file remembering the most recently trained adapter."""
     return paths.state_dir() / "last_adapter.json"
 
 
 def remember_adapter(adapter_dir: Path, voice_name: str = "") -> None:
-    """Запоминает последний обученный адаптер - для кнопки «универсальная модель»."""
+    """Remember the last trained adapter - for the "universal model" button."""
     try:
         _last_adapter_file().write_text(json.dumps(
             {"adapter_dir": str(adapter_dir), "voice_name": voice_name, "time": int(time.time())},
@@ -118,7 +127,7 @@ def remember_adapter(adapter_dir: Path, voice_name: str = "") -> None:
 
 
 def last_adapter() -> Optional[Path]:
-    """Папка последнего обученного адаптера; None, если не было или папку удалили."""
+    """Folder of the last trained adapter; None if there was none or the folder was deleted."""
     try:
         d = Path(json.loads(_last_adapter_file().read_text(encoding="utf-8"))["adapter_dir"])
     except (OSError, ValueError, KeyError, TypeError):
@@ -145,6 +154,7 @@ def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech
 
 
 def _run_merge(req: TaskRequest, progress: ProgressCallback, cancel: CancelToken) -> TaskResult:
+    """Export the adapter merged into the base model as a universal model (``KIND_MERGE``)."""
     from core.errors import ExportError
     from core.model_export import MERGED_DIRNAME, export_merged_model, speaker_name
 
@@ -160,6 +170,12 @@ def _run_merge(req: TaskRequest, progress: ProgressCallback, cancel: CancelToken
 def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cancel: Optional[CancelToken] = None,
              updater: Optional[Updater] = None,
              aligner_factory: Optional[Callable[[], object]] = None) -> TaskResult:
+    """Run one scenario end to end and return its :class:`TaskResult`.
+
+    Dataset: check updates -> load aligner -> align -> slice -> quality filter -> save.  LoRA additionally trains the
+    adapter, remembers it and writes ``voice.json`` next to it.  ``updater`` and ``aligner_factory`` are injectable for
+    tests; ``cancel`` is checked between stages and inside the long loops.
+    """
     cancel = cancel or CancelToken()
     if req.kind == KIND_MERGE:
         return _run_merge(req, progress, cancel)
@@ -197,11 +213,11 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
     return res
 
 
-# --------------------------------------------------------------------------- первый запуск
+# --------------------------------------------------------------------------- first run
 
 
 def required_model_repos() -> List[str]:
-    """Модели, нужные для полного сценария на этом компьютере (база TTS зависит от VRAM)."""
+    """Models needed for the full scenario on this computer (the TTS base depends on the available VRAM)."""
     from infra.vram_optimizer import detect_gpu, plan_training
 
     plan = plan_training(detect_gpu(), 100)
@@ -209,7 +225,7 @@ def required_model_repos() -> List[str]:
 
 
 def models_missing(repos: Optional[List[str]] = None) -> List[str]:
-    """Модели, которых нет ни в каталоге Voxprint, ни у других программ (их надо скачивать)."""
+    """Models that exist neither in Voxprint's folder nor in another program's copy (they must be downloaded)."""
     repos = repos if repos is not None else required_model_repos()
     return [r for r in repos
             if not md.verify_local_model(md.local_dir_for(r)) and md.external_model(r) is None]
@@ -217,17 +233,17 @@ def models_missing(repos: Optional[List[str]] = None) -> List[str]:
 
 def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[List[str]] = None,
                     ensure=None) -> List[str]:
-    """Первый запуск: автоматически докачивает все нужные модели. Возвращает список скачанных."""
+    """First run: download all required models automatically.  Returns the list of repositories that were downloaded."""
     ensure = ensure or md.ensure_model
     repos = repos if repos is not None else required_model_repos()
     todo = models_missing(repos)
-    for repo in repos:   # копии других программ: мгновенно, только сообщение «найдено, используем»
+    for repo in repos:   # copies of other programs: instant, only the "found, using it" message is shown
         if repo not in todo and not md.verify_local_model(md.local_dir_for(repo)):
             ensure(repo, lambda s, f, m: progress(Stage.MODEL, 0.0, m))
     for i, repo in enumerate(todo):
         ensure(repo, lambda s, f, m, i=i: progress(Stage.MODEL, (i + f) / max(1, len(todo)), m))
     if ensure is md.ensure_model and sys.platform == "win32":
-        from infra import assets   # системный ffmpeg, иначе закреплённая LGPL-сборка (best effort, не блокирует)
+        from infra import assets   # system ffmpeg, else the pinned LGPL build (best effort, never blocks)
 
         assets.ensure_ffmpeg_tool(lambda f, m: progress(Stage.MODEL, 0.0, m))
     return todo

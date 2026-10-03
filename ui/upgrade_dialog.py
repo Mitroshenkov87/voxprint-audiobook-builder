@@ -16,9 +16,11 @@ from core.i18n import tr
 
 
 class UpgradeOfferDialog(QDialog):
+    """Asks whether to upgrade the listed components of the user's environment; emits ``decided`` exactly once."""
     decided = Signal(list)     # names the user agreed to upgrade ([] = declined)
 
     def __init__(self, offers: List[Dict], parent: Optional[QWidget] = None) -> None:
+        """``offers`` are dicts with ``name``, ``installed``, ``target``, ``compatible`` and ``env`` (see :class:`infra.version_manager.Offer`)."""
         super().__init__(parent)
         self.offers = list(offers)
         self._emitted = False
@@ -58,6 +60,7 @@ class UpgradeOfferDialog(QDialog):
         self.btn_later.clicked.connect(self.reject)
 
     def _items_html(self) -> str:
+        """Rich-text list of the offers, each with a note on what happens if the user declines."""
         parts = []
         for o in self.offers:
             line = html.escape(tr("upg.item", name=o["name"], old=o.get("installed") or "-", new=o["target"]))
@@ -66,17 +69,21 @@ class UpgradeOfferDialog(QDialog):
         return "<br><br>".join(parts)
 
     def accepted_names(self) -> List[str]:
+        """Names of all offered components (what "Upgrade" agrees to)."""
         return [o["name"] for o in self.offers]
 
     def _finish(self, names: List[str]) -> None:
+        """Emit ``decided`` once, no matter how the dialog is closed."""
         if not self._emitted:
             self._emitted = True
             self.decided.emit(names)
 
     def accept_upgrade(self) -> None:
+        """"Upgrade" pressed: agree to all offers and close."""
         self._finish(self.accepted_names())
         self.accept()
 
     def reject(self) -> None:           # «Not now», Esc, closing the window
+        """"Not now", Esc or closing the window: decline everything."""
         self._finish([])
         super().reject()

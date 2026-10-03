@@ -1,10 +1,12 @@
-"""Генератор THIRD_PARTY_NOTICES.md из credits.json (единственный источник данных).
+"""Generator of ``THIRD_PARTY_NOTICES.md`` from ``credits.json`` (the single source of data).
 
-  python tools/gen_notices.py                      -> THIRD_PARTY_NOTICES.md в корне проекта (хранится в репозитории)
-  python tools/gen_notices.py --check              -> код 1, если файл в репозитории отличается от credits.json
-  python tools/gen_notices.py --with-installed --out build/notices/THIRD_PARTY_NOTICES.md
-        -> добавляет таблицу лицензий ВСЕХ установленных пакетов (включая зависимости) из importlib.metadata;
-           используется build.bat для файла, который попадает в установщик.
+::
+
+    python tools/gen_notices.py                      -> THIRD_PARTY_NOTICES.md in the project root (kept in the repo)
+    python tools/gen_notices.py --check              -> exit code 1 if the committed file differs from credits.json
+    python tools/gen_notices.py --with-installed --out build/notices/THIRD_PARTY_NOTICES.md
+        -> also adds a table with the licences of ALL installed packages (including dependencies) from
+           importlib.metadata; used by build.bat for the file that goes into the installer.
 """
 from __future__ import annotations
 
@@ -61,6 +63,7 @@ SPECIAL = """## Important compliance notes
 
 
 def _entry(c: Dict[str, Any]) -> List[str]:
+    """Markdown lines of one component section."""
     lines = [f"### {c['name']}", ""]
     lines.append(f"* Purpose: {c['purpose']['en']}")
     lines.append(f"* Licence: {c['license']}")
@@ -75,6 +78,7 @@ def _entry(c: Dict[str, Any]) -> List[str]:
 
 
 def render(data: Dict[str, Any], with_installed: bool = False) -> str:
+    """Render the whole notices document from the parsed ``credits.json`` (optionally with the installed-packages appendix)."""
     app = data["app"]
     out: List[str] = [HEADER.format(author=app["author"], version=app["version"])]
     comps = data["components"]
@@ -92,7 +96,7 @@ def render(data: Dict[str, Any], with_installed: bool = False) -> str:
 
 
 def installed_appendix() -> str:
-    """Лицензии всех установленных пакетов (транзитивные зависимости) по метаданным дистрибутивов."""
+    """Markdown table with the licences of all installed packages (transitive dependencies), read from distribution metadata."""
     from importlib import metadata
 
     rows = []
@@ -116,6 +120,7 @@ def installed_appendix() -> str:
 
 
 def main(argv: List[str]) -> int:
+    """CLI entry: write the file, or with ``--check`` verify that the committed one is up to date."""
     data = json.loads((ROOT / "credits.json").read_text(encoding="utf-8"))
     text = render(data, with_installed="--with-installed" in argv)
     out = Path(argv[argv.index("--out") + 1]) if "--out" in argv else OUT_DEFAULT
