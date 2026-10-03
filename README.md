@@ -72,20 +72,16 @@ Real screenshots of the current build on **Windows (RTX 4090 server, dark theme,
 
 <p align="center"><img src="docs/screenshots/desktop_acrylic.png" alt="Voxprint Studio over a dark desktop (Acrylic)" width="720"></p>
 
-| Studio | My voices (installed voices, licence and scope badges) | My voices (an online voice, not downloaded yet) |
-|---|---|---|
-| <img src="docs/screenshots/studio_home.png" width="300"> | <img src="docs/screenshots/voices.png" width="300"> | <img src="docs/screenshots/voices_online.png" width="300"> |
-
-| Narrate a book, with the mini player (listen while it is being made) | Train: presets and the no-transcript mode |
+| Studio | Train: presets and the no-transcript mode |
 |---|---|
-| <img src="docs/screenshots/narrate.png" width="330"> | <img src="docs/screenshots/train_notranscript.png" width="330"> |
+| <img src="docs/screenshots/studio_home.png" width="300"> | <img src="docs/screenshots/train_notranscript.png" width="330"> |
 
 | Train: quick preview, compare two variants | Train: voice-owner consent after training | Settings |
 |---|---|---|
 | <img src="docs/screenshots/train_preview.png" width="300"> | <img src="docs/screenshots/train_consent.png" width="300"> | <img src="docs/screenshots/settings.png" width="240"> |
 
-Russian: [`studio_home`](docs/screenshots/ru/studio_home.png), [`voices`](docs/screenshots/ru/voices.png), [`narrate`](docs/screenshots/ru/narrate.png) · German: [`studio_home`](docs/screenshots/de/studio_home.png), [`voices`](docs/screenshots/de/voices.png), [`narrate`](docs/screenshots/de/narrate.png).
-The voices in the screenshots are demo entries.
+Russian: [`studio_home`](docs/screenshots/ru/studio_home.png) · German: [`studio_home`](docs/screenshots/de/studio_home.png)
+Screenshots that show voice lists are not included (they would show the maintainers' private voices); the voices window and the narration window with the mini player are described in the sections below.
 
 ## Installation
 There is no public release yet. Planned installer channels are listed in the [Roadmap](#roadmap). Today you have two options.
