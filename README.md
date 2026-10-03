@@ -93,6 +93,7 @@ The release has two builds of the **same program**; take either one:
 |---|---|---|
 | `Voxprint-Setup-github-build.exe` (+ `.sha256`) | the public **GitHub Actions** workflow `.github/workflows/build-installer.yml` from the tagged source - the build log is public, so you can see how it was made | about 1.96 GiB |
 | `Voxprint-Setup-grokbot-build.exe` (+ `.sha256`) | built by the maintainers' AI assistant on a Windows GPU server with the same `build.bat` and `installer\Voxprint.iss` (maximum LZMA2 compression); it is the build that was installed and tested end to end | about 1.86 GiB |
+| `Voxprint-Setup-online.exe` (+ `.sha256`, `manifest-beta.json`, `Voxprint-payload-NN.zip`) | the small online installer (about 33 MB; see "Online installer" below); downloads the two payload parts (about 3.1 GB) and verifies them with the manifest | about 33 MB + 3.1 GB |
 
 Both are full installers (PyTorch with CUDA is inside, about 3.8 GB installed); the models (about 7 GB) are downloaded once on the first start. If in doubt, use the **github-build**.
 
@@ -101,7 +102,7 @@ Both are full installers (PyTorch with CUDA is inside, about 3.8 GB installed); 
 Get-FileHash .\Voxprint-Setup-github-build.exe -Algorithm SHA256     # compare with the text in Voxprint-Setup-github-build.exe.sha256
 # or:  certutil -hashfile Voxprint-Setup-github-build.exe SHA256
 ```
-Hashes of the current release assets: github-build `4e4bd86e48510fc7a908d4c25c7c58229b56f6007b82c13b001b174e7f57fdbd`, grokbot-build `c2f8f01dc02568a55b60a1c5ed1f456c2f0c03fa4468f27fdc54a93cb53ebc24`.
+Hashes of the current release assets: github-build `4e4bd86e48510fc7a908d4c25c7c58229b56f6007b82c13b001b174e7f57fdbd`, grokbot-build `c2f8f01dc02568a55b60a1c5ed1f456c2f0c03fa4468f27fdc54a93cb53ebc24`, online `e9457b8f977a3ae8084b65ede808978fa99ee8719cb011e0d78df0113958ef1b` (the payload parts' hashes are in `manifest-beta.json`).
 
 ### Online installer (small download)
 `Voxprint-Setup-online.exe` (a few MB, from the same release) is the **smart installer**: it downloads the program in parts (`Voxprint-payload-NN.zip`, each below the 2 GiB GitHub limit) listed in `manifest-beta.json` / `manifest-stable.json` (the channel follows the release: a pre-release such as `v0.1.0-beta` is *beta*). Every part is **verified by its SHA-256** from the manifest, a broken or interrupted download is **resumed** (HTTP `Range`; a corrupt part is discarded), and parts that are **already installed** (same SHA-256 recorded in `voxprint-components.json` in the install folder) are skipped on a re-run or repair. It asks for administrator rights **once** (UAC); your data (models, voices, logs) stays in `%LOCALAPPDATA%\Voxprint`. Silent install: `Voxprint-Setup-online.exe /VERYSILENT /DIR="C:\Voxprint"`; `/Manifest=<url or file>` uses another manifest (a mirror, a test). Unlike the full installer it needs the internet during the setup (about 2 GB of parts, then about 7 GB of models on the first start). Source: `tools/online_fetch.py` (downloader), `tools/make_online_payload.py` (splitter), `installer/Voxprint.iss /DONLINE`, `installer/build_online.ps1`.
