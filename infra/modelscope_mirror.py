@@ -43,7 +43,9 @@ class MirrorError(Exception):
 
 
 def _open(req: urllib.request.Request, timeout: float):
-    return urllib.request.urlopen(req, timeout=timeout)  # noqa: S310 - only https to modelscope.cn / huggingface.co
+    from infra import net
+
+    return net.urlopen(req, timeout)  # noqa: S310 - only https to modelscope.cn / huggingface.co
 
 
 def hf_endpoint() -> str:

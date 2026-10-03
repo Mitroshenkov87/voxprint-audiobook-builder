@@ -15,6 +15,8 @@ imageio-ffmpeg                          # ffmpeg для pydub (MP3/M4A и т.д.
 librosa
 packaging
 safetensors
+certifi                                 # запасные корневые сертификаты (свежая Windows/Server без нужных CA)
+hf_xet                                  # быстрая загрузка моделей с HF (на Windows маркер платформы AMD64 не срабатывает в зависимостях hub)
 
 # transformers: qwen-asr 0.0.6 и qwen-tts 0.1.1 написаны под transformers 4.57.x (в их METADATA стоит ==4.57.6 и
 # ==4.57.3 - они конфликтуют друг с другом), а transformers 5.x их ломает -> держим 4.x.

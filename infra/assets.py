@@ -43,7 +43,9 @@ Opener = Callable[[urllib.request.Request, float], Any]
 
 
 def _open(req: urllib.request.Request, timeout: float):
-    return urllib.request.urlopen(req, timeout=timeout)  # noqa: S310 - pinned https URL, verified by sha256
+    from infra import net
+
+    return net.urlopen(req, timeout)  # noqa: S310 - pinned https URL, verified by sha256
 
 
 def load_manifest(path: Path = MANIFEST_PATH) -> Dict[str, Any]:

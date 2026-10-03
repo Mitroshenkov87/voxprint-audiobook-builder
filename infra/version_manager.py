@@ -137,7 +137,9 @@ def installed_version(name: str) -> Optional[str]:
 
 def http_fetch_json(url: str, timeout: float = 6.0) -> Any:
     req = urllib.request.Request(url, headers={"User-Agent": "Voxprint-updater"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 - только https к PyPI/HF
+    from infra import net
+
+    with net.urlopen(req, timeout) as r:  # noqa: S310 - только https к PyPI/HF
         return json.loads(r.read().decode("utf-8"))
 
 

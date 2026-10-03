@@ -372,3 +372,30 @@ def test_offline_check_and_apply(tmp_path):
     rep, res = u.check_and_apply()
     assert not rep.network_ok and "интернет" in res.summary_ru()
     assert u.should_autocheck()  # неудачная проверка не сбрасывает таймер
+
+
+def test_net_urlopen_retries_with_certifi_on_cert_error(monkeypatch):
+    import ssl
+    import urllib.error
+    import urllib.request
+    from infra import net
+
+    calls = []
+
+    def fake(req, timeout=10.0, context=None):
+        calls.append(context)
+        if context is None:
+            raise urllib.error.URLError(ssl.SSLCertVerificationError("CERTIFICATE_VERIFY_FAILED"))
+        return "ok"
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    assert net.urlopen("https://example.org", 3) == "ok"
+    assert calls[0] is None and calls[1] is not None             # second attempt carries the certifi context
+
+    def other(req, timeout=10.0, context=None):
+        raise urllib.error.URLError(OSError("network down"))
+
+    monkeypatch.setattr(urllib.request, "urlopen", other)
+    import pytest
+    with pytest.raises(urllib.error.URLError):
+        net.urlopen("https://example.org", 3)
