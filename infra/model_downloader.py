@@ -28,6 +28,7 @@ APPROX_SIZE_GB = {
     ALIGNER_REPO: 2.0,
     "Qwen/Qwen3-TTS-12Hz-1.7B-Base": 4.5,
     "Qwen/Qwen3-TTS-12Hz-0.6B-Base": 2.5,
+    "ai-forever/sage-fredt5-distilled-95m": 0.5,         # optional text clean-up model (see infra/text_models.py)
 }
 
 

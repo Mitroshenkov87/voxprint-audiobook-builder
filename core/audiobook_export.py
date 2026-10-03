@@ -76,6 +76,29 @@ class Bitrates:
         return Bitrates(c(self.aac_kbps, 24, 256), c(self.mp3_kbps, 32, 320), c(self.opus_kbps, 12, 128))
 
 
+#: Quality presets shown in the UI (typical bitrates for mono speech); exact values live under "Advanced".
+PRESET_COMPACT, PRESET_STANDARD, PRESET_HIGH = "compact", "standard", "high"
+QUALITY_PRESETS = {
+    PRESET_COMPACT: Bitrates(aac_kbps=48, mp3_kbps=64, opus_kbps=24),
+    PRESET_STANDARD: Bitrates(aac_kbps=64, mp3_kbps=96, opus_kbps=32),
+    PRESET_HIGH: Bitrates(aac_kbps=96, mp3_kbps=128, opus_kbps=48),
+}
+DEFAULT_PRESET = PRESET_STANDARD
+
+
+def preset_for(bitrates: "Bitrates") -> str:
+    """Name of the preset equal to ``bitrates`` or ``""`` (custom values)."""
+    for name, b in QUALITY_PRESETS.items():
+        if (b.aac_kbps, b.mp3_kbps, b.opus_kbps) == (bitrates.aac_kbps, bitrates.mp3_kbps, bitrates.opus_kbps):
+            return name
+    return ""
+
+
+def megabytes_per_hour(kbps: int) -> float:
+    """Size of one hour of audio at ``kbps`` (decimal megabytes)."""
+    return kbps * 1000 / 8 * 3600 / 1e6
+
+
 @dataclass
 class ChapterAudio:
     """A finished chapter: lossless WAV on disk plus its title and exact duration."""

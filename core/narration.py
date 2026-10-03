@@ -12,9 +12,13 @@ after a crash, a cancel or a pause that became a quit skips every finished chunk
 cached job never loads the model.  **Pause/cancel** are cooperative and checked between chunks.
 
 The TTS model sits behind the tiny :class:`TTSEngine` protocol (``synthesize(text) -> samples``); the real implementation
-is :mod:`core.tts_engine` and unit tests use a fake one.  Extension points (deliberately not implemented yet): the
-``preprocessors`` option (text clean-up / translation hook, applied to every chunk's text before synthesis) and
-``Chunk``-level voice selection for multi-voice role markup (all chunks currently use the job's voice).
+is :mod:`core.tts_engine` and unit tests use a fake one.
+
+**Preparation** (``options.prep``, see :mod:`core.book_prep`): before chunking, the whole book goes through the automatic
+rule-based steps and the optional neural clean-up; the prepared text is saved to ``<job>/.debug/``.  Chapter titles in
+the exported files keep their original spelling.  Extension points (deliberately not implemented yet): the
+``preprocessors`` option (a per-chunk ``text -> text`` hook, e.g. translation) and ``Chunk``-level voice selection for
+multi-voice role markup (all chunks currently use the job's voice).
 """
 from __future__ import annotations
 
@@ -34,6 +38,7 @@ import soundfile as sf
 from core import audiobook_export as ex
 from core.audio_utils import resample
 from core.book_parsers import Book
+from core.book_prep import PrepPlan, run_preparation
 from core.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_book
 from core.errors import CancelledByUser, DatasetMakerError, NarrationError
 from core.events import CancelToken
@@ -94,8 +99,10 @@ class NarrationOptions:
     speak_titles: bool = True                 # read each chapter title aloud before the chapter
     keep_cache: bool = False                  # keep the per-chunk audio after a successful export
     allow_aac: bool = True                    # False = the M4B (AAC) export is refused (see infra/features.py)
-    #: Extension point (text clean-up, later translation): functions ``text -> text`` applied to every chunk.
+    #: Extension point (later translation): functions ``text -> text`` applied to every chunk.
     preprocessors: List[Callable[[str], str]] = field(default_factory=list)
+    #: Automatic book preparation (rules + optional neural clean-up); ``None`` = the text is used as it is.
+    prep: Optional[PrepPlan] = None
 
 
 @dataclass
@@ -105,13 +112,13 @@ class NarrationProgress:
     total: int
     eta: Optional[float]
     message: str = ""
-    phase: str = "synth"            # synth | assemble | export | done
+    phase: str = "synth"            # prepare | synth | assemble | export | done
 
     @property
     def fraction(self) -> float:
         """Overall progress 0..1 (synthesis is ~90 % of the work)."""
-        base = {"synth": 0.0, "assemble": 0.9, "export": 0.95, "done": 1.0}[self.phase]
-        span = {"synth": 0.9, "assemble": 0.05, "export": 0.05, "done": 0.0}[self.phase]
+        base = {"prepare": 0.0, "synth": 0.0, "assemble": 0.9, "export": 0.95, "done": 1.0}[self.phase]
+        span = {"prepare": 0.0, "synth": 0.9, "assemble": 0.05, "export": 0.05, "done": 0.0}[self.phase]
         return min(1.0, base + span * (self.done / self.total if self.total else 1.0))
 
 
@@ -312,10 +319,18 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
         if missing:
             raise NarrationError(tr("err.narration_encoder", encoder=", ".join(missing)))
 
+    source_book = book                                        # original titles go into the exported files
+    plan = options.prep
+    if plan is not None and plan.enabled:
+        progress(NarrationProgress(0, 1, None, tr("narr.preparing"), "prepare"))
+        book, _report = run_preparation(
+            book, plan, language, debug_dir=job_dir / ".debug", cache_dir=job_dir / ".cache",
+            progress=lambda f, m: progress(NarrationProgress(int(f * 100), 100, None, tr("narr.preparing_neural", done=m), "prepare")),
+            cancel=cancel)
     chunk_list = chunk_book(book, options.max_chars, chapters, options.speak_titles)
     if not chunk_list:
         raise NarrationError(tr("err.book_empty"))
-    normalizer = default_normalizer(language)
+    normalizer = None if (plan is not None and plan.spells_out_numbers) else default_normalizer(language)
     texts = {c.index: prepare_text(c.text, options, normalizer) for c in chunk_list}
     cache = ChunkCache(job_dir / ".cache")
     counts = synthesize_chunks(chunk_list, engine_factory, engine_tag, cache, texts, progress, cancel, pause)
@@ -325,14 +340,14 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
     progress(NarrationProgress(total, total, 0.0, tr("narr.assembling"), "assemble"))
     work = job_dir / ".work"
     shutil.rmtree(work, ignore_errors=True)
-    chapter_audio = assemble_chapters(book, chunk_list, engine_tag, cache, texts, work)
+    chapter_audio = assemble_chapters(source_book, chunk_list, engine_tag, cache, texts, work)
     cancel.check()
 
     cover_path: Optional[Path] = None
-    if book.cover:
-        cover_path = work / f"cover.{book.cover_ext}"
-        cover_path.write_bytes(book.cover)
-    meta = ex.BookMeta(book.title, book.author, narrator, book.language, cover_path)
+    if source_book.cover:
+        cover_path = work / f"cover.{source_book.cover_ext}"
+        cover_path.write_bytes(source_book.cover)
+    meta = ex.BookMeta(source_book.title, source_book.author, narrator, source_book.language, cover_path)
     result = ex.export_formats(
         ffmpeg, formats, chapter_audio, meta, job_dir, options.bitrates, run,
         progress=lambda f, m: progress(NarrationProgress(total, total, 0.0, tr("narr.exporting"), "export")),
