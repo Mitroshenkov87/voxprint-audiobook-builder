@@ -1,4 +1,15 @@
-"""Каталоги приложения (Windows: %LOCALAPPDATA%\\Voxprint; переопределяется VOXPRINT_HOME)."""
+"""Application directories (Windows: ``%LOCALAPPDATA%\\Voxprint``; overridable with ``VOXPRINT_HOME``).
+
+Layout under :func:`app_home`::
+
+    models/      downloaded Hugging Face / ModelScope snapshots
+    packages/    updated Python packages, put on ``sys.path`` at start-up (before heavy imports)
+    state/       small settings files (language, privacy acknowledgement, updater state, last adapter ...)
+    logs/        log files
+    .staging/    updates are installed here and checked for compatibility before being promoted
+
+Every function creates its directory on demand, except :func:`packages_dir` (it is only read at start-up).
+"""
 from __future__ import annotations
 
 import os
@@ -9,6 +20,7 @@ APP_NAME = "Voxprint"
 
 
 def app_home() -> Path:
+    """Root data directory: ``$VOXPRINT_HOME``, else ``%LOCALAPPDATA%\\Voxprint`` (Windows) / ``$XDG_DATA_HOME/Voxprint``."""
     env = os.environ.get("VOXPRINT_HOME")
     if env:
         p = Path(env)
@@ -21,40 +33,47 @@ def app_home() -> Path:
 
 
 def _sub(name: str) -> Path:
+    """Return (and create) the sub-directory ``name`` of :func:`app_home`."""
     p = app_home() / name
     p.mkdir(parents=True, exist_ok=True)
     return p
 
 
 def models_dir() -> Path:
+    """Directory with downloaded model snapshots."""
     return _sub("models")
 
 
 def logs_dir() -> Path:
+    """Directory for log files."""
     return _sub("logs")
 
 
 def staging_dir() -> Path:
-    """.staging/ - сюда ставятся обновления до проверки совместимости."""
+    """.staging/ - updates are installed here before their compatibility is checked."""
     return _sub(".staging")
 
 
 def packages_dir() -> Path:
-    """Каталог с обновлёнными Python-пакетами; подключается в sys.path при старте (до импорта тяжёлых библиотек)."""
+    """Directory with updated Python packages; added to ``sys.path`` at start-up (before the heavy libraries are imported)."""
     return app_home() / "packages"
 
 
 def state_dir() -> Path:
+    """Directory for small state files (language, privacy acknowledgement, updater state ...)."""
     return _sub("state")
 
 
 def default_results_dir() -> Path:
+    """Default parent folder for results: ``~/Documents/Voxprint``."""
     return Path.home() / "Documents" / APP_NAME
 
 
 def resource_dir() -> Path:
-    """Корень ресурсов, поставляемых с программой (locales/, licenses/, credits.json).
-    В сборке PyInstaller - каталог распаковки (sys._MEIPASS), иначе корень проекта."""
+    """Root of the resources shipped with the program (``locales/``, ``licenses/``, ``credits.json``).
+
+    In a PyInstaller build this is the unpack directory (``sys._MEIPASS``), otherwise the project root.
+    """
     base = getattr(sys, "_MEIPASS", None)
     if base:
         return Path(base)
@@ -62,10 +81,12 @@ def resource_dir() -> Path:
 
 
 def previous_homes() -> list:
-    """Папки данных более ранних установок Voxprint (только чтение): в них можно найти модели и настройки.
+    """Data folders of earlier Voxprint installations (read-only): models and settings can be found there.
 
-    Обновление через установщик сохраняет %LOCALAPPDATA%\\Voxprint (то же app_home) - это и есть основной случай.
-    Дополнительно смотрим типичные прежние места и VOXPRINT_PREVIOUS_HOMES (список через os.pathsep)."""
+    An installer-based upgrade keeps ``%LOCALAPPDATA%\\Voxprint`` (the same :func:`app_home`), which is the main case.
+    Additionally the typical former locations and ``VOXPRINT_PREVIOUS_HOMES`` (a list separated by ``os.pathsep``) are
+    checked.  A candidate counts only if it is a directory containing ``models``, ``state`` or ``packages``.
+    """
     cur = None
     try:
         cur = app_home().resolve()
@@ -104,8 +125,10 @@ ADOPTED_STATE_FILES = ("language", "privacy_ack", "updater_state.json", "last_ad
 
 
 def adopt_previous_settings() -> list:
-    """Копирует настройки из прежней установки Voxprint в текущий каталог состояния (старая папка не меняется).
-    Возвращает список перенесённых файлов."""
+    """Copy settings from an earlier Voxprint installation into the current state directory.
+
+    The old folder is never modified and existing files are never overwritten.  Returns the names of the copied files.
+    """
     done = []
     dst_dir = state_dir()
     for home in previous_homes():

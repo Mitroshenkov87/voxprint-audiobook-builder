@@ -1,8 +1,10 @@
-"""HTTPS-запросы стандартной библиотекой с запасным набором корневых сертификатов (certifi).
+"""HTTPS requests through the standard library with a fallback set of root certificates (certifi).
 
-На «свежей» Windows (особенно Windows Server) в хранилище сертификатов может не быть нужных корневых
-сертификатов, и ssl отвечает CERTIFICATE_VERIFY_FAILED, хотя сайт доступен (скачивание через requests/certifi при
-этом работает). Сначала пробуем обычный контекст; при ошибке проверки сертификата - один повтор с certifi."""
+On a "fresh" Windows (especially Windows Server) the certificate store may lack some root certificates, so ``ssl``
+answers ``CERTIFICATE_VERIFY_FAILED`` even though the site is reachable (downloading through ``requests``/certifi
+works fine in the same situation).  We first try the normal context and, only on a certificate verification error,
+retry exactly once with the certifi bundle.
+"""
 from __future__ import annotations
 
 import ssl
@@ -14,6 +16,7 @@ _certifi_ctx: Optional[ssl.SSLContext] = None
 
 
 def _is_cert_error(exc: BaseException) -> bool:
+    """Return True if ``exc`` (or its ``reason``) is a TLS certificate verification failure."""
     if isinstance(exc, ssl.SSLCertVerificationError):
         return True
     reason = getattr(exc, "reason", None)
@@ -21,6 +24,7 @@ def _is_cert_error(exc: BaseException) -> bool:
 
 
 def certifi_context() -> Optional[ssl.SSLContext]:
+    """Return a (cached) SSL context that trusts the certifi bundle, or None when certifi is unavailable."""
     global _certifi_ctx
     if _certifi_ctx is None:
         try:
@@ -33,7 +37,7 @@ def certifi_context() -> Optional[ssl.SSLContext]:
 
 
 def urlopen(req, timeout: float = 10.0):
-    """Как urllib.request.urlopen, но с повтором через certifi при ошибке проверки сертификата."""
+    """Like :func:`urllib.request.urlopen`, but retries once through certifi on a certificate verification error."""
     try:
         return urllib.request.urlopen(req, timeout=timeout)  # noqa: S310 - только https
     except (urllib.error.URLError, ssl.SSLError, OSError) as exc:

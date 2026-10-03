@@ -23,7 +23,9 @@ from infra import paths
 
 log = logging.getLogger("voxprint.assets")
 MANIFEST_PATH = Path(__file__).with_name("assets_manifest.json")
+#: Marker file proving a folder under ``tools/`` was created by Voxprint (we never replace/delete foreign folders).
 OWNER_MARKER = ".voxprint-owned"
+#: Small JSON next to the installed asset recording which pinned sha256/version it is.
 INFO_FILE = ".asset.json"
 CHUNK = 1024 * 1024
 
@@ -33,26 +35,32 @@ class AssetError(Exception):
     smoke_failed, swap_failed, unsupported_platform."""
 
     def __init__(self, code: str, detail: str = "") -> None:
+        """Store the stable reason ``code`` and an optional human-readable ``detail``."""
         super().__init__(f"{code}: {detail}" if detail else code)
         self.code = code
         self.detail = detail
 
 
+#: ``run(argv) -> (return_code, output)`` - injectable so tests never start real processes.
 Runner = Callable[[List[str]], Tuple[int, str]]
+#: ``open(request, timeout) -> file-like`` - injectable so tests never touch the network.
 Opener = Callable[[urllib.request.Request, float], Any]
 
 
 def _open(req: urllib.request.Request, timeout: float):
+    """Default opener: HTTPS through :mod:`infra.net` (certifi fallback).  The URL is pinned and checked by sha256."""
     from infra import net
 
     return net.urlopen(req, timeout)  # noqa: S310 - pinned https URL, verified by sha256
 
 
 def load_manifest(path: Path = MANIFEST_PATH) -> Dict[str, Any]:
+    """Read the pinned-asset manifest (``assets_manifest.json``: URL, sha256, size, platforms ...)."""
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def spec_for(name: str, platform: Optional[str] = None, manifest: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    """Return the manifest entry of asset ``name`` for ``platform`` (default: this one) merged with its version, or None."""
     m = manifest or load_manifest()
     asset = (m.get("assets") or {}).get(name)
     if not asset:
@@ -62,12 +70,14 @@ def spec_for(name: str, platform: Optional[str] = None, manifest: Optional[Dict[
 
 
 def tools_dir() -> Path:
+    """Directory where pinned third-party tools (ffmpeg) are installed: ``<app_home>/tools``."""
     p = paths.app_home() / "tools"
     p.mkdir(parents=True, exist_ok=True)
     return p
 
 
 def sha256_file(p: Path) -> str:
+    """SHA-256 hex digest of a file, read in 1 MiB chunks."""
     h = hashlib.sha256()
     with open(p, "rb") as f:
         for chunk in iter(lambda: f.read(CHUNK), b""):
@@ -76,12 +86,14 @@ def sha256_file(p: Path) -> str:
 
 
 def _run(args: List[str]) -> Tuple[int, str]:
+    """Default runner: execute a command with a 60 s timeout through the updater's subprocess helper."""
     from infra.updater import run_subprocess
 
     return run_subprocess(args, timeout=60)
 
 
 def smoke_ok(exe: Path, args: List[str], expect: str, run: Runner = _run) -> bool:
+    """Run ``exe args`` and check that it exits with 0 and its output contains ``expect`` (case-insensitive)."""
     rc, out = run([str(exe), *args])
     return rc == 0 and expect.lower() in out.lower()
 
@@ -124,6 +136,7 @@ def _download(spec: Dict[str, Any], dest: Path, opener: Opener, progress: Callab
 
 
 def _extract(archive: Path, spec: Dict[str, Any], out: Path) -> None:
+    """Extract only the whitelisted members from the zip into ``out``; target names must be plain file names (no path traversal)."""
     out.mkdir(parents=True, exist_ok=True)
     try:
         with zipfile.ZipFile(archive) as z:

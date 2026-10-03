@@ -36,9 +36,9 @@ OWNER_MARKER = ".voxprint-owned"
 #: Modules whose presence proves a usable install (checked without importing them - fast; see ``deep``).
 HEALTH_MODULES = ("torch", "transformers", "peft", "accelerate", "safetensors", "qwen_tts", "qwen_asr")
 REQUIREMENT_FILES = ("requirements.txt", "requirements-verified.txt", "requirements-nodeps.txt")
-PYTHON_VERSION_DEFAULT = "3.11"   # = Python сборки/разработки (build.bat: py -3.11); verify сверяет версию с запущенным интерпретатором
+PYTHON_VERSION_DEFAULT = "3.11"   # = the Python of the build/dev machine (build.bat: py -3.11); verify_install compares only major.minor with the running interpreter
 
-# stable reason codes (each has a locale key health.<code>)
+# Stable reason codes (each has a locale key ``health.<code>``); they never contain tracebacks.
 R_NO_MANIFEST = "no_manifest"
 R_SCHEMA = "manifest_unreadable"
 R_APP = "app_version_changed"
@@ -53,19 +53,23 @@ ALL_CODES = (R_NO_MANIFEST, R_SCHEMA, R_APP, R_PYTHON, R_REQS, R_TORCH, R_MISSIN
 
 
 def manifest_path() -> Path:
+    """Path of the install-completion manifest: ``<app_home>/install_manifest.json``."""
     return paths.app_home() / MANIFEST_NAME
 
 
 def venv_dir() -> Path:
+    """Fixed per-user location of Voxprint's own virtual environment: ``<app_home>/venv``."""
     return paths.app_home() / "venv"
 
 
 def venv_python(venv: Optional[Path] = None) -> Path:
+    """Path of the Python executable inside the venv (``Scripts/python.exe`` on Windows, ``bin/python`` elsewhere)."""
     v = venv or venv_dir()
     return v / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
 
 
 def requirement_hashes(root: Optional[Path] = None) -> Dict[str, str]:
+    """sha256 of every requirements file (and the verified manifest), so a later change can be detected."""
     root = root or paths.resource_dir()
     out = {}
     for name in (*REQUIREMENT_FILES, "infra/verified_manifest.json"):
@@ -78,6 +82,7 @@ def requirement_hashes(root: Optional[Path] = None) -> Dict[str, str]:
 
 
 def _atomic_write(path: Path, text: str) -> bool:
+    """Write ``text`` to ``path`` through a temp file + fsync + ``os.replace``; returns False (and logs) on OSError."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
@@ -115,7 +120,7 @@ def begin_install() -> None:
 
 def write_manifest(torch_flavor: str, python: Optional[str] = None, req_root: Optional[Path] = None,
                    now: Callable[[], float] = time.time) -> bool:
-    """Called LAST, only after every step succeeded."""
+    """Called LAST, only after every install step succeeded: records what the environment was built from."""
     data = {
         "schema": SCHEMA,
         "completed_at": int(now()),
@@ -130,6 +135,7 @@ def write_manifest(torch_flavor: str, python: Optional[str] = None, req_root: Op
 
 
 def read_manifest() -> Optional[dict]:
+    """Load the install manifest, or None if it is missing / unreadable / not a JSON object."""
     try:
         d = json.loads(manifest_path().read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -139,19 +145,23 @@ def read_manifest() -> Optional[dict]:
 
 @dataclass
 class HealthReport:
+    """Result of :func:`verify_install`: ``ok`` plus reasons as ``"code"`` or ``"code:detail"`` strings."""
     ok: bool = True
     reasons: List[str] = field(default_factory=list)      # "code" or "code:detail"
 
     def add(self, code: str, detail: str = "") -> None:
+        """Record a failure (marks the report as not ok)."""
         self.ok = False
         self.reasons.append(f"{code}:{detail}" if detail else code)
 
     @property
     def codes(self) -> List[str]:
+        """Only the stable codes, without the details."""
         return [r.split(":", 1)[0] for r in self.reasons]
 
 
 def _has_module(name: str) -> bool:
+    """True if the module can be found without importing it (fast)."""
     try:
         return importlib.util.find_spec(name) is not None
     except (ImportError, ValueError):
@@ -234,6 +244,7 @@ def describe_reasons(rep: HealthReport) -> List[str]:
 
 # ------------------------------------------------------------------------------------- the per-user venv (uv)
 def owned(path: Path) -> bool:
+    """True if the folder carries Voxprint's ownership marker (so it may be rebuilt/deleted)."""
     return (path / OWNER_MARKER).exists()
 
 
@@ -256,6 +267,7 @@ def plan_commands(uv: str, torch_flavor: str, python_version: str = PYTHON_VERSI
 
 @dataclass
 class InstallResult:
+    """Outcome of :func:`run_install`: success flag, index of the failed step and the tail of its output."""
     ok: bool
     failed_step: int = -1
     log: str = ""

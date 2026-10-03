@@ -1,27 +1,28 @@
-"""Windows-специфичный код (всё под проверкой sys.platform): версия ОС, тёмный заголовок, Acrylic.
+"""Windows-specific code (everything is guarded by ``sys.platform``): OS version check, dark title bar, Acrylic.
 
-Целевая ОС: Windows 11 26H2 (сборка 26300) и новее той же ветки (24H2/25H2 = 26100+). Минимум - 26100.
-На других ОС все функции безопасно ничего не делают, чтобы позже можно было добавить платформенный модуль
-для Linux (infra/platform_linux.py) с тем же набором функций.
+Target OS: Windows 11 26H2 (build 26300) and newer builds of the same branch (24H2/25H2 = 26100+); the minimum is
+26100.  On other platforms every function safely does nothing, so a platform module for Linux
+(``infra/platform_linux.py``) with the same set of functions can be added later.
 """
 from __future__ import annotations
 
-from core.i18n import tr
 import sys
 from dataclasses import dataclass
 from typing import Optional
 
-MIN_BUILD = 26100          # Windows 11 24H2 и новее (26H2 = 26300)
-BACKDROP_MIN_BUILD = 22621  # DWMWA_SYSTEMBACKDROP_TYPE появился в 22H2
+from core.i18n import tr
+
+MIN_BUILD = 26100          # Windows 11 24H2 and newer (26H2 = 26300)
+BACKDROP_MIN_BUILD = 22621  # DWMWA_SYSTEMBACKDROP_TYPE appeared in 22H2
 
 IS_WINDOWS = sys.platform == "win32"
 
-# Константы DWM - сверены с документацией Microsoft Learn (dwmapi.h, 2026-10-02):
+# DWM constants - checked against the Microsoft Learn documentation (dwmapi.h, 2026-10-02):
 #   DWMWA_USE_IMMERSIVE_DARK_MODE = 20 (Win10 20H1+/Win11), DWMWA_WINDOW_CORNER_PREFERENCE = 33,
 #   DWMWA_SYSTEMBACKDROP_TYPE = 38 (Win11 build 22621+);
 #   DWM_SYSTEMBACKDROP_TYPE: AUTO=0, NONE=1, MAINWINDOW=2 (Mica), TRANSIENTWINDOW=3 (Acrylic),
 #   TABBEDWINDOW=4 (Mica Alt); DWM_WINDOW_CORNER_PREFERENCE: DEFAULT=0, DONOTROUND=1, ROUND=2, ROUNDSMALL=3.
-# Только нативный DWM через ctypes: GPL-библиотеки (PyQt-Frameless-Window, PySide6-Fluent-Widgets) не используются.
+# Only the native DWM through ctypes is used: GPL libraries (PyQt-Frameless-Window, PySide6-Fluent-Widgets) are avoided.
 DWMWA_USE_IMMERSIVE_DARK_MODE = 20
 DWMWA_WINDOW_CORNER_PREFERENCE = 33
 DWMWA_SYSTEMBACKDROP_TYPE = 38
@@ -31,12 +32,14 @@ DWMWCP_ROUND = 2
 
 @dataclass(frozen=True)
 class OsCheck:
+    """Result of the OS check: ``ok`` flag, the detected build (None if unknown) and a user-facing message (empty when ok)."""
     ok: bool
     build: Optional[int]
     message: str
 
 
 def windows_build() -> Optional[int]:
+    """Return the Windows build number, or None on other platforms / when it cannot be determined."""
     if not IS_WINDOWS:
         return None
     try:
@@ -85,7 +88,7 @@ def apply_backdrop(hwnd: int, dark: bool = True) -> str:
         class MARGINS(ctypes.Structure):
             _fields_ = [("l", ctypes.c_int), ("r", ctypes.c_int), ("t", ctypes.c_int), ("b", ctypes.c_int)]
 
-        m = MARGINS(-1, -1, -1, -1)  # «стекло» на всю клиентскую область
+        m = MARGINS(-1, -1, -1, -1)  # extend the "glass" frame over the whole client area
         dwm.DwmExtendFrameIntoClientArea(h, ctypes.byref(m))
         hr = _set(DWMWA_SYSTEMBACKDROP_TYPE, DWMSBT_TRANSIENTWINDOW)
         return "acrylic" if hr == 0 else "plain"

@@ -48,8 +48,11 @@ Runner = Callable[[List[str]], Tuple[int, str]]
 #: What we ask other Pythons about (metadata only).
 PROBED_PACKAGES = ("torch", "torchaudio", "transformers", "peft", "accelerate", "bitsandbytes", "huggingface_hub",
                    "qwen-tts", "qwen-asr", "unsloth", "safetensors")
+#: Upper bound on the number of other interpreters we ask (each probe is a subprocess).
 MAX_PYTHONS = 6
 
+# Tiny script run by *other* Pythons (``python -I -c``): prints the installed versions as one JSON line.
+# It uses importlib.metadata only - nothing is imported from the probed environment, nothing is written.
 _PROBE_CODE = (
     "import json,sys\n"
     "from importlib import metadata as m\n"
@@ -82,6 +85,7 @@ def is_own_environment() -> bool:
 
 
 def _run(args: List[str]) -> Tuple[int, str]:
+    """Default runner for subprocess probes (30 s timeout)."""
     from infra.updater import run_subprocess
 
     return run_subprocess(args, timeout=30)
@@ -94,7 +98,8 @@ CUDA_FLAVORS: Tuple[Tuple[Tuple[int, int], str], ...] = (
 
 
 def parse_nvidia_smi_cuda(text: str) -> Optional[Tuple[int, int]]:
-    m = re.search(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)", text or "")   # драйверы 6xx печатают "CUDA UMD Version"
+    """Extract the driver's CUDA version ``(major, minor)`` from ``nvidia-smi`` output, or None."""
+    m = re.search(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)", text or "")   # 6xx drivers print "CUDA UMD Version"
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 
@@ -115,6 +120,7 @@ def torch_flavor_of(version: Optional[str]) -> Optional[str]:
 
 
 def _cuda_tuple(tag: str) -> Optional[Tuple[int, int]]:
+    """'cu128' -> (12, 8); 'cu118' -> (11, 8); anything else -> None."""
     m = re.fullmatch(r"cu(\d{2,3})", tag or "")
     if not m:
         return None
@@ -146,6 +152,7 @@ def decide_torch(installed: Optional[str], wanted_flavor: str, external: bool = 
 
 
 def detect_driver_cuda(run: Runner = _run, which: Callable[[str], Optional[str]] = shutil.which) -> Optional[Tuple[int, int]]:
+    """CUDA version supported by the installed NVIDIA driver (via ``nvidia-smi``), or None without a driver."""
     exe = which("nvidia-smi")
     if not exe:
         return None
@@ -156,6 +163,7 @@ def detect_driver_cuda(run: Runner = _run, which: Callable[[str], Optional[str]]
 # ------------------------------------------------------------------------------------- ffmpeg
 @dataclass(frozen=True)
 class FfmpegInfo:
+    """An ffmpeg found on PATH: location, version string and whether ``ffmpeg -version`` really ran."""
     path: str
     version: str
     ok: bool            # `ffmpeg -version` ran and printed a version
@@ -174,6 +182,7 @@ def probe_ffmpeg(which: Callable[[str], Optional[str]] = shutil.which, run: Runn
 # ------------------------------------------------------------------------------------- other Pythons
 @dataclass
 class PythonEnv:
+    """Another Python interpreter we looked at: executable, version, tracked package versions and where it was found."""
     exe: str
     version: Tuple[int, int, int]
     packages: Dict[str, str] = field(default_factory=dict)
@@ -235,6 +244,7 @@ def candidate_pythons(which: Callable[[str], Optional[str]] = shutil.which,
 
 def probe_python(exe: str, source: str = "path", run: Runner = _run,
                  names: Tuple[str, ...] = PROBED_PACKAGES) -> Optional[PythonEnv]:
+    """Ask another interpreter for its version and the versions of ``names`` (metadata only); None on any failure."""
     rc, out = run([exe, "-I", "-c", _PROBE_CODE, *names])
     if rc != 0 or "VXPROBE" not in out:
         return None
@@ -257,6 +267,7 @@ def pick_pip_python(envs: List[PythonEnv], want: Tuple[int, int] = tuple(sys.ver
 # ------------------------------------------------------------------------------------- the report
 @dataclass
 class EnvReport:
+    """Everything the read-only probe found: per-component decisions, other Pythons, ffmpeg, driver CUDA, ignored packages."""
     decisions: List[Decision] = field(default_factory=list)
     pythons: List[PythonEnv] = field(default_factory=list)
     ffmpeg: Optional[FfmpegInfo] = None
@@ -265,6 +276,7 @@ class EnvReport:
     ignored: Dict[str, str] = field(default_factory=dict)       # package -> reason code (e.g. unsloth)
 
     def counts(self) -> Dict[str, int]:
+        """Number of decisions per action (reuse / upgrade / offer_upgrade / install)."""
         c = {ACTION_REUSE: 0, ACTION_UPGRADE: 0, ACTION_OFFER: 0, ACTION_INSTALL: 0}
         for d in self.decisions:
             if d.action in c:
@@ -272,6 +284,7 @@ class EnvReport:
         return c
 
     def by_name(self, name: str) -> Optional[Decision]:
+        """The decision for package ``name``, or None."""
         return next((d for d in self.decisions if d.name == name), None)
 
 

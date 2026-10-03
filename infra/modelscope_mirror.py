@@ -30,7 +30,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 log = logging.getLogger("voxprint.models")
 
 BASE_URL = os.environ.get("VOXPRINT_MODELSCOPE_URL", "https://modelscope.cn").rstrip("/")
-REVISION = "master"
+REVISION = "master"   # ModelScope has no commit sha for these files; sizes are verified instead (see module docstring)
 CHUNK = 1024 * 1024
 #: Hugging Face counts as "slow/unreachable" if a tiny API request takes longer than this (seconds).
 HF_PROBE_TIMEOUT = 6.0
@@ -39,16 +39,19 @@ Opener = Callable[[urllib.request.Request, float], "object"]
 
 
 class MirrorError(Exception):
+    """The mirror cannot supply a complete, verified copy; the caller reports it (or tries another source)."""
     pass
 
 
 def _open(req: urllib.request.Request, timeout: float):
+    """Default opener: HTTPS through :mod:`infra.net` (certifi fallback)."""
     from infra import net
 
     return net.urlopen(req, timeout)  # noqa: S310 - only https to modelscope.cn / huggingface.co
 
 
 def hf_endpoint() -> str:
+    """Hugging Face base URL: ``$HF_ENDPOINT`` (a user's own mirror) or huggingface.co."""
     return os.environ.get("HF_ENDPOINT", "https://huggingface.co").rstrip("/")
 
 
@@ -74,6 +77,7 @@ def hf_is_fast(repo_id: str, opener: Opener = _open, timeout: float = HF_PROBE_T
 
 
 def list_files(repo_id: str, opener: Opener = _open, timeout: float = 20.0) -> List[Tuple[str, int]]:
+    """List ``(path, size)`` of all files of a ModelScope repository (folders, ``.gitattributes`` and README excluded)."""
     url = f"{BASE_URL}/api/v1/models/{repo_id}/repo/files?Recursive=true"
     try:
         with opener(urllib.request.Request(url, headers={"User-Agent": "Voxprint"}), timeout) as r:  # type: ignore
@@ -89,6 +93,7 @@ def list_files(repo_id: str, opener: Opener = _open, timeout: float = 20.0) -> L
 
 
 def _safe_rel(rel: str) -> bool:
+    """True for a relative path that cannot escape the destination folder (no absolute path, ``..`` or drive letter)."""
     parts = rel.replace("\\", "/").split("/")
     return bool(rel) and not rel.startswith(("/", "\\")) and ".." not in parts and ":" not in parts[0]
 
@@ -96,9 +101,11 @@ def _safe_rel(rel: str) -> bool:
 def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = lambda f: None,
                   expected_sizes: Optional[Dict[str, int]] = None, opener: Opener = _open,
                   timeout: float = 30.0) -> Dict[str, int]:
-    """Downloads all files of ``repo_id`` into ``dest`` (resuming), verifies sizes, returns {path: size}.
+    """Download all files of ``repo_id`` into ``dest`` (resuming), verify the sizes and return ``{path: size}``.
 
-    ``expected_sizes``: sizes of the verified revision; every one of those files must be present with that size."""
+    ``expected_sizes`` are the sizes of the verified revision; every one of those files that exists on the mirror must
+    have exactly that size, otherwise :class:`MirrorError` is raised.
+    """
     files = list_files(repo_id, opener)
     sizes = dict(files)
     if expected_sizes:
@@ -130,7 +137,7 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
             try:
                 with opener(urllib.request.Request(url, headers=headers), timeout) as r:  # type: ignore[arg-type]
                     status = getattr(r, "status", 200)
-                    if have and status != 206:       # server ignored Range: start over
+                    if have and status != 206:       # server ignored Range (no 206 Partial Content): start over
                         have = 0
                     with open(part, "ab" if have else "wb") as f:
                         while True:

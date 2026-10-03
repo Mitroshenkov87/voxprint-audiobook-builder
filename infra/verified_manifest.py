@@ -1,10 +1,10 @@
-"""Манифест «проверено Voxprint»: закреплённые версии пакетов и ревизии моделей, с которыми приложение тестировалось.
+""""Verified by Voxprint" manifest: pinned package versions and model revisions the app was tested with.
 
-* Встроенный файл verified_manifest.json лежит рядом с кодом (и в exe).
-* Необязательный удалённый манифест (REMOTE_MANIFEST_URL / переменная VOXPRINT_MANIFEST_URL) подхватывается,
-  если он корректен и новее встроенного; последняя удачная копия кэшируется в state/.
-* Безопасность: из манифеста принимаются только известные пакеты и модели из списков version_manager,
-  версии проверяются как PEP 440, ревизии - как 40-значный sha. Ничего другого pip не получит.
+* The bundled ``verified_manifest.json`` lives next to the code (and inside the exe).
+* An optional remote manifest (``REMOTE_MANIFEST_URL`` / the ``VOXPRINT_MANIFEST_URL`` variable) is picked up if it
+  is valid and not older than the bundled one; the last good copy is cached in ``state/``.
+* Safety: only known packages and models from the ``version_manager`` lists are accepted, versions must be valid
+  PEP 440 and revisions 40-character shas.  pip is never handed anything else.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from infra import paths
 log = logging.getLogger("voxprint.manifest")
 
 SCHEMA = 1
-#: TODO: после публикации репозитория сюда можно прописать raw-URL манифеста; пусто = только встроенный.
+#: TODO: once the repository is published, put the raw URL of the manifest here; empty = bundled manifest only.
 REMOTE_MANIFEST_URL = ""
 BUNDLED_PATH = Path(__file__).with_name("verified_manifest.json")
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -31,6 +31,7 @@ _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 @dataclass
 class Manifest:
+    """A parsed manifest: package -> exact version, model repo -> commit sha, plus where it came from (``source``)."""
     name: str = "Voxprint verified set"
     date: str = ""
     note: str = ""
@@ -39,13 +40,14 @@ class Manifest:
     source: str = "bundled"      # bundled | remote | cache
 
     def to_dict(self) -> Dict[str, Any]:
+        """Serialise to the on-disk JSON format (used for the cache file)."""
         return {"schema": SCHEMA, "name": self.name, "date": self.date, "note": self.note,
                 "packages": self.packages, "models": self.models}
 
 
 def parse_manifest(data: Any, allowed_packages: Optional[List[str]] = None,
                    allowed_models: Optional[List[str]] = None, source: str = "bundled") -> Manifest:
-    """Проверяет структуру; бросает ValueError при любой неточности."""
+    """Validate the structure and return a :class:`Manifest`; raises ValueError on any irregularity."""
     if not isinstance(data, dict) or data.get("schema") != SCHEMA:
         raise ValueError("unsupported manifest schema")
     pk = data.get("packages") or {}
@@ -69,22 +71,25 @@ def parse_manifest(data: Any, allowed_packages: Optional[List[str]] = None,
 
 
 def _allowed():
+    """The (packages, models) allow-lists from :mod:`infra.version_manager` (imported lazily to avoid a cycle)."""
     from infra.version_manager import TRACKED_MODELS, TRACKED_PACKAGES
 
     return list(TRACKED_PACKAGES), list(TRACKED_MODELS)
 
 
 def load_bundled() -> Manifest:
+    """Load the manifest shipped with the program."""
     pk, md = _allowed()
     return parse_manifest(json.loads(BUNDLED_PATH.read_text(encoding="utf-8")), pk, md, "bundled")
 
 
 def cache_file() -> Path:
+    """Where the last good remote manifest is cached."""
     return paths.state_dir() / "verified_manifest.json"
 
 
 def load_manifest(fetch_json: Optional[Callable[[str], Any]] = None, url: Optional[str] = None) -> Manifest:
-    """Встроенный манифест; удалённый (или кэш) заменяет его, только если корректен и не старее."""
+    """The bundled manifest; a remote one (or the cache) replaces it only if it is valid and not older."""
     best = load_bundled()
     pk, md = _allowed()
     url = url if url is not None else os.environ.get("VOXPRINT_MANIFEST_URL", REMOTE_MANIFEST_URL)
@@ -93,7 +98,7 @@ def load_manifest(fetch_json: Optional[Callable[[str], Any]] = None, url: Option
         try:
             candidate = parse_manifest(fetch_json(url), pk, md, "remote")
             cache_file().write_text(json.dumps(candidate.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception as exc:  # noqa: BLE001 - сеть/формат: тихо остаёмся на том, что есть
+        except Exception as exc:  # noqa: BLE001 - network/format problem: quietly keep what we have
             log.warning("remote manifest ignored: %s", exc)
             candidate = None
     if candidate is None:
@@ -106,23 +111,24 @@ def load_manifest(fetch_json: Optional[Callable[[str], Any]] = None, url: Option
     return best
 
 
-NODEPS_PREFIXES = ("qwen-",)   # qwen-asr / qwen-tts закрепляют разные transformers -> ставятся с --no-deps
+NODEPS_PREFIXES = ("qwen-",)   # qwen-asr / qwen-tts pin different transformers versions -> they are installed with --no-deps
 
 
 def requirements_lines(m: Optional[Manifest] = None, nodeps: bool = False) -> List[str]:
+    """``name==version`` lines of the manifest; ``nodeps`` selects the packages that must be installed with ``--no-deps``."""
     m = m or load_bundled()
     return [f"{n}=={v}" for n, v in sorted(m.packages.items()) if n.startswith(NODEPS_PREFIXES) == nodeps]
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    """python -m infra.verified_manifest [--nodeps]  -> строки requirements из встроенного манифеста."""
+    """``python -m infra.verified_manifest [--nodeps]`` prints requirements lines from the bundled manifest."""
     import sys
 
     nodeps = "--nodeps" in (argv if argv is not None else sys.argv[1:])
-    print("# Сгенерировано: python -m infra.verified_manifest" + (" --nodeps" if nodeps else "")
-          + "  (версии из infra/verified_manifest.json)")
+    print("# Generated by: python -m infra.verified_manifest" + (" --nodeps" if nodeps else "")
+          + "  (versions from infra/verified_manifest.json)")
     if nodeps:
-        print("# Ставить так: pip install --no-deps -r requirements-nodeps.txt")
+        print("# Install with: pip install --no-deps -r requirements-nodeps.txt")
     for line in requirements_lines(nodeps=nodeps):
         print(line)
     return 0

@@ -1,11 +1,17 @@
-"""Подбор параметров обучения LoRA под объём VRAM (чистая логика + необязательный мониторинг через torch)."""
+"""Choose LoRA training parameters for the available VRAM (pure logic + optional monitoring through torch).
+
+The defaults mirror the Alexandria training script (``train_lora.py``): batch size 1 with gradient accumulation,
+r=32 / alpha=128, a tiny learning rate, eager attention, gradient checkpointing, bf16 on the GPU.  The plan degrades
+gracefully with less VRAM (8-bit Adam, the 0.6B base model) and falls back to the CPU.
+"""
 from __future__ import annotations
 
-from core.i18n import tr
 import logging
 import threading
 from dataclasses import dataclass, field, replace
 from typing import Callable, List, Optional
+
+from core.i18n import tr
 
 log = logging.getLogger("voxprint.vram")
 
@@ -15,25 +21,27 @@ MODEL_0_6B = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
 
 @dataclass(frozen=True)
 class GpuInfo:
+    """What we know about the first CUDA device: availability, name and total/free memory in GiB."""
     available: bool
     name: str = ""
     total_gb: float = 0.0
     free_gb: float = 0.0
 
 
-#: Значения по умолчанию взяты из документации и скрипта Alexandria (train_lora.py / lora.md).
+#: Defaults taken from the Alexandria documentation and training script (train_lora.py / lora.md).
 LORA_R = 32
 LORA_ALPHA = 128
-TARGET_PASSES = 320          # правило lora.md: примеров x эпох ~ 250-400 (больше ~600 - переобучение)
-LOSS_WARN_BELOW = 3.5        # lora.md: loss < ~3.5 - "каша" / нет EOS (для английского; для русского не подтверждено)
-MAX_AUDIO_SECONDS = 30.0     # как --max_audio_seconds в train_lora.py
+TARGET_PASSES = 320          # lora.md rule: examples x epochs ~ 250-400 (above ~600 it overfits)
+LOSS_WARN_BELOW = 3.5        # lora.md: loss < ~3.5 means garbled speech / missing EOS (confirmed for English only, not for Russian)
+MAX_AUDIO_SECONDS = 30.0     # same as --max_audio_seconds in train_lora.py
 
 
 @dataclass(frozen=True)
 class TrainPlan:
+    """Complete, immutable set of training hyper-parameters chosen for this machine and dataset size."""
     device: str                    # "cuda:0" | "cpu"
     base_model: str
-    batch_size: int                # всегда 1 (как в train_lora.py)
+    batch_size: int                # always 1 (as in train_lora.py)
     grad_accum: int
     gradient_checkpointing: bool
     use_8bit_adam: bool
@@ -43,17 +51,18 @@ class TrainPlan:
     lr: float
     epochs: int
     max_seconds_per_item: float
-    language: str = "russian"      # флаг --language обучения (строчными буквами; по умолчанию у Alexandria - english)
-    attn_implementation: str = "eager"   # как в train_lora.py; flash-attn на Windows не используется
+    language: str = "russian"      # the trainer's --language flag (lower case; Alexandria's default is english)
+    attn_implementation: str = "eager"   # as in train_lora.py; flash-attn is not used on Windows
     warnings: List[str] = field(default_factory=list)
 
     @property
     def effective_batch(self) -> int:
+        """Examples per optimizer step (``batch_size * grad_accum``)."""
         return self.batch_size * self.grad_accum
 
 
 def detect_gpu() -> GpuInfo:
-    """Определяет NVIDIA GPU через torch (ленивый импорт). Без torch/CUDA -> available=False."""
+    """Detect the NVIDIA GPU through torch (lazy import).  Without torch/CUDA returns ``available=False``."""
     try:
         import torch
 
@@ -68,22 +77,27 @@ def detect_gpu() -> GpuInfo:
 
 
 def compute_epochs(n_items: int, target_passes: int = TARGET_PASSES, lo: int = 2, hi: int = 15) -> int:
-    """Эпохи так, чтобы (примеров x эпох) оказалось около target_passes (правило 250-400 из lora.md)."""
+    """Epochs such that (examples x epochs) lands near ``target_passes`` (the 250-400 rule from lora.md), clamped to [lo, hi]."""
     return max(lo, min(hi, round(target_passes / max(1, n_items))))
 
 
 def compute_lr(n_items: int) -> float:
-    """lora.md: 1e-6 для ~60 примеров, 2e-6 для ~120. Для нового языка берём нижнюю границу."""
+    """Learning rate: lora.md suggests 1e-6 for ~60 examples and 2e-6 for ~120; for a new language we take the lower bound."""
     return 1e-6 if n_items < 90 else 2e-6
 
 
 def compute_grad_accum(n_items: int) -> int:
+    """Gradient accumulation steps: 4 for small datasets, 8 from 100 examples on."""
     return 4 if n_items < 100 else 8
 
 
 def plan_training(gpu: GpuInfo, n_items: int, *, force_cpu: bool = False, language: str = "russian") -> TrainPlan:
-    """Автоконфиг. batch 1 + накопление 4-8 (как у Alexandria), r=32/alpha=128, lr 1e-6..2e-6,
-    эпохи по правилу «примеров x эпох ~ 320», eager-внимание, checkpointing, bf16 на GPU."""
+    """Automatic configuration.
+
+    Batch 1 + accumulation 4-8 (as in Alexandria), r=32/alpha=128, lr 1e-6..2e-6, epochs by the "examples x epochs ~ 320"
+    rule, eager attention, checkpointing, bf16 on the GPU.  VRAM tiers: >= 14 GB -> 1.7B model; >= 10 GB -> 1.7B with
+    8-bit Adam; >= 6 GB -> 0.6B with 8-bit Adam; less (or no CUDA, or ``force_cpu``) -> CPU with the 0.6B model.
+    """
     warnings: List[str] = []
     n = max(1, n_items)
     common = dict(lora_r=LORA_R, lora_alpha=LORA_ALPHA, lr=compute_lr(n), batch_size=1,
@@ -99,7 +113,7 @@ def plan_training(gpu: GpuInfo, n_items: int, *, force_cpu: bool = False, langua
                          epochs=compute_epochs(n, target_passes=250), warnings=warnings, **common)
 
     total = gpu.total_gb
-    if total >= 14:            # 16 ГБ (RTX 4090 Mobile) и выше
+    if total >= 14:            # 16 GB (RTX 4090 Mobile) and above
         model, use8 = MODEL_1_7B, False
     elif total >= 10:
         model, use8 = MODEL_1_7B, True
@@ -114,8 +128,10 @@ def plan_training(gpu: GpuInfo, n_items: int, *, force_cpu: bool = False, langua
 
 
 def reduce_after_oom(plan: TrainPlan) -> Optional[TrainPlan]:
-    """Следующий, более экономный план после OOM (или None, если дальше снижать нечего).
-    Размер пакета уже 1, поэтому: 8-битный оптимизатор -> облегчённая модель 0.6B -> (UI предложит CPU)."""
+    """Next, more frugal plan after an out-of-memory error (None when nothing more can be reduced).
+
+    The batch size is already 1, so the steps are: 8-bit optimizer -> the lighter 0.6B model -> (the UI offers the CPU).
+    """
     if plan.device == "cpu":
         return None
     if not plan.use_8bit_adam:
@@ -128,9 +144,10 @@ def reduce_after_oom(plan: TrainPlan) -> Optional[TrainPlan]:
 
 
 class VramMonitor:
-    """Фоновый мониторинг VRAM (раз в interval секунд). Без CUDA ничего не делает."""
+    """Background VRAM sampler (every ``interval`` seconds, tracks the peak).  Does nothing without CUDA."""
 
     def __init__(self, interval: float = 5.0, on_sample: Optional[Callable[[float, float], None]] = None) -> None:
+        """``on_sample(used_gb, total_gb)`` is called from the monitor thread for every sample."""
         self.interval = interval
         self.on_sample = on_sample
         self.peak_gb = 0.0
@@ -139,7 +156,7 @@ class VramMonitor:
 
     @staticmethod
     def snapshot() -> Optional[tuple]:
-        """(used_gb, total_gb) или None."""
+        """``(used_gb, total_gb)`` of the first CUDA device, or None."""
         try:
             import torch
 
@@ -151,6 +168,7 @@ class VramMonitor:
             return None
 
     def _run(self) -> None:
+        """Thread body: sample until stopped, remembering the peak."""
         while not self._stop.wait(self.interval):
             s = self.snapshot()
             if s:
@@ -160,11 +178,13 @@ class VramMonitor:
                     self.on_sample(*s)
 
     def start(self) -> "VramMonitor":
+        """Start the daemon sampling thread; returns self for chaining."""
         self._thread = threading.Thread(target=self._run, daemon=True, name="vram-monitor")
         self._thread.start()
         return self
 
     def stop(self) -> None:
+        """Stop sampling and wait briefly for the thread to finish."""
         self._stop.set()
         if self._thread:
             self._thread.join(timeout=2)

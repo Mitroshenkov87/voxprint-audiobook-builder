@@ -1,7 +1,9 @@
-"""Автоматическая загрузка моделей с Hugging Face в локальный каталог приложения.
+"""Automatic download of the models from Hugging Face (with a ModelScope fallback) into the app's model folder.
 
-Загрузка идёт в `<имя>.partial`, после проверки каталог переименовывается (частично скачанная
-модель никогда не считается готовой). Ревизия (sha коммита) хранится в файле `.revision`.
+A download goes into ``<name>.partial``; only after verification is the folder renamed, so a partially downloaded
+model is never considered ready, and the next run resumes from the ``.partial`` data.  The commit sha of the
+downloaded revision is stored in the ``.revision`` file.  Copies that other programs already downloaded (HF cache,
+Pinokio/Alexandria, ModelScope ...) are reused in place, read-only - see :mod:`core.model_locator`.
 """
 from __future__ import annotations
 
@@ -21,7 +23,7 @@ os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 log = logging.getLogger("voxprint.models")
 
 ALIGNER_REPO = "Qwen/Qwen3-ForcedAligner-0.6B"
-#: Примерный размер, ГБ (для проверки свободного места; оценка, не точное значение).
+#: Approximate download size in GB (for the free-disk-space check; an estimate, not an exact value).
 APPROX_SIZE_GB = {
     ALIGNER_REPO: 2.0,
     "Qwen/Qwen3-TTS-12Hz-1.7B-Base": 4.5,
@@ -30,15 +32,17 @@ APPROX_SIZE_GB = {
 
 
 def hf_url(repo_id: str) -> str:
+    """Web page of the repository on Hugging Face (shown to the user in error messages)."""
     return f"https://huggingface.co/{repo_id}"
 
 
 def local_dir_for(repo_id: str, root: Optional[Path] = None) -> Path:
+    """Folder of a model inside the models directory: ``Qwen/X`` -> ``Qwen--X``."""
     return (root or paths.models_dir()) / repo_id.replace("/", "--")
 
 
 def verify_local_model(path: Path) -> bool:
-    """Модель считается готовой, если есть config.json и хотя бы один файл весов."""
+    """A model counts as ready when it has ``config.json`` and at least one weights file."""
     if not path.is_dir() or not (path / "config.json").exists():
         return False
     has_weights = any(path.glob("*.safetensors")) or any(path.glob("*.bin"))
@@ -51,40 +55,45 @@ def pinned_revision(repo_id: str) -> Optional[str]:
         from infra.verified_manifest import load_bundled
 
         return load_bundled().models.get(repo_id)
-    except Exception:  # noqa: BLE001 - манифест необязателен
+    except Exception:  # noqa: BLE001 - the manifest is optional
         return None
 
 
+#: Set to 1 to disable the ModelScope fallback mirror.
 ENV_NO_MIRROR = "VOXPRINT_NO_MIRROR"
 
 
 def mirror_enabled() -> bool:
-    """ModelScope-зеркало включено (отключить: VOXPRINT_NO_MIRROR=1)."""
+    """True unless the ModelScope mirror is disabled with ``VOXPRINT_NO_MIRROR=1``."""
     return os.environ.get(ENV_NO_MIRROR, "").strip().lower() not in ("1", "true", "yes", "on")
 
 
 def _default_mirror_download(repo_id, dest, progress, expected_sizes):
+    """Default mirror downloader (injectable in tests): ModelScope with size verification."""
     return modelscope_mirror.download_repo(repo_id, dest, progress, expected_sizes)
 
 
 def external_model(repo_id: str, revision: Optional[str] = None):
-    """Копия модели, скачанная другой программой (только чтение), либо None.
+    """A copy of the model downloaded by another program (read-only), or None.
 
-    См. core/model_locator.py: проверяются полнота файлов и закреплённая ревизия; ничего не копируется
-    и не изменяется. Эта папка НИКОГДА не обновляется и не удаляется Voxprint."""
+    See :mod:`core.model_locator`: file completeness and the pinned revision are checked; nothing is copied or modified.
+    Voxprint NEVER updates or deletes such a folder.
+    """
     from core import model_locator
 
     try:
         return model_locator.find_model(repo_id, revision if revision else pinned_revision(repo_id))
-    except Exception as exc:  # noqa: BLE001 - поиск чужих копий не должен ломать обычную загрузку
+    except Exception as exc:  # noqa: BLE001 - looking for foreign copies must never break a normal download
         log.warning("external model search failed for %s: %s", repo_id, exc)
         return None
 
 
+#: Model states reported to the UI (see :func:`model_state`).
 STATE_MISSING, STATE_PARTIAL, STATE_READY = "missing", "partial", "ready"
 
 
 def partial_dir_has_data(repo_id: str, root: Optional[Path] = None) -> bool:
+    """True if an interrupted download (``.partial`` folder with content) exists and can be resumed."""
     p = local_dir_for(repo_id, root)
     p = p.with_name(p.name + ".partial")
     try:
@@ -111,10 +120,12 @@ def model_state(repo_id: str) -> str:
 
 
 def model_states(repos) -> Dict[str, str]:
+    """``{repo_id: state}`` for several repositories (see :func:`model_state`)."""
     return {r: model_state(r) for r in repos}
 
 
 def local_revision(repo_id: str, root: Optional[Path] = None) -> Optional[str]:
+    """Commit sha recorded in the model's ``.revision`` file, or None."""
     f = local_dir_for(repo_id, root) / ".revision"
     try:
         return f.read_text(encoding="utf-8").strip() or None
@@ -123,6 +134,7 @@ def local_revision(repo_id: str, root: Optional[Path] = None) -> Optional[str]:
 
 
 def local_revisions(repos, root: Optional[Path] = None) -> Dict[str, str]:
+    """``{repo_id: sha}`` for the repositories that are complete locally and have a recorded revision."""
     out = {}
     for r in repos:
         d = local_dir_for(r, root)
@@ -133,21 +145,25 @@ def local_revisions(repos, root: Optional[Path] = None) -> Dict[str, str]:
 
 
 class _ByteProgress:
-    """Суммирует прогресс по всем файловым tqdm-барам huggingface_hub."""
+    """Sums the progress of all per-file byte progress bars of huggingface_hub into one 0..1 value."""
 
     def __init__(self, cb: Callable[[float], None]) -> None:
+        """``cb(fraction)`` is called whenever the overall progress changes."""
         self.cb = cb
         self.lock = threading.Lock()
         self.total = 0
         self.done = 0
 
     def make_tqdm_class(self):
+        """Build a tqdm subclass that reports byte progress to this tracker (non-byte bars are disabled)."""
         from huggingface_hub.utils import tqdm as hf_tqdm
 
         tracker = self
 
         class _Tqdm(hf_tqdm):  # type: ignore[misc, valid-type]
+            """tqdm replacement that feeds the shared tracker."""
             def __init__(self, *a: Any, **kw: Any) -> None:
+                """Register this bar's total size with the tracker (only for byte bars)."""
                 kw["disable"] = True if kw.get("unit") != "B" else kw.get("disable", False)
                 super().__init__(*a, **kw)
                 self._is_bytes = kw.get("unit") == "B"
@@ -156,6 +172,7 @@ class _ByteProgress:
                         tracker.total += int(self.total)
 
             def update(self, n: float = 1) -> Optional[bool]:
+                """Count the transferred bytes and report the overall fraction."""
                 r = super().update(n)
                 if getattr(self, "_is_bytes", False):
                     with tracker.lock:
@@ -179,14 +196,17 @@ def ensure_model(
     mirror_download: Optional[Callable[..., Any]] = None,
     hf_probe: Optional[Callable[[str], bool]] = None,
 ) -> Path:
-    """Возвращает путь к локальной модели; скачивает при первом запуске (автоматически).
+    """Return the path of the local model, downloading it on first use (automatically).
 
-    Перед скачиванием ищем полную копию, оставленную другой программой (кэш Hugging Face, Pinokio/Alexandria,
-    ModelScope...): она используется на месте, только для чтения (core/model_locator.py). Только для основного
-    каталога моделей (root=None): обновление через промежуточный каталог всегда скачивает свою копию.
+    Before downloading we look for a complete copy left by another program (HF cache, Pinokio/Alexandria, ModelScope ...);
+    it is used in place, read-only (:mod:`core.model_locator`).  This applies only to the main models folder
+    (``root=None``): an update through a staging folder always downloads its own copy.
 
-    revision - коммит HF; по умолчанию берётся проверенная ревизия из манифеста «проверено Voxprint».
-    Если закреплённая ревизия недоступна, один раз пробуем актуальную (с записью в журнал)."""
+    ``revision`` is the HF commit; by default the verified revision from the "verified by Voxprint" manifest is used.
+    If the pinned revision is unavailable the latest one is tried once (and logged).  Sources are tried in order
+    Hugging Face -> ModelScope (reversed when Hugging Face is slow/unreachable).  The result lands in ``<name>.partial``
+    first and is renamed only after verification.
+    """
     target = local_dir_for(repo_id, root)
     if verify_local_model(target):
         return target
@@ -222,14 +242,15 @@ def ensure_model(
                 from huggingface_hub import HfApi
 
                 sha = HfApi().model_info(repo_id).sha
-        except Exception as exc:  # noqa: BLE001 - сеть может быть недоступна, ошибка всплывёт ниже
+        except Exception as exc:  # noqa: BLE001 - the network may be down; the real error surfaces below
             log.warning("remote sha unavailable: %s", exc)
 
-    partial = target.with_name(target.name + ".partial")   # остаётся между запусками: докачка с места обрыва
+    partial = target.with_name(target.name + ".partial")   # survives between runs: the download resumes where it stopped
     tracker = _ByteProgress(lambda f: progress(stage, f, tr("progress.downloading", short=short, pct=int(f * 100))))
     state = {"sha": sha}
 
     def _download(rev: Optional[str]) -> None:
+        """One ``snapshot_download`` call into the ``.partial`` folder (``rev`` None = latest)."""
         sd = snapshot_download
         if sd is None:
             try:
@@ -241,17 +262,18 @@ def ensure_model(
             kwargs["revision"] = rev
         try:
             sd(tqdm_class=tracker.make_tqdm_class(), **kwargs)
-        except TypeError:  # старые/новые версии hub без tqdm_class
+        except TypeError:  # some huggingface_hub versions have no tqdm_class parameter
             sd(**kwargs)
 
     def _from_hf() -> None:
+        """Download from Hugging Face; fall back once to the latest revision if the pinned one is unavailable."""
         try:
             _download(revision)
         except Exception as exc:  # noqa: BLE001
             if not revision:
                 raise
             log.warning("pinned revision %s of %s unavailable (%s) - trying latest", revision[:8], repo_id, exc)
-            if not isinstance(exc, OSError):    # сетевой сбой: файлы пригодны для докачки; ошибка ревизии: убираем
+            if not isinstance(exc, OSError):    # network failure: the files are still good for resuming; a revision error: discard them
                 shutil.rmtree(partial, ignore_errors=True)
             state["sha"] = None
             _download(None)
@@ -261,6 +283,7 @@ def ensure_model(
                 state["sha"] = None
 
     def _from_modelscope() -> None:
+        """Download from the ModelScope mirror, accepting the pinned revision only if all file sizes matched."""
         from core import model_locator
 
         known = model_locator.KNOWN_SIZES.get(repo_id)
@@ -272,7 +295,7 @@ def ensure_model(
         # ModelScope has no commit sha: the revision is confirmed only when the sizes matched the pinned commit
         state["sha"] = revision if expected else None
 
-    mirror_ok = mirror_enabled() and root is None   # обновление через staging всегда идёт напрямую с HF
+    mirror_ok = mirror_enabled() and root is None   # updates through the staging folder always go straight to Hugging Face
     if mirror_ok:
         mirror_download = mirror_download or _default_mirror_download
         fast = (hf_probe or modelscope_mirror.hf_is_fast)(repo_id)
@@ -297,7 +320,7 @@ def ensure_model(
             errors.append(f"{src}: {type(exc).__name__}: {exc}")
             log.warning("download of %s from %s failed: %s", repo_id, src, exc)
     if not ok_source:
-        # .partial остаётся на диске: следующая попытка продолжит с места обрыва
+        # the .partial folder stays on disk: the next attempt continues where this one stopped
         raise ModelDownloadError(
             tr("err.download_failed", short=short, url=hf_url(repo_id)),
             url=hf_url(repo_id), details=" | ".join(errors))
@@ -316,10 +339,14 @@ def ensure_model(
 
 
 def ensure_aligner_model(progress: ProgressCallback = noop_progress, **kw: Any) -> Path:
+    """Ensure the forced-aligner model (Qwen3-ForcedAligner) is available locally."""
     return ensure_model(ALIGNER_REPO, progress, **kw)
 
 
 def ensure_tts_models(base_repo: str, progress: ProgressCallback = noop_progress, **kw: Any) -> Dict[str, Path]:
-    """База TTS для обучения. Аудио-токенайзер (speech_tokenizer/) лежит внутри репозитория Base-модели
-    (проверено по списку файлов HF), отдельный репозиторий токенайзера не нужен."""
+    """The TTS base model used for training.
+
+    The audio tokenizer (``speech_tokenizer/``) lives inside the Base model repository (checked against the HF file
+    list), so no separate tokenizer repository is needed.
+    """
     return {"base": ensure_model(base_repo, progress, stage=Stage.MODEL, **kw)}

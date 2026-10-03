@@ -1,23 +1,27 @@
-"""Обновление компонентов: проверка PyPI + HF Hub, установка в .staging/, проверка совместимости,
-подмена каталога или откат. Журнал: logs/updater.log.
+"""Updating components: check PyPI + HF Hub, install into ``.staging/``, check compatibility, swap or roll back.
 
-Канал по умолчанию - «verified» (манифест «проверено Voxprint», infra/verified_manifest.py): ставим именно
-проверенные версии пакетов и ревизии моделей; более новые версии PyPI только фиксируются как «ещё не проверены».
-Канал «latest» (переменная VOXPRINT_CHANNEL=latest или state/updater_state.json: {"channel": "latest"}) берёт
-последнюю стабильную версию. `restore_verified()` возвращает всё к проверенному набору (кнопка не нужна:
-вызывается автоматически при неудачном обновлении/по запросу из CLI), `rollback()` - к предыдущему каталогу пакетов.
+The log goes to ``logs/updater.log``.
 
-Схема (работает и из исходников, и из собранного exe):
-  * Python-пакеты ставятся командой `pip install --no-deps --target .staging/<ts>/site` (pip берётся из
-    системного Python; в exe без Python обновление пакетов пропускается, обновление моделей работает).
-  * В staging сначала копируется текущий каталог `packages/` (прошлые обновления), затем поверх ставятся
-    новые версии. Затем отдельный процесс Python с этим каталогом в sys.path выполняет «дымовой тест»
-    (импорты + проверка токенизатора выравнивателя). Только при успехе `packages/` подменяется
-    (старая версия сохраняется как packages.bak-<ts>), иначе staging удаляется.
-  * Новые версии подхватываются при следующем запуске: main.py вызывает activate_overlay() до импорта
-    тяжёлых библиотек.
-  * Модели: скачиваются в .staging/models/<имя>, проверяются, затем подменяют локальную копию; при сбое
-    остаётся старая.
+The default channel is ``verified`` (the "verified by Voxprint" manifest, ``infra/verified_manifest.py``): exactly the
+tested package versions and model revisions are installed; newer PyPI releases are only recorded as "not verified
+yet".  The ``latest`` channel (``VOXPRINT_CHANNEL=latest`` or ``state/updater_state.json``: ``{"channel": "latest"}``)
+takes the newest stable release.  :meth:`Updater.restore_verified` returns everything to the verified set (called
+automatically after a failed update / on request from the CLI); :meth:`Updater.rollback` restores the previous
+``packages`` directory.
+
+Scheme (works from source and from the packaged exe):
+
+* Python packages are installed with ``pip install --no-deps --target .staging/<ts>/site`` (pip comes from a system
+  Python; in an exe without any Python the package update is skipped, model updates still work).
+* The current ``packages/`` directory (earlier updates) is copied into the staging area first and the new versions are
+  installed on top.  Then a separate Python process with that directory on ``sys.path`` runs a smoke test (imports +
+  a tokenizer check of the aligner).  Only on success is ``packages/`` swapped (the old one is kept as
+  ``packages.bak-<ts>``); otherwise the staging area is deleted.
+* New versions are picked up on the next start: ``main.py`` calls :func:`activate_overlay` before importing the heavy
+  libraries.
+* Models are downloaded into ``.staging/models/<name>``, verified and only then replace the local copy; on failure the
+  old one stays.
+* Components in the USER's environment are never touched silently: they are offered (see :meth:`Updater.apply`).
 """
 from __future__ import annotations
 
@@ -44,13 +48,16 @@ from infra.version_manager import (CHANNEL_LATEST, CHANNEL_VERIFIED, TRACKED_MOD
                                    make_offers)
 
 log = logging.getLogger("voxprint.updater")
+#: The UI re-checks for updates automatically at most once per this many days.
 AUTOCHECK_DAYS = 7
 
+# Compatibility smoke test, run in a SEPARATE interpreter with the staged site directory first on sys.path.
+# The Russian sentence is test data: it exercises the aligner's tokenizer on non-English text.
 SMOKE_CODE = r"""
 import sys, json
 sys.path.insert(0, sys.argv[1])
 import transformers
-assert int(transformers.__version__.split('.')[0]) < 5, 'transformers>=5 не поддерживается qwen-asr/qwen-tts'
+assert int(transformers.__version__.split('.')[0]) < 5, 'transformers>=5 is not supported by qwen-asr/qwen-tts'
 import peft, accelerate
 from peft import LoraConfig
 from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForceAlignProcessor
@@ -67,11 +74,12 @@ for n in sys.argv[2:]:
 print('SMOKE_OK ' + json.dumps(out))
 """
 
+#: ``run(argv) -> (return_code, output)`` - injectable so tests never start real processes.
 Runner = Callable[[List[str]], Tuple[int, str]]
 
 
 def setup_log() -> None:
-    """Подключает файл logs/updater.log (пересоздаёт обработчик, если каталог данных изменился)."""
+    """Attach the ``logs/updater.log`` file handler (re-created if the data directory changed)."""
     target = str(paths.logs_dir() / "updater.log")
     for h in list(log.handlers):
         if getattr(h, "_vox", False):
@@ -87,7 +95,7 @@ def setup_log() -> None:
 
 
 def activate_overlay() -> Optional[Path]:
-    """Ставит каталог обновлённых пакетов первым в sys.path. Вызывать в самом начале main.py."""
+    """Put the directory of updated packages first on ``sys.path``.  Call at the very start of ``main.py``."""
     p = paths.packages_dir()
     if p.is_dir() and any(p.iterdir()):
         sp = str(p)
@@ -98,10 +106,12 @@ def activate_overlay() -> Optional[Path]:
 
 
 def _creationflags() -> int:
+    """``CREATE_NO_WINDOW`` on Windows so child processes do not flash a console window."""
     return getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
 
 
 def run_subprocess(args: List[str], timeout: int = 1800) -> Tuple[int, str]:
+    """Run a command, capture stdout+stderr; returns ``(return_code, output)`` and never raises (timeout/OSError -> rc 1)."""
     try:
         r = subprocess.run(args, capture_output=True, text=True, timeout=timeout,
                            creationflags=_creationflags(), encoding="utf-8", errors="replace")
@@ -111,17 +121,17 @@ def run_subprocess(args: List[str], timeout: int = 1800) -> Tuple[int, str]:
 
 
 def find_python() -> Optional[str]:
-    """Python для pip/дымового теста: текущий интерпретатор или системный (для собранного exe)."""
+    """Python used for pip / the smoke test: the current interpreter, or a system one when running as a packaged exe."""
     if not getattr(sys, "frozen", False):
         return sys.executable
-    try:   # для собранного exe нужен Python той же версии (бинарные колёса), pip --target пишет только в нашу папку
+    try:   # the packaged exe needs a Python of the same version (binary wheels); pip --target writes only into our folder
         from infra import env_probe
 
         envs = [e for e in (env_probe.probe_python(x, src) for x, src in env_probe.candidate_pythons()) if e]
         exe = env_probe.pick_pip_python(envs)
         if exe:
             return exe
-    except Exception:  # noqa: BLE001 - выбор необязателен, ниже прежний запасной путь
+    except Exception:  # noqa: BLE001 - the choice is optional, the old fallback below still applies
         pass
     for name in ("python", "python3", "py"):
         w = shutil.which(name)
@@ -132,15 +142,17 @@ def find_python() -> Optional[str]:
 
 @dataclass
 class UpdateResult:
+    """What an update run did: versions before/after, updated models, rollback flag, messages and restart need."""
     before: Dict[str, Optional[str]] = field(default_factory=dict)
     after: Dict[str, Optional[str]] = field(default_factory=dict)
     models_updated: List[str] = field(default_factory=list)
     rolled_back: bool = False
-    unverified_newer: List[str] = field(default_factory=list)   # на PyPI новее проверенных (информативно)
+    unverified_newer: List[str] = field(default_factory=list)   # newer on PyPI than the verified set (informational)
     needs_restart: bool = False
     messages: List[str] = field(default_factory=list)
 
     def summary(self) -> str:
+        """Localized multi-line summary of the run for the UI/log."""
         lines: List[str] = []
         for k in sorted(set(self.before) | set(self.after)):
             b, a = self.before.get(k), self.after.get(k)
@@ -158,10 +170,11 @@ class UpdateResult:
         return "\n".join(lines)
 
 
-UpdateResult.summary_ru = UpdateResult.summary  # прежнее имя (совместимость)
+UpdateResult.summary_ru = UpdateResult.summary  # old name (compatibility)
 
 
 class Updater:
+    """Checks for and applies updates of packages and models (see the module docstring for the scheme)."""
     def __init__(self, fetch_json=http_fetch_json, pip_runner: Optional[Runner] = None,
                  smoke_runner: Optional[Runner] = None, python_exe: Optional[str] = None,
                  now: Callable[[], float] = time.time,
@@ -171,12 +184,13 @@ class Updater:
                  packages: Optional[Dict[str, str]] = None, models: Optional[tuple] = None,
                  manifest: Optional[Manifest] = None, channel: Optional[str] = None,
                  probe_env: Optional[Callable[[], Any]] = None, external_env: Optional[bool] = None) -> None:
+        """All collaborators are injectable (network, pip, smoke test, clock ...) so the updater is testable offline."""
         setup_log()
         if external_env is None:
             from infra.env_probe import is_own_environment
 
             external_env = not is_own_environment()
-        self.external_env = external_env     # True: Voxprint работает в окружении пользователя (устаревшее - только по запросу)
+        self.external_env = external_env     # True: Voxprint runs inside the user's own environment (outdated components only on request)
         self.probe_env = probe_env
         self._manifest = manifest
         self._channel = channel
@@ -191,37 +205,44 @@ class Updater:
         self.packages = packages if packages is not None else TRACKED_PACKAGES
         self.models = models if models is not None else TRACKED_MODELS
 
-    # ---- состояние
+    # ---- persistent state (state/updater_state.json)
     @property
     def state_file(self) -> Path:
+        """``state/updater_state.json``: last check time, channel, history, declined offers."""
         return paths.state_dir() / "updater_state.json"
 
     def _load_state(self) -> dict:
+        """Read the state file; ``{}`` if missing or broken."""
         try:
             return json.loads(self.state_file.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return {}
 
     def _save_state(self, st: dict) -> None:
+        """Write the state file."""
         self.state_file.write_text(json.dumps(st, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def should_autocheck(self, interval_days: float = AUTOCHECK_DAYS) -> bool:
+        """True if the last successful check is older than ``interval_days``."""
         last = self._load_state().get("last_check", 0)
         return (self.now() - float(last)) >= interval_days * 86400
 
-    # ---- канал и манифест
+    # ---- channel and manifest
     @property
     def channel(self) -> str:
+        """Active channel: constructor argument, ``VOXPRINT_CHANNEL``, or the state file; anything but ``latest`` means ``verified``."""
         c = self._channel or os.environ.get("VOXPRINT_CHANNEL") or self._load_state().get("channel")
         return CHANNEL_LATEST if c == CHANNEL_LATEST else CHANNEL_VERIFIED
 
     def manifest(self) -> Manifest:
+        """The verified manifest (loaded lazily, with the remote/cached override)."""
         if self._manifest is None:
             self._manifest = load_manifest(self.fetch_json)
         return self._manifest
 
-    # ---- проверка
+    # ---- checking
     def check(self, channel: Optional[str] = None) -> VersionReport:
+        """Compare installed packages/models with the target versions of the channel; remembers the time of a successful check."""
         rep = check_versions(md.local_revisions(self.models), self.fetch_json, self.installed_fn,
                              self.packages, self.models, manifest=self.manifest(), channel=channel or self.channel,
                              external_env=self.external_env)
@@ -235,14 +256,17 @@ class Updater:
                  [m.repo_id for m in rep.outdated_models], rep.unverified_newer)
         return rep
 
-    # ---- применение
+    # ---- applying
     def apply(self, report: VersionReport, progress: ProgressCallback = noop_progress,
               accepted: Optional[Iterable[str]] = None) -> UpdateResult:
-        """accepted - имена устаревших компонентов В ОКРУЖЕНИИ ПОЛЬЗОВАТЕЛЯ, которые он согласился обновить.
-        Согласие -> pip обновляет их там; отказ и компонент ещё совместим -> используем как есть; отказ и несовместим ->
-        собственная копия в каталоге packages Voxprint (окружение пользователя не меняется)."""
+        """Apply a :class:`VersionReport`.
+
+        ``accepted`` holds the names of outdated components IN THE USER'S ENVIRONMENT that the user agreed to update.
+        Agreed -> pip updates them there.  Declined and still compatible -> used as they are.  Declined and incompatible ->
+        Voxprint's own copy goes into its ``packages`` directory (the user's environment is not changed).
+        """
         res = UpdateResult()
-        todo = list(report.outdated_packages)           # собственное окружение Voxprint: обновляется само
+        todo = list(report.outdated_packages)           # Voxprint's own environment: updated without asking
         yes = set(accepted or ())
         for p in report.offered_packages:
             if p.name in yes:
@@ -281,8 +305,10 @@ class Updater:
         return res
 
     def _upgrade_in_place(self, p, res: UpdateResult) -> None:
-        """Только после согласия пользователя: pip обновляет пакет в окружении, из которого запущен Voxprint.
-        Проверка импортом; при сбое возвращаем прежнюю версию."""
+        """Only after the user's consent: pip upgrades the package in the environment Voxprint runs from.
+
+        The result is verified by importing; on failure the previous version is restored.
+        """
         if not self.python:
             res.messages.append(tr("upd.no_python"))
             return
@@ -298,7 +324,7 @@ class Updater:
         if not ok:
             res.rolled_back = True
             if old:
-                rc2, out2 = self.run([*base, f"{name}=={old}"])   # вернуть то, что было у пользователя
+                rc2, out2 = self.run([*base, f"{name}=={old}"])   # restore what the user had
                 log.info("rollback pip rc=%s\n%s", rc2, out2[-1000:])
             res.messages.append(tr("upg.rolled_back", name=name, old=old or "-"))
             return
@@ -306,6 +332,7 @@ class Updater:
         res.needs_restart = True
 
     def _apply_packages(self, todo, res: UpdateResult) -> None:
+        """Install ``todo`` into a staging copy of ``packages/``, smoke-test it and swap it in (or discard it)."""
         if not self.python:
             res.messages.append(tr("upd.no_python"))
             log.warning("no python for pip; skipping package update")
@@ -329,13 +356,13 @@ class Updater:
                 res.rolled_back = True
                 res.messages.append(tr("upd.download_failed"))
                 return
-            # проверка совместимости в отдельном процессе с новым каталогом в sys.path
+            # compatibility check in a separate process with the new directory on sys.path
             ok, versions = self._smoke(site, [p.name for p in todo])
             if not ok:
                 res.rolled_back = True
                 log.error("smoke test failed for staging")
                 return
-            # подмена каталога
+            # swap the directory (the old one is kept as packages.bak-<ts>)
             backup = None
             if current.exists():
                 backup = current.with_name(f"packages.bak-{ts}")
@@ -358,6 +385,7 @@ class Updater:
             shutil.rmtree(stage_root, ignore_errors=True)
 
     def _smoke(self, site: Path, names: List[str]) -> Tuple[bool, Dict[str, Optional[str]]]:
+        """Run the smoke test in a separate interpreter; returns ``(ok, {package: version})``."""
         assert self.python
         rc, out = self.smoke([self.python, "-c", SMOKE_CODE, str(site), *names])
         log.info("smoke rc=%s %s", rc, out[-2000:])
@@ -371,12 +399,13 @@ class Updater:
 
     @staticmethod
     def _prune_backups(keep: int = 2) -> None:
+        """Keep only the newest ``keep`` ``packages.bak-*`` directories."""
         baks = sorted(paths.app_home().glob("packages.bak-*"))
         for b in baks[:-keep]:
             shutil.rmtree(b, ignore_errors=True)
 
     def rollback(self) -> bool:
-        """Ручной откат к предыдущему каталогу пакетов."""
+        """Manual rollback to the previous ``packages`` directory; False if there is no backup."""
         baks = sorted(paths.app_home().glob("packages.bak-*"))
         if not baks:
             return False
@@ -388,6 +417,7 @@ class Updater:
         return True
 
     def _apply_model(self, repo_id: str, progress: ProgressCallback, revision: Optional[str] = None) -> bool:
+        """Download a model into staging, verify it and swap it in; on any failure the old copy is kept.  True on success."""
         stage_models = paths.staging_dir() / "models"
         stage_models.mkdir(parents=True, exist_ok=True)
         new_dir = md.local_dir_for(repo_id, stage_models)
@@ -397,7 +427,7 @@ class Updater:
                             get_remote_sha=self.get_remote_sha, stage=Stage.UPDATES, revision=revision)
             if not md.verify_local_model(new_dir):
                 raise UpdateError(tr("upd.model_check_failed"))
-        except Exception as exc:  # noqa: BLE001 - любая ошибка = остаёмся на старой модели
+        except Exception as exc:  # noqa: BLE001 - any error = we stay on the old model
             log.error("model update failed for %s: %s", repo_id, exc)
             shutil.rmtree(new_dir, ignore_errors=True)
             return False
@@ -418,7 +448,7 @@ class Updater:
         return True
 
     def restore_verified(self, progress: ProgressCallback = noop_progress) -> UpdateResult:
-        """Возвращает пакеты и модели к набору «проверено Voxprint» (откат вниз тоже допустим)."""
+        """Return packages and models to the "verified by Voxprint" set (downgrading is allowed)."""
         rep = self.check(channel=CHANNEL_VERIFIED)
         if not rep.network_ok:
             return UpdateResult(messages=[tr("upd.no_net_restore")])
@@ -427,7 +457,7 @@ class Updater:
         return res
 
     def _report_environment(self, progress: ProgressCallback) -> None:
-        """Только чтение: что уже установлено и что с этим будет (использовать / обновить / поставить)."""
+        """Read-only: report what is already installed and what will happen to it (reuse / upgrade / install)."""
         if self.probe_env is None and os.environ.get("VOXPRINT_NO_ENV_PROBE"):
             return
         try:
@@ -439,14 +469,17 @@ class Updater:
             self.last_env = env
             for line in env_probe.user_messages(env):
                 progress(Stage.UPDATES, 0.0, line)
-        except Exception as exc:  # noqa: BLE001 - диагностика не должна мешать обновлению
+        except Exception as exc:  # noqa: BLE001 - diagnostics must not get in the way of the update
             log.warning("environment probe failed: %s", exc)
 
-    # ---- «всё сразу» для UI
+    # ---- everything at once, for the UI
     def check_and_apply(self, progress: ProgressCallback = noop_progress,
                         ask: Optional[Callable[[List[Offer]], Iterable[str]]] = None) -> Tuple[VersionReport, UpdateResult]:
-        """ask(offers) -> имена, которые пользователь разрешил обновить (диалог в UI). Без ask отказ подразумевается.
-        Предложение, от которого пользователь уже отказался для этой же версии, повторно не показывается."""
+        """Check and apply in one go (what the UI's "Check for updates" does).
+
+        ``ask(offers)`` returns the names the user allowed to update (a dialog in the UI); without ``ask`` refusal is assumed.
+        An offer the user already declined for the same target version is not shown again.
+        """
         progress(Stage.UPDATES, 0.0, tr("upd.checking"))
         self._report_environment(progress)
         rep = self.check()
