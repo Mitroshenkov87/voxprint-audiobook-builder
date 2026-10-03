@@ -86,8 +86,9 @@ def test_teacher_forcing_input_layout_matches_alexandria():
     full, labels, codes, prefill = build_teacher_forcing_input(sample, m, m.talker, torch.device("cpu"), "russian")
     # prefill = 3 roles + (4 codec prefix + spk + pad + bos - 1) + (L-8 text + eos) + 1 end
     assert prefill == 3 + 6 + (L - 8 + 1) + 1
-    assert full.shape == (1, prefill + T, tc.hidden_size) and labels.shape == (1, prefill + T)
-    assert (labels[0, :prefill] == -100).all() and (labels[0, prefill:] == sample["codec_ids"][:, 0]).all()
+    assert full.shape == (1, prefill + T + 1, tc.hidden_size) and labels.shape == (1, prefill + T + 1)
+    assert (labels[0, :prefill] == -100).all() and (labels[0, prefill:prefill + T] == sample["codec_ids"][:, 0]).all()
+    assert labels[0, prefill + T] == tc.codec_eos_token_id        # the model is taught to stop (found on the GPU)
     # language not found -> the nothink variant: one token shorter
     full2, _, _, prefill2 = build_teacher_forcing_input(sample, m, m.talker, torch.device("cpu"), "klingon")
     assert prefill2 == prefill - 1

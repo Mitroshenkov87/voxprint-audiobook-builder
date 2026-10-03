@@ -9,10 +9,11 @@ For one training sample the sequence is, in order:
 * speaker embedding, ``codec_pad``, ``codec_bos``;
 * text ``text_ids[:, 3:-5]`` + ``tts_eos``, with ``codec_pad`` embeddings added on top;
 * end of prefill: ``tts_pad + codec_bos``;
-* audio steps: the sum of the embeddings of all 16 codec groups + ``tts_pad``.
+* audio steps: the sum of the embeddings of all 16 codec groups + ``tts_pad``;
+* one final step carrying the ``codec_eos`` label (end of speech).
 
-Labels: the first codec group on the audio steps, ``-100`` (ignored) on the prefill.  Keeping this identical to
-Alexandria is deliberate: adapters trained here load unchanged in Alexandria.
+Labels: the first codec group on the audio steps, ``codec_eos`` on the final step, ``-100`` (ignored) on the prefill.  Apart from the end-of-speech label the input is the same as in
+Alexandria; adapters trained here still load unchanged in Alexandria.
 """
 from __future__ import annotations
 
@@ -82,7 +83,13 @@ def build_teacher_forcing_input(sample: dict, hf_model: Any, talker: Any, device
     codec_sum = torch.cat(group_embeds, dim=1).sum(dim=1)                   # [T, D]
     audio_embeds = (codec_sum + tts_pad_embed.squeeze(0)).unsqueeze(0)      # [1, T, D]
 
-    full_input = torch.cat([prefill_embeds, audio_embeds], dim=1)
-    labels = torch.full((1, prefill_len + T), -100, device=device, dtype=torch.long)
-    labels[0, prefill_len:] = codec_ids_2d[:, 0]
+    # One extra step whose only job is to carry the end-of-speech label: the model must learn to emit ``codec_eos``
+    # after the last frame.  Without it (as in the original script) the fine-tuned talker never learns to stop, and
+    # from ~3e-6 x 20 epochs on it babbles until the token limit (found in the first real-voice test).
+    eos_embed = tts_pad_embed.squeeze(0) + emb(torch.tensor([[tc.codec_eos_token_id]], device=device,
+                                                            dtype=text_ids.dtype)).squeeze(0)
+    full_input = torch.cat([prefill_embeds, audio_embeds, eos_embed.unsqueeze(0).to(audio_embeds.dtype)], dim=1)
+    labels = torch.full((1, prefill_len + T + 1), -100, device=device, dtype=torch.long)
+    labels[0, prefill_len:prefill_len + T] = codec_ids_2d[:, 0]
+    labels[0, prefill_len + T] = tc.codec_eos_token_id
     return full_input, labels, codec_ids_2d, prefill_len
