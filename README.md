@@ -152,6 +152,16 @@ Use **← Studio** in any window to come back; the gear (top right) opens Settin
 
 Use voices responsibly: only with the voice owner's permission, in line with the voice's licence (see *Privacy* below).
 
+### No transcript? (audio only)
+
+Tick **I have no transcript** in the Train window and the program recognises the speech itself (Qwen3-ASR, offline; the model, ~1.9 GB, is downloaded on first use).
+You can choose **many audio files at once**, add a **folder** (searched recursively) or drag and drop them; each file is recognised separately. Long recordings are cut at pauses
+into pieces of at most 14 s, short clips are used as they are, and everything is merged into **one dataset** (volume-normalised to about -20 dBFS).
+Skipped automatically: clips under 1.5 s or over 20 s, empty or **implausible recognition** (looping text, absurd speaking rate, wrong script - a score computed from the clip
+and the text, because the ASR API gives no per-token confidence), duplicates (identical audio, or the same words at the same length) and clips that fail the usual signal-quality filter.
+When it is done the window reports the totals: files, kept clips and how many minutes of the audio were kept. Automatic recognition can contain errors, so a clear localized warning is shown and
+**an explicit "I understand" tick is required** before the buttons work; the dataset's `report.json` records every clip's source file and plausibility.
+
 ### Narrate a book
 1. **Choose book…**: `.txt` (UTF-8 / cp1251; headings like "Chapter 1", "Глава 2", "Part I" become chapters), `.fb2` / `.fb2.zip`, `.epub`. The book title, author and cover are read when present.
 2. Pick the **voice** (a licence badge is shown; for a personal-use-only voice you are reminded not to publish or sell the narration). No voices yet? The window offers *Train your voice* / *My voices*.

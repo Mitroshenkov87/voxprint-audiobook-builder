@@ -6,6 +6,7 @@ The project is not released yet; everything below is the history of the 0.1.0 de
 ## [Unreleased]
 
 ### Added
+- **No-transcript mode** in the Train window: audio only (many files / a folder / drag and drop) -> Qwen3-ASR per file -> plausibility, duration, duplicate and signal-quality gates -> one merged, loudness-normalised dataset, with totals (files, kept clips, minutes kept), a localized accuracy warning and an explicit opt-in. `core/asr.py`, `core/asr_dataset.py`.
 - **Studio** - new home window with three cards (*Narrate a book*, *Train your voice*, *My voices*) and the gear; every sub-window has a *← Studio* button; language changes apply to all windows.
 - **Voice library** (`%LOCALAPPDATA%\Voxprint\voices\<id>\`): trained voices are registered automatically; *My voices* with licence badge, preview, details, delete, import from folder / zip (hardened), and
   *Download voices from repository* (configurable index URL, placeholder by default, SHA-256 verified).

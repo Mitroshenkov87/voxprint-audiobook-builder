@@ -23,9 +23,11 @@ os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 log = logging.getLogger("voxprint.models")
 
 ALIGNER_REPO = "Qwen/Qwen3-ForcedAligner-0.6B"
+ASR_REPO = "Qwen/Qwen3-ASR-0.6B"   # speech recognition for the no-transcript mode (downloaded on first use)
 #: Approximate download size in GB (for the free-disk-space check; an estimate, not an exact value).
 APPROX_SIZE_GB = {
     ALIGNER_REPO: 2.0,
+    ASR_REPO: 1.9,
     "Qwen/Qwen3-TTS-12Hz-1.7B-Base": 4.5,
     "Qwen/Qwen3-TTS-12Hz-0.6B-Base": 2.5,
     "ai-forever/sage-fredt5-distilled-95m": 0.5,         # optional text clean-up model (see infra/text_models.py)

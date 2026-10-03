@@ -47,6 +47,9 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 | `tts_engine.py` | the real engine `Qwen3AdapterEngine` (qwen-tts + PEFT adapter, voice-clone prompt from `ref_sample.wav`) - **not yet run on a GPU** |
 | `audiobook_export.py` | format registry, file naming, `ffmetadata` chapters, `.m3u8`, ffmpeg command builders, encoder pre-check, `export_formats` (injectable `run`) |
 
+- `asr.py` - speech recognition interface (`Qwen3ASR`, `FakeASR`), `plausibility()` (confidence proxy), `split_at_pauses()`.
+- `asr_dataset.py` - no-transcript mode: many audio files -> ASR -> gates -> the same dataset files as `DatasetBuilder` (clips are recognised individually, so no forced alignment is needed).
+
 ### `infra/`
 | Module | Purpose |
 |---|---|

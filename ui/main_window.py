@@ -20,7 +20,7 @@ from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
-from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
 from core import i18n, model_export, voice_info
@@ -107,6 +107,7 @@ QLabel#status {{{{ color: {muted}; }}}}
 QLabel#ready {{{{ font-size: 22px; font-weight: 600; color: #86efac; }}}}
 QLabel#footer {{{{ color: {faint}; font-size: 12px; }}}}
 QLabel#hint {{{{ color: {faint}; font-size: 12px; padding-left: 4px; }}}}
+QLabel#warn {{{{ color: #f2c14e; font-size: 12px; padding: 2px 4px; }}}}
 QComboBox {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px;
             padding: 6px 12px; min-width: 110px; }}}}
 QComboBox:disabled {{{{ color: {disabled}; }}}}
@@ -245,6 +246,7 @@ class MainWindow(QWidget):
         self.updater_factory = updater_factory
         self.auto_open_folder = auto_open_folder
         self.audio: Optional[Path] = None
+        self.audio_files: List[Path] = []      # no-transcript mode: several files and/or folders
         self.text: Optional[Path] = None
         self.result_dir: Optional[Path] = None
         self.worker: Optional[ProcessWorker] = None
@@ -356,6 +358,23 @@ class MainWindow(QWidget):
             row.addWidget(b)
             row.addWidget(l, 1)
             cl.addLayout(row)
+        # "No transcript" mode: audio only, the app recognises the speech itself (warning + explicit opt-in)
+        self.chk_no_text = QCheckBox()
+        cl.addWidget(self.chk_no_text)
+        self.asr_box = QWidget()
+        al = QVBoxLayout(self.asr_box)
+        al.setContentsMargins(0, 0, 0, 0)
+        al.setSpacing(6)
+        self.btn_folder = QPushButton()
+        al.addWidget(self.btn_folder)
+        self.lbl_asr_warning = QLabel()
+        self.lbl_asr_warning.setObjectName("warn")
+        self.lbl_asr_warning.setWordWrap(True)
+        al.addWidget(self.lbl_asr_warning)
+        self.chk_asr_ok = QCheckBox()
+        al.addWidget(self.chk_asr_ok)
+        self.asr_box.hide()
+        cl.addWidget(self.asr_box)
         root.addWidget(card)
 
         self.btn_lora = QPushButton()
@@ -446,6 +465,9 @@ class MainWindow(QWidget):
 
         self.btn_audio.clicked.connect(self.choose_audio)
         self.btn_text.clicked.connect(self.choose_text)
+        self.btn_folder.clicked.connect(self.choose_folder)
+        self.chk_no_text.toggled.connect(self.set_no_transcript)
+        self.chk_asr_ok.toggled.connect(lambda _on: self._refresh_buttons())
         self.btn_dataset.clicked.connect(lambda: self.start(KIND_DATASET))
         self.btn_lora.clicked.connect(lambda: self.start(KIND_LORA))
         self.btn_merge.clicked.connect(self.start_merge)
@@ -466,7 +488,11 @@ class MainWindow(QWidget):
         self.lbl_sub.setText(tr("ui.subtitle"))
         self.btn_audio.setText(tr("ui.choose_audio"))
         self.btn_text.setText(tr("ui.choose_text"))
-        self.lbl_audio.setText(self.audio.name if self.audio else tr("ui.audio_none"))
+        self.chk_no_text.setText(tr("asr.checkbox"))
+        self.btn_folder.setText(tr("asr.choose_folder"))
+        self.lbl_asr_warning.setText(tr("asr.warning"))
+        self.chk_asr_ok.setText(tr("asr.confirm"))
+        self._show_audio_label()
         self.lbl_text.setText(self.text.name if self.text else tr("ui.text_none"))
         self.btn_lora.setText(tr("ui.btn_lora"))
         self.btn_lora.setToolTip(tr("ui.tip_lora"))
@@ -573,9 +599,55 @@ class MainWindow(QWidget):
         self.lbl_text.setToolTip(str(self.text))
         self._refresh_buttons()
 
+    @property
+    def no_transcript(self) -> bool:
+        """True while the "I don't have a transcript" mode is on."""
+        return self.chk_no_text.isChecked()
+
+    def set_no_transcript(self, on: bool) -> None:
+        """Switch the audio-only mode: hides the text row, shows the warning and the opt-in; the opt-in resets each time."""
+        if self.chk_no_text.isChecked() != on:
+            self.chk_no_text.setChecked(on)
+            return
+        self.chk_asr_ok.setChecked(False)
+        self.asr_box.setVisible(on)
+        self.btn_text.setVisible(not on)
+        self.lbl_text.setVisible(not on)
+        self._show_audio_label()
+        self._refresh_buttons()
+
+    def set_audio_files(self, paths: List[Path]) -> None:
+        """No-transcript mode: remember several audio files and/or folders."""
+        from core.asr_dataset import expand_inputs
+
+        self.audio_files = [Path(p) for p in paths]
+        self._audio_count = len(expand_inputs(self.audio_files))
+        self._show_audio_label()
+        self._refresh_buttons()
+
+    def _show_audio_label(self) -> None:
+        if self.no_transcript:
+            n = getattr(self, "_audio_count", 0) if self.audio_files else 0
+            self.lbl_audio.setText(tr("asr.files_chosen", n=n) if n else tr("asr.files_none"))
+            self.lbl_audio.setToolTip("\n".join(str(p) for p in self.audio_files[:20]))
+        else:
+            self.lbl_audio.setText(self.audio.name if self.audio else tr("ui.audio_none"))
+            self.lbl_audio.setToolTip(str(self.audio) if self.audio else "")
+
+    def choose_folder(self) -> None:
+        """No-transcript mode: pick a folder with clips (searched recursively)."""
+        d = QFileDialog.getExistingDirectory(self, tr("asr.choose_folder"))
+        if d:
+            self.set_audio_files(self.audio_files + [Path(d)])
+
     def choose_audio(self) -> None:
-        """File dialog for the recording."""
+        """File dialog for the recording (several files in the no-transcript mode)."""
         exts = " ".join(f"*{e}" for e in sorted(AUDIO_EXT))
+        if self.no_transcript:
+            fs, _ = QFileDialog.getOpenFileNames(self, tr("ui.dlg_audio"), "", tr("ui.filter_audio", exts=exts))
+            if fs:
+                self.set_audio_files([Path(f) for f in fs])
+            return
         f, _ = QFileDialog.getOpenFileName(self, tr("ui.dlg_audio"), "", tr("ui.filter_audio", exts=exts))
         if f:
             self.set_audio(Path(f))
@@ -593,6 +665,12 @@ class MainWindow(QWidget):
 
     def dropEvent(self, e: QDropEvent) -> None:  # noqa: N802
         """Dropped ``.txt`` files become the text, known audio extensions become the recording."""
+        if self.no_transcript:   # many files and/or folders at once
+            dropped = [Path(u.toLocalFile()) for u in e.mimeData().urls()]
+            dropped = [p for p in dropped if p.is_dir() or p.suffix.lower() in AUDIO_EXT]
+            if dropped:
+                self.set_audio_files(self.audio_files + dropped)
+            return
         for url in e.mimeData().urls():
             p = Path(url.toLocalFile())
             if p.suffix.lower() in TEXT_EXT:
@@ -620,9 +698,15 @@ class MainWindow(QWidget):
     def _refresh_buttons(self) -> None:
         """Enable/disable controls according to the current state (files chosen, busy, adapter available ...)."""
         busy = self.busy
-        ready = bool(self.audio and self.text) and not busy
+        if self.no_transcript:   # audio only: needs files and the explicit "I understand" opt-in
+            ready = bool(self.audio_files) and self.chk_asr_ok.isChecked() and not busy
+        else:
+            ready = bool(self.audio and self.text) and not busy
         self.btn_audio.setEnabled(not busy)
         self.btn_text.setEnabled(not busy)
+        self.btn_folder.setEnabled(not busy)
+        self.chk_no_text.setEnabled(not busy)
+        self.chk_asr_ok.setEnabled(not busy)
         self.btn_settings.setEnabled(True)
         self.cmb_voice_type.setEnabled(not busy)
         self.edt_voice_desc.setEnabled(not busy)
@@ -652,6 +736,13 @@ class MainWindow(QWidget):
     # ------------------------------------------------------------------ running a task
     def start(self, kind: str, force_cpu: bool = False) -> None:
         """Start a ``dataset`` or ``lora`` task for the chosen files (with the optional voice type/description)."""
+        if self.no_transcript:
+            if self.busy or not (self.audio_files and self.chk_asr_ok.isChecked()):
+                return
+            self._launch(TaskRequest(kind=kind, no_transcript=True, audio_files=list(self.audio_files), force_cpu=force_cpu,
+                                     voice_type=str(self.cmb_voice_type.currentData() or ""),
+                                     voice_description=self.edt_voice_desc.text().strip()))
+            return
         if self.busy or not (self.audio and self.text):
             return
         self._launch(TaskRequest(kind=kind, audio=self.audio, text=self.text, force_cpu=force_cpu,
@@ -732,6 +823,11 @@ class MainWindow(QWidget):
                 if getattr(result, "voice_id", ""):
                     extra += "\n" + tr("ui.voice_registered")
             warn = ("\n" + "\n".join(result.warnings[-3:])) if getattr(result, "warnings", None) else ""
+            rep = getattr(result, "asr_report", None)
+            if rep is not None:   # no-transcript mode: how much of the audio was usable
+                extra += "\n" + tr("asr.report", files=rep.files - rep.files_failed, kept=rep.kept, clips=rep.clips,
+                                   kept_min=f"{rep.seconds_kept / 60:.1f}", total_min=f"{rep.seconds_total / 60:.1f}",
+                                   pct=int(round(100 * rep.share_kept)))
             self.lbl_status.setText(tr("ui.done_segments", n=result.n_segments) + f"{extra}{warn}"
                                     + (f"\n{result.update_summary}" if getattr(result, "update_summary", "") else ""))
         self.lbl_ready.show()

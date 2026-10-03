@@ -56,11 +56,17 @@ class TaskRequest:
     adapter_dir: Optional[Path] = None   # KIND_MERGE only: folder of the trained adapter
     voice_type: str = ""                 # optional, goes to voice.json: male / female / child / other
     voice_description: str = ""          # optional free text, goes to voice.json
+    no_transcript: bool = False          # audio only: the app recognises the speech itself (see core.asr_dataset)
+    audio_files: List[Path] = field(default_factory=list)   # no_transcript: files and/or folders (many clips)
+    asr_language: Optional[str] = None   # no_transcript: "Russian" / "English" ... or None = automatic
 
     def voice_name(self) -> str:
         """Voice name = the recording's file name (or the adapter folder's name); also the result folder name in ``output/``."""
         if self.audio:
             return safe_name(Path(self.audio).stem)
+        if self.audio_files:
+            first = Path(self.audio_files[0])
+            return safe_name(first.name if first.is_dir() else (first.parent.name if len(self.audio_files) > 1 else first.stem))
         if self.adapter_dir:
             return safe_name(Path(self.adapter_dir).name)
         return "voice"
@@ -69,9 +75,11 @@ class TaskRequest:
         """Result folder: ``out_root`` if given, else ``<audio folder>/<voice>_Voxprint``."""
         if self.out_root:
             return Path(self.out_root)
-        if self.audio is None:
+        if self.audio is None and not self.audio_files:
             raise ValueError("audio is required")
-        return Path(self.audio).resolve().parent / f"{self.voice_name()}_Voxprint"
+        base = Path(self.audio) if self.audio else Path(self.audio_files[0])
+        base = base.resolve() if base.is_dir() else base.resolve().parent
+        return base / f"{self.voice_name()}_Voxprint"
 
 
 @dataclass
@@ -87,6 +95,7 @@ class TaskResult:
     merged_path: Optional[Path] = None   # folder of the universal model (KIND_MERGE)
     speaker: str = ""                   # voice (speaker) name inside the model
     voice_id: str = ""                  # id of the voice registered in the voice library (LoRA only)
+    asr_report: Optional[object] = None  # no-transcript mode: core.asr_dataset.AsrReport (files, kept clips, seconds ...)
 
     @property
     def open_dir(self) -> Path:
@@ -182,7 +191,8 @@ def _run_merge(req: TaskRequest, progress: ProgressCallback, cancel: CancelToken
 
 def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cancel: Optional[CancelToken] = None,
              updater: Optional[Updater] = None,
-             aligner_factory: Optional[Callable[[], object]] = None, voice_library=None) -> TaskResult:
+             aligner_factory: Optional[Callable[[], object]] = None, voice_library=None,
+             asr_factory: Optional[Callable[[], object]] = None) -> TaskResult:
     """Run one scenario end to end and return its :class:`TaskResult`.
 
     Dataset: check updates -> load aligner -> align -> slice -> quality filter -> save.  LoRA additionally trains the
@@ -200,22 +210,33 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
     summary = safe_auto_update(progress, updater)
     cancel.check()
 
-    if aligner_factory is not None:
-        aligner = aligner_factory()
+    if req.no_transcript:   # audio only: ASR -> quality gates -> merged dataset (no aligner, no text file)
+        from core.asr import make_default_asr
+        from core.asr_dataset import AsrConfig, build_from_audio
+
+        if asr_factory is not None:
+            asr = asr_factory()
+        else:
+            asr = make_default_asr(str(md.ensure_model(md.ASR_REPO, progress)), "cpu" if req.force_cpu else "auto")
+        build = build_from_audio(req.audio_files or [req.audio], dataset_dir, asr, AsrConfig(language=req.asr_language),
+                                 progress, cancel)
     else:
-        path = md.ensure_aligner_model(progress)
-        aligner = make_default_aligner(str(path), "cpu" if req.force_cpu else "auto")
-    cfg = BuildConfig()
-    try:
-        build = DatasetBuilder(aligner, cfg, save_stage=Stage.SLICE if lora else Stage.SAVE).run(
-            req.audio, req.text, dataset_dir, progress, cancel)
-    finally:
+        if aligner_factory is not None:
+            aligner = aligner_factory()
+        else:
+            path = md.ensure_aligner_model(progress)
+            aligner = make_default_aligner(str(path), "cpu" if req.force_cpu else "auto")
+        cfg = BuildConfig()
         try:
-            aligner.unload()
-        except Exception:  # noqa: BLE001
-            pass
+            build = DatasetBuilder(aligner, cfg, save_stage=Stage.SLICE if lora else Stage.SAVE).run(
+                req.audio, req.text, dataset_dir, progress, cancel)
+        finally:
+            try:
+                aligner.unload()
+            except Exception:  # noqa: BLE001
+                pass
     res = TaskResult(req.kind, root, dataset_dir, n_segments=build.n_segments, warnings=list(build.warnings),
-                     update_summary=summary)
+                     update_summary=summary, asr_report=getattr(build, "asr_report", None))
     if lora:
         from core.lora_trainer import train_lora_from_dataset
 
@@ -237,7 +258,7 @@ def required_model_repos() -> List[str]:
     from infra.vram_optimizer import detect_gpu, plan_training
 
     plan = plan_training(detect_gpu(), 100)
-    return [md.ALIGNER_REPO, plan.base_model]
+    return [md.ALIGNER_REPO, plan.base_model]   # the ASR model (no-transcript mode) is fetched on first use
 
 
 def models_missing(repos: Optional[List[str]] = None) -> List[str]:
