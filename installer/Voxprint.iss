@@ -4,16 +4,18 @@
 ; (after the installation, Voxprint can be started right away with the --prefetch flag).
 
 #define AppName "Voxprint"
+; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
+#define AppDisplayName "Voxprint AI Audiobook Builder"
 #define AppVersion "0.1.0"
 #define AppExe "Voxprint.exe"
 
 [Setup]
 AppId={{6F1D2B7A-3C54-4E0B-9A41-7B5E0C9D2F18}
-AppName={#AppName}
+AppName={#AppDisplayName}
 AppVersion={#AppVersion}
 AppPublisher=Voxprint
 DefaultDirName={autopf}\{#AppName}
-DefaultGroupName={#AppName}
+DefaultGroupName={#AppDisplayName}
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExe}
 SetupIconFile=..\assets\voxprint-setup.ico
@@ -52,14 +54,14 @@ Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 #endif
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
+Name: "{group}\{#AppDisplayName}"; Filename: "{app}\{#AppExe}"
+Name: "{autodesktop}\{#AppDisplayName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
 #ifexist "redist\vc_redist.x64.exe"
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Устанавливаю компоненты Microsoft Visual C++…"; Flags: waituntilterminated
 #endif
-Filename: "{app}\{#AppExe}"; Parameters: "--prefetch"; Description: "Запустить Voxprint и скачать модели (рекомендуется, ~7 ГБ, один раз)"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#AppExe}"; Parameters: "--prefetch"; Description: "Запустить {#AppDisplayName} и скачать модели (рекомендуется, ~7 ГБ, один раз)"; Flags: nowait postinstall skipifsilent
 
 [Code]
 function InitializeSetup(): Boolean;
@@ -69,7 +71,7 @@ begin
   Result := True;
   GetWindowsVersionEx(V);
   if V.Build < 26100 then
-    Result := MsgBox('Voxprint рассчитан на Windows 11 26H2 (сборка 26100 и новее). ' +
+    Result := MsgBox('{#AppDisplayName} рассчитан на Windows 11 26H2 (сборка 26100 и новее). ' +
       'У вас сборка ' + IntToStr(V.Build) + ': программа может работать некорректно.' + #13#10 +
       'Продолжить установку?', mbConfirmation, MB_YESNO) = IDYES;
 end;

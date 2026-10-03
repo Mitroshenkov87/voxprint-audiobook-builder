@@ -29,7 +29,7 @@ SHIP = {"bundled": "bundled", "optional": "optional, not bundled", "download": "
 
 HEADER = """# Third-party notices
 
-Voxprint (c) {author}, built with AI assistance. Version {version}.
+Voxprint AI Audiobook Builder (c) {author}, built with AI assistance. Version {version}.
 
 Voxprint stands on the open-source projects and models listed below. Every component keeps its own licence;
 the full licence texts are in the `licenses/` folder next to this file. This file is generated from
@@ -48,6 +48,15 @@ SPECIAL = """## Important compliance notes
   <https://ffmpeg.org/download.html#get-sources>; build scripts of the binary:
   <https://github.com/imageio/imageio-binaries>. If you do not want to ship a GPL binary, remove it and ship an
   LGPL build of ffmpeg or require ffmpeg on `PATH`.
+* **AAC / M4B export - patents.** The optional M4B (AAC) export exists only as a convenience for Apple Books
+  compatibility. The AAC codec is patent-encumbered. Voxprint does not provide a patent licence for it, and this
+  project's licence (and the licences listed here) do not grant one. **You are solely responsible for any legal
+  compliance** (patent licensing, royalties, distribution rules in your country or for your use) when you choose
+  this format. The default formats (Opus, MP3 per chapter, FLAC, WAV) are not affected by this note. You can hide and
+  disable the AAC option completely: set the environment variable `VOXPRINT_ENABLE_AAC=0` or put
+  `{"aac_m4b": false}` into `%LOCALAPPDATA%\\Voxprint\\state\\features.json`. The encoders (`aac`, `libopus`,
+  `libmp3lame`) come from the ffmpeg build in use; their presence in the pinned build is checked at run time, and the
+  export stops with a clear message if one is missing.
 * **soynlp (GPLv3) is intentionally excluded.** `qwen-asr` imports it only inside the Korean-language branch of its
   forced aligner. Voxprint does not install or bundle it; therefore **Korean alignment is unavailable**.
 * **Non-commercial model.** The optional backup aligner model `MahmoudAshraf/mms-300m-1130-forced-aligner` is
