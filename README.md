@@ -106,6 +106,8 @@ uv pip install -r requirements.txt -r requirements-verified.txt
 uv pip install --no-deps -r requirements-nodeps.txt        :: qwen-asr/qwen-tts: their transformers pins conflict
 python -m bitsandbytes                                     :: check the 8-bit optimizer (plain AdamW otherwise - fine)
 python main.py
+:: quick rebuild without tests/installer: set VOX_SKIP_TESTS=1 & set VOX_SKIP_INSTALLER=1 & build.bat onedir
+:: check that a frozen build really contains every library:  dist\Voxprint\Voxprint.exe --selftest-imports   (result in <app home>\logs\selftest_imports.txt)
 :: tests
 pip install pytest && python -m pytest
 :: CLI (developer tool, no GUI)
@@ -177,6 +179,10 @@ Important points:
   Pinokio/Alexandria-style tree, ModelScope layout, pinned-revision mismatch, read-only guarantee, ModelScope listing and resumable download (fake server), reuse/upgrade/install decisions,
   torch flavor mapping, completion manifest + reason codes, pinned-asset installer (sha256, staging, smoke test, rollback). Real endpoints checked 2026-10-03: ModelScope repo ids and file sizes equal the pinned HF commits;
   Qwen has no newer Qwen3-TTS/aligner than the ones used (new in the org: `Qwen3-ForcedAligner-0.6B-hf` and `Qwen3-ASR-*-hf`, transformers-native variants - not adopted, noted only).
+
+## Verified on Windows Server 2025 + RTX 4090 (2026-10-03; details in winrm-test/REPORT.md if shipped with the repo)
+Python 3.11.9, torch 2.14.1+cu130 (`uv --torch-backend=auto`), full test suite green, real Qwen3-TTS-1.7B-Base + ForcedAligner download, alignment -> slicing -> dataset -> LoRA training (about 5.2 GiB peak VRAM, ~7.5 s per epoch of 20 fragments),
+merged-model export (4.2 GiB, 13 s) and generation, PyInstaller onedir build + Inno Setup installer, `--verify-install` / `--repair`, model reuse from an HF cache, bitsandbytes 0.50.2.
 
 ## Still to verify on Windows / GPU (TODO-needs-GPU-test)
 * Reuse against a **real** Alexandria/Pinokio install on Windows (folder names, real symlink/no-symlink caches, `%USERPROFILE%` paths); a real ModelScope download; the real `nvidia-smi` mapping; `uv venv`/`uv pip` repair end to end;
