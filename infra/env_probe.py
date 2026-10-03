@@ -94,7 +94,7 @@ CUDA_FLAVORS: Tuple[Tuple[Tuple[int, int], str], ...] = (
 
 
 def parse_nvidia_smi_cuda(text: str) -> Optional[Tuple[int, int]]:
-    m = re.search(r"CUDA Version:\s*(\d+)\.(\d+)", text or "")
+    m = re.search(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)", text or "")   # драйверы 6xx печатают "CUDA UMD Version"
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 

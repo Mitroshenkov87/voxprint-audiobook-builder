@@ -63,6 +63,7 @@ def test_check_versions_counts_actions():
 # ------------------------------------------------------------------------------------- torch flavor
 @pytest.mark.parametrize("smi,flavor", [
     ("| NVIDIA-SMI 581.15  Driver Version: 581.15  CUDA Version: 13.0 |", "cu130"),
+    ("NVIDIA-SMI 610.88  KMD Version: 610.88  CUDA UMD Version: 13.3", "cu130"),     # drivers 6xx: "UMD"
     ("CUDA Version: 12.9", "cu128"), ("CUDA Version: 12.6", "cu126"), ("CUDA Version: 12.4", "cu124"),
     ("CUDA Version: 11.8", "cu118"), ("CUDA Version: 11.2", "cpu"), ("no gpu here", "cpu")])
 def test_torch_flavor_from_driver(smi, flavor):
@@ -568,3 +569,8 @@ def test_ensure_ffmpeg_in_audio_utils_requires_smoke_test(monkeypatch, tmp_path)
     assert got != "/broken/ffmpeg"                                   # falls through to the next source
     monkeypatch.setattr(env_probe, "probe_ffmpeg", lambda *a, **k: env_probe.FfmpegInfo("/good/ffmpeg", "7", True))
     assert audio_utils.ensure_ffmpeg() == "/good/ffmpeg"
+
+
+def test_default_venv_python_matches_supported_runtime():
+    # --verify-install сравнивает версию Python из манифеста с запущенным интерпретатором (3.11): venv по умолчанию - тоже 3.11
+    assert ist.PYTHON_VERSION_DEFAULT == "3.11"

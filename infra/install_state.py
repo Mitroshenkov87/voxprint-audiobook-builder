@@ -36,7 +36,7 @@ OWNER_MARKER = ".voxprint-owned"
 #: Modules whose presence proves a usable install (checked without importing them - fast; see ``deep``).
 HEALTH_MODULES = ("torch", "transformers", "peft", "accelerate", "safetensors", "qwen_tts", "qwen_asr")
 REQUIREMENT_FILES = ("requirements.txt", "requirements-verified.txt", "requirements-nodeps.txt")
-PYTHON_VERSION_DEFAULT = "3.12"
+PYTHON_VERSION_DEFAULT = "3.11"   # = Python сборки/разработки (build.bat: py -3.11); verify сверяет версию с запущенным интерпретатором
 
 # stable reason codes (each has a locale key health.<code>)
 R_NO_MANIFEST = "no_manifest"
