@@ -80,6 +80,8 @@ Source: "..\dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 #endif
 ; Third-party licences (LGPL/GPL/Apache etc.): the component list and the full licence texts.
 Source: "..\build\notices\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\credits.json"; DestDir: "{app}"; Flags: ignoreversion
 ; Optional: put vc_redist.x64.exe into installer\redist and it will be installed silently (PyTorch needs it).

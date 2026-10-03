@@ -67,5 +67,6 @@ Open an issue with: Windows build, GPU/driver, what you did, the message shown (
 `%LOCALAPPDATA%\Voxprint\logs\voxprint.log`. `main.py --verify-install` prints stable reason codes that help a lot. Do not attach recordings of other people.
 
 ## Licence of contributions
-The project's own source-code licence is still to be chosen (see the README). By contributing you agree that your contribution may be distributed under the licence
-the project adopts; if you object, tell us in the PR.
+Voxprint's source code is licensed under the **Apache License 2.0** (see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE)). Unless you state otherwise, any contribution you
+submit for inclusion is licensed under the same terms (Apache-2.0, section 5) - no extra agreement is needed. Only contribute code you wrote or that you may license this way.
+Do not commit trained voices, recordings, model weights or other people's data: voices have their own licences and are distributed through the voices repository, not through this repository.
