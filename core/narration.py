@@ -23,6 +23,7 @@ multi-voice role markup (all chunks currently use the job's voice).
 from __future__ import annotations
 
 import hashlib
+from concurrent.futures import Future, ThreadPoolExecutor
 import logging
 import os
 import shutil
@@ -211,30 +212,119 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
     chars_done = 0
     remaining_chars = sum(len(texts[c.index]) for c in pending)
     progress(NarrationProgress(done, total, None, tr("narr.resuming", n=cached) if cached else ""))
+    # Pipeline: the GPU thread (this one) only generates; finished chunks are encoded to FLAC and written by a helper thread,
+    # so the disk/CPU work of chunk N overlaps with the generation of chunk N+1.  Errors of the writer surface at the next check.
+    saver = ThreadPoolExecutor(max_workers=1, thread_name_prefix="chunk-writer")
+    futures: List[Future] = []
     try:
-        for c in pending:
+        queue = list(pending)
+        batch_limit = 0                                      # 0 = not known yet (the engine is created lazily)
+        while queue:
             pause.wait(cancel)
             cancel.check()
             if engine is None:
                 progress(NarrationProgress(done, total, None, tr("narr.loading_model")))
                 engine = engine_factory()
+                batch_limit = _batch_limit(engine)
+            group = _next_group(queue, texts, batch_limit)
             t0 = time.monotonic()
-            audio = _synth_with_retry(engine, texts[c.index], c.index)
-            took = time.monotonic() - t0
-            cache.save(keys[c.index], audio, engine.sample_rate)
-            spent += took
-            chars_done += max(1, len(texts[c.index]))
-            remaining_chars -= len(texts[c.index])
-            done += 1
+            audios, batch_limit = _synth_group(engine, [texts[c.index] for c in group], [c.index for c in group], batch_limit)
+            spent += time.monotonic() - t0
+            for c, audio in zip(group, audios):
+                futures.append(saver.submit(cache.save, keys[c.index], audio, engine.sample_rate))
+                chars_done += max(1, len(texts[c.index]))
+                remaining_chars -= len(texts[c.index])
+                done += 1
+            _raise_finished(futures)
             eta = spent / chars_done * max(0, remaining_chars) if chars_done else None
             progress(NarrationProgress(done, total, eta, tr("narr.chunk_progress", done=done, total=total)))
+        for f in futures:
+            f.result()
     finally:
+        saver.shutdown(wait=True)
         if engine is not None:
             try:
                 engine.close()
             except Exception:  # noqa: BLE001
                 log.warning("engine close failed", exc_info=True)
     return {"cached": cached, "made": len(pending)}
+
+
+#: Chunks are sorted by length inside a window of this many batches (a batch runs until its longest item ends, so similar
+#: lengths waste the least); a small window keeps the finished chunks close to book order for the live player.
+SORT_WINDOW_BATCHES = 3
+
+
+def _batch_limit(engine: TTSEngine) -> int:
+    """How many chunks the engine can take at once (1 = no batching: engine without ``synthesize_batch`` or on CPU)."""
+    if not callable(getattr(engine, "synthesize_batch", None)) or not callable(getattr(engine, "max_batch", None)):
+        return 1
+    try:
+        return max(1, int(engine.max_batch()))
+    except Exception:  # noqa: BLE001
+        return 1
+
+
+def _next_group(queue: List[Chunk], texts: Dict[int, str], limit: int) -> List[Chunk]:
+    """Take the next batch off ``queue`` (in place): the shortest ``limit`` texts of the next window, so lengths are similar."""
+    if limit <= 1:
+        return [queue.pop(0)]
+    window = sorted(queue[:limit * SORT_WINDOW_BATCHES], key=lambda c: len(texts[c.index]))
+    group = window[:limit] if len(window) <= limit or SORT_WINDOW_BATCHES == 1 else _centered(window, limit)
+    for c in group:
+        queue.remove(c)
+    return group
+
+
+def _centered(window: List[Chunk], limit: int) -> List[Chunk]:
+    """The batch of ``limit`` neighbours (in length order) that contains the window's first chunk in book order."""
+    first = min(range(len(window)), key=lambda i: window[i].index)
+    lo = max(0, min(first - limit // 2, len(window) - limit))
+    return window[lo:lo + limit]
+
+
+def _is_oom(exc: BaseException) -> bool:
+    return "out of memory" in str(exc).lower() or type(exc).__name__ == "OutOfMemoryError"
+
+
+def _synth_group(engine: TTSEngine, group_texts: List[str], indexes: List[int], limit: int):
+    """Synthesize one batch; returns ``(audios, new_limit)``.  Out of memory halves the limit and splits the batch; any other
+    batch failure falls back to chunk-by-chunk synthesis (with the usual retry), so batching can never make a book fail."""
+    if len(group_texts) == 1 or limit <= 1:
+        return [_synth_with_retry(engine, t, i) for t, i in zip(group_texts, indexes)], limit
+    try:
+        audios = [np.asarray(a, dtype=np.float32).reshape(-1) for a in engine.synthesize_batch(group_texts)]  # type: ignore[attr-defined]
+        if len(audios) == len(group_texts) and all(a.size for a in audios):
+            return audios, limit
+        log.warning("batch returned empty audio; retrying chunk by chunk")
+    except (CancelledByUser, DatasetMakerError):
+        raise
+    except Exception as exc:  # noqa: BLE001
+        log.warning("batch of %d failed (%s); %s", len(group_texts), exc, "halving the batch size" if _is_oom(exc) else "retrying one by one")
+        if _is_oom(exc):
+            _free_gpu_cache()
+            half = max(1, len(group_texts) // 2)
+            first, rest = _synth_group(engine, group_texts[:half], indexes[:half], half)
+            second, _ = _synth_group(engine, group_texts[half:], indexes[half:], half)
+            return first + second, half
+    return [_synth_with_retry(engine, t, i) for t, i in zip(group_texts, indexes)], limit
+
+
+def _free_gpu_cache() -> None:
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _raise_finished(futures: List[Future]) -> None:
+    """Re-raise the error of an already finished background write (so a full disk stops the job early)."""
+    for f in futures:
+        if f.done() and f.exception() is not None:
+            raise f.exception()  # type: ignore[misc]
 
 
 def _synth_with_retry(engine: TTSEngine, text: str, index: int, attempts: int = 2) -> np.ndarray:

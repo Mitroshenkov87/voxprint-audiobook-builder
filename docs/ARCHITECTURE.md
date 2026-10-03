@@ -48,8 +48,8 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 | `train_presets.py` | Fast/Balanced/Maximum/Manual `TrainPlan`s on top of `plan_training`, `estimate_seconds` (4090-calibrated, scaled per GPU) |
 | `consent.py` | spoken-consent templates, rule-based `parse_statement` (scope/name/date), `consent` block of voice.json, scope -> licence mapping |
 | `voice_check.py` | sample quality metrics: autocorrelation F0 median, semitone distance, WER, verdict + issue codes (pitch / WER / babbling / quiet) |
-| `narration.py` | `narrate_book`: `TTSEngine` protocol, `ChunkCache` (atomic per-chunk FLAC, key = sha256(engine tag + text)), `synthesize_chunks` (lazy engine, retry, ETA), `assemble_chapters`, `PauseToken`, `NarrationOptions` (formats, bitrates, `allow_aac`, `preprocessors`) |
-| `tts_engine.py` | the real engine `Qwen3AdapterEngine` (qwen-tts + PEFT adapter, voice-clone prompt from `ref_sample.wav`) - **not yet run on a GPU** |
+| `narration.py` | `narrate_book`: `TTSEngine` protocol, `ChunkCache` (atomic per-chunk FLAC, key = sha256(engine tag + text)), `synthesize_chunks` (lazy engine, length-sorted batches sized by the engine, OOM halving, per-chunk fallback, FLAC writer thread, retry, ETA), `assemble_chapters`, `PauseToken`, `NarrationOptions` (formats, bitrates, `allow_aac`, `preprocessors`) |
+| `tts_engine.py` | the real engine `Qwen3AdapterEngine` (qwen-tts + PEFT adapter, voice-clone prompt from `ref_sample.wav`); attention backend flash-attn 2 > SDPA > eager with fallback; `synthesize_batch` / `max_batch` (batch by free VRAM); validated on an RTX 4090 |
 | `audiobook_export.py` | format registry, file naming, `ffmetadata` chapters, `.m3u8`, ffmpeg command builders, encoder pre-check, `export_formats` (injectable `run`) |
 
 ### `infra/`
@@ -105,7 +105,7 @@ result in the output folder.
 ```
 book file --book_parsers.load_book--> Book(chapters) --chunker.chunk_book--> chunks (sentence-sized, per chapter)
    book_prep.run_preparation (optional, `NarrationOptions.prep`): text_prep rules -> text_cleanup (SAGE + validator, cached in .cache/cleanup.json) -> prepared Book; debug copy in .debug/
-   narration.synthesize_chunks: for each chunk  cache hit?  yes -> reuse   no -> TTSEngine.synthesize (Qwen3AdapterEngine: base model + voice adapter + reference clip) -> ChunkCache (atomic FLAC)
+   narration.synthesize_chunks: for each chunk  cache hit?  yes -> reuse   no -> TTSEngine.synthesize_batch (or synthesize) (Qwen3AdapterEngine: base model + voice adapter + reference clip) -> ChunkCache (atomic FLAC)
    narration.assemble_chapters: stream chunks into one WAV per chapter, pauses between sentences / paragraphs, a tail after each chapter
    audiobook_export.export_formats: ffmpeg  ->  .opus (chapters in ffmetadata)  /  per-chapter .mp3 + .m3u8  /  .m4b (AAC, only if allowed)  / ...
 ```

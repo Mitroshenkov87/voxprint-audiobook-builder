@@ -271,7 +271,13 @@ Start. A downloaded voice remembers its index id (`repo_id`) and is then shown o
 
 **Voice packages.** A voice package is a zip with the LoRA adapter and a `voice.json` (name, localized `names` / `descriptions`, licence, consent block). Packages are **not** part of this repository or the installer;
 they are hosted separately (a model host or a release asset) and listed in the voices index. Voices meant for testing carry the licence **`custom/test-use-only`** - *Test use only - no public release of generated audio, no commercial use*;
-their consent block has `method: "owner"` (the publisher owns the voice). The programme shows a "test use only" reminder on its card, in Narrate and when an audiobook made with it is ready. To publish a voice package yourself:
+their consent block has `method: "owner"` (the publisher owns the voice). **The open universal voice ("Open universal voice" / "Открытый универсальный голос" / "Offene Universalstimme").** A fully open English voice for anyone who has no recording of their own: trained with Voxprint's own pipeline
+(LoRA, learning rate 1e-6, 10 epochs, 66 clips = 7.5 min) **only** from the public-domain **LJ Speech 1.1** dataset (reader Linda Johnson, LibriVox recordings; compiled by Keith Ito, <https://keithito.com/LJ-Speech-Dataset/>;
+the dataset is dedicated to the public domain, the Hugging Face copy `keithito/lj_speech` is tagged `unlicense`) on top of `Qwen/Qwen3-TTS-12Hz-1.7B-Base`, which is **Apache-2.0** (commercial use of the model, its outputs and adapters is allowed).
+The voice package is licensed **CC0-1.0** (free for any use, also commercial; attribution to the LJ Speech dataset is appreciated). It is not stored in this repository: the spec is `tools/voice_specs/open-universal.json`, the zip is hosted separately and listed in the voices index.
+Measured on the finished voice: a 15.8 s sample was recognised back with WER 0.04 and a pitch shift of +1.0 semitone from the reference clip.
+
+The programme shows a "test use only" reminder on its card, in Narrate and when an audiobook made with it is ready. To publish a voice package yourself:
 ```
 python tools/make_voice_package.py --adapter <trained voice folder> --spec tools/voice_specs/example-open-voice.json --out dist_voices --url https://huggingface.co/<user>/voxprint-voices/resolve/main/open-voice.zip
 ```
@@ -526,6 +532,29 @@ packages (`tools\gen_notices.py --with-installed`, called by `build.bat`). Voxpr
   * every **voice** carries its own licence in `voice.json` (see *My voices and licences*). Voices you train are `custom/personal-only` until you decide otherwise;
   * voice packages are not part of this repository or the installer; a voice marked **"test use only"** (`custom/test-use-only`) may be used to try the program only: do not publish audio made with it and do not use it commercially.
 * Third-party components: `THIRD_PARTY_NOTICES.md` and `licenses\`.
+
+## Narration speed
+
+Narration used one chunk at a time with the "eager" attention code (RTF 3.05 on an RTX 4090: 3 s of GPU time per second of audio). It now defaults to:
+* **SDPA attention** (PyTorch fused kernels; FlashAttention 2 is used instead if the `flash_attn` package is installed - it is not available for Windows from PyPI; "eager" remains the fallback if the model refuses to load);
+* **batched generation**: several chunks go through the model in one call (`Qwen3AdapterEngine.synthesize_batch`), the batch size comes from the free VRAM (up to 12), chunks of similar length are batched together (sorted inside a small window, so the book order is kept for the live player),
+  and an out-of-memory error halves the batch automatically; any other batch error falls back to chunk-by-chunk synthesis (so batching can never make a book fail);
+* **a writer thread**: finished chunks are encoded to FLAC and stored by a helper thread while the GPU already generates the next batch.
+The model still runs only on the GPU (bfloat16, the dtype it was trained and validated in).
+
+Measured (RTX 4090, 12 English chunks of 20-170 characters, 80 s of audio, open voice, same seed; WER = the audio recognised back by Qwen3-ASR; "pitch" = mean f0 shift against the reference clip):
+
+| Setup | RTF | time for 80 s of audio | VRAM peak | mean WER | pitch shift |
+|---|---|---|---|---|---|
+| before: eager, one chunk at a time | 3.05 | 243 s | 5.95 GB | 0.014 | +0.9 st |
+| SDPA, one chunk at a time | 2.09 | 166 s | 5.95 GB | 0.035 | +0.7 st |
+| SDPA, batch of 4 | 0.72 | 57 s | 7.6 GB | 0.019 | +0.4 st |
+| SDPA, batch of 6 | 0.51 | 41 s | 8.7 GB | 0.014 | -0.1 st |
+| SDPA, batch of 12 (default on 24 GB) | **0.31** | **25 s** | 11.8 GB | 0.004 | -0.3 st |
+
+That is about **10x faster** on this GPU. Estimates for a book at RTF 0.31-0.5 (one narrated hour of audio = 60 min x RTF of GPU time): **5 hours of audio ≈ 1.6-2.5 h, 20 hours ≈ 6-10 h** (before: 15 h and 61 h). Longer chunks use more VRAM per item, so the real batch is smaller on 12-16 GB cards.
+Caveats: the WER differences between rows are within the sampling noise of 12 chunks (generation is random); speaker similarity was checked only through the pitch shift (the project has no speaker-embedding model); a small pitch drift (about 1 semitone lower than the single-chunk run) is visible with large batches - use the single-chunk
+path (`MAX_BATCH = 1` in `core/tts_engine.py`) if you prefer. `torch.compile` / CUDA graphs were not tried (no Triton on Windows).
 
 ## What was verified against primary sources
 * **qwen-asr 0.0.6** (PyPI sources): `Qwen3ForcedAligner.from_pretrained(path, dtype, device_map)`, `.align(audio=(np, sr), text, language="Russian")` ->

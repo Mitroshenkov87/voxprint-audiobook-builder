@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, List, Optional, Sequence
 
 import numpy as np
 
@@ -44,6 +44,28 @@ def max_tokens_for(text: str) -> int:
     return max(MIN_TOKENS, min(MAX_TOKENS, int(round(seconds * FRAMES_PER_SECOND))))
 
 
+#: Batched synthesis: at most this many chunks per generate call; VRAM per extra sequence (KV cache + activations; measured 0.5-0.6 GB
+#: for chunks up to ~150 characters on an RTX 4090, rounded up for longer ones) and a reserve that is never planned.
+MAX_BATCH = 12
+VRAM_PER_ITEM_GB = 0.9
+VRAM_RESERVE_GB = 2.0
+
+
+def _attn_candidates(attn: str, use_cuda: bool) -> List[str]:
+    """Attention implementations to try, best first.  ``attn`` forces one ("eager" / "sdpa" / "flash_attention_2"); "auto" picks."""
+    if attn and attn != "auto":
+        return [attn] + [a for a in ("sdpa", "eager") if a != attn]
+    out: List[str] = []
+    if use_cuda:
+        try:
+            import flash_attn  # noqa: F401  (only usable when installed; not available for Windows from PyPI)
+
+            out.append("flash_attention_2")
+        except Exception:  # noqa: BLE001
+            pass
+    return out + ["sdpa", "eager"]
+
+
 def engine_tag(voice: VoiceRecord) -> str:
     """Identity of voice + adapter weights + base model: a retrained or replaced adapter invalidates cached audio."""
     adapter = voice.path / "adapter_model.safetensors"
@@ -59,7 +81,7 @@ def engine_tag(voice: VoiceRecord) -> str:
 class Qwen3AdapterEngine:
     """Synthesizes with a LoRA voice.  Create it lazily (loading takes a while and ~4-7 GB of VRAM)."""
 
-    def __init__(self, voice: VoiceRecord, base_dir: Path, language: str = "", device: str = "auto") -> None:
+    def __init__(self, voice: VoiceRecord, base_dir: Path, language: str = "", device: str = "auto", attn: str = "auto") -> None:
         """Load the model, apply the adapter and prepare the voice-clone prompt."""
         import torch
         from peft import PeftModel
@@ -69,8 +91,21 @@ class Qwen3AdapterEngine:
         self.language = (language or voice.language or "auto").strip().capitalize()
         use_cuda = device == "cuda" or (device == "auto" and torch.cuda.is_available())
         dtype = torch.bfloat16 if use_cuda else torch.float32
-        self._q = Qwen3TTSModel.from_pretrained(str(base_dir), device_map="cuda:0" if use_cuda else None, dtype=dtype,
-                                                attn_implementation="eager")
+        self._q = None
+        self.attn = ""
+        # Attention backend: flash-attn 2 (if installed) > SDPA (PyTorch fused kernels) > eager.  Every step falls back to the
+        # next one if the model refuses to load with it, so an unusual GPU/driver never blocks narration.
+        for impl in _attn_candidates(attn, use_cuda):
+            try:
+                self._q = Qwen3TTSModel.from_pretrained(str(base_dir), device_map="cuda:0" if use_cuda else None, dtype=dtype,
+                                                        attn_implementation=impl)
+                self.attn = impl
+                break
+            except Exception:  # noqa: BLE001
+                log.warning("attention backend %s is not available; trying the next one", impl, exc_info=True)
+                self._q = None
+        if self._q is None:
+            raise NarrationError(tr("err.voice_invalid"), details="the model could not be loaded")
         talker = PeftModel.from_pretrained(self._q.model.talker, str(voice.path))
         try:
             talker = talker.merge_and_unload()          # faster inference; fall back to the unmerged adapter
@@ -93,6 +128,32 @@ class Qwen3AdapterEngine:
                                                     max_new_tokens=max_tokens_for(text))
         self.sample_rate = int(sr)
         return np.asarray(wavs[0], dtype=np.float32).reshape(-1)
+
+    def synthesize_batch(self, texts: Sequence[str]) -> List[np.ndarray]:
+        """Several chunks in ONE generate call (the GPU is mostly idle with a single sequence, so a batch is almost free).
+
+        Texts of similar length should be batched together (the narrator sorts them): the batch runs until its longest item ends.
+        """
+        import torch
+
+        n = len(texts)
+        with torch.inference_mode():
+            wavs, sr = self._q.generate_voice_clone(text=list(texts), language=[self.language] * n, voice_clone_prompt=self._prompt,
+                                                    max_new_tokens=max(max_tokens_for(t) for t in texts))
+        self.sample_rate = int(sr)
+        return [np.asarray(w, dtype=np.float32).reshape(-1) for w in wavs]
+
+    def max_batch(self) -> int:
+        """How many chunks fit into the free VRAM at once (``VRAM_PER_ITEM_GB`` each, capped); 1 on CPU or if unknown."""
+        try:
+            import torch
+
+            if not torch.cuda.is_available():
+                return 1
+            free = torch.cuda.mem_get_info()[0] / 1024 ** 3
+            return int(max(1, min(MAX_BATCH, (free - VRAM_RESERVE_GB) // VRAM_PER_ITEM_GB)))
+        except Exception:  # noqa: BLE001
+            return 1
 
     def close(self) -> None:
         """Free the model and the GPU cache."""

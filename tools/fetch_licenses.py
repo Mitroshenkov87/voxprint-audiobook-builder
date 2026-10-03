@@ -21,6 +21,7 @@ SPDX = "https://raw.githubusercontent.com/spdx/license-list-data/main/text/{}.tx
 
 # file id -> ("repo", "owner/name") | ("url", direct URL) | ("spdx", SPDX identifier)
 SOURCES = {
+    "CC0-1.0": ("spdx", "CC0-1.0"),            # the public-domain dedication used for the open example voice / LJ Speech
     "qwen-tts": ("repo", "QwenLM/Qwen3-TTS"),
     "sage-fredt5": ("spdx", "MIT"),            # the model repository has no LICENSE file; licenses/sage-fredt5.txt carries an explanatory header
     "qwen-asr": ("repo", "QwenLM/Qwen3-ASR"),

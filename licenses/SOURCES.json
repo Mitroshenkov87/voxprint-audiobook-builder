@@ -1,6 +1,7 @@
 {
   "Apache-2.0": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/Apache-2.0.txt",
   "CC-BY-NC-4.0": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/CC-BY-NC-4.0.txt",
+  "CC0-1.0": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/CC0-1.0.txt",
   "MPL-2.0": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/MPL-2.0.txt",
   "accelerate": "https://raw.githubusercontent.com/huggingface/accelerate/main/LICENSE",
   "bitsandbytes": "https://raw.githubusercontent.com/bitsandbytes-foundation/bitsandbytes/main/LICENSE",

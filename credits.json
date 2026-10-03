@@ -692,6 +692,22 @@
     "de": "Das Fingerabdruck-Symbol der Anwendung (angepasst)",
     "ru": "Значок-отпечаток приложения (изменён)"
    }
+  },
+  {
+   "id": "ljspeech",
+   "name": "LJ Speech 1.1 (public-domain speech; reader Linda Johnson, LibriVox; compiled by Keith Ito)",
+   "kind": "asset",
+   "ship": "optional",
+   "license": "Public domain (CC0-1.0)",
+   "license_files": [
+    "CC0-1.0"
+   ],
+   "url": "https://keithito.com/LJ-Speech-Dataset/",
+   "purpose": {
+    "en": "Training speech of the optional fully open example voice (not part of the program; the voice is downloaded separately)",
+    "de": "Trainingssprache der optionalen vollständig offenen Beispielstimme (nicht Teil des Programms; die Stimme wird separat geladen)",
+    "ru": "Обучающая речь необязательного полностью открытого голоса-примера (не входит в программу; голос скачивается отдельно)"
+   }
   }
  ]
 }

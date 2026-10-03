@@ -312,6 +312,14 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 * Status: bundled
 * Licence text: [`licenses/tabler-icons.txt`](licenses/tabler-icons.txt)
 
+### LJ Speech 1.1 (public-domain speech; reader Linda Johnson, LibriVox; compiled by Keith Ito)
+
+* Purpose: Training speech of the optional fully open example voice (not part of the program; the voice is downloaded separately)
+* Licence: Public domain (CC0-1.0)
+* Project: <https://keithito.com/LJ-Speech-Dataset/>
+* Status: optional, not bundled
+* Licence text: [`licenses/CC0-1.0.txt`](licenses/CC0-1.0.txt)
+
 ## Build tools (not shipped, except the PyInstaller bootloader and the Inno Setup installer runtime)
 
 ### FFmpeg LGPL build (BtbN/FFmpeg-Builds, downloaded when needed)
