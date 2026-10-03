@@ -171,6 +171,15 @@ and the text, because the ASR API gives no per-token confidence), duplicates (id
 When it is done the window reports the totals: files, kept clips and how many minutes of the audio were kept. Automatic recognition can contain errors, so a clear localized warning is shown and
 **an explicit "I understand" tick is required** before the buttons work; the dataset's `report.json` records every clip's source file and plausibility.
 
+### Quick preview and automatic voice check
+
+Before a long run, **Quick preview…** in the Train window trains a short adapter on a small subset (at most 12 clips, at most 4 epochs, capped at about 3 minutes of estimated time; the estimate is shown next to the button),
+then synthesizes a ~10 s sample and plays it in the app. Each sample shows **automatic metrics**: pitch distance to your recording in semitones and the word error rate of a Qwen3-ASR re-reading of the sample, with a good / warning / bad verdict
+(thresholds: pitch 3 / 6 semitones, WER 0.25 / 0.5; a sample that runs to the length cap is flagged as babbling).
+**Compare 2 variants** makes two previews: A with the current settings, B with rank and alpha doubled and 1.5x the epochs (same learning rate). Listen, press **Use these settings** under the better one: the Manual preset is filled in and the full run uses it.
+**Cancel** stops after the current step; the trainer's own VRAM handling applies (a preview never raises the learning rate). A preview adapter is temporary and is not added to *My voices*; the full run re-runs the alignment check.
+The same check can run after a full training (tick *Check the voice after training*, on by default): a poor result adds a warning with a suggestion (e.g. fewer epochs, lower rank). Metrics are a hint, not a verdict: the loss is not a quality signal, always listen.
+
 ### Voice owner's consent and usage scope
 
 End the recording with **one spoken consent sentence** (the recording script, block 18, offers three templates in Russian, English and German: your name, the date, and what is allowed).

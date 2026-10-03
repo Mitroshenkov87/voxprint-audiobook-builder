@@ -26,6 +26,7 @@ log = logging.getLogger("voxprint.runner")
 
 KIND_DATASET = "dataset"
 KIND_LORA = "lora"
+KIND_PREVIEW = "preview"   # quick preview: short training on a subset + a sample (nothing is registered)
 KIND_MERGE = "merge"   # universal (merged) model from an already trained adapter (button only)
 
 #: Stages of each scenario, used to turn per-stage progress into one overall percentage.
@@ -38,7 +39,7 @@ def plan_for(kind: str) -> List[Stage]:
     """The ordered list of stages a task kind goes through (for the overall progress percentage)."""
     if kind == KIND_MERGE:
         return PLAN_MERGE
-    return PLAN_LORA if kind == KIND_LORA else PLAN_DATASET
+    return PLAN_LORA if kind in (KIND_LORA, KIND_PREVIEW) else PLAN_DATASET
 
 
 def safe_name(value: str) -> str:
@@ -64,6 +65,8 @@ class TaskRequest:
     consent_scope: str = "private_only"  # manual: commercial / public_noncommercial / private_only
     consent_name: str = ""               # manual: the speaker's name
     consent_save_clip: bool = True       # auto: keep the recorded statement next to the adapter
+    compare: bool = False                # KIND_PREVIEW: two variants to compare
+    quality_check: bool = False          # LoRA: synthesize a sample after training and judge it (core/voice_check.py)
     preset: str = "balanced"             # training preset: fast / balanced / maximum / manual (core.train_presets)
     manual: Optional[object] = None      # core.train_presets.Manual for the "manual" preset
 
@@ -102,6 +105,8 @@ class TaskResult:
     merged_path: Optional[Path] = None   # folder of the universal model (KIND_MERGE)
     speaker: str = ""                   # voice (speaker) name inside the model
     voice_id: str = ""                  # id of the voice registered in the voice library (LoRA only)
+    previews: List[object] = field(default_factory=list)   # KIND_PREVIEW: workers.preview_runner.PreviewItem list
+    quality: Optional[dict] = None       # LoRA with quality_check: the checks of the sample (voice_check.Check.as_dict())
     consent: Optional[dict] = None       # the voice.json "consent" block written for this voice (LoRA only)
     asr_report: Optional[object] = None  # no-transcript mode: core.asr_dataset.AsrReport (files, kept clips, seconds ...)
 
@@ -190,6 +195,81 @@ def _register_voice(adapter_dir: Path, info: dict, library=None) -> str:
         return ""
 
 
+def _asr_for_check(req: TaskRequest, asr_factory, progress=None):
+    """The recogniser for WER checks, or None (the check then simply has no WER)."""
+    try:
+        if asr_factory is not None:
+            return asr_factory()
+        from core.asr import make_default_asr
+
+        return make_default_asr(str(md.ensure_model(md.ASR_REPO, progress or noop_progress)), "cpu" if req.force_cpu else "auto")
+    except Exception as exc:  # noqa: BLE001 - WER is a bonus, never a reason to fail
+        log.warning("no ASR for the voice check: %s", exc)
+        return None
+
+
+def _run_preview(req, build, dataset_dir, root, progress, cancel, asr_factory, deps) -> list:
+    """Quick preview(s): see :mod:`workers.preview_runner`."""
+    from core import train_presets
+    from infra.vram_optimizer import detect_gpu
+    from workers import preview_runner
+
+    gpu = detect_gpu()
+    plan = train_presets.build_plan(req.preset, gpu, build.n_segments, force_cpu=req.force_cpu,
+                                    language=build.training_language, manual=req.manual)
+    asr = _asr_for_check(req, asr_factory, progress)
+    if asr is not None:
+        try:
+            asr.load()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("ASR could not be loaded for the preview check: %s", exc)
+            asr = None
+    return preview_runner.run_previews(dataset_dir, root / "preview", plan, compare=req.compare, language=build.training_language,
+                                       gpu=gpu, progress=progress, cancel=cancel, force_cpu=req.force_cpu, asr=asr,
+                                       train_fn=deps.get("train_fn"), engine_factory=deps.get("engine_factory"))
+
+
+def _quality_check(req, res, build, asr_factory, deps, cancel) -> None:
+    """Automatic post-training check: synthesize a short sample with the new voice, judge it, suggest what to change.  Never raises."""
+    import numpy as np
+
+    from core import audio_utils as au, voice_check
+    from core.tts_engine import FRAMES_PER_SECOND, max_tokens_for
+    from workers import preview_runner
+
+    try:
+        adapter = Path(res.adapter_path)
+        lang = build.training_language
+        text = preview_runner.SAMPLE_TEXT.get(lang, preview_runner.SAMPLE_TEXT["english"])
+        eng = deps["engine_factory"](adapter, lang) if deps.get("engine_factory") else preview_runner._default_engine(adapter, lang)
+        try:
+            audio = np.asarray(eng.synthesize(text), dtype=np.float32).reshape(-1)
+            sr = int(getattr(eng, "sample_rate", 24000))
+        finally:
+            try:
+                eng.close()
+            except Exception:  # noqa: BLE001
+                pass
+        asr = _asr_for_check(req, asr_factory)
+        if asr is not None:
+            asr.load()
+        try:
+            ref, ref_sr = au.load_audio(adapter / "ref_sample.wav", 24000)
+            chk = voice_check.check_sample(audio, sr, text, ref, ref_sr, asr=asr, language=lang.capitalize(),
+                                           max_seconds=max_tokens_for(text) / FRAMES_PER_SECOND)
+        finally:
+            if asr is not None:
+                asr.unload()
+        res.quality = chk.as_dict()
+        if chk.verdict != voice_check.GOOD:
+            res.warnings.append(tr("check.verdict_" + chk.verdict) + " " + " ".join(tr("check.sugg_" + c) for c in chk.issues
+                                                                                 if c != "no_pitch"))
+    except DatasetMakerError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        log.warning("voice quality check failed: %s", exc)
+
+
 def _consent_block(req: TaskRequest, res: TaskResult, progress: ProgressCallback, cancel: CancelToken,
                    asr_factory) -> Optional[dict]:
     """The ``consent`` block for voice.json.  "auto" reads the spoken statement at the end of the recording; whatever goes wrong
@@ -253,7 +333,7 @@ def _run_merge(req: TaskRequest, progress: ProgressCallback, cancel: CancelToken
 def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cancel: Optional[CancelToken] = None,
              updater: Optional[Updater] = None,
              aligner_factory: Optional[Callable[[], object]] = None, voice_library=None,
-             asr_factory: Optional[Callable[[], object]] = None) -> TaskResult:
+             asr_factory: Optional[Callable[[], object]] = None, synth_deps: Optional[dict] = None) -> TaskResult:
     """Run one scenario end to end and return its :class:`TaskResult`.
 
     Dataset: check updates -> load aligner -> align -> slice -> quality filter -> save.  LoRA additionally trains the
@@ -266,6 +346,7 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
     root = req.resolved_root()
     dataset_dir, output_dir = root / "dataset", root / "output" / req.voice_name()
     lora = req.kind == KIND_LORA
+    preview = req.kind == KIND_PREVIEW
 
     progress(Stage.UPDATES, 0.0, tr("upd.checking"))
     summary = safe_auto_update(progress, updater)
@@ -289,7 +370,7 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
             aligner = make_default_aligner(str(path), "cpu" if req.force_cpu else "auto")
         cfg = BuildConfig(max_edge_gap=60.0 if req.consent_mode == "auto" else BuildConfig.max_edge_gap)
         try:
-            build = DatasetBuilder(aligner, cfg, save_stage=Stage.SLICE if lora else Stage.SAVE).run(
+            build = DatasetBuilder(aligner, cfg, save_stage=Stage.SLICE if (lora or preview) else Stage.SAVE).run(
                 req.audio, req.text, dataset_dir, progress, cancel)
         finally:
             try:
@@ -298,6 +379,9 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
                 pass
     res = TaskResult(req.kind, root, dataset_dir, n_segments=build.n_segments, warnings=list(build.warnings),
                      update_summary=summary, asr_report=getattr(build, "asr_report", None))
+    if preview:
+        res.previews = _run_preview(req, build, dataset_dir, root, progress, cancel, asr_factory, synth_deps or {})
+        return res
     if lora:
         from core.lora_trainer import train_lora_from_dataset
 
@@ -316,6 +400,8 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
         res.voice_id = _register_voice(res.adapter_path, info, voice_library)
         if not res.voice_id:
             res.warnings.append(tr("warn.voice_not_registered"))
+        if req.quality_check:
+            _quality_check(req, res, build, asr_factory, synth_deps or {}, cancel)
     return res
 
 

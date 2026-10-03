@@ -47,6 +47,7 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 | `asr_dataset.py` | no-transcript mode: many audio files -> ASR -> gates -> the same dataset files as `DatasetBuilder` (clips are recognised individually, no forced alignment) |
 | `train_presets.py` | Fast/Balanced/Maximum/Manual `TrainPlan`s on top of `plan_training`, `estimate_seconds` (4090-calibrated, scaled per GPU) |
 | `consent.py` | spoken-consent templates, rule-based `parse_statement` (scope/name/date), `consent` block of voice.json, scope -> licence mapping |
+| `voice_check.py` | sample quality metrics: autocorrelation F0 median, semitone distance, WER, verdict + issue codes (pitch / WER / babbling / quiet) |
 | `narration.py` | `narrate_book`: `TTSEngine` protocol, `ChunkCache` (atomic per-chunk FLAC, key = sha256(engine tag + text)), `synthesize_chunks` (lazy engine, retry, ETA), `assemble_chapters`, `PauseToken`, `NarrationOptions` (formats, bitrates, `allow_aac`, `preprocessors`) |
 | `tts_engine.py` | the real engine `Qwen3AdapterEngine` (qwen-tts + PEFT adapter, voice-clone prompt from `ref_sample.wav`) - **not yet run on a GPU** |
 | `audiobook_export.py` | format registry, file naming, `ffmetadata` chapters, `.m3u8`, ffmpeg command builders, encoder pre-check, `export_formats` (injectable `run`) |
@@ -73,7 +74,7 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 ### `workers/`
 `pipeline_runner.py` holds the Qt-free scenarios ("dataset", "voice (LoRA)", "universal model", first-run prefetch) with injectable collaborators;
 `process_worker.py` wraps them in `QThread` workers whose only interface to the UI is signals (`progress`, `finished`, `failed`, `cancelled`).
-`narration_runner.py` (`NarrationJob`, `run_narration`, `format_eta`) is the Qt-free narrator scenario; `backup_runner.py` (which repositories belong to a backup, run functions) and `backup_worker.py` (`BackupWorker`, a generic thread for backup / restore / import) serve the Settings dialog. `narrate_worker.py` has `NarrateWorker` (narration with pause / cancel) and the repository workers
+`preview_runner.py` (`run_previews`, `make_variants`, `subset`, `clips_for_time_cap`) is the Qt-free quick-preview scenario (short training on a subset + sample + metrics, injectable trainer/engine/ASR). `narration_runner.py` (`NarrationJob`, `run_narration`, `format_eta`) is the Qt-free narrator scenario; `backup_runner.py` (which repositories belong to a backup, run functions) and `backup_worker.py` (`BackupWorker`, a generic thread for backup / restore / import) serve the Settings dialog. `narrate_worker.py` has `NarrateWorker` (narration with pause / cancel) and the repository workers
 (`RepoIndexWorker`, `RepoDownloadWorker`). Training registers the finished voice in the library (`pipeline_runner._register_voice`, `TaskResult.voice_id`).
 
 ### `ui/`

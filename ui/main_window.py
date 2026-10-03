@@ -30,7 +30,7 @@ from core.events import Stage
 from core.i18n import tr
 from infra import paths, platform_win
 from infra.vram_optimizer import detect_gpu
-from workers.pipeline_runner import (KIND_DATASET, KIND_LORA, KIND_MERGE, TaskRequest, last_adapter, plan_for,
+from workers.pipeline_runner import (KIND_DATASET, KIND_LORA, KIND_MERGE, KIND_PREVIEW, TaskRequest, last_adapter, plan_for,
                                      run_task)
 from ui.settings_dialog import SettingsDialog
 from workers.process_worker import PrefetchWorker, ProcessWorker, RepairWorker, StatusWorker, UpdateWorker
@@ -502,6 +502,26 @@ class MainWindow(QWidget):
         self.lbl_hint_lora.setWordWrap(True)
         root.addWidget(self.lbl_hint_lora)
 
+        # Quick preview: a short training on a few clips + a ~10 s sample with automatic checks (pitch, WER, does it stop)
+        prev = QHBoxLayout()
+        self.btn_preview = QPushButton()
+        self.chk_compare = QCheckBox()
+        self.chk_check = QCheckBox()
+        self.chk_check.setChecked(True)
+        prev.addWidget(self.btn_preview)
+        prev.addWidget(self.chk_compare)
+        root.addLayout(prev)
+        root.addWidget(self.chk_check)
+        self.lbl_preview_estimate = QLabel()
+        self.lbl_preview_estimate.setObjectName("hint")
+        self.lbl_preview_estimate.setWordWrap(True)
+        root.addWidget(self.lbl_preview_estimate)
+        self.preview_box = QWidget()
+        self.preview_layout = QVBoxLayout(self.preview_box)
+        self.preview_layout.setContentsMargins(0, 0, 0, 0)
+        self.preview_box.hide()
+        root.addWidget(self.preview_box)
+
         # Two optional fields; they only end up in voice.json next to the adapter.
         vrow = QHBoxLayout()
         self.cmb_voice_type = QComboBox()
@@ -583,6 +603,8 @@ class MainWindow(QWidget):
         self.btn_audio.clicked.connect(self.choose_audio)
         self.btn_text.clicked.connect(self.choose_text)
         self.btn_folder.clicked.connect(self.choose_folder)
+        self.btn_preview.clicked.connect(lambda: self.start(KIND_PREVIEW))
+        self.chk_compare.toggled.connect(lambda _on: self.refresh_estimate())
         self.cmb_preset.currentIndexChanged.connect(self._on_preset)
         self.btn_adv.toggled.connect(self._on_adv_toggled)
         self.cmb_consent.currentIndexChanged.connect(lambda _i: self._on_consent_mode())
@@ -635,6 +657,9 @@ class MainWindow(QWidget):
         self.chk_asr_ok.setText(tr("asr.confirm"))
         self._show_audio_label()
         self.lbl_text.setText(self.text.name if self.text else tr("ui.text_none"))
+        self.btn_preview.setText(tr("preview.button"))
+        self.chk_compare.setText(tr("preview.compare"))
+        self.chk_check.setText(tr("check.checkbox"))
         self.btn_lora.setText(tr("ui.btn_lora"))
         self.btn_lora.setToolTip(tr("ui.tip_lora"))
         self.lbl_hint_lora.setText(tr("ui.hint_lora"))
@@ -741,6 +766,65 @@ class MainWindow(QWidget):
         self.lbl_text.setToolTip(str(self.text))
         self._refresh_buttons()
 
+    # ------------------------------------------------------------------ quick preview
+    def show_previews(self, items: list) -> None:
+        """One row per quick variant: settings, automatic checks, Play and "use these settings"."""
+        while self.preview_layout.count():
+            it = self.preview_layout.takeAt(0)
+            if it.widget():
+                it.widget().deleteLater()
+        self.preview_rows = []
+        for item in items:
+            row = QFrame()
+            row.setObjectName("card")
+            rl = QVBoxLayout(row)
+            chk = item.check or {}
+            wer = chk.get("wer")
+            st = chk.get("semitones")
+            lbl = QLabel(tr("preview.row", v=item.key, epochs=item.epochs, rank=item.lora_r, secs=f"{item.seconds:.0f}",
+                            wer="-" if wer is None else f"{round(100 * wer)} %",
+                            pitch="-" if st is None else f"{st:+.1f}", verdict=tr("check.verdict_" + chk.get("verdict", "good"))
+                            if chk.get("verdict", "good") != "good" else tr("check.verdict_good")))
+            lbl.setWordWrap(True)
+            rl.addWidget(lbl)
+            if chk.get("issues"):
+                hint = QLabel(" ".join(tr("check.sugg_" + c) for c in chk["issues"] if c != "no_pitch"))
+                hint.setObjectName("hint")
+                hint.setWordWrap(True)
+                rl.addWidget(hint)
+            btns = QHBoxLayout()
+            play = QPushButton(tr("preview.play"))
+            play.clicked.connect(lambda _c=False, p=item.wav: self.play_preview(p))
+            use = QPushButton(tr("preview.use"))
+            use.clicked.connect(lambda _c=False, it=item: self.use_preview_settings(it))
+            btns.addWidget(play)
+            btns.addWidget(use)
+            rl.addLayout(btns)
+            self.preview_layout.addWidget(row)
+            self.preview_rows.append((row, play, use))
+        self.preview_box.show()
+
+    def play_preview(self, path: Path) -> None:
+        """Play a preview sample (``self.previewer`` is replaced in tests)."""
+        if getattr(self, "previewer", None) is None:
+            from ui.audio_preview import Previewer
+
+            self.previewer = Previewer(self)
+        self.previewer.play(Path(path))
+
+    def use_preview_settings(self, item) -> None:
+        """The chosen variant's numbers become the Manual settings of the full run (rank, alpha, accumulation, learning rate; the
+        epochs go back to the full-run level of the preset, x1.5 for variant B)."""
+        full = train_presets.build_plan(self.preset if self.preset != train_presets.MANUAL else train_presets.BALANCED,
+                                        self.gpu(), self._expected_clips()[0])
+        self.cmb_preset.setCurrentIndex(train_presets.PRESETS.index(train_presets.MANUAL))
+        self.sp_rank.setValue(item.lora_r)
+        self.sp_alpha.setValue(item.lora_alpha)
+        self.sp_accum.setValue(item.grad_accum)
+        self.sp_lr.setValue(item.lr)
+        self.sp_epochs.setValue(full.epochs if item.key == "A" else int(round(full.epochs * 1.5)))   # B = 50 % more passes
+        self.lbl_status.setText(tr("preview.chosen", v=item.key))
+
     # ------------------------------------------------------------------ voice-owner consent
     @property
     def consent_mode(self) -> str:
@@ -751,6 +835,9 @@ class MainWindow(QWidget):
         self.manual_consent.setVisible(mode == "manual")
         self.chk_consent_clip.setVisible(mode == "auto")
         self.lbl_consent_hint.setText(tr("consent.hint_" + mode))
+
+    def _task_extras(self) -> dict:
+        return dict(compare=self.chk_compare.isChecked(), quality_check=self.chk_check.isChecked())
 
     def _consent_kwargs(self) -> dict:
         return dict(consent_mode=self.consent_mode, consent_scope=str(self.cmb_consent_scope.currentData()),
@@ -843,6 +930,12 @@ class MainWindow(QWidget):
         dur = train_presets.format_duration(train_presets.estimate_seconds(plan, n, gpu), tr("preset.unit_min"),
                                             tr("preset.unit_sec"), tr("preset.unit_hour"))
         where = gpu.name if gpu.available else tr("preset.cpu")
+        from workers import preview_runner
+
+        vs = preview_runner.make_variants(plan, self.chk_compare.isChecked())
+        quick = sum(train_presets.estimate_seconds(v.plan, min(preview_runner.MAX_CLIPS, n), gpu) + 30 for v in vs) + 30
+        self.lbl_preview_estimate.setText(tr("preview.estimate", time=train_presets.format_duration(
+            quick, tr("preset.unit_min"), tr("preset.unit_sec"), tr("preset.unit_hour")), n=len(vs)))
         fmt = dict(time=dur, epochs=plan.epochs, rank=plan.lora_r, n=n, gpu=where)
         self.lbl_estimate.setText(tr("preset.estimate", **fmt) if real else tr("preset.estimate_example", **fmt))
 
@@ -963,6 +1056,9 @@ class MainWindow(QWidget):
         self.btn_merge.setToolTip(tr("ui.tip_merge") if has_adapter else tr("ui.tip_merge_disabled"))
         self.btn_lora.setEnabled(ready)
         self.btn_dataset.setEnabled(ready)
+        self.btn_preview.setEnabled(ready)
+        self.chk_compare.setEnabled(not busy)
+        self.chk_check.setEnabled(not busy)
         if self._settings is not None:
             self._settings.refresh()
         self.btn_cancel.setVisible(bool(self.worker and self.worker.isRunning()))
@@ -991,7 +1087,7 @@ class MainWindow(QWidget):
                                      voice_type=str(self.cmb_voice_type.currentData() or ""),
                                      voice_description=self.edt_voice_desc.text().strip(),
                                      preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None,
-                                     **self._consent_kwargs()))
+                                     **self._consent_kwargs(), **self._task_extras()))
             return
         if self.busy or not (self.audio and self.text):
             return
@@ -999,7 +1095,7 @@ class MainWindow(QWidget):
                                  voice_type=str(self.cmb_voice_type.currentData() or ""),
                                  voice_description=self.edt_voice_desc.text().strip(),
                                  preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None,
-                                     **self._consent_kwargs()))
+                                     **self._consent_kwargs(), **self._task_extras()))
 
     def start_merge(self) -> bool:
         """"Universal model" button: check free disk space, ask for confirmation, start.  True if started.
@@ -1065,6 +1161,12 @@ class MainWindow(QWidget):
         self.progress.setValue(100)
         self._set_chip(Stage.SAVE.label)
         self.result_dir = Path(result.open_dir)
+        if getattr(result, "kind", "") == KIND_PREVIEW:
+            self.show_previews(result.previews)
+            self.lbl_status.setText(tr("preview.ready", n=len(result.previews)))
+            self.lbl_ready.show()
+            self._refresh_buttons()
+            return
         if getattr(result, "kind", "") == KIND_MERGE:
             self.lbl_status.setText(tr("ui.merge_done", path=result.merged_path) + "\n"
                                     + tr("ui.merge_note", speaker=result.speaker))
