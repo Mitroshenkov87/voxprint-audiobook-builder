@@ -86,8 +86,9 @@ def test_download_button_fetches_and_the_card_becomes_a_local_voice(app, lib, tm
     assert local.lbl_name.text() == "Open Voice" and local.lbl_note is not None and "Test use only" in local.lbl_note.text()
 
 
-def test_list_refresh_uses_the_index_and_reports_offline_cache(app, lib, tmp_path, entries):
+def test_list_refresh_uses_the_index_and_reports_offline_cache(app, lib, tmp_path, entries, monkeypatch):
     i18n.set_language("en")
+    monkeypatch.delenv("VOXPRINT_VOICES_INDEX")                      # conftest blocks the real index; this test sets its own URL
     repo.set_index_url("https://example.org/index.json")
     res = []
 

@@ -25,6 +25,9 @@ def _isolated_home(tmp_path, monkeypatch):
     monkeypatch.setenv("VOXPRINT_NO_EXTERNAL_MODELS", "1")
     monkeypatch.setenv("VOXPRINT_NO_MIRROR", "1")
     monkeypatch.setenv("VOXPRINT_NO_ENV_PROBE", "1")
+    # The voice index is public now: windows that refresh it when they open (Narrate, My voices) must not reach the real one
+    # (a late answer adds online voices to the list in the middle of a test). Tests that need an index pass their own fetch/URL.
+    monkeypatch.setenv("VOXPRINT_VOICES_INDEX", "offline://tests")
     monkeypatch.setenv("VOXPRINT_OWN_ENV", "1")   # the test interpreter counts as Voxprint-owned (auto-upgrade); external-env tests pass external_env=True
     from core import i18n
 
