@@ -4,6 +4,7 @@ Layout under :func:`app_home`::
 
     models/      downloaded Hugging Face / ModelScope snapshots
     packages/    updated Python packages, put on ``sys.path`` at start-up (before heavy imports)
+    voices/      the voice library: one folder per voice (adapter + voice.json), see core/voice_library.py
     state/       small settings files (language, privacy acknowledgement, updater state, last adapter ...)
     logs/        log files
     .staging/    updates are installed here and checked for compatibility before being promoted
@@ -42,6 +43,11 @@ def _sub(name: str) -> Path:
 def models_dir() -> Path:
     """Directory with downloaded model snapshots."""
     return _sub("models")
+
+
+def voices_dir() -> Path:
+    """Directory of the voice library (``voices/<id>/`` = LoRA adapter + ``voice.json``)."""
+    return _sub("voices")
 
 
 def logs_dir() -> Path:

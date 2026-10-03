@@ -86,6 +86,7 @@ class TaskResult:
     update_summary: str = ""
     merged_path: Optional[Path] = None   # folder of the universal model (KIND_MERGE)
     speaker: str = ""                   # voice (speaker) name inside the model
+    voice_id: str = ""                  # id of the voice registered in the voice library (LoRA only)
 
     @property
     def open_dir(self) -> Path:
@@ -135,8 +136,8 @@ def last_adapter() -> Optional[Path]:
     return d if (d / "adapter_model.safetensors").exists() else None
 
 
-def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech_seconds: float) -> None:
-    """Write voice.json next to the adapter. A failure here must not fail a finished training run."""
+def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech_seconds: float) -> dict:
+    """Write voice.json next to the adapter and return its content. A failure here must not fail a finished training run."""
     from core import voice_info
 
     epochs, base_model = 0, ""
@@ -151,6 +152,18 @@ def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech
         voice_info.write_voice_json(adapter_dir, info)
     except OSError as exc:
         log.warning("cannot write voice.json: %s", exc)
+    return info
+
+
+def _register_voice(adapter_dir: Path, info: dict, library=None) -> str:
+    """Add the freshly trained adapter to the voice library; returns the voice id ("" if that failed)."""
+    from core.voice_library import VoiceLibrary
+
+    try:
+        return (library or VoiceLibrary()).add_from_adapter(adapter_dir, info).id
+    except Exception as exc:  # noqa: BLE001 - the adapter itself is already saved; never fail the run for the library
+        log.warning("cannot register the voice in the library: %s", exc)
+        return ""
 
 
 def _run_merge(req: TaskRequest, progress: ProgressCallback, cancel: CancelToken) -> TaskResult:
@@ -169,12 +182,12 @@ def _run_merge(req: TaskRequest, progress: ProgressCallback, cancel: CancelToken
 
 def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cancel: Optional[CancelToken] = None,
              updater: Optional[Updater] = None,
-             aligner_factory: Optional[Callable[[], object]] = None) -> TaskResult:
+             aligner_factory: Optional[Callable[[], object]] = None, voice_library=None) -> TaskResult:
     """Run one scenario end to end and return its :class:`TaskResult`.
 
     Dataset: check updates -> load aligner -> align -> slice -> quality filter -> save.  LoRA additionally trains the
-    adapter, remembers it and writes ``voice.json`` next to it.  ``updater`` and ``aligner_factory`` are injectable for
-    tests; ``cancel`` is checked between stages and inside the long loops.
+    adapter, remembers it, writes ``voice.json`` next to it and registers the voice in the voice library.  ``updater`` and ``aligner_factory`` are injectable for
+    tests (so is ``voice_library``, the registry that receives the new voice); ``cancel`` is checked between stages and inside the long loops.
     """
     cancel = cancel or CancelToken()
     if req.kind == KIND_MERGE:
@@ -209,7 +222,10 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
         res.adapter_path = train_lora_from_dataset(dataset_dir, output_dir, progress, cancel, req.force_cpu,
                                                    language=build.training_language, warnings_out=res.warnings)
         remember_adapter(res.adapter_path, req.voice_name())
-        _write_voice_json(req, res.adapter_path, build.language, build.total_seconds)
+        info = _write_voice_json(req, res.adapter_path, build.language, build.total_seconds)
+        res.voice_id = _register_voice(res.adapter_path, info, voice_library)
+        if not res.voice_id:
+            res.warnings.append(tr("warn.voice_not_registered"))
     return res
 
 

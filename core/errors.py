@@ -85,3 +85,27 @@ class ExportError(DatasetMakerError):
     """The universal (merged) model could not be built: no disk space, no adapter, etc."""
 
     kind = "export"
+
+
+class VoiceLibraryError(DatasetMakerError):
+    """A voice could not be imported, found or changed in the voice library."""
+
+    kind = "voice"
+
+
+class VoiceRepositoryError(DatasetMakerError):
+    """The online voice repository could not be read, or a downloaded voice failed its integrity check."""
+
+    kind = "voice_repo"
+
+
+class BookParseError(DatasetMakerError):
+    """A book file (TXT / FB2 / EPUB) is unreadable, unsafe or has no text."""
+
+    kind = "book"
+
+
+class NarrationError(DatasetMakerError):
+    """Synthesis or export of an audiobook failed (engine problem, ffmpeg problem, no disk space ...)."""
+
+    kind = "narration"
