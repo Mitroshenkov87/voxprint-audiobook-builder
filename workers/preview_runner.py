@@ -78,6 +78,46 @@ def make_variants(base: TrainPlan, compare: bool) -> List[Variant]:
     return out
 
 
+_VERDICT_RANK = {voice_check.GOOD: 0, voice_check.WARN: 1, voice_check.BAD: 2}
+
+
+def recommend(items: List[PreviewItem]) -> Optional[str]:
+    """Key of the variant to recommend, or ``None`` for an empty list.
+
+    Order of the criteria: the automatic verdict (good before warn before bad), then the lower word error rate, then the
+    smaller pitch shift.  A tie goes to the first variant (A: fewer passes, the smaller adapter, the cheaper full run), and a
+    difference below the noise of a single ~10 s sample (WER within 0.03, pitch within 0.5 semitone) counts as a tie."""
+    if not items:
+        return None
+
+    def wer_of(it: PreviewItem) -> float:
+        w = (it.check or {}).get("wer")
+        return 1.0 if w is None else float(w)
+
+    def pitch_of(it: PreviewItem) -> float:
+        st = (it.check or {}).get("semitones")
+        return 99.0 if st is None else abs(float(st))
+
+    best = items[0]
+    for it in items[1:]:
+        rb, ri = (_VERDICT_RANK.get((best.check or {}).get("verdict", voice_check.GOOD), 1),
+                  _VERDICT_RANK.get((it.check or {}).get("verdict", voice_check.GOOD), 1))
+        if ri != rb:
+            if ri < rb:
+                best = it
+        elif best_wer_gap(wer_of(best), wer_of(it)) != 0:
+            if wer_of(it) < wer_of(best):
+                best = it
+        elif pitch_of(best) - pitch_of(it) > 0.5:
+            best = it
+    return best.key
+
+
+def best_wer_gap(a: float, b: float) -> float:
+    """Difference of two word error rates, 0 when it is within the sample noise (0.03)."""
+    return 0.0 if abs(a - b) <= 0.03 else a - b
+
+
 def subset(dataset_dir: Path, out: Path, n_max: int = MAX_CLIPS) -> int:
     """Copy up to ``n_max`` evenly spaced clips (and ref.wav / ref_text.txt) into ``out``; returns the count."""
     rows = read_metadata_jsonl(Path(dataset_dir) / "metadata.jsonl")

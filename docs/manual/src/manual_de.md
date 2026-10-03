@@ -356,6 +356,7 @@ Das Badge ist eine Information, keine Rechtsberatung. Die Lizenz gilt nur für d
 | Bedienelement | Was es tut |
 |---|---|
 | **{{ui.language}}** | Die Oberflächensprache: English, Deutsch, Русский. Sie ändert sich sofort in allen Fenstern. |
+| **{{auto.button}}** | Wählt alle empfohlenen automatischen Optionen und lädt die nötigen Modelle (siehe unten). |
 | **{{ui.btn_update}}** | Prüft, ob neuere verifizierte Versionen von Komponenten oder Modellen existieren, und installiert sie (mit Sicherheitsprüfung und automatischem Zurückrollen). Voxprint prüft außerdem einmal pro Woche unauffällig. Meldungen: „{{upd.up_to_date}}“, „{{upd.restart}}“ |
 | **{{ui.settings_models_folder}}** | Öffnet den Ordner mit den heruntergeladenen Modellen. |
 | **{{ui.settings_data_folder}}** | Öffnet den Daten- und Protokollordner – schicken Sie das Protokoll dem Entwickler, wenn ein Fehler wiederkehrt. |
@@ -370,6 +371,18 @@ Das Badge ist eine Information, keine Rechtsberatung. Die Lizenz gilt nur für d
 Bemerkt das Programm eine beschädigte Installation, bietet ein Banner die Reparatur an („{{ui.repair_offer_plain}}“). Hilft die Reparatur in der installierten Version nicht, starten Sie das Voxprint-Installationsprogramm erneut – Stimmen und Modelle bleiben erhalten.
 
 Findet das Programm eine ältere Komponente in einer Umgebung, die ihm nicht gehört (zum Beispiel Ihr eigenes Python), fragt es zuerst: „{{upg.title}}“ mit **{{upg.btn_upgrade}}** oder **{{upg.btn_later}}**; Ihre Umgebung ändert es nie stillschweigend.
+
+## {{auto.button}}
+
+Ab Werk ist alles, was automatisch laufen kann, **bereits gewählt** und mit einem Stern und dem Wort „{{auto.recommended}}“ markiert: Wenn Sie nichts anfassen, arbeitet Voxprint mit maximaler Qualität. Die Schaltfläche **{{auto.button}}** in den Einstellungen wählt diese Optionen erneut (falls Sie welche abgeschaltet haben) und lädt die dafür nötigen Modelle mit Fortschrittsbalken. Die einzelnen Kontrollkästchen bleiben in ihren Fenstern.
+
+* Textaufbereitung („Buch vertonen“): die sieben regelbasierten Schritte – Layout, Fußnotenmarken und Seitenzahlen, Anführungszeichen und Striche, Links, Kapitelüberschriften, Zahlen in Worten, Abkürzungen.
+* KI-Korrektur von Tippfehlern (russische Bücher; einmaliger Download von etwa 365 MB).
+* Trainingsfenster: „{{check.checkbox}}“ und „{{preview.compare}}“ (beide brauchen das Spracherkennungsmodell, etwa 1,9 GB, einmal geladen).
+* Immer aktiv, ohne Schalter: Ausrichtung des Textes auf das Audio mit Plausibilitätsprüfung, Audio-Qualitätsfilter, Erkennungsfilter des Nur-Audio-Modus.
+* Nicht enthalten, weil es sie noch nicht gibt: Zeichensetzungsmodell, Betonungszeichen, Übersetzung, Sprecherrollen.
+
+Die Trainingsvorgabe bleibt absichtlich bei „{{preset.balanced}}“: In unseren Tests ließ längeres Training mit höherer Lernrate die Stimme nuscheln, mehr ist dort also nicht besser. Stattdessen wird nach „{{preview.compare}}“ die bessere der beiden Varianten als „{{auto.recommended}}“ markiert (zuerst das Urteil, dann weniger Erkennungsfehler, dann die kleinere Tonhöhenabweichung; ohne klaren Unterschied Variante A, die günstiger ist). Die Entscheidung bleibt bei Ihnen: Hören Sie immer hin.
 
 # Glossar
 

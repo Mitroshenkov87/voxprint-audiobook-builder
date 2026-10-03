@@ -568,5 +568,14 @@
  "warn.very_low_vram": "Video memory is low: a lighter model is used, voice quality may be lower.",
  "warn.voice_not_registered": "The voice was saved, but could not be added to “My voices” automatically - import the output folder there.",
  "asr.choose_script": "Script (optional): the text that was read aloud…",
- "asr.script_none": "(no script: the speech is recognised without one)"
+ "asr.script_none": "(no script: the speech is recognised without one)",
+ "auto.recommended": "recommended",
+ "auto.button": "Maximum quality (auto)",
+ "auto.button_tip": "Selects every recommended automatic option and downloads the models they need",
+ "auto.hint": "One click selects every automatic step that exists: text preparation, AI clean-up of typos, the voice check and the A/B comparison. The models they need are downloaded once. Alignment and the audio checks are always on. Single options can still be changed in their windows.",
+ "auto.done_none": "All recommended options are selected; the models they need are already downloaded.",
+ "auto.downloading": "Downloading {names} (about {gb} GB)…",
+ "auto.done": "Done: {n} model(s) downloaded. All recommended options are selected.",
+ "auto.failed": "Download failed: {error}. The options are selected; press the button again to continue.",
+ "preview.best": "Best variant"
 }

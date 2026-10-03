@@ -11,6 +11,7 @@ from core import text_prep
 from infra import text_models
 from tests.test_studio import app, lib, make_studio, wait_for, add_voice, fake_runner_factory  # noqa: F401
 from ui import narrate_window as nw
+from ui.main_window import recommended_text
 
 RU_BOOK = ("Глава 1\n\nВ 1999 г. он купил 3 книги и пошёл домой. Это было очень хорошо.\n\n"
            "Глава 2\n\nОн вернулся к 5 часам.")
@@ -34,7 +35,7 @@ def test_every_rule_step_is_a_checked_box_with_a_description_in_every_language(a
         texts = nw.prep_texts()
         assert set(texts) == set(n.prep_checks)
         for key, (name, desc) in texts.items():
-            assert name and desc and n.prep_checks[key].text() == name and n.prep_desc[key].text() == desc
+            assert name and desc and n.prep_checks[key].text() == recommended_text(name) and n.prep_desc[key].text() == desc
             assert n.prep_desc[key].isVisibleTo(n)
     i18n.set_language("en")
     n.retranslate()

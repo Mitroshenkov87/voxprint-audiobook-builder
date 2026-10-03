@@ -356,6 +356,7 @@ Open **{{ui.settings_title}}** with the gear button (top right of the Studio and
 | Control | What it does |
 |---|---|
 | **{{ui.language}}** | The interface language: English, Deutsch, Русский. It changes at once in all windows. |
+| **{{auto.button}}** | Selects every recommended automatic option and downloads the models they need (see below). |
 | **{{ui.btn_update}}** | Checks whether newer verified versions of components or models exist and installs them (with a safety check and automatic rollback). Voxprint also checks quietly once a week. Messages: *{{upd.up_to_date}}*, *{{upd.restart}}* |
 | **{{ui.settings_models_folder}}** | Opens the folder with the downloaded models. |
 | **{{ui.settings_data_folder}}** | Opens the data and log folder – send the log to the developer if an error repeats. |
@@ -370,6 +371,18 @@ Open **{{ui.settings_title}}** with the gear button (top right of the Studio and
 If the program notices a damaged installation, a banner offers the repair (*{{ui.repair_offer_plain}}*). In the installed version, if repair does not help, run the Voxprint installer again – voices and models are kept.
 
 When the program finds an older component in an environment it does not own (for example your own Python), it asks first: *{{upg.title}}* with **{{upg.btn_upgrade}}** or **{{upg.btn_later}}**; it never changes your environment silently.
+
+## {{auto.button}}
+
+Out of the box, everything that can run automatically is **already selected** and marked with a star and the word *{{auto.recommended}}*: if you touch nothing, Voxprint works at maximum quality. The **{{auto.button}}** button in Settings selects all of these options again (after you have switched some off) and downloads the models they need, with a progress bar. The single check boxes stay in their windows.
+
+* Text preparation (Narrate a book): the seven rule-based steps – layout, footnote marks and page numbers, quotes and dashes, links, chapter headings, numbers in words, abbreviations.
+* AI clean-up of typos (Russian books; one-time download of about 365 MB).
+* Training window: *{{check.checkbox}}* and *{{preview.compare}}* (both need the speech-recognition model, about 1.9 GB, downloaded once).
+* Always on, without a switch: alignment of the text onto the audio and its plausibility check, the audio quality filter, the recognition filters of the audio-only mode.
+* Not included, because they do not exist yet: punctuation model, stress marks, translation, speaker roles.
+
+The training preset stays at *{{preset.balanced}}* on purpose: in our tests longer training with a higher learning rate made voices babble, so more is not better there. Instead, after **{{preview.compare}}** the better of the two variants is marked **{{auto.recommended}}** (verdict first, then fewer recognition errors, then the smaller pitch shift; with no clear difference variant A, which is cheaper). The choice is still yours: always listen.
 
 # Glossary
 

@@ -75,6 +75,19 @@ BADGE_GREEN_TEXT = "#0b1f12"
 BADGE_AMBER_TEXT = "#251a02"
 
 
+def recommended_text(text: str) -> str:
+    """``text`` with the "recommended" badge (a star and the word) behind it; used for the pre-selected best options."""
+    return f"{text}  \u2605 {tr('auto.recommended')}"
+
+
+def mark_recommended(widget: QWidget, on: bool = True) -> None:
+    """Highlight ``widget`` as the recommended choice (bold check box / accent border of a card, see :func:`build_style`)."""
+    widget.setProperty("recommended", "true" if on else "false")
+    st = widget.style()
+    st.unpolish(widget)
+    st.polish(widget)
+
+
 def _check_icon_url() -> str:
     """URL for the tick mark of checked check boxes (an SVG next to the icons); empty if the file is missing."""
     try:
@@ -143,6 +156,9 @@ QFrame#note QLabel {{{{ color: {amber}; background: transparent; font-size: 12px
 QFrame#sep {{{{ background: {border}; max-height: 1px; border: none; }}}}
 QCheckBox {{{{ spacing: 8px; }}}}
 QCheckBox:disabled {{{{ color: {disabled}; }}}}
+QCheckBox[recommended="true"] {{{{ font-weight: 600; }}}}
+QFrame#card[recommended="true"] {{{{ border: 2px solid {accent}; }}}}
+QPushButton[recommended="true"] {{{{ border: 2px solid {accent}; font-weight: 600; }}}}
 QCheckBox::indicator {{{{ width: 16px; height: 16px; border: 1px solid {accent}; border-radius: 4px; background: {control}; }}}}
 QCheckBox::indicator:checked {{{{ background: {strong}; border-color: {soft}; {check_image} }}}}
 QToolButton#expander {{{{ background: transparent; border: none; color: {soft}; font-weight: 600; padding: 4px 2px; }}}}
@@ -507,8 +523,11 @@ class MainWindow(QWidget):
         prev = QHBoxLayout()
         self.btn_preview = QPushButton()
         self.chk_compare = QCheckBox()
+        self.chk_compare.setChecked(True)               # the best option is pre-selected (see infra.auto_steps)
         self.chk_check = QCheckBox()
         self.chk_check.setChecked(True)
+        mark_recommended(self.chk_compare)
+        mark_recommended(self.chk_check)
         prev.addWidget(self.btn_preview)
         prev.addWidget(self.chk_compare)
         root.addLayout(prev)
@@ -664,7 +683,7 @@ class MainWindow(QWidget):
         self.chk_asr_ok.setText(tr("asr.confirm"))
         self._show_audio_label()
         self.btn_preview.setText(tr("preview.button"))
-        self.chk_compare.setText(tr("preview.compare"))
+        self.chk_compare.setText(recommended_text(tr("preview.compare")))
         self.chk_check.setText(tr("check.checkbox"))
         self.btn_lora.setText(tr("ui.btn_lora"))
         self.btn_lora.setToolTip(tr("ui.tip_lora"))
@@ -772,6 +791,11 @@ class MainWindow(QWidget):
         self.lbl_text.setToolTip(str(self.text))
         self._refresh_buttons()
 
+    def reload_auto_steps(self) -> None:
+        """"Maximum quality (auto)": select every recommended automatic option of this window again."""
+        self.chk_compare.setChecked(True)
+        self.chk_check.setChecked(True)
+
     # ------------------------------------------------------------------ quick preview
     def show_previews(self, items: list) -> None:
         """One row per quick variant: settings, automatic checks, Play and "use these settings"."""
@@ -780,10 +804,19 @@ class MainWindow(QWidget):
             if it.widget():
                 it.widget().deleteLater()
         self.preview_rows = []
+        from workers import preview_runner
+
+        best = preview_runner.recommend(items)
         for item in items:
             row = QFrame()
             row.setObjectName("card")
+            if best and item.key == best and len(items) > 1:
+                mark_recommended(row)
             rl = QVBoxLayout(row)
+            if best and item.key == best and len(items) > 1:
+                badge = QLabel(recommended_text(tr("preview.best")))
+                badge.setObjectName("sectiontitle")
+                rl.addWidget(badge)
             chk = item.check or {}
             wer = chk.get("wer")
             st = chk.get("semitones")
@@ -802,6 +835,8 @@ class MainWindow(QWidget):
             play = QPushButton(tr("preview.play"))
             play.clicked.connect(lambda _c=False, p=item.wav: self.play_preview(p))
             use = QPushButton(tr("preview.use"))
+            if best and item.key == best and len(items) > 1:
+                mark_recommended(use)
             use.clicked.connect(lambda _c=False, it=item: self.use_preview_settings(it))
             btns.addWidget(play)
             btns.addWidget(use)

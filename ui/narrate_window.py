@@ -38,7 +38,7 @@ from core.voice_library import VoiceLibrary
 from infra import features, text_models
 from infra import voice_catalog as catalog
 from infra import voice_repository as repo
-from ui.main_window import open_folder
+from ui.main_window import mark_recommended, open_folder, recommended_text
 from ui.mini_player import MiniPlayer
 from ui.voices_window import make_badge, make_scope_badge
 from ui.window_base import SubWindow, card_frame, fit_to_screen, hint_label
@@ -175,6 +175,7 @@ class NarrateWindow(SubWindow):
         parent_layout.addWidget(chk)
         parent_layout.addWidget(desc)
         self.prep_checks[key], self.prep_desc[key] = chk, desc
+        mark_recommended(chk)
         chk.toggled.connect(lambda c, k=key: self._on_prep_toggled(k, c))
         return chk
 
@@ -465,7 +466,7 @@ class NarrateWindow(SubWindow):
         self.lbl_prep_title.setText(tr("narr.prep_title"))
         self.lbl_prep_hint.setText(tr("narr.prep_hint"))
         for key, (name, desc) in prep_texts().items():
-            self.prep_checks[key].setText(name)
+            self.prep_checks[key].setText(recommended_text(name))
             self.prep_desc[key].setText(desc)
         self.btn_model_download.setText(tr("prep.model_download"))
         later = later_texts()
@@ -575,6 +576,14 @@ class NarrateWindow(SubWindow):
         """Neural steps that are checked and usable (the clean-up model must be downloaded)."""
         chk = self.prep_checks[text_models.STEP_SPELLFIX]
         return {text_models.STEP_SPELLFIX} if chk.isChecked() and chk.isEnabled() else set()
+
+    def reload_auto_steps(self) -> None:
+        """"Maximum quality (auto)": select every recommended preparation step again (the AI step once its model is there)."""
+        for key in RULE_STEPS:
+            self.prep_checks[key].setChecked(True)
+        self._spell_wanted = True
+        self._refresh_model_row()
+        self._refresh_buttons()
 
     def book_language(self) -> str:
         """Language code of the loaded book (``""`` = unknown / no book)."""

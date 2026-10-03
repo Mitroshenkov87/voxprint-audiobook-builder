@@ -568,5 +568,14 @@
  "warn.very_low_vram": "Der Grafikspeicher ist gering: Es wird ein leichteres Modell verwendet, die Stimmqualität kann geringer sein.",
  "warn.voice_not_registered": "Die Stimme wurde gespeichert, konnte aber nicht automatisch zu „Meine Stimmen“ hinzugefügt werden – importieren Sie den Ausgabeordner dort.",
  "asr.choose_script": "Skript (optional): der vorgelesene Text…",
- "asr.script_none": "(kein Skript: die Sprache wird ohne erkannt)"
+ "asr.script_none": "(kein Skript: die Sprache wird ohne erkannt)",
+ "auto.recommended": "empfohlen",
+ "auto.button": "Maximale Qualität (automatisch)",
+ "auto.button_tip": "Wählt alle empfohlenen automatischen Optionen und lädt die dafür nötigen Modelle herunter",
+ "auto.hint": "Ein Klick wählt alle vorhandenen automatischen Schritte: Textaufbereitung, KI-Korrektur von Tippfehlern, Stimmprüfung und A/B-Vergleich. Die nötigen Modelle werden einmal geladen. Ausrichtung und Audioprüfungen sind immer aktiv. Einzelne Optionen lassen sich weiterhin in ihren Fenstern ändern.",
+ "auto.done_none": "Alle empfohlenen Optionen sind gewählt; die nötigen Modelle sind bereits geladen.",
+ "auto.downloading": "Lade {names} (ca. {gb} GB)…",
+ "auto.done": "Fertig: {n} Modell(e) geladen. Alle empfohlenen Optionen sind gewählt.",
+ "auto.failed": "Download fehlgeschlagen: {error}. Die Optionen sind gewählt; drücken Sie die Schaltfläche erneut, um fortzufahren.",
+ "preview.best": "Beste Variante"
 }

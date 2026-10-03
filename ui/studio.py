@@ -252,6 +252,11 @@ class StudioWindow(SubWindow):
         self.trainer.retranslate()
         self.retranslate_all()
 
+    def reload_auto_steps(self) -> None:
+        """"Maximum quality (auto)": select the recommended options in the training and narration windows."""
+        self.trainer.reload_auto_steps()
+        self.narrate_window.reload_auto_steps()
+
     def check_updates(self) -> None:
         """Start an update check (progress shows on the home screen)."""
         self.trainer.check_updates()

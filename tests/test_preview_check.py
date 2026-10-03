@@ -185,6 +185,8 @@ def test_train_window_preview_flow(app, tmp_path):
     assert not w.btn_preview.isEnabled() and "около" in w.lbl_preview_estimate.text()
     (tmp_path / "a.wav").write_bytes(b"x"); (tmp_path / "t.txt").write_text("x", encoding="utf-8")
     w.set_audio(tmp_path / "a.wav"); w.set_text(tmp_path / "t.txt")
+    assert w.chk_compare.isChecked()                     # the best option is pre-selected
+    w.chk_compare.setChecked(False)
     one = w.lbl_preview_estimate.text()
     w.chk_compare.setChecked(True)
     assert w.lbl_preview_estimate.text() != one and w.btn_preview.isEnabled()
