@@ -18,12 +18,13 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, List, Optional
 
-from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtCore import Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
 from core import i18n, model_export, voice_info
+from core.appinfo import APP_DISPLAY_NAME
 from core.errors import DatasetMakerError
 from core.events import Stage
 from core.i18n import tr
@@ -35,7 +36,7 @@ from workers.process_worker import PrefetchWorker, ProcessWorker, RepairWorker, 
 
 log = logging.getLogger("voxprint.ui")
 
-APP_TITLE = "Voxprint"
+APP_TITLE = APP_DISPLAY_NAME
 #: Hard minimum of the window; the content scrolls below its natural size (see ``_fit_to_screen``).
 MIN_WINDOW_W, MIN_WINDOW_H = 480, 320
 AUDIO_EXT = {".wav", ".mp3", ".flac", ".m4a", ".ogg", ".aac", ".wma", ".opus", ".mp4"}
@@ -64,6 +65,22 @@ CARD_GLASS = "rgba(34,34,44,238)"
 CONTROL_BG = "#2c2c38"      # buttons, combo boxes, line edits
 CONTROL_HOVER = "#383846"
 CONTROL_BORDER = "#4b4b5c"
+AMBER = "#fcd34d"           # warnings / "personal use only" accents
+NOTE_BG = "#2a2418"         # background of warning notes (e.g. the AAC disclaimer)
+NOTE_BORDER = "#6b5720"
+GREEN = "#86efac"
+BADGE_GREEN_TEXT = "#0b1f12"
+BADGE_AMBER_TEXT = "#251a02"
+
+
+def _check_icon_url() -> str:
+    """URL for the tick mark of checked check boxes (an SVG next to the icons); empty if the file is missing."""
+    try:
+        f = paths.resource_dir() / "assets" / "check.png"
+        return f.as_posix() if f.is_file() else ""
+    except OSError:
+        return ""
+
 
 STYLE_TEMPLATE = """
 * {{{{ font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif; font-size: 14px; color: {text}; }}}}
@@ -105,11 +122,39 @@ QScrollBar::handle:vertical {{{{ background: #5a5a6c; border-radius: 4px; min-he
 QScrollBar:horizontal {{{{ background: transparent; height: 10px; margin: 2px; }}}}
 QScrollBar::handle:horizontal {{{{ background: #5a5a6c; border-radius: 4px; min-width: 30px; }}}}
 QScrollBar::add-line, QScrollBar::sub-line {{{{ width: 0; height: 0; }}}}
+QPushButton#back {{{{ padding: 6px 12px; }}}}
+QPushButton#bigcard {{{{ background: {{card_bg}}; border: 1px solid {border}; border-radius: 16px; text-align: left; padding: 0; }}}}
+QPushButton#bigcard:hover {{{{ background: {hover}; border-color: {accent}; }}}}
+QPushButton#bigcard:disabled {{{{ background: #1f1f28; }}}}
+QPushButton#bigcard[primary="true"] {{{{ border: 2px solid {accent}; }}}}
+QPushButton#bigcard QLabel {{{{ background: transparent; }}}}
+QLabel#cardtitle {{{{ font-size: 21px; font-weight: 600; }}}}
+QLabel#carddesc {{{{ color: {muted}; }}}}
+QLabel#cardnote {{{{ color: {amber}; font-size: 12px; }}}}
+QLabel#sectiontitle {{{{ font-size: 16px; font-weight: 600; }}}}
+QLabel#badge {{{{ padding: 2px 9px; border-radius: 9px; font-size: 12px; font-weight: 600; }}}}
+QLabel#badge[commercial="true"] {{{{ color: {badge_green_text}; background: {green}; }}}}
+QLabel#badge[commercial="false"] {{{{ color: {badge_amber_text}; background: {amber}; }}}}
+QFrame#note {{{{ background: {note_bg}; border: 1px solid {note_border}; border-radius: 8px; }}}}
+QFrame#note QLabel {{{{ color: {amber}; background: transparent; font-size: 12px; }}}}
+QFrame#sep {{{{ background: {border}; max-height: 1px; border: none; }}}}
+QCheckBox {{{{ spacing: 8px; }}}}
+QCheckBox:disabled {{{{ color: {disabled}; }}}}
+QCheckBox::indicator {{{{ width: 16px; height: 16px; border: 1px solid {accent}; border-radius: 4px; background: {control}; }}}}
+QCheckBox::indicator:checked {{{{ background: {strong}; border-color: {soft}; {check_image} }}}}
+QToolButton#expander {{{{ background: transparent; border: none; color: {soft}; font-weight: 600; padding: 4px 2px; }}}}
+QSpinBox {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px; padding: 5px 8px; }}}}
+QListWidget {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px; padding: 4px; }}}}
+QListWidget::item {{{{ padding: 6px; }}}}
+QListWidget::item:selected {{{{ background: {strong}; color: #ffffff; }}}}
 QDialog#root, QTextBrowser {{{{ color: {text}; }}}}
 QDialog#root {{{{ background: {root_plain}; }}}}
 """.format(text=TEXT, muted=TEXT_MUTED, faint=TEXT_FAINT, disabled=TEXT_DISABLED, on_accent=TEXT_ON_ACCENT,
            accent=ACCENT, accent_hover=ACCENT_HOVER, soft=ACCENT_SOFT, strong=ACCENT_STRONG,
-           control=CONTROL_BG, hover=CONTROL_HOVER, border=CONTROL_BORDER, root_plain=ROOT_PLAIN)
+           control=CONTROL_BG, hover=CONTROL_HOVER, border=CONTROL_BORDER, root_plain=ROOT_PLAIN, amber=AMBER,
+           note_bg=NOTE_BG, note_border=NOTE_BORDER, green=GREEN, badge_green_text=BADGE_GREEN_TEXT,
+           badge_amber_text=BADGE_AMBER_TEXT,
+           check_image=(f"image: url({_check_icon_url()});" if _check_icon_url() else ""))
 
 # (foreground, background) pairs that must keep >= 4.5:1; checked by tests/test_ui.py::test_theme_contrast.
 CONTRAST_PAIRS = [
@@ -117,6 +162,8 @@ CONTRAST_PAIRS = [
     (TEXT_MUTED, ROOT_PLAIN), (TEXT_MUTED, CARD_PLAIN), (TEXT_FAINT, ROOT_PLAIN), (TEXT_FAINT, CARD_PLAIN),
     (TEXT_ON_ACCENT, ACCENT), (TEXT_ON_ACCENT, ACCENT_HOVER), (TEXT_ON_ACCENT, ACCENT_SOFT),
     (TEXT, ACCENT_STRONG), ("#dcdce4", "#34343f"), ("#86efac", CARD_PLAIN),
+    (BADGE_GREEN_TEXT, GREEN), (BADGE_AMBER_TEXT, AMBER), (AMBER, CARD_PLAIN), (AMBER, NOTE_BG), (AMBER, ROOT_PLAIN),
+    ("#ffffff", ACCENT_STRONG), (ACCENT_SOFT, ROOT_PLAIN), (ACCENT_SOFT, CARD_PLAIN),
 ]
 
 
@@ -158,8 +205,27 @@ def open_folder(path: Path) -> None:
     QDesktopServices.openUrl(QUrl.fromLocalFile(p))
 
 
+class StatusLabel(QLabel):
+    """A label that announces every text change (``changed``), so the Studio home screen can mirror the status line."""
+
+    changed = Signal(str)
+
+    def setText(self, text: str) -> None:  # noqa: N802 - Qt naming
+        """Set the text and emit :attr:`changed`."""
+        super().setText(text)
+        self.changed.emit(text)
+
+
 class MainWindow(QWidget):
-    """The application window.  Public attributes (buttons, labels, ``audio``/``text``) are what the tests inspect."""
+    """The "Train your voice" window.  Public attributes (buttons, labels, ``audio``/``text``) are what the tests inspect.
+
+    Inside the Studio it is one of several windows: ``enable_studio_nav()`` shows the "Studio" back button, and the
+    signals ``go`` (navigation request), ``closing`` and ``language_changed`` let the Studio react.  Standalone (tests)
+    it behaves exactly like the old main window.
+    """
+    go = Signal(str)                 # "studio" - ask the Studio to show another window
+    closing = Signal()               # the user closed this window
+    language_changed = Signal()      # the UI language was switched here
     def __init__(self, runner: Callable[..., Any] = run_task, updater_factory: Optional[Callable[[], Any]] = None,
                  autocheck: bool = True, auto_open_folder: bool = True,
                  prefetch_fn: Optional[Callable[..., Any]] = None, prefetch: bool = False,
@@ -196,6 +262,7 @@ class MainWindow(QWidget):
         self.backdrop = "plain"
         self.last_error_text = ""
         self._settings: Optional[SettingsDialog] = None
+        self._in_studio = False
 
         self.setWindowTitle(APP_TITLE)
         self.setObjectName("root")
@@ -254,9 +321,13 @@ class MainWindow(QWidget):
         root.setContentsMargins(28, 24, 28, 24)
         root.setSpacing(14)
         head = QHBoxLayout()
-        title = QLabel(APP_TITLE)
-        title.setObjectName("title")
-        head.addWidget(title)
+        self.btn_back = QPushButton()                      # back to the Studio home (hidden outside the Studio)
+        self.btn_back.setObjectName("back")
+        self.btn_back.hide()
+        head.addWidget(self.btn_back)
+        self.lbl_title = QLabel()
+        self.lbl_title.setObjectName("title")
+        head.addWidget(self.lbl_title)
         head.addStretch(1)
         self.btn_settings = QPushButton("\u2699")          # gear: opens the Settings dialog
         self.btn_settings.setObjectName("gear")
@@ -331,7 +402,7 @@ class MainWindow(QWidget):
         chips.addStretch(1)
         root.addLayout(chips)
 
-        self.lbl_status = QLabel()
+        self.lbl_status = StatusLabel()
         self.lbl_status.setObjectName("status")
         self.lbl_status.setWordWrap(True)
         root.addWidget(self.lbl_status)
@@ -377,6 +448,7 @@ class MainWindow(QWidget):
         self.btn_lora.clicked.connect(lambda: self.start(KIND_LORA))
         self.btn_merge.clicked.connect(self.start_merge)
         self.btn_settings.clicked.connect(self.open_settings)
+        self.btn_back.clicked.connect(lambda: self.go.emit("studio"))
         self.btn_open.clicked.connect(self.open_result)
         self.btn_cancel.clicked.connect(self.cancel)
         self.btn_repair.clicked.connect(self.start_repair)
@@ -385,6 +457,10 @@ class MainWindow(QWidget):
     # ------------------------------------------------------------------ language
     def retranslate(self) -> None:
         """Apply the texts of the current language (called on creation and whenever the language changes)."""
+        self.lbl_title.setText(tr("train.title"))
+        self.btn_back.setText(tr("nav.back"))
+        if self._in_studio:
+            self.setWindowTitle(f"{APP_TITLE} - {tr('train.title')}")
         self.lbl_sub.setText(tr("ui.subtitle"))
         self.btn_audio.setText(tr("ui.choose_audio"))
         self.btn_text.setText(tr("ui.choose_text"))
@@ -426,6 +502,13 @@ class MainWindow(QWidget):
             return
         i18n.set_language(code, persist=True)
         self.retranslate()
+        self.language_changed.emit()
+
+    def enable_studio_nav(self) -> None:
+        """Called by the Studio: show the "back to Studio" button and use the section title as window title."""
+        self._in_studio = True
+        self.btn_back.show()
+        self.setWindowTitle(f"{APP_TITLE} - {tr('train.title')}")
 
     # ------------------------------------------------------------------ settings dialog
     def settings_dialog(self) -> SettingsDialog:
@@ -644,6 +727,8 @@ class MainWindow(QWidget):
             extra = ""
             if getattr(result, "adapter_path", None):
                 extra = "\n" + tr("ui.adapter_saved")
+                if getattr(result, "voice_id", ""):
+                    extra += "\n" + tr("ui.voice_registered")
             warn = ("\n" + "\n".join(result.warnings[-3:])) if getattr(result, "warnings", None) else ""
             self.lbl_status.setText(tr("ui.done_segments", n=result.n_segments) + f"{extra}{warn}"
                                     + (f"\n{result.update_summary}" if getattr(result, "update_summary", "") else ""))
@@ -850,3 +935,4 @@ class MainWindow(QWidget):
             self.worker.cancel()
             self.worker.wait(5000)
         super().closeEvent(e)
+        self.closing.emit()

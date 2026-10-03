@@ -45,7 +45,7 @@ def test_main_window_keeps_only_core_buttons_plus_gear(app):
     for gone in ("btn_update", "btn_about", "cmb_lang"):
         assert not hasattr(w, gone)
     assert w.btn_settings.isEnabled() and w.btn_settings.toolTip() == "Настройки"
-    assert w.windowTitle() == "Voxprint"
+    assert w.windowTitle() == "Voxprint AI Audiobook Builder"
     assert not w.btn_lora.isEnabled() and not w.btn_dataset.isEnabled()  # no files
     assert [s.label for s in plan_for(KIND_LORA)] == [
         "Проверка обновлений", "Загрузка модели", "Выравнивание", "Нарезка", "Обучение LoRA", "Сохранение"]

@@ -69,7 +69,7 @@ def test_no_cyrillic_user_literals_left_in_code():
         # exceptions: abbreviation tables, language names, the bilingual USAGE.txt, the update smoke-test script,
         # service comments of the requirements-file generator
         if f.name in ("normalizer.py", "text_utils.py", "i18n.py", "model_export.py", "updater.py",
-                      "verified_manifest.py"):
+                      "verified_manifest.py", "book_parsers.py"):   # book_parsers: Russian chapter-heading words (data)
             continue
         tree = ast.parse(f.read_text(encoding="utf-8"))
         doc = {id(n.body[0].value) for n in ast.walk(tree)

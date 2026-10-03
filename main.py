@@ -106,7 +106,7 @@ def main(argv=None) -> int:
     from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
 
-    from ui.main_window import MainWindow
+    from ui.studio import StudioWindow
 
     app = QApplication.instance() or QApplication(argv)
     app.setApplicationName("Voxprint")
@@ -128,8 +128,9 @@ def main(argv=None) -> int:
             first_run = bool(models_missing())
         except Exception:  # noqa: BLE001 - never get in the way of starting up
             first_run = False
-    win = MainWindow(autocheck=not selftest, prefetch=first_run or "--prefetch" in argv)
-    win.show()
+    win = StudioWindow(autocheck=not selftest, prefetch=first_run or "--prefetch" in argv)
+    app.aboutToQuit.connect(win.shutdown)
+    win.show_studio()
     if selftest:
         QTimer.singleShot(300, app.quit)
     return app.exec()

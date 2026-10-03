@@ -1,6 +1,7 @@
 {
  "app": {
   "name": "Voxprint",
+  "display_name": "Voxprint AI Audiobook Builder",
   "version": "0.1.0",
   "author": "Aleksandr Mitroshenkov"
  },

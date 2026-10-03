@@ -39,7 +39,7 @@ class AboutDialog(QDialog):
         lay.setContentsMargins(24, 20, 24, 20)
         lay.setSpacing(10)
 
-        title = QLabel(f"{appinfo.APP_NAME}  <span style='font-size:14px;color:#9aa0aa'>"
+        title = QLabel(f"{html.escape(appinfo.APP_DISPLAY_NAME)}  <span style='font-size:14px;color:#9aa0aa'>"
                        f"{html.escape(tr('about.version', version=appinfo.APP_VERSION))}</span>")
         title.setObjectName("title")
         title.setTextFormat(Qt.TextFormat.RichText)
