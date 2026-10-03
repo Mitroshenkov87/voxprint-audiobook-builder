@@ -350,7 +350,7 @@ def test_cmd_single_m4b_has_aac_chapters_and_cover():
     rates = ex.Bitrates()
     meta = ex.BookMeta("T", "A", "V", cover=Path("/w/cover.jpg"))
     c = ex.cmd_single("ff", ex.FORMAT_M4B, Path("/w/l.txt"), Path("/w/m.ffmetadata"), meta, Path("/o/T.m4b"), rates)
-    s = " ".join(c)
+    s = " ".join(c).replace("\\", "/")      # Windows paths use backslashes
     assert c[0] == "ff" and "-f concat -safe 0 -i /w/l.txt -i /w/m.ffmetadata -i /w/cover.jpg" in s
     assert "-map 0:a -map 2:v -map_metadata 1 -map_chapters 1" in s
     assert "-c:a aac -b:a 64k -ac 1" in s and "-disposition:v:0 attached_pic" in s and s.endswith("-f ipod /o/T.m4b")
