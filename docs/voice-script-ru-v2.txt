@@ -156,3 +156,38 @@ Voxprint ничего из этого не изобретает заново: о
 [question] Do you want to save the changes before closing the window?
 [whisper] Quiet, please. Everyone is asleep, and the screen is barely glowing.
 [shout] Stop! Do not turn off the computer during the update!
+
+=== БЛОК 18. СОГЛАСИЕ ВЛАДЕЛЬЦА ГОЛОСА — САМЫЙ КОНЕЦ ЗАПИСИ ===
+(спокойно, чётко, своим обычным голосом. Прочитайте ОДНУ фразу из девяти: на вашем языке и с тем уровнем разрешения, который вы действительно даёте. Вместо слов в квадратных скобках скажите своё имя и сегодняшнюю дату. Остальные фразы НЕ читайте. Программа распознает эту фразу, определит имя, дату и уровень и покажет вам результат для подтверждения. Если фраза нечёткая, будет выбран самый строгий уровень — «только личное». Это запись вашего согласия, а не юридическая консультация. Эту фразу читайте только если голос ваш или у вас есть разрешение владельца голоса; этот блок не входит в текст для программы.)
+
+--- НА РУССКОМ ---
+А. КОММЕРЧЕСКОЕ (озвучки можно продавать):
+Я, [ВАШЕ ИМЯ], сегодня, [ДАТА, например: третье октября две тысячи двадцать шестого года], разрешаю использовать эту запись и характеристики моего голоса для обучения нейросетей и синтеза речи, в том числе в коммерческих целях: озвучки можно продавать.
+
+Б. ПУБЛИЧНОЕ НЕКОММЕРЧЕСКОЕ (можно публиковать бесплатно, нельзя продавать):
+Я, [ВАШЕ ИМЯ], сегодня, [ДАТА, например: третье октября две тысячи двадцать шестого года], разрешаю использовать эту запись и характеристики моего голоса для обучения нейросетей и синтеза речи в некоммерческих целях: озвучки можно публиковать в открытом доступе, но нельзя продавать.
+
+В. ТОЛЬКО ЛИЧНОЕ (озвучки не публиковать):
+Я, [ВАШЕ ИМЯ], сегодня, [ДАТА, например: третье октября две тысячи двадцать шестого года], разрешаю использовать эту запись и характеристики моего голоса для обучения нейросетей и синтеза речи только в личных целях: озвучки нельзя публиковать, они должны оставаться на компьютере пользователя.
+
+
+--- IN ENGLISH ---
+A. COMMERCIAL (the audio may be sold):
+I, [YOUR NAME], today, [DATE, e.g. October third, twenty twenty-six], give permission to use this recording and the characteristics of my voice for training neural networks and for speech synthesis, including commercial purposes: the audio may be sold.
+
+B. PUBLIC NON-COMMERCIAL (may be published free, not sold):
+I, [YOUR NAME], today, [DATE, e.g. October third, twenty twenty-six], give permission to use this recording and the characteristics of my voice for training neural networks and for speech synthesis for non-commercial purposes: the audio may be published freely but may not be sold.
+
+C. PRIVATE ONLY (not to be published):
+I, [YOUR NAME], today, [DATE, e.g. October third, twenty twenty-six], give permission to use this recording and the characteristics of my voice for training neural networks and for speech synthesis for personal use only: the audio must not be published and must stay on the user's computer.
+
+
+--- AUF DEUTSCH ---
+A. KOMMERZIELL (Hörbücher dürfen verkauft werden):
+Ich, [IHR NAME], erlaube heute, am [DATUM, z. B. 3. Oktober 2026], diese Aufnahme und die Merkmale meiner Stimme für das Training neuronaler Netze und die Sprachsynthese zu verwenden, auch für kommerzielle Zwecke: die Hörbücher dürfen verkauft werden.
+
+B. ÖFFENTLICH NICHTKOMMERZIELL (kostenlos veröffentlichen, nicht verkaufen):
+Ich, [IHR NAME], erlaube heute, am [DATUM, z. B. 3. Oktober 2026], diese Aufnahme und die Merkmale meiner Stimme für das Training neuronaler Netze und die Sprachsynthese zu verwenden, für nichtkommerzielle Zwecke: die Hörbücher dürfen frei veröffentlicht, aber nicht verkauft werden.
+
+C. NUR PRIVAT (nicht veröffentlichen):
+Ich, [IHR NAME], erlaube heute, am [DATUM, z. B. 3. Oktober 2026], diese Aufnahme und die Merkmale meiner Stimme für das Training neuronaler Netze und die Sprachsynthese zu verwenden, nur für den persönlichen Gebrauch: die Hörbücher dürfen nicht veröffentlicht werden und bleiben auf dem Computer des Nutzers.

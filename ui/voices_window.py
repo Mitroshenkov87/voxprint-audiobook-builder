@@ -72,6 +72,15 @@ def make_badge(license_id: str, commercial: bool, url: str = "") -> QLabel:
     return b
 
 
+def make_scope_badge(scope: str) -> QLabel:
+    """Badge of the voice-owner's usage scope (commercial / public non-commercial / private only)."""
+    b = QLabel(tr("consent.badge_" + scope))
+    b.setObjectName("badge")
+    b.setProperty("commercial", "true" if scope == "commercial" else "false")
+    b.setToolTip(tr("consent.tip_" + scope))
+    return b
+
+
 class VoiceCard(QFrame):
     """One voice of the library."""
 
@@ -94,6 +103,8 @@ class VoiceCard(QFrame):
         top.addWidget(self.lbl_name)
         self.badge = make_badge(rec.license, rec.commercial_use, str(rec.info.get("license_url", "")))
         top.addWidget(self.badge)
+        self.scope_badge = make_scope_badge(rec.scope)
+        top.addWidget(self.scope_badge)
         top.addStretch(1)
         lay.addLayout(top)
         self.lbl_meta = QLabel(meta_line(rec))

@@ -171,6 +171,23 @@ and the text, because the ASR API gives no per-token confidence), duplicates (id
 When it is done the window reports the totals: files, kept clips and how many minutes of the audio were kept. Automatic recognition can contain errors, so a clear localized warning is shown and
 **an explicit "I understand" tick is required** before the buttons work; the dataset's `report.json` records every clip's source file and plausibility.
 
+### Voice owner's consent and usage scope
+
+End the recording with **one spoken consent sentence** (the recording script, block 18, offers three templates in Russian, English and German: your name, the date, and what is allowed).
+After training the program recognises the statement (Qwen3-ASR, rule-based keyword reading in ru/en/de), shows the detected **name, date and scope** and asks for one click to confirm or change it.
+If the statement is unclear or missing, the strictest level is used. You can also choose the scope by hand, or train without a statement (private only).
+
+| Scope | Meaning | Licence field it maps to |
+| --- | --- | --- |
+| Commercial | the audio may be sold | `CC-BY-4.0` |
+| Public, non-commercial | may be published free of charge, not sold | `CC-BY-NC-4.0` |
+| Private only | may narrate, but results stay on the user's computer | `custom/personal-only` |
+
+`voice.json` gets a `consent` block (`scope`, `name`, `date`, `recorded_statement`, `method` = `spoken` / `spoken_confirmed` / `manual` / `none`, `confirmed`, the recognised `statement`, and the clip name); the spoken clip
+(the last 45 s of the recording) is stored next to the adapter as `consent_statement.wav` unless you untick it. *My voices* and *Narrate* show a scope badge; Narrate repeats the limit under the voice and when the audiobook is ready
+(a private voice: "keep it on your computer, do not publish or sell"). This is a record of what the speaker said, not legal advice, and it does not replace the law of your country.
+When a statement ends the recording, up to 60 s of unscripted speech at the end is tolerated by the alignment check (15 s otherwise).
+
 ### Narrate a book
 1. **Choose book…**: `.txt` (UTF-8 / cp1251; headings like "Chapter 1", "Глава 2", "Part I" become chapters), `.fb2` / `.fb2.zip`, `.epub`. The book title, author and cover are read when present.
 2. Pick the **voice** (a licence badge is shown; for a personal-use-only voice you are reminded not to publish or sell the narration). No voices yet? The window offers *Train your voice* / *My voices*.

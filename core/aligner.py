@@ -407,7 +407,7 @@ def align_long(
     return words_all
 
 
-def check_alignment(words: Sequence[WordTiming], audio: np.ndarray, sr: int) -> List[str]:
+def check_alignment(words: Sequence[WordTiming], audio: np.ndarray, sr: int, max_edge_gap: float = 15.0) -> List[str]:
     """Sanity-check an alignment result.
 
     Raises ``AudioTextMismatchError`` if audio and text clearly do not belong together (too many zero-length words,
@@ -428,7 +428,7 @@ def check_alignment(words: Sequence[WordTiming], audio: np.ndarray, sr: int) -> 
             tr("err.mismatch_length"),
             details=f"zero_frac={zero:.2f} chars_per_voiced_sec={rate:.1f}",
         )
-    if tail_gap > 15 or head_gap > 15:
+    if tail_gap > max_edge_gap or head_gap > max_edge_gap:   # unscripted speech at the edges (e.g. the spoken consent statement)
         raise AudioTextMismatchError(
             tr("err.mismatch_extra"),
             details=f"head_gap={head_gap:.1f} tail_gap={tail_gap:.1f}",

@@ -564,7 +564,7 @@ def test_non_commercial_voice_shows_a_note_and_badge(app, lib, tmp_path):
     add_voice(lib, tmp_path, "Anna", "custom/personal-only")
     n.refresh_voices()
     assert "Personal use only" in n.lbl_voice_info.text()
-    assert n.badge_box.count() == 1 and n.badge_box.itemAt(0).widget().property("commercial") == "false"
+    assert n.badge_box.count() == 2 and n.badge_box.itemAt(0).widget().property("commercial") == "false"
     add_voice(lib, tmp_path, "Zed", "CC0-1.0")
     n.refresh_voices(select=lib.list_voices()[0].id)
     s.shutdown()

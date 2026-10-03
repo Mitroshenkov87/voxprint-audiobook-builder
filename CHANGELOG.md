@@ -6,6 +6,7 @@ The project is not released yet; everything below is the history of the 0.1.0 de
 ## [Unreleased]
 
 ### Added
+- **Voice-owner consent**: spoken consent statement at the end of the recording (script block 18, ru/en/de templates) is read automatically into a usage scope (commercial / public non-commercial / private only), confirmed with one click, stored in `voice.json` (`consent` block, optional clip), mapped to the licence fields and shown as badges and reminders in My voices and Narrate. `core/consent.py`, `workers/consent_runner.py`.
 - **Training presets** (Fast / Balanced / Maximum / Manual) in the Train window with a GPU-calibrated time estimate and a collapsed Advanced panel (`core/train_presets.py`); Balanced = the automatic plan, the learning rate is never raised by a preset.
 - **No-transcript mode** in the Train window: audio only (many files / a folder / drag and drop) -> Qwen3-ASR per file -> plausibility, duration, duplicate and signal-quality gates -> one merged, loudness-normalised dataset, with totals (files, kept clips, minutes kept), a localized accuracy warning and an explicit opt-in. `core/asr.py`, `core/asr_dataset.py`.
 - **Studio** - new home window with three cards (*Narrate a book*, *Train your voice*, *My voices*) and the gear; every sub-window has a *← Studio* button; language changes apply to all windows.

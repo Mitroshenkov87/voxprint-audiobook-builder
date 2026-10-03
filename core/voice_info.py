@@ -87,7 +87,8 @@ def clean_license_url(value: Optional[str]) -> str:
 def build_voice_info(name: str, language: str, duration: float, epochs: int, base_model: str,
                      voice_type: Optional[str] = "", description: Optional[str] = "",
                      now: Optional[datetime] = None, *, voice_id: str = "", author: str = "",
-                     license: str = DEFAULT_LICENSE, license_url: str = "") -> Dict[str, Any]:  # noqa: A002
+                     license: str = DEFAULT_LICENSE, license_url: str = "",  # noqa: A002
+                     consent: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Assemble the ``voice.json`` dictionary.
 
     ``language`` is the language of the recording (as detected from the text), ``duration`` the amount of cleaned
@@ -96,7 +97,7 @@ def build_voice_info(name: str, language: str, duration: float, epochs: int, bas
     """
     created = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     lic = (license or DEFAULT_LICENSE).strip()
-    return {
+    info = {
         "schema": VOICE_SCHEMA,
         "id": voice_id,
         "name": clean_line(name),
@@ -112,6 +113,16 @@ def build_voice_info(name: str, language: str, duration: float, epochs: int, bas
         "description": clean_description(description),
         "commercial_use": license_allows_commercial(lic),
     }
+    cons = _clean_consent(consent)
+    if cons:
+        info["consent"] = cons
+    return info
+
+
+def _clean_consent(data: Any) -> Optional[Dict[str, Any]]:
+    from core.consent import clean_consent    # local import: consent.py has no dependency back on this module
+
+    return clean_consent(data)
 
 
 def normalize_info(data: Dict[str, Any], fallback_id: str = "") -> Dict[str, Any]:
@@ -126,7 +137,7 @@ def normalize_info(data: Dict[str, Any], fallback_id: str = "") -> Dict[str, Any
             return default
 
     lic = str(data.get("license") or DEFAULT_LICENSE).strip()
-    return {
+    out = {
         "schema": VOICE_SCHEMA,
         "id": str(data.get("id") or fallback_id),
         "name": clean_line(str(data.get("name") or data.get("voice_name") or fallback_id)),
@@ -142,6 +153,10 @@ def normalize_info(data: Dict[str, Any], fallback_id: str = "") -> Dict[str, Any
         "description": clean_description(str(data.get("description") or "")),
         "commercial_use": license_allows_commercial(lic),
     }
+    cons = _clean_consent(data.get("consent"))
+    if cons:
+        out["consent"] = cons      # who allowed what (see core/consent.py); the scope never lifts the licence limits above
+    return out
 
 
 def write_voice_json(adapter_dir: Path, info: Dict[str, Any]) -> Path:

@@ -79,6 +79,7 @@ class StudioWindow(SubWindow):
         super().__init__(with_back=False, with_gear=True)
         self.library = library or VoiceLibrary()
         self.trainer = trainer or MainWindow(**trainer_kwargs)
+        self.trainer.library = self.library      # the Train window confirms the voice-owner consent in the same library
         self.voices_window = voices or VoicesWindow(self.library)
         self.narrate_window = narrate or NarrateWindow(self.library)
         self.pages: Dict[str, QWidget] = {"studio": self, "train": self.trainer, "voices": self.voices_window,

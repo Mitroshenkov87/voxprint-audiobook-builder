@@ -57,6 +57,7 @@ class BuildConfig:
     normalize: bool = True            # expand numbers/abbreviations (Russian only)
     quality_filter: bool = True       # drop bad segments (clipping, too quiet, too noisy)
     ref_min: float = 5.0
+    max_edge_gap: float = 15.0        # seconds of unscripted speech tolerated at the start/end (60 when a spoken consent statement ends the recording)
     ref_max: float = 10.0
     max_chunk_sec: float = MAX_CHUNK_SEC
     slice: SliceConfig = field(default_factory=SliceConfig)
@@ -258,7 +259,7 @@ class DatasetBuilder:
             on_progress=lambda f, m: progress(Stage.ALIGN, f, m),
             cancel_check=cancel.check,
         )
-        warnings.extend(check_alignment(words, a_align, ALIGNER_SR))
+        warnings.extend(check_alignment(words, a_align, ALIGNER_SR, cfg.max_edge_gap))
         warnings.extend(attach_spans(words, text))
         cancel.check()
 

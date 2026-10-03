@@ -16,6 +16,7 @@ from typing import Callable, List, Optional
 
 from core.aligner import make_default_aligner
 from core.dataset_builder import BuildConfig, DatasetBuilder
+from core.errors import DatasetMakerError
 from core.events import CancelToken, ProgressCallback, Stage, noop_progress
 from core.i18n import tr
 from infra import model_downloader as md, paths
@@ -59,6 +60,10 @@ class TaskRequest:
     no_transcript: bool = False          # audio only: the app recognises the speech itself (see core.asr_dataset)
     audio_files: List[Path] = field(default_factory=list)   # no_transcript: files and/or folders (many clips)
     asr_language: Optional[str] = None   # no_transcript: "Russian" / "English" ... or None = automatic
+    consent_mode: str = "none"           # voice-owner consent: "auto" (read the spoken statement), "manual" or "none" (private only)
+    consent_scope: str = "private_only"  # manual: commercial / public_noncommercial / private_only
+    consent_name: str = ""               # manual: the speaker's name
+    consent_save_clip: bool = True       # auto: keep the recorded statement next to the adapter
     preset: str = "balanced"             # training preset: fast / balanced / maximum / manual (core.train_presets)
     manual: Optional[object] = None      # core.train_presets.Manual for the "manual" preset
 
@@ -97,6 +102,7 @@ class TaskResult:
     merged_path: Optional[Path] = None   # folder of the universal model (KIND_MERGE)
     speaker: str = ""                   # voice (speaker) name inside the model
     voice_id: str = ""                  # id of the voice registered in the voice library (LoRA only)
+    consent: Optional[dict] = None       # the voice.json "consent" block written for this voice (LoRA only)
     asr_report: Optional[object] = None  # no-transcript mode: core.asr_dataset.AsrReport (files, kept clips, seconds ...)
 
     @property
@@ -147,7 +153,8 @@ def last_adapter() -> Optional[Path]:
     return d if (d / "adapter_model.safetensors").exists() else None
 
 
-def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech_seconds: float) -> dict:
+def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech_seconds: float,
+                      consent_block: Optional[dict] = None) -> dict:
     """Write voice.json next to the adapter and return its content. A failure here must not fail a finished training run."""
     from core import voice_info
 
@@ -157,8 +164,14 @@ def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech
         epochs, base_model = int(meta.get("epochs", 0)), str(meta.get("model_name", ""))
     except (OSError, ValueError, TypeError):
         log.warning("training_meta.json unreadable; voice.json will lack epochs/base model")
+    extra = {}
+    if consent_block:   # the scope maps onto the licence fields; the speaker's name becomes the author
+        from core import consent as consent_mod
+
+        extra = dict(license=consent_mod.license_for_scope(consent_block["scope"]), consent=consent_block,
+                     author=consent_block.get("name", ""))
     info = voice_info.build_voice_info(req.voice_name(), language, speech_seconds, epochs, base_model,
-                                       req.voice_type, req.voice_description)
+                                       req.voice_type, req.voice_description, **extra)
     try:
         voice_info.write_voice_json(adapter_dir, info)
     except OSError as exc:
@@ -175,6 +188,52 @@ def _register_voice(adapter_dir: Path, info: dict, library=None) -> str:
     except Exception as exc:  # noqa: BLE001 - the adapter itself is already saved; never fail the run for the library
         log.warning("cannot register the voice in the library: %s", exc)
         return ""
+
+
+def _consent_block(req: TaskRequest, res: TaskResult, progress: ProgressCallback, cancel: CancelToken,
+                   asr_factory) -> Optional[dict]:
+    """The ``consent`` block for voice.json.  "auto" reads the spoken statement at the end of the recording; whatever goes wrong
+    (no ASR model, no statement found) ends in the most restrictive scope with a warning - never in a failed training run."""
+    from core import consent
+
+    if req.consent_mode == "manual":
+        res.consent = consent.build_consent(None, scope=req.consent_scope, name=req.consent_name, method="manual",
+                                            recorded=False, confirmed=True)
+        return res.consent
+    if req.consent_mode != "auto":
+        res.consent = consent.build_consent(None, scope=consent.PRIVATE, method="none", recorded=False, confirmed=True)
+        return res.consent
+    parsed, clip = None, None
+    try:
+        from core.asr import make_default_asr
+        from core.asr_dataset import expand_inputs
+        from workers import consent_runner
+
+        files = expand_inputs(req.audio_files) if req.audio_files else [req.audio]
+        progress(Stage.TRAIN, 0.0, tr("progress.consent_reading"))
+        asr = asr_factory() if asr_factory is not None else make_default_asr(
+            str(md.ensure_model(md.ASR_REPO, progress)), "cpu" if req.force_cpu else "auto")
+        parsed, clip = consent_runner.detect_from_recording(files[-1], asr, req.asr_language)
+        cancel.check()
+    except DatasetMakerError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        log.warning("consent statement could not be read: %s", exc)
+    saved = ""
+    if parsed is not None and req.consent_save_clip and clip is not None and res.adapter_path:
+        try:
+            saved = consent_runner.save_clip(res.adapter_path, clip)
+        except OSError as exc:
+            log.warning("cannot save the consent clip: %s", exc)
+    if parsed is None or not parsed.text:
+        res.warnings.append(tr("warn.consent_not_found"))
+        parsed = parsed or consent.Parsed()
+        res.consent = consent.build_consent(parsed, scope=consent.PRIVATE, method="spoken", recorded=False, confirmed=False)
+        return res.consent
+    res.consent = consent.build_consent(parsed, scope=parsed.scope, method="spoken", recorded=True, confirmed=False, clip=saved)
+    if not parsed.confident:
+        res.warnings.append(tr("warn.consent_unclear"))
+    return res.consent
 
 
 def _run_merge(req: TaskRequest, progress: ProgressCallback, cancel: CancelToken) -> TaskResult:
@@ -228,7 +287,7 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
         else:
             path = md.ensure_aligner_model(progress)
             aligner = make_default_aligner(str(path), "cpu" if req.force_cpu else "auto")
-        cfg = BuildConfig()
+        cfg = BuildConfig(max_edge_gap=60.0 if req.consent_mode == "auto" else BuildConfig.max_edge_gap)
         try:
             build = DatasetBuilder(aligner, cfg, save_stage=Stage.SLICE if lora else Stage.SAVE).run(
                 req.audio, req.text, dataset_dir, progress, cancel)
@@ -252,7 +311,8 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
         res.adapter_path = train_lora_from_dataset(dataset_dir, output_dir, progress, cancel, req.force_cpu,
                                                    language=build.training_language, warnings_out=res.warnings, **kw)
         remember_adapter(res.adapter_path, req.voice_name())
-        info = _write_voice_json(req, res.adapter_path, build.language, build.total_seconds)
+        cblock = _consent_block(req, res, progress, cancel, asr_factory)
+        info = _write_voice_json(req, res.adapter_path, build.language, build.total_seconds, cblock)
         res.voice_id = _register_voice(res.adapter_path, info, voice_library)
         if not res.voice_id:
             res.warnings.append(tr("warn.voice_not_registered"))

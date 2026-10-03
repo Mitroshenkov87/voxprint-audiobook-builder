@@ -23,7 +23,7 @@ from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QSpinBox, QToolButton, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
-from core import i18n, model_export, train_presets, voice_info
+from core import consent as consent_mod, i18n, model_export, train_presets, voice_info
 from core.appinfo import APP_DISPLAY_NAME
 from core.errors import DatasetMakerError
 from core.events import Stage
@@ -259,6 +259,8 @@ class MainWindow(QWidget):
         self.auto_open_folder = auto_open_folder
         self.audio: Optional[Path] = None
         self._gpu = None
+        self.library = None                    # set by the Studio; None -> the default library
+        self._last_voice_id = ""
         self.gpu_fn = gpu_fn or detect_gpu
         self.audio_files: List[Path] = []      # no-transcript mode: several files and/or folders
         self.text: Optional[Path] = None
@@ -443,6 +445,55 @@ class MainWindow(QWidget):
         pl.addWidget(self.adv_box)
         root.addWidget(pcard)
 
+        # Voice-owner consent: read from the spoken statement at the end of the recording, or chosen by hand
+        ccard = self._card()
+        cl2 = QVBoxLayout(ccard)
+        cl2.setContentsMargins(16, 12, 16, 12)
+        cl2.setSpacing(8)
+        self.lbl_consent = QLabel()
+        self.lbl_consent.setObjectName("sectiontitle")
+        cl2.addWidget(self.lbl_consent)
+        self.cmb_consent = QComboBox()
+        for code in ("auto", "manual", "none"):
+            self.cmb_consent.addItem("", code)
+        cl2.addWidget(self.cmb_consent)
+        self.lbl_consent_hint = QLabel()
+        self.lbl_consent_hint.setObjectName("hint")
+        self.lbl_consent_hint.setWordWrap(True)
+        cl2.addWidget(self.lbl_consent_hint)
+        self.manual_consent = QWidget()
+        ml = QHBoxLayout(self.manual_consent)
+        ml.setContentsMargins(0, 0, 0, 0)
+        self.edt_consent_name = QLineEdit()
+        self.cmb_consent_scope = QComboBox()
+        for sc in consent_mod.SCOPES:
+            self.cmb_consent_scope.addItem("", sc)
+        self.cmb_consent_scope.setCurrentIndex(consent_mod.SCOPES.index(consent_mod.PRIVATE))
+        ml.addWidget(self.edt_consent_name, 1)
+        ml.addWidget(self.cmb_consent_scope, 1)
+        self.manual_consent.hide()
+        cl2.addWidget(self.manual_consent)
+        self.chk_consent_clip = QCheckBox()
+        self.chk_consent_clip.setChecked(True)
+        cl2.addWidget(self.chk_consent_clip)
+        self.consent_result = QWidget()           # shown after training: the detected scope for one-click confirmation
+        rl = QVBoxLayout(self.consent_result)
+        rl.setContentsMargins(0, 0, 0, 0)
+        self.lbl_consent_result = QLabel()
+        self.lbl_consent_result.setWordWrap(True)
+        rl.addWidget(self.lbl_consent_result)
+        crow = QHBoxLayout()
+        self.cmb_consent_confirm = QComboBox()
+        for sc in consent_mod.SCOPES:
+            self.cmb_consent_confirm.addItem("", sc)
+        self.btn_consent_confirm = QPushButton()
+        crow.addWidget(self.cmb_consent_confirm, 1)
+        crow.addWidget(self.btn_consent_confirm)
+        rl.addLayout(crow)
+        self.consent_result.hide()
+        cl2.addWidget(self.consent_result)
+        root.addWidget(ccard)
+
         self.btn_lora = QPushButton()
         self.btn_lora.setObjectName("primary")
         root.addWidget(self.btn_lora)
@@ -534,6 +585,8 @@ class MainWindow(QWidget):
         self.btn_folder.clicked.connect(self.choose_folder)
         self.cmb_preset.currentIndexChanged.connect(self._on_preset)
         self.btn_adv.toggled.connect(self._on_adv_toggled)
+        self.cmb_consent.currentIndexChanged.connect(lambda _i: self._on_consent_mode())
+        self.btn_consent_confirm.clicked.connect(self.confirm_consent)
         for sp in (self.sp_epochs, self.sp_rank, self.sp_alpha, self.sp_accum, self.sp_lr):
             sp.valueChanged.connect(lambda _v: self.refresh_estimate())
         self.chk_no_text.toggled.connect(self.set_no_transcript)
@@ -558,6 +611,16 @@ class MainWindow(QWidget):
         self.lbl_sub.setText(tr("ui.subtitle"))
         self.btn_audio.setText(tr("ui.choose_audio"))
         self.btn_text.setText(tr("ui.choose_text"))
+        self.lbl_consent.setText(tr("consent.title"))
+        for i, code in enumerate(("auto", "manual", "none")):
+            self.cmb_consent.setItemText(i, tr("consent.mode_" + code))
+        for combo in (self.cmb_consent_scope, self.cmb_consent_confirm):
+            for i, sc in enumerate(consent_mod.SCOPES):
+                combo.setItemText(i, tr("consent.scope_" + sc))
+        self.edt_consent_name.setPlaceholderText(tr("consent.name_placeholder"))
+        self.chk_consent_clip.setText(tr("consent.save_clip"))
+        self.btn_consent_confirm.setText(tr("consent.confirm"))
+        self._on_consent_mode()
         self.lbl_preset.setText(tr("preset.label"))
         for i, code in enumerate(train_presets.PRESETS):
             self.cmb_preset.setItemText(i, tr("preset." + code))
@@ -677,6 +740,46 @@ class MainWindow(QWidget):
         self.lbl_text.setText(self.text.name)
         self.lbl_text.setToolTip(str(self.text))
         self._refresh_buttons()
+
+    # ------------------------------------------------------------------ voice-owner consent
+    @property
+    def consent_mode(self) -> str:
+        return str(self.cmb_consent.currentData() or "auto")
+
+    def _on_consent_mode(self) -> None:
+        mode = self.consent_mode
+        self.manual_consent.setVisible(mode == "manual")
+        self.chk_consent_clip.setVisible(mode == "auto")
+        self.lbl_consent_hint.setText(tr("consent.hint_" + mode))
+
+    def _consent_kwargs(self) -> dict:
+        return dict(consent_mode=self.consent_mode, consent_scope=str(self.cmb_consent_scope.currentData()),
+                    consent_name=self.edt_consent_name.text().strip(), consent_save_clip=self.chk_consent_clip.isChecked())
+
+    def show_consent_result(self, block: dict, voice_id: str) -> None:
+        """After training: show what was detected (name, date, scope, the recognised statement) for confirmation or change."""
+        self._last_voice_id = voice_id
+        self.cmb_consent_confirm.setCurrentIndex(consent_mod.SCOPES.index(block["scope"]))
+        who = block.get("name") or tr("consent.unknown")
+        self.lbl_consent_result.setText(tr("consent.detected", name=who, date=block.get("date", ""),
+                                           scope=tr("consent.scope_" + block["scope"]),
+                                           statement=(block.get("statement") or tr("consent.no_statement"))[:300]))
+        self.consent_result.show()
+
+    def confirm_consent(self) -> None:
+        """One click: mark the (possibly changed) scope as confirmed in the voice library and in voice.json."""
+        if not self._last_voice_id:
+            return
+        from core.voice_library import VoiceLibrary
+
+        scope = str(self.cmb_consent_confirm.currentData())
+        try:
+            (self.library or VoiceLibrary()).confirm_consent(self._last_voice_id, scope)
+        except DatasetMakerError as exc:
+            self.show_error("library", getattr(exc, "user_message", str(exc)))
+            return
+        self.consent_result.hide()
+        self.lbl_status.setText(tr("consent.confirmed", scope=tr("consent.scope_" + scope)))
 
     # ------------------------------------------------------------------ training presets
     def gpu(self):
@@ -887,14 +990,16 @@ class MainWindow(QWidget):
             self._launch(TaskRequest(kind=kind, no_transcript=True, audio_files=list(self.audio_files), force_cpu=force_cpu,
                                      voice_type=str(self.cmb_voice_type.currentData() or ""),
                                      voice_description=self.edt_voice_desc.text().strip(),
-                                     preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None))
+                                     preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None,
+                                     **self._consent_kwargs()))
             return
         if self.busy or not (self.audio and self.text):
             return
         self._launch(TaskRequest(kind=kind, audio=self.audio, text=self.text, force_cpu=force_cpu,
                                  voice_type=str(self.cmb_voice_type.currentData() or ""),
                                  voice_description=self.edt_voice_desc.text().strip(),
-                                 preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None))
+                                 preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None,
+                                     **self._consent_kwargs()))
 
     def start_merge(self) -> bool:
         """"Universal model" button: check free disk space, ask for confirmation, start.  True if started.
@@ -970,6 +1075,10 @@ class MainWindow(QWidget):
                 if getattr(result, "voice_id", ""):
                     extra += "\n" + tr("ui.voice_registered")
             warn = ("\n" + "\n".join(result.warnings[-3:])) if getattr(result, "warnings", None) else ""
+            self.consent_result.hide()
+            cb = getattr(result, "consent", None)
+            if cb and not cb.get("confirmed") and getattr(result, "voice_id", ""):
+                self.show_consent_result(cb, result.voice_id)
             rep = getattr(result, "asr_report", None)
             if rep is not None:   # no-transcript mode: how much of the audio was usable
                 extra += "\n" + tr("asr.report", files=rep.files - rep.files_failed, kept=rep.kept, clips=rep.clips,

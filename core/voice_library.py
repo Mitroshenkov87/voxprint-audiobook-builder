@@ -31,7 +31,7 @@ log = logging.getLogger("voxprint.voices")
 #: Files that make a usable adapter.
 REQUIRED_FILES = ("adapter_model.safetensors", "adapter_config.json")
 #: Everything that may live in a voice folder; any other file in an imported archive/folder is ignored.
-ALLOWED_FILES = REQUIRED_FILES + ("ref_sample.wav", "training_meta.json", "preview.wav", voice_info.VOICE_FILENAME)
+ALLOWED_FILES = REQUIRED_FILES + ("ref_sample.wav", "training_meta.json", "preview.wav", "consent_statement.wav", voice_info.VOICE_FILENAME)
 MAX_FILE_BYTES = 1 << 30            # 1 GiB per file
 MAX_TOTAL_BYTES = 2 << 30           # 2 GiB per voice
 PREVIEW_FILES = ("preview.wav", "ref_sample.wav")
@@ -70,6 +70,13 @@ class VoiceRecord:
     def license(self) -> str:
         """SPDX-like licence id."""
         return str(self.info.get("license", voice_info.DEFAULT_LICENSE))
+
+    @property
+    def scope(self) -> str:
+        """Usage scope: ``commercial`` / ``public_noncommercial`` / ``private_only`` (consent mark, else derived from the licence)."""
+        from core import consent
+
+        return consent.scope_of(self.info)
 
     @property
     def commercial_use(self) -> bool:
@@ -249,7 +256,7 @@ class VoiceLibrary:
         if rec is None:
             raise VoiceLibraryError(tr("err.voice_not_found"), details=voice_id)
         info = dict(rec.info)
-        for key in ("name", "author", "license", "license_url", "voice_type", "description"):
+        for key in ("name", "author", "license", "license_url", "voice_type", "description", "consent"):
             if key in fields and fields[key] is not None:
                 info[key] = fields[key]
         if "license" in fields and "license_url" not in fields:
@@ -258,6 +265,24 @@ class VoiceLibrary:
         info["id"] = voice_id
         voice_info.write_voice_json(rec.path, info)
         return VoiceRecord(voice_id, rec.path, info)
+
+    def confirm_consent(self, voice_id: str, scope: str, name: Optional[str] = None) -> VoiceRecord:
+        """The user's one-click confirmation (or change) of the detected usage scope: marks the consent confirmed and maps the
+        scope onto the licence fields (private only -> personal-only licence, public -> CC-BY-NC, commercial -> CC-BY)."""
+        from core import consent
+
+        rec = self.get(voice_id)
+        if rec is None:
+            raise VoiceLibraryError(tr("err.voice_not_found"), details=voice_id)
+        block = dict(consent.clean_consent(rec.info.get("consent")) or consent.build_consent(None, scope=scope, method="manual",
+                                                                                           recorded=False, confirmed=True))
+        block.update(scope=scope if scope in consent.SCOPES else consent.DEFAULT_SCOPE, confirmed=True)
+        if name is not None:
+            block["name"] = name
+        if block["method"] == "spoken":
+            block["method"] = "spoken_confirmed"        # the user has seen the detected scope and confirmed or changed it
+        return self.update(voice_id, consent=block, license=consent.license_for_scope(block["scope"]),
+                           author=block["name"] or rec.info.get("author", ""))
 
     def delete(self, voice_id: str) -> None:
         """Delete a voice folder.  Refuses anything that is not a direct child of the library root."""

@@ -36,7 +36,7 @@ from core.i18n import tr
 from core.voice_library import VoiceLibrary
 from infra import features, text_models
 from ui.main_window import open_folder
-from ui.voices_window import make_badge
+from ui.voices_window import make_badge, make_scope_badge
 from ui.window_base import SubWindow, card_frame, fit_to_screen, hint_label
 from workers.narrate_worker import NarrateWorker, TextModelDownloadWorker
 from workers.narration_runner import NarrationJob, default_output_dir, format_eta, run_narration
@@ -740,9 +740,19 @@ class NarrateWindow(SubWindow):
             self.lbl_voice_info.setText("")
             return
         self.badge_box.addWidget(make_badge(rec.license, rec.commercial_use, str(rec.info.get("license_url", ""))))
+        self.badge_box.addWidget(make_scope_badge(rec.scope))
         lang = rec.language.capitalize() if rec.language else ""
         self.lbl_voice_info.setText(" \u00b7 ".join(p for p in (lang, rec.info.get("author", "")) if p)
-                                    + ("\n" + tr("narr.voice_personal_note") if not rec.commercial_use else ""))
+                                    + self._scope_note(rec))
+
+    @staticmethod
+    def _scope_note(rec) -> str:
+        """Reminder under the voice: what the voice owner allowed (nothing for a commercial scope)."""
+        if rec.scope == "private_only":
+            return "\n" + tr("narr.voice_personal_note")
+        if rec.scope == "public_noncommercial":
+            return "\n" + tr("narr.voice_noncommercial_note")
+        return ""
 
     # ------------------------------------------------------------------ output
     def choose_folder(self) -> None:
@@ -847,7 +857,13 @@ class NarrateWindow(SubWindow):
         """Worker signal: show the result."""
         self.result = result
         self.progress.setValue(100)
-        self.lbl_status.setText(tr("narr.done_summary", chapters=result.chapters, files=len(result.files)))
+        rec = self.library.get(self.selected_voice_id()) if self.selected_voice_id() else None
+        reminder = ""      # the voice owner's scope is repeated when the files are ready: private results must stay local
+        if rec is not None and rec.scope == "private_only":
+            reminder = "\n" + tr("narr.done_private_reminder")
+        elif rec is not None and rec.scope == "public_noncommercial":
+            reminder = "\n" + tr("narr.done_noncommercial_reminder")
+        self.lbl_status.setText(tr("narr.done_summary", chapters=result.chapters, files=len(result.files)) + reminder)
         self.lbl_ready.show()
         self.btn_open.show()
         self._refresh_buttons()
