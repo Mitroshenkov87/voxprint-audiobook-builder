@@ -202,7 +202,7 @@ When a statement ends the recording, up to 60 s of unscripted speech at the end 
 2. Pick the **voice** (a licence badge is shown; for a personal-use-only voice you are reminded not to publish or sell the narration). No voices yet? The window offers *Train your voice* / *My voices*.
 3. **Prepare the text** (automatic, see [below](#prepare-the-text)): all rule-based steps are on by default; leave them as they are or untick what you do not want.
 4. Pick the **format** (see below) and a **quality** button (*Compact / Standard / High*), then **Start narration**. Rarely needed things are collapsed: *Other formats*, and *Advanced* (exact bitrates per format, the output folder - default `Documents\Voxprint\Audiobooks` - whether chapter titles are read aloud, and a read-only sample of how the first changed paragraph looks after preparation).
-5. Progress with the time left; **Pause / Resume** and **Cancel** are always available. Every synthesized fragment is stored (`<output>\<book>\.cache`), so after a cancel, a crash or closing the program
+5. Progress with the time left; **Pause / Resume** and **Cancel** are always available. A **mini player** appears as soon as the first fragments are ready: *Play / Pause*, a seek slider and the clock work on the finished part while the rest is still being made, and the player follows new fragments (it waits if it catches up with the synthesis). It only checks a few file names every 1.5 s and plays through Qt Multimedia, so it does not slow the narration down; when the job ends the whole result becomes the playlist. Every synthesized fragment is stored (`<output>\<book>\.cache`), so after a cancel, a crash or closing the program
    **Start continues where it stopped**; the cache is deleted after a successful run. Texts are split into chunks at sentence/clause boundaries (reusing the clause splitter of the aligner), chapters get a pause between them.
 
 | Format | What you get | Where it plays |
@@ -261,17 +261,34 @@ adapter files, size limits). A voice without a declared licence is treated as `c
 | CC0-1.0, CC-BY-4.0, CC-BY-SA-4.0 | allowed (attribution / share-alike per the licence) |
 | CC-BY-NC-4.0, CC-BY-NC-SA-4.0 | not allowed |
 | custom/personal-only (default) | not allowed |
+| custom/voxprint-original-test-only (the original voice) | not allowed; test use only, no public release of the audio |
 
 `commercial_use` in `voice.json` is always derived from the licence, never trusted from a file you import. The badge is information, not legal advice.
 
 **Download voices from repository.** The button reads a static `index.json` (schema 1) from a configurable URL: environment variable `VOXPRINT_VOICES_INDEX`, or the first line of
 `%LOCALAPPDATA%\Voxprint\state\voice_index_url.txt`. The built-in default is a placeholder (`.../OWNER/voxprint-voices/...`): until a real repository exists the dialog says "not set up yet". An empty list and no network
-are handled with friendly messages. Downloads are HTTPS-only, size-capped, the SHA-256 from the index must match, and the licence in the index is the one shown. Index format:
+are handled with friendly messages. Downloads are HTTPS-only, size-capped, **resumable** (a `.part` file named by the SHA-256 and an HTTP `Range` request; a server that ignores `Range` restarts the download), the SHA-256 from the index must match, and the licence in the index is the one shown. The last good index is cached (`state\voice_index_cache.json`), so the list still shows offline. Index format:
 ```json
 {"schema": 1, "voices": [{"id": "anna-ru", "name": "Anna", "language": "russian", "author": "...", "license": "CC-BY-4.0",
   "description": "...", "voice_type": "female", "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-  "url": "https://example.org/anna-ru.zip", "sha256": "<64 hex digits>", "size_bytes": 61000000}]}
+  "url": "https://example.org/anna-ru.zip", "sha256": "<64 hex digits>", "size_bytes": 61000000,
+  "names": {"ru": "Анна", "en": "Anna", "de": "Anna"}, "descriptions": {"ru": "...", "en": "...", "de": "..."}}]}
 ```
+`names` / `descriptions` are optional: the UI shows the entry for the current UI language and falls back to `name` / `description`. The same two maps may be in `voice.json`
+(a downloaded voice keeps them, so "Александр" becomes "Alexander" when you switch the language; the stored `name` is never rewritten).
+
+**Online voices appear by themselves.** *My voices* and the voice list of *Narrate a book* merge the local library with the index (refreshed when the window opens; *Refresh list* in My voices): an online voice
+that is not installed yet is a card with the licence and scope badges, the size and a **Download** button; in *Narrate* it is listed as "<name> (to download, N MB)" and is downloaded and verified automatically when you press
+Start. A downloaded voice remembers its index id (`repo_id`) and is then shown once, as a local voice. A voice added to the index later shows up after the next refresh - no program update needed.
+
+**The original voice "Alexander" (Александр).** The first voice ever trained with Voxprint (10 minutes of the author's own recording). It is **not in this repository and not in the installer**; it is published in the voices
+repository as `alexander.zip` (SHA-256 in the index) under the licence **`custom/voxprint-original-test-only`** - *Voxprint Original Voice - test use only, no public release of generated audio, no commercial use*.
+Its `voice.json` carries `names` (ru Александр, en Alexander, de Alexander), localized `descriptions` and a consent block with `method: "owner"` (the owner of the voice is the publisher; scope `private_only`).
+The programme shows a "test use only" reminder on its card, in Narrate and when an audiobook made with it is ready. To publish a voice package yourself:
+```
+python tools/make_voice_package.py --adapter <trained voice folder> --spec tools/voice_specs/alexander.json --out dist_voices --url https://huggingface.co/<user>/voxprint-voices/resolve/main/alexander.zip
+```
+It writes the folder, `alexander.zip` and `alexander.index-entry.json` (one object for the `voices` list, with SHA-256 and size). Upload the zip to a model host or a release asset and add the entry to `index.json`.
 
 ### AAC / M4B: patents (please read)
 > The **M4B (AAC)** export exists only as a convenience for **Apple Books compatibility**. The **AAC codec is patent-encumbered** and not fully open. **This project does not provide a patent licence** for it.
@@ -442,7 +459,7 @@ Ideas, not promises:
 * A real **voices repository** (the index URL in the program is a placeholder today).
 * **Android** - later: convert the merged model for phones (GGUF / LiteRT; today the merged folder is a plain Hugging Face directory a converter can start from).
 * **Installer channels** - *online* (small installer, downloads components), *offline* (everything included), and *beta* (pre-releases).
-* A public repository URL and a published licence for the Voxprint source code.
+* A public repository URL (the source-code licence is chosen: Apache-2.0).
 * More languages in the UI (see "Adding a language" below) and Linux/macOS builds.
 
 ## Contributing
@@ -486,8 +503,7 @@ the link is hidden in **About**; replace it with the real URL and the button app
 ## Licences and third-party components
 Voxprint stands on open-source software; the single source of truth is `credits.json`. From it come the **About** list, `THIRD_PARTY_NOTICES.md`
 (shipped by the installer together with the `licenses\` folder of full licence texts) and the build-time appendix with the licences of all installed
-packages (`tools\gen_notices.py --with-installed`, called by `build.bat`). Voxprint's *own* source-code licence has not been chosen yet and will be added
-before the first public release. Important points:
+packages (`tools\gen_notices.py --with-installed`, called by `build.bat`). Voxprint's *own* source code is under the **Apache License 2.0** (see "Licence of Voxprint" below). Important points:
 * **Qt / PySide6 - LGPL-3.0.** Used unmodified and dynamically linked. To let users replace the Qt/PySide6 libraries, prefer `build.bat onedir`
   (the libraries are ordinary files); `--onefile` makes this harder. The LGPL/GPL texts and the source pointers (<https://code.qt.io>, <https://pyside.org>) are included.
 * **FFmpeg is a GPL-3.0 build.** The ffmpeg binary inside the `imageio-ffmpeg` wheel was built with `--enable-gpl --enable-version3` (verified in the Windows 7.1 binary of
@@ -500,6 +516,16 @@ before the first public release. Important points:
 * **CC-BY-NC-4.0 model.** The optional backup aligner model `MahmoudAshraf/mms-300m-1130-forced-aligner` (used only if you install the optional `ctc-forced-aligner`) is
   non-commercial. The default Qwen models and libraries are Apache-2.0 / MIT / BSD-style.
 * PyInstaller is GPL-2.0-or-later **with a bootloader exception** (apps may use any licence); Inno Setup has its own permissive licence.
+
+### Licence of Voxprint
+* **Source code: Apache License 2.0** - Copyright 2026 Aleksandr Mitroshenkov. Full text in [`LICENSE`](LICENSE), attribution in [`NOTICE`](NOTICE).
+  You may use, modify and redistribute the code, also commercially, under the terms of that licence (keep the notices; it includes a patent grant). *(The choice may still change to MIT before the first public release.)*
+* **Models and voices have their own licences** - the Apache licence of the code does *not* cover them:
+  * the models Voxprint downloads (Qwen3-TTS, Qwen3-ASR and the optional text models) keep the licences of their authors;
+  * every **voice** carries its own licence in `voice.json` (see *My voices and licences*). Voices you train are `custom/personal-only` until you decide otherwise;
+  * the original voice **Alexander / Александр** is not part of this repository or the installer. It is published separately in the voices repository under
+    **"Voxprint Original Voice - test use only"**: use it to try the program; do not publish audio made with it and do not use it commercially.
+* Third-party components: `THIRD_PARTY_NOTICES.md` and `licenses\`.
 
 ## What was verified against primary sources
 * **qwen-asr 0.0.6** (PyPI sources): `Qwen3ForcedAligner.from_pretrained(path, dtype, device_map)`, `.align(audio=(np, sr), text, language="Russian")` ->

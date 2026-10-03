@@ -32,13 +32,17 @@ from core import narration as nr
 from core import text_prep
 from core.book_parsers import SUPPORTED_EXTENSIONS, Book, load_book
 from core.errors import DatasetMakerError
+from core import voice_info
 from core.i18n import tr
 from core.voice_library import VoiceLibrary
 from infra import features, text_models
+from infra import voice_catalog as catalog
+from infra import voice_repository as repo
 from ui.main_window import open_folder
+from ui.mini_player import MiniPlayer
 from ui.voices_window import make_badge, make_scope_badge
 from ui.window_base import SubWindow, card_frame, fit_to_screen, hint_label
-from workers.narrate_worker import NarrateWorker, TextModelDownloadWorker
+from workers.narrate_worker import NarrateWorker, RepoDownloadWorker, RepoIndexWorker, TextModelDownloadWorker
 from workers.narration_runner import NarrationJob, default_output_dir, format_eta, run_narration
 
 log = logging.getLogger("voxprint.ui.narrate")
@@ -109,12 +113,20 @@ class NarrateWindow(SubWindow):
                  out_dir: Optional[Path] = None, aac_allowed: Optional[bool] = None,
                  auto_open_folder: bool = True, model_state: Callable[[Any], str] = text_models.state,
                  model_ensure: Callable[..., Any] = text_models.ensure,
-                 plan_builder: Callable[..., Any] = text_models.build_plan) -> None:
+                 plan_builder: Callable[..., Any] = text_models.build_plan,
+                 fetch: Callable[..., Any] = repo.fetch_index, download: Callable[..., Any] = repo.download_voice,
+                 auto_refresh: bool = True, player_backend: Any = None) -> None:
         """Build the window.  ``runner``, the file pickers and the text-model hooks (``model_state(model)``,
         ``model_ensure(model, progress)``, ``plan_builder(rule_steps, neural_steps)``) are injectable (tests);
         ``aac_allowed`` overrides the feature flag."""
         super().__init__(with_back=True)
         self.library = library or VoiceLibrary()
+        self._fetch, self._download = fetch, download
+        self._player_backend = player_backend
+        self.entries: list = repo.load_cache()          # online voices not installed yet (cached index; refreshed in the background)
+        self._index_worker = None
+        self._dl_worker = None
+        self._auto_refresh = auto_refresh
         self.runner = runner
         self._pick_book, self._pick_folder = pick_book, pick_folder
         self.out_dir: Path = Path(out_dir) if out_dir else default_output_dir()
@@ -403,6 +415,9 @@ class NarrateWindow(SubWindow):
         self.lbl_status.setObjectName("status")
         self.lbl_status.setWordWrap(True)
         self.body.addWidget(self.lbl_status)
+        self.player = MiniPlayer(backend=self._player_backend)          # live listening of the finished parts
+        self.player.hide()
+        self.body.addWidget(self.player)
         self.lbl_ready = QLabel()
         self.lbl_ready.setObjectName("ready")
         self.btn_open = QPushButton()
@@ -435,6 +450,9 @@ class NarrateWindow(SubWindow):
     def retranslate(self) -> None:
         """Apply the current language."""
         super().retranslate()
+        if hasattr(self, "player"):
+            self.player.retranslate()
+            self.player.setToolTip(tr("narr.player_hint"))
         self.lbl_intro.setText(tr("narr.intro"))
         self.lbl_book_title.setText(tr("narr.book"))
         self.btn_book.setText(tr("narr.choose_book"))
@@ -705,8 +723,11 @@ class NarrateWindow(SubWindow):
         current = select or str(self.cmb_voice.currentData() or "")
         self.cmb_voice.blockSignals(True)
         self.cmb_voice.clear()
-        for rec in self.library.list_voices():
-            self.cmb_voice.addItem(rec.name, rec.id)
+        for it in catalog.build(self.library, self.entries):
+            if it.installed:
+                self.cmb_voice.addItem(it.name, it.key)
+            else:
+                self.cmb_voice.addItem(tr("narr.voice_remote_item", name=it.name, size=catalog.size_text(it.size_bytes)), it.key)
         idx = self.cmb_voice.findData(current)
         self.cmb_voice.setCurrentIndex(idx if idx >= 0 else 0)
         self.cmb_voice.blockSignals(False)
@@ -735,7 +756,11 @@ class NarrateWindow(SubWindow):
             it = self.badge_box.takeAt(0)
             if it.widget():
                 it.widget().deleteLater()
-        rec = self.library.get(self.selected_voice_id()) if self.selected_voice_id() else None
+        key = self.selected_voice_id()
+        if catalog.is_remote_key(key):
+            self._render_remote_info(key)
+            return
+        rec = self.library.get(key) if key else None
         if rec is None:
             self.lbl_voice_info.setText("")
             return
@@ -745,9 +770,23 @@ class NarrateWindow(SubWindow):
         self.lbl_voice_info.setText(" \u00b7 ".join(p for p in (lang, rec.info.get("author", "")) if p)
                                     + self._scope_note(rec))
 
+    def _render_remote_info(self, key: str) -> None:
+        """Badges and note of an online voice that is downloaded on first use."""
+        e = catalog.find_entry(self.entries, key)
+        if e is None:
+            self.lbl_voice_info.setText("")
+            return
+        self.badge_box.addWidget(make_badge(e.license, e.commercial_use, e.license_url))
+        self.badge_box.addWidget(make_scope_badge(catalog.scope_for_license(e.license)))
+        lang = e.language.capitalize() if e.language else ""
+        note = "\n" + tr("narr.voice_test_only_note") if e.license == voice_info.LICENSE_TEST_ONLY else ""
+        self.lbl_voice_info.setText(" \u00b7 ".join(p for p in (lang, e.author) if p) + "\n" + tr("narr.voice_remote_note") + note)
+
     @staticmethod
     def _scope_note(rec) -> str:
         """Reminder under the voice: what the voice owner allowed (nothing for a commercial scope)."""
+        if rec.test_only:
+            return "\n" + tr("narr.voice_test_only_note")
         if rec.scope == "private_only":
             return "\n" + tr("narr.voice_personal_note")
         if rec.scope == "public_noncommercial":
@@ -806,7 +845,10 @@ class NarrateWindow(SubWindow):
     # ------------------------------------------------------------------ run
     def start(self) -> bool:
         """Start (or resume) the narration of the loaded book; returns False if something is missing."""
-        rec = self.library.get(self.selected_voice_id()) if self.selected_voice_id() else None
+        key = self.selected_voice_id()
+        if catalog.is_remote_key(key):
+            return self._download_then_start(key)
+        rec = self.library.get(key) if key else None
         if not (self.book and rec and self.selected_formats()) or self.busy:
             return False
         job = NarrationJob(self.book, rec, self.out_dir, self.options())
@@ -816,6 +858,9 @@ class NarrateWindow(SubWindow):
         self.progress.setValue(0)
         self.lbl_status.setText(tr("narr.starting"))
         w = NarrateWorker(job, self.runner, parent=self)
+        self.player.stop()
+        self.player.hide()
+        w.plan.connect(self.on_plan)
         w.progress.connect(self.on_progress)
         w.done.connect(self.on_done)
         w.failed.connect(self.on_failed)
@@ -825,6 +870,53 @@ class NarrateWindow(SubWindow):
         w.start()
         self._refresh_buttons()
         return True
+
+    # ------------------------------------------------------------------ online voices
+    def refresh_remote(self) -> None:
+        """Re-read the online index in the background (no-op while the repository is not configured)."""
+        if not repo.is_configured() or (self._index_worker is not None and self._index_worker.isRunning()):
+            return
+        w = RepoIndexWorker(fetch=self._fetch, parent=self)
+        w.done.connect(self._on_index)
+        self._index_worker = w
+        w.start()
+
+    def _on_index(self, res) -> None:
+        """New index: update the list, keeping the selection."""
+        if res.voices:
+            self.entries = list(res.voices)
+            self.refresh_voices()
+
+    def showEvent(self, e) -> None:  # noqa: N802
+        """Refresh the online index each time the window opens."""
+        super().showEvent(e)
+        if self._auto_refresh:
+            self.refresh_remote()
+
+    def _download_then_start(self, key: str) -> bool:
+        """The selected voice is online only: download it (SHA-256 checked), select it and start the narration."""
+        entry = catalog.find_entry(self.entries, key)
+        if entry is None or not (self.book and self.selected_formats()) or self.busy or (
+                self._dl_worker is not None and self._dl_worker.isRunning()):
+            return False
+        self.lbl_status.setText(tr("narr.voice_downloading", name=entry.display_name, p=0))
+        self.btn_start.setEnabled(False)
+        w = RepoDownloadWorker([entry], self.library, download=self._download, parent=self)
+        w.progress.connect(lambda f, _n: self.lbl_status.setText(tr("narr.voice_downloading", name=entry.display_name, p=int(f * 100))))
+        w.failed.connect(lambda m: self.lbl_status.setText(m))
+        w.finished_all.connect(self._on_voice_downloaded)
+        self._dl_worker = w
+        w.start()
+        return True
+
+    def _on_voice_downloaded(self, ids: list) -> None:
+        """Download finished: select the new voice and start (or just refresh on failure)."""
+        if not ids:
+            self.refresh_voices()
+            return
+        self.refresh_voices(select=ids[0])
+        self.lbl_status.setText("")
+        self.start()
 
     def toggle_pause(self) -> None:
         """Pause / resume the running job."""
@@ -844,6 +936,11 @@ class NarrateWindow(SubWindow):
             self.lbl_status.setText(tr("ui.stopping"))
             self.worker.cancel()
 
+    def on_plan(self, paths: list) -> None:
+        """The job announced its chunk files: show the player; it follows the parts as they are made."""
+        self.player.set_plan([Path(p) for p in paths], live=True)
+        self.player.show()
+
     def on_progress(self, p: nr.NarrationProgress) -> None:
         """Worker signal: bar, chunk counter and ETA."""
         self.progress.setValue(int(p.fraction * 100))
@@ -860,12 +957,15 @@ class NarrateWindow(SubWindow):
         rec = self.library.get(self.selected_voice_id()) if self.selected_voice_id() else None
         reminder = ""      # the voice owner's scope is repeated when the files are ready: private results must stay local
         if rec is not None and rec.scope == "private_only":
-            reminder = "\n" + tr("narr.done_private_reminder")
+            reminder = "\n" + (tr("narr.done_test_only_reminder") if rec.test_only else tr("narr.done_private_reminder"))
         elif rec is not None and rec.scope == "public_noncommercial":
             reminder = "\n" + tr("narr.done_noncommercial_reminder")
         self.lbl_status.setText(tr("narr.done_summary", chapters=result.chapters, files=len(result.files)) + reminder)
         self.lbl_ready.show()
         self.btn_open.show()
+        if self.player.isVisibleTo(self) or self.player.queue.planned:
+            self.player.set_final(result.files[0] if result.files else None)
+            self.player.show()
         self._refresh_buttons()
         if self.auto_open_folder:
             open_folder(result.out_dir)
@@ -873,10 +973,12 @@ class NarrateWindow(SubWindow):
     def on_cancelled(self) -> None:
         """Worker signal: cancelled."""
         self.lbl_status.setText(tr("narr.cancelled"))
+        self.player.set_final(None)
 
     def on_failed(self, kind: str, message: str, details: str) -> None:
         """Worker signal: failed - the message is shown; finished chunks are still cached."""
         self.progress.setValue(0)
+        self.player.set_final(None)
         self.lbl_status.setText(message + "  " + tr("narr.failed_resume"))
         log.error("narration failed: kind=%s %s | %s", kind, message, details)
 
@@ -887,11 +989,15 @@ class NarrateWindow(SubWindow):
 
     def shutdown(self) -> None:
         """Cancel a running job and wait for the thread (application exit)."""
+        self.player.shutdown()
         if self.worker and self.worker.isRunning():
             self.worker.cancel()
             self.worker.wait(8000)
         if self.model_worker and self.model_worker.isRunning():
             self.model_worker.wait(8000)
+        for w in (self._dl_worker, self._index_worker):
+            if w is not None and w.isRunning():
+                w.wait(3000)
 
     def closeEvent(self, e) -> None:  # noqa: N802
         """Stop the worker before closing."""

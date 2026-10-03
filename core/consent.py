@@ -26,7 +26,7 @@ SCOPES = (COMMERCIAL, PUBLIC_NC, PRIVATE)
 DEFAULT_SCOPE = PRIVATE                       # the most restrictive level wins whenever the statement is unclear
 SCOPE_LICENSE = {COMMERCIAL: "CC-BY-4.0", PUBLIC_NC: "CC-BY-NC-4.0", PRIVATE: "custom/personal-only"}
 CLIP_NAME = "consent_statement.wav"
-METHODS = ("spoken", "spoken_confirmed", "manual", "none")
+METHODS = ("spoken", "spoken_confirmed", "manual", "owner", "none")   # "owner": the owner of the voice is the publisher (no statement needed)
 
 #: Template sentences the speaker can read (``{name}`` and ``{date}`` are filled in by the speaker); shown in the script and in docs.
 TEMPLATES = {
@@ -142,10 +142,10 @@ def parse_statement(text: str) -> Parsed:
 
 
 def build_consent(parsed: Optional[Parsed], *, scope: str, name: str = "", method: str, recorded: bool, confirmed: bool,
-                  today: Optional[str] = None, clip: str = "") -> Dict[str, Any]:
+                  today: Optional[str] = None, clip: str = "", owner_confirmed: bool = False) -> Dict[str, Any]:
     """The ``consent`` block of ``voice.json``."""
     p = parsed or Parsed()
-    return {
+    out = {
         "scope": scope if scope in SCOPES else DEFAULT_SCOPE,
         "name": (name or p.name).strip(),
         "date": p.date or today or _date.today().isoformat(),
@@ -156,6 +156,9 @@ def build_consent(parsed: Optional[Parsed], *, scope: str, name: str = "", metho
         "statement": p.text[:1500],
         "clip": clip,
     }
+    if owner_confirmed:
+        out["owner_confirmed"] = True
+    return out
 
 
 def clean_consent(data: Any) -> Optional[Dict[str, Any]]:
@@ -164,7 +167,7 @@ def clean_consent(data: Any) -> Optional[Dict[str, Any]]:
         return None
     scope = str(data.get("scope") or DEFAULT_SCOPE)
     method = str(data.get("method") or "none")
-    return {
+    out = {
         "scope": scope if scope in SCOPES else DEFAULT_SCOPE,
         "name": re.sub(r"\s+", " ", str(data.get("name") or "")).strip()[:80],
         "date": str(data.get("date") or "")[:10],
@@ -175,6 +178,9 @@ def clean_consent(data: Any) -> Optional[Dict[str, Any]]:
         "statement": str(data.get("statement") or "")[:1500],
         "clip": str(data.get("clip") or "")[:80],
     }
+    if data.get("owner_confirmed"):        # only the "owner" method (the original voice) carries this mark
+        out["owner_confirmed"] = True
+    return out
 
 
 def scope_of(info: Dict[str, Any]) -> str:

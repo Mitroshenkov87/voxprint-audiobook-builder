@@ -25,11 +25,14 @@ class NarrateWorker(QThread):
     done = Signal(object)
     failed = Signal(str, str, str)
     cancelled = Signal()
+    plan = Signal(list)        # ordered chunk files of the job (for the live player)
 
     def __init__(self, job: NarrationJob, runner: Callable[..., Any] = run_narration, parent=None) -> None:
         """``runner(job, progress, cancel, pause)`` is injectable (tests)."""
         super().__init__(parent)
         self.job, self.runner = job, runner
+        if getattr(job, "on_plan", None) is None:
+            job.on_plan = lambda paths: self.plan.emit(list(paths))
         self.cancel_token = CancelToken()
         self.pause_token = nr.PauseToken()
 

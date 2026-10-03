@@ -23,6 +23,7 @@ from core import voice_info
 from core.errors import DatasetMakerError
 from core.i18n import tr
 from core.voice_library import VoiceLibrary, VoiceRecord
+from infra import voice_catalog as catalog
 from infra import voice_repository as repo
 from ui.audio_preview import Previewer
 from ui.window_base import SubWindow, card_frame, fit_to_screen, hint_label
@@ -81,6 +82,56 @@ def make_scope_badge(scope: str) -> QLabel:
     return b
 
 
+class RemoteCard(QFrame):
+    """A voice that is in the online index but not on this computer yet: badges, size and a *Download* button."""
+
+    download = Signal(str)
+
+    def __init__(self, item: "catalog.CatalogItem", busy: bool = False, progress: float = -1.0) -> None:
+        """``progress`` >= 0 shows the running download."""
+        super().__init__()
+        self.setObjectName("card")
+        self.key = item.key
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(16, 14, 16, 14)
+        lay.setSpacing(6)
+        top = QHBoxLayout()
+        self.lbl_name = QLabel(item.name)
+        self.lbl_name.setObjectName("sectiontitle")
+        top.addWidget(self.lbl_name)
+        self.badge = make_badge(item.license, item.commercial, item.license_url)
+        top.addWidget(self.badge)
+        self.scope_badge = make_scope_badge(item.scope)
+        top.addWidget(self.scope_badge)
+        top.addStretch(1)
+        lay.addLayout(top)
+        size = catalog.size_text(item.size_bytes)
+        meta = [p for p in (item.language.capitalize() if item.language else "", item.author and tr("voices.by_author", author=item.author),
+                            size) if p]
+        self.lbl_meta = QLabel(" \u00b7 ".join(meta))
+        self.lbl_meta.setObjectName("carddesc")
+        lay.addWidget(self.lbl_meta)
+        self.lbl_desc = QLabel(item.description)
+        self.lbl_desc.setWordWrap(True)
+        self.lbl_desc.setVisible(bool(item.description))
+        lay.addWidget(self.lbl_desc)
+        if item.license == voice_info.LICENSE_TEST_ONLY:
+            self.lbl_note = QLabel(tr("voices.test_only_note"))
+            self.lbl_note.setObjectName("hint")
+            self.lbl_note.setWordWrap(True)
+            lay.addWidget(self.lbl_note)
+        row = QHBoxLayout()
+        self.lbl_state = QLabel(tr("voices.remote_state"))
+        self.lbl_state.setObjectName("carddesc")
+        self.btn_download = QPushButton(tr("voices.remote_download") if progress < 0 else tr("voices.remote_downloading", p=int(progress * 100)))
+        self.btn_download.setEnabled(not busy and progress < 0)
+        self.btn_download.clicked.connect(lambda: self.download.emit(self.key))
+        row.addWidget(self.lbl_state)
+        row.addStretch(1)
+        row.addWidget(self.btn_download)
+        lay.addLayout(row)
+
+
 class VoiceCard(QFrame):
     """One voice of the library."""
 
@@ -111,10 +162,16 @@ class VoiceCard(QFrame):
         self.lbl_meta.setObjectName("carddesc")
         self.lbl_meta.setWordWrap(True)
         lay.addWidget(self.lbl_meta)
-        self.lbl_desc = QLabel(str(rec.info.get("description", "")))
+        self.lbl_desc = QLabel(rec.description)
         self.lbl_desc.setWordWrap(True)
-        self.lbl_desc.setVisible(bool(rec.info.get("description")))
+        self.lbl_desc.setVisible(bool(rec.description))
         lay.addWidget(self.lbl_desc)
+        self.lbl_note = None
+        if rec.test_only:      # the original Voxprint voice: always remind of its terms
+            self.lbl_note = QLabel(tr("voices.test_only_note"))
+            self.lbl_note.setObjectName("hint")
+            self.lbl_note.setWordWrap(True)
+            lay.addWidget(self.lbl_note)
         row = QHBoxLayout()
         self.btn_preview = QPushButton(("\u25a0 " + tr("voices.stop")) if playing else ("\u25b6 " + tr("voices.preview")))
         self.btn_preview.setEnabled(rec.preview_path is not None)
@@ -146,7 +203,7 @@ class VoiceEditDialog(QDialog):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(24, 20, 24, 20)
         lay.setSpacing(10)
-        self.edt_name = QLineEdit(rec.name)
+        self.edt_name = QLineEdit(str(rec.info.get("name") or rec.name))   # the stored default, not the localized display name
         self.edt_name.setMaxLength(voice_info.MAX_NAME_CHARS)
         self.edt_author = QLineEdit(str(rec.info.get("author", "")))
         self.edt_author.setPlaceholderText(tr("voices.author_placeholder"))
@@ -188,8 +245,11 @@ class VoiceEditDialog(QDialog):
     def _update_note(self, _i: int = 0) -> None:
         """Explain what the selected licence allows."""
         lic = str(self.cmb_license.currentData())
-        self.lbl_license_note.setText(tr("voices.license_commercial") if voice_info.license_allows_commercial(lic)
-                                      else tr("voices.license_personal"))
+        if lic == voice_info.LICENSE_TEST_ONLY:
+            self.lbl_license_note.setText(tr("voices.test_only_note"))
+        else:
+            self.lbl_license_note.setText(tr("voices.license_commercial") if voice_info.license_allows_commercial(lic)
+                                          else tr("voices.license_personal"))
 
     def values(self) -> dict:
         """The edited fields, ready for :meth:`VoiceLibrary.update`."""
@@ -292,7 +352,7 @@ class RepoDialog(QDialog):
         else:
             self.lbl_state.setText(tr("voices.repo_found", n=len(self.entries)))
         for e in self.entries:
-            it = QListWidgetItem(f"{e.name}  \u00b7  {e.language}  \u00b7  {badge_text(e.license, e.commercial_use)}")
+            it = QListWidgetItem(f"{e.display_name}  \u00b7  {e.language}  \u00b7  {badge_text(e.license, e.commercial_use)}")
             it.setData(Qt.ItemDataRole.UserRole, e.id)
             self.list.addItem(it)
         self._on_selection()
@@ -359,9 +419,17 @@ class VoicesWindow(SubWindow):
     def __init__(self, library: Optional[VoiceLibrary] = None, previewer: Optional[Previewer] = None,
                  confirm: Optional[Callable[[str, str], bool]] = None,
                  pick_folder: Optional[Callable[[], str]] = None, pick_zip: Optional[Callable[[], str]] = None,
-                 repo_dialog_factory: Optional[Callable[..., RepoDialog]] = None) -> None:
-        """Build the window; every dialog/IO collaborator can be replaced for tests."""
+                 repo_dialog_factory: Optional[Callable[..., RepoDialog]] = None,
+                 fetch: Callable[..., Any] = repo.fetch_index, download: Callable[..., Any] = repo.download_voice,
+                 auto_refresh: bool = True) -> None:
+        """Build the window; every dialog/IO collaborator can be replaced for tests.  ``fetch`` / ``download`` are the
+        repository hooks; the index is refreshed in the background when the window opens (``auto_refresh``)."""
         super().__init__(with_back=True)
+        self._fetch, self._download = fetch, download
+        self.entries: List[repo.RepoVoice] = repo.load_cache()      # the cached index shows at once, also offline
+        self._index_worker = None
+        self._dl_worker = None
+        self._dl_key, self._dl_progress = "", -1.0
         self.library = library or VoiceLibrary()
         self.previewer = previewer or Previewer(self)
         self.previewer.stopped.connect(self.refresh)
@@ -381,6 +449,8 @@ class VoicesWindow(SubWindow):
         self.btn_repo = QPushButton()
         bar.addWidget(self.btn_import)
         bar.addWidget(self.btn_repo)
+        self.btn_reload = QPushButton()
+        bar.addWidget(self.btn_reload)
         bar.addStretch(1)
         self.body.addLayout(bar)
         self.lbl_status = QLabel()
@@ -410,10 +480,13 @@ class VoicesWindow(SubWindow):
         self.act_folder.triggered.connect(self.import_folder_dialog)
         self.act_zip.triggered.connect(self.import_zip_dialog)
         self.btn_repo.clicked.connect(self.open_repository)
+        self.btn_reload.clicked.connect(self.refresh_remote)
         self.btn_train.clicked.connect(lambda: self.go.emit("train"))
         self.retranslate()
         self.refresh()
         fit_to_screen(self, self.content, 760, 520)
+        if auto_refresh:
+            self.refresh_remote()
 
     def window_title(self) -> str:
         """Localized window title."""
@@ -427,6 +500,7 @@ class VoicesWindow(SubWindow):
         self.act_folder.setText(tr("voices.import_folder"))
         self.act_zip.setText(tr("voices.import_zip"))
         self.btn_repo.setText(tr("voices.repo_button"))
+        self.btn_reload.setText(tr("voices.remote_refresh"))
         self.lbl_empty.setText(tr("voices.empty"))
         self.btn_train.setText(tr("voices.empty_train"))
         self.lbl_rights.setText(tr("voices.rights_note"))
@@ -440,15 +514,70 @@ class VoicesWindow(SubWindow):
             it = self.cards_box.takeAt(0)
             if it.widget():
                 it.widget().deleteLater()
-        voices = self.library.list_voices()
-        for rec in voices:
+        items = catalog.build(self.library, self.entries)
+        voices = [i for i in items if i.installed]
+        for it in voices:
+            rec = it.record
             c = VoiceCard(rec, playing=(self.previewer.current is not None and rec.preview_path == self.previewer.current))
             c.preview.connect(self.toggle_preview)
             c.narrate.connect(self.narrate_with.emit)
             c.edit.connect(self.edit_voice)
             c.delete.connect(self.delete_voice)
             self.cards_box.addWidget(c)
-        self.empty.setVisible(not voices)
+        busy = self._dl_worker is not None and self._dl_worker.isRunning()
+        for it in (i for i in items if not i.installed):
+            rc = RemoteCard(it, busy=busy, progress=self._dl_progress if it.key == self._dl_key and busy else -1.0)
+            rc.download.connect(self.download_remote)
+            self.cards_box.addWidget(rc)
+        self.empty.setVisible(not items)
+
+    # ------------------------------------------------------------------ online voices
+    def refresh_remote(self) -> None:
+        """Fetch the index in the background (does nothing while the repository is not configured)."""
+        if not repo.is_configured() or (self._index_worker is not None and self._index_worker.isRunning()):
+            return
+        self.lbl_status.setText(tr("voices.repo_loading"))
+        w = RepoIndexWorker(fetch=self._fetch, parent=self)
+        w.done.connect(self._on_index)
+        self._index_worker = w
+        w.start()
+
+    def _on_index(self, res: "repo.IndexResult") -> None:
+        """New index (or the cached one when offline): rebuild the list."""
+        if res.voices:
+            self.entries = list(res.voices)
+        if res.offline:
+            self.lbl_status.setText(tr("voices.repo_offline"))
+        elif res.error and res.error != "not_configured":
+            self.lbl_status.setText(tr("voices.repo_unreachable"))
+        else:
+            self.lbl_status.setText("")
+        self.refresh()
+
+    def download_remote(self, key: str) -> None:
+        """Download one index voice (SHA-256 checked, resumable) and add it to the library."""
+        entry = catalog.find_entry(self.entries, key)
+        if entry is None or (self._dl_worker is not None and self._dl_worker.isRunning()):
+            return
+        self._dl_key, self._dl_progress = key, 0.0
+        w = RepoDownloadWorker([entry], self.library, download=self._download, parent=self)
+        w.progress.connect(self._on_dl_progress)
+        w.failed.connect(lambda m: self.lbl_status.setText(m))
+        w.finished_all.connect(self._on_downloaded)
+        self._dl_worker = w
+        w.start()
+        self.refresh()
+
+    def _on_dl_progress(self, frac: float, _name: str) -> None:
+        self._dl_progress = max(0.0, frac)
+        self.lbl_status.setText(tr("voices.remote_downloading", p=int(self._dl_progress * 100)))
+
+    def _on_downloaded(self, ids: list) -> None:
+        self._dl_progress, self._dl_key = -1.0, ""
+        if ids:
+            self.lbl_status.setText(tr("voices.repo_downloaded", n=len(ids)))
+            self.library_changed.emit()
+        self.refresh()
 
     def card_ids(self) -> List[str]:
         """Ids of the cards currently shown (tests)."""

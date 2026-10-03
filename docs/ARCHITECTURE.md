@@ -57,6 +57,7 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 |---|---|
 | `paths.py` | application folders (`%LOCALAPPDATA%\Voxprint`, override `VOXPRINT_HOME`): `models/`, `packages/`, `voices/`, `state/`, `logs/`, `.staging/` |
 | `voice_repository.py` | online voice index (`index.json`, URL configurable, placeholder default) and verified downloads (HTTPS, size cap, SHA-256); never raises to the UI |
+| `voice_catalog.py` | the voices the user sees: local library + index voices that are not installed (`repo:<id>` keys, matched by `repo_id`), `ensure_local` (download on first use), scope derived from the licence |
 | `text_models.py` | registry of the on-demand text models (`TextModel`, `REGISTRY`: SAGE integrated; RUPunct, en/de spelling, stress, translation, roles = placeholders), `state()` (ready / needs_download / planned), `ensure()` (pinned revision via `model_downloader`), `make_engine`, `build_plan(rule_steps, neural_steps)` |
 | `backup.py` | backup / restore of models, the ffmpeg tool and voices: `collect_items`, `plan_backup` / `run_backup` (resumable `.part` files, manifest `voxprint-backup.json` with SHA-256, skip identical, `check_space`), `plan_restore` / `run_restore` (staging `.restoring`, hash verification, voices never overwritten); disk usage is injectable |
 | `existing_models.py` | the "existing models folder" (`state/existing_models_dir.txt`, env `VOXPRINT_EXISTING_MODELS`): `find` (model locator roots with `ignore_disabled`), `import_model` (hard link on the same drive, else verified copy through `<name>.importing`), `import_available`, `pending` (start-up) |
@@ -79,7 +80,7 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 
 ### `ui/`
 `studio.py` (**`StudioWindow`**: the first window, owns the other three), `main_window.py` (the *Train your voice* window + theme constants), `voices_window.py` (*My voices*, voice cards, edit dialog, repository dialog),
-`narrate_window.py` (*Narrate a book*), `window_base.py` (`SubWindow`: backdrop, back button / gear, common cards), `audio_preview.py` (QtMultimedia `Previewer`), `settings_dialog.py` (gear), `about_dialog.py`, `upgrade_dialog.py`.
+`narrate_window.py` (*Narrate a book*), `window_base.py` (`SubWindow`: backdrop, back button / gear, common cards), `audio_preview.py` (QtMultimedia `Previewer`), `mini_player.py` (play / pause / seek over a growing list of files; `core/play_queue.py` is its Qt-free playlist), `settings_dialog.py` (gear), `about_dialog.py`, `upgrade_dialog.py`.
 
 ## 3. Data flow of voice training
 ```
@@ -158,7 +159,7 @@ Narration and the repository dialog use their own `QThread`s (`workers/narrate_w
 CC-BY-NC-4.0, CC-BY-NC-SA-4.0 and `custom/personal-only` do not); unknown or missing values become `custom/personal-only`. `commercial_use` is always recomputed from the licence when a file is read, so an imported file cannot
 claim more than its licence gives. Schema 1 (`voice_name`, `speech_seconds`) is migrated on read. **Library layout:** `voices/<id>/{adapter_model.safetensors, adapter_config.json, ref_sample.wav, training_meta.json, voice.json}`.
 
-**Repository index** (`infra/voice_repository.py`): `{"schema": 1, "voices": [{id, name, language, author, license, license_url, description, voice_type, base_model, url, sha256, size_bytes}]}`.
+**Repository index** (`infra/voice_repository.py`): `{"schema": 1, "voices": [{id, name, language, author, license, license_url, description, voice_type, base_model, url, sha256, size_bytes, names?, descriptions?}]}` (`names` / `descriptions`: optional `{ru,en,de}` maps).
 
 **Audiobook output**: see README "Output format"; format keys and defaults are in `core/audiobook_export.py` (`DEFAULT_FORMATS = (opus_single,)`).
 

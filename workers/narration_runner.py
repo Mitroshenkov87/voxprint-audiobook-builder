@@ -26,6 +26,7 @@ class NarrationJob:
     out_dir: Path
     options: nr.NarrationOptions = field(default_factory=nr.NarrationOptions)
     chapters: Sequence[int] = ()          # empty = all chapters
+    on_plan: Optional[Callable[[list], None]] = None     # receives the ordered chunk files (live player)
 
 
 def run_narration(job: NarrationJob, progress: Callable[[nr.NarrationProgress], None], cancel: CancelToken,
@@ -36,7 +37,7 @@ def run_narration(job: NarrationJob, progress: Callable[[nr.NarrationProgress], 
     factory = tts_engine.make_engine_factory(job.voice, language)
     return nr.narrate_book(job.book, factory, tts_engine.engine_tag(job.voice), job.out_dir, language=language,
                            narrator=job.voice.name, options=job.options, progress=progress, cancel=cancel,
-                           pause=pause, ffmpeg=ensure_ffmpeg(), chapters=job.chapters)
+                           pause=pause, ffmpeg=ensure_ffmpeg(), chapters=job.chapters, on_plan=job.on_plan)
 
 
 def default_output_dir() -> Path:

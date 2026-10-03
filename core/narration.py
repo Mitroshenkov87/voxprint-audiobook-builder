@@ -297,11 +297,13 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
                  language: str = "", narrator: str = "", options: Optional[NarrationOptions] = None,
                  progress: Optional[ProgressFn] = None, cancel: Optional[CancelToken] = None,
                  pause: Optional[PauseToken] = None, ffmpeg: Optional[str] = None,
-                 run: Optional[ex.Run] = None, chapters: Sequence[int] = ()) -> NarrationResult:
+                 run: Optional[ex.Run] = None, chapters: Sequence[int] = (),
+                 on_plan: Optional[Callable[[List[Path]], None]] = None) -> NarrationResult:
     """Run a complete narration job into ``out_dir / <book name>`` and return its :class:`NarrationResult`.
 
     ``engine_factory`` is called only if some chunk is missing from the cache.  ``chapters`` restricts the job to the
-    given 0-based chapter numbers.  ``ffmpeg``/``run`` are injectable for tests.
+    given 0-based chapter numbers.  ``on_plan`` receives the ordered chunk files (they appear one by one; used by the live
+    player).  ``ffmpeg``/``run`` are injectable for tests.
     """
     options = options or NarrationOptions()
     progress = progress or (lambda p: None)
@@ -333,6 +335,8 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
     normalizer = None if (plan is not None and plan.spells_out_numbers) else default_normalizer(language)
     texts = {c.index: prepare_text(c.text, options, normalizer) for c in chunk_list}
     cache = ChunkCache(job_dir / ".cache")
+    if on_plan is not None:
+        on_plan([cache.path(cache.key(engine_tag, texts[c.index])) for c in chunk_list])
     counts = synthesize_chunks(chunk_list, engine_factory, engine_tag, cache, texts, progress, cancel, pause)
 
     total = len(chunk_list)

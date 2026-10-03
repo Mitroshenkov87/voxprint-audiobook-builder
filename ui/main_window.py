@@ -32,6 +32,7 @@ from infra import paths, platform_win
 from infra.vram_optimizer import detect_gpu
 from workers.pipeline_runner import (KIND_DATASET, KIND_LORA, KIND_MERGE, KIND_PREVIEW, TaskRequest, last_adapter, plan_for,
                                      run_task)
+from ui.mini_player import MiniPlayer
 from ui.settings_dialog import SettingsDialog
 from workers.process_worker import PrefetchWorker, ProcessWorker, RepairWorker, StatusWorker, UpdateWorker
 
@@ -520,6 +521,10 @@ class MainWindow(QWidget):
         self.preview_layout = QVBoxLayout(self.preview_box)
         self.preview_layout.setContentsMargins(0, 0, 0, 0)
         self.preview_box.hide()
+        self.preview_player = MiniPlayer(backend=getattr(self, "_player_backend", None))    # all samples in one seekable player
+        self.preview_player.hide()
+        self.preview_player.started.connect(self._stop_previewer)
+        root.addWidget(self.preview_player)
         root.addWidget(self.preview_box)
 
         # Two optional fields; they only end up in voice.json next to the adapter.
@@ -626,6 +631,8 @@ class MainWindow(QWidget):
     # ------------------------------------------------------------------ language
     def retranslate(self) -> None:
         """Apply the texts of the current language (called on creation and whenever the language changes)."""
+        if hasattr(self, "preview_player"):
+            self.preview_player.retranslate()
         self.lbl_title.setText(tr("train.title"))
         self.btn_back.setText(tr("nav.back"))
         if self._in_studio:
@@ -803,6 +810,15 @@ class MainWindow(QWidget):
             self.preview_layout.addWidget(row)
             self.preview_rows.append((row, play, use))
         self.preview_box.show()
+        wavs = [Path(i.wav) for i in items if i.wav and Path(i.wav).is_file()]
+        if wavs:
+            self.preview_player.set_files(wavs)
+            self.preview_player.show()
+
+    def _stop_previewer(self) -> None:
+        """The mini player started: stop the single-file previewer."""
+        if getattr(self, "previewer", None) is not None and hasattr(self.previewer, "stop"):
+            self.previewer.stop()
 
     def play_preview(self, path: Path) -> None:
         """Play a preview sample (``self.previewer`` is replaced in tests)."""
@@ -810,6 +826,7 @@ class MainWindow(QWidget):
             from ui.audio_preview import Previewer
 
             self.previewer = Previewer(self)
+        self.preview_player.pause()
         self.previewer.play(Path(path))
 
     def use_preview_settings(self, item) -> None:
@@ -1385,6 +1402,8 @@ class MainWindow(QWidget):
 
     def closeEvent(self, e) -> None:  # noqa: N802
         """Decline any pending upgrade offer, cancel a running task and wait for it, then close."""
+        if hasattr(self, "preview_player"):
+            self.preview_player.shutdown()
         if self.upgrade_dialog is not None:      # an unanswered offer = «Not now» (the worker must not wait)
             self.upgrade_dialog.reject()
         if self.worker and self.worker.isRunning():

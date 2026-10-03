@@ -1,0 +1,19 @@
+{
+  "id": "alexander",
+  "name": "Александр",
+  "names": {"ru": "Александр", "en": "Alexander", "de": "Alexander"},
+  "language": "Russian",
+  "author": "Aleksandr Mitroshenkov",
+  "voice_type": "male",
+  "license": "custom/voxprint-original-test-only",
+  "description": "The original Voxprint voice: the first voice ever trained with this software. Test use only.",
+  "descriptions": {
+    "ru": "Оригинальный голос Voxprint: первый голос, обученный в этой программе. Только для тестов.",
+    "en": "The original Voxprint voice: the first voice ever trained with this software. Test use only.",
+    "de": "Die Original-Stimme von Voxprint: die erste Stimme, die mit dieser Software trainiert wurde. Nur zum Testen."
+  },
+  "consent": {
+    "scope": "private_only", "name": "Aleksandr Mitroshenkov", "date": "2026-10-03", "method": "owner",
+    "owner_confirmed": true, "confirmed": true
+  }
+}

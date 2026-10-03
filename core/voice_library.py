@@ -58,8 +58,32 @@ class VoiceRecord:
 
     @property
     def name(self) -> str:
-        """Display name."""
-        return str(self.info.get("name") or self.id)
+        """Display name (the entry of ``names`` for the UI language if the voice has one, else ``name``)."""
+        return self._localized("names", str(self.info.get("name") or self.id))
+
+    def _localized(self, key: str, default: str) -> str:
+        """``info[key][ui language]`` if present, else ``default`` (never raises)."""
+        table = self.info.get(key)
+        if isinstance(table, dict) and table:
+            try:
+                from core.i18n import get_language
+
+                hit = table.get(get_language())
+                if hit:
+                    return str(hit)
+            except Exception:  # noqa: BLE001 - a display text must never fail
+                pass
+        return default
+
+    @property
+    def description(self) -> str:
+        """Description in the UI language (``descriptions``), else ``description``."""
+        return self._localized("descriptions", str(self.info.get("description") or ""))
+
+    @property
+    def test_only(self) -> bool:
+        """True for the original Voxprint voice: test/demo use only, no public release of the audio, no commercial use."""
+        return self.license == voice_info.LICENSE_TEST_ONLY
 
     @property
     def language(self) -> str:

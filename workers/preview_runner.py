@@ -40,7 +40,7 @@ SAMPLE_TEXT = {
 #: The ~15-25 s demo passage (final narration sample, demo text in the docs): SAMPLE_TEXT plus how narration and consent work.
 DEMO_TEXT = {
     "russian": SAMPLE_TEXT["russian"] + " Далее пайплайн нарезает книгу на чанки, синтезирует их с кэшем и умеет продолжить после сбоя. Перед обучением фиксируется согласие владельца голоса, а готовый адаптер проверяется по WER и высоте тона.",
-    "english": SAMPLE_TEXT["english"] + " The pipeline then splits a book into chunks, synthesizes them with a cache and can resume after a crash. The voice owner's consent is recorded before training, and the finished adapter is checked by WER and pitch.",
+    "english": SAMPLE_TEXT["english"] + " Then the pipeline splits a book into chunks and synthesizes them with a cache. Consent is recorded before training, and the finished adapter is checked by WER and pitch.",
     "german": SAMPLE_TEXT["german"] + " Danach zerlegt die Pipeline ein Buch in Chunks, synthetisiert sie mit Cache und kann nach einem Absturz fortsetzen. Vor dem Training wird die Einwilligung des Stimmeninhabers festgehalten, und der fertige Adapter wird per WER und Tonhöhe geprüft.",
 }
 

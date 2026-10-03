@@ -38,6 +38,12 @@ MAX_NAME_CHARS = 80
 
 #: Licence used for a freshly trained voice: the safe default is "only for me".
 DEFAULT_LICENSE = "custom/personal-only"
+#: Licence of the original Voxprint voice (the first voice trained with this software, distributed separately from the program).
+LICENSE_TEST_ONLY = "custom/voxprint-original-test-only"
+#: Human-readable text of the custom licences (English; the UI shows a localized reminder).
+LICENSE_TEXTS = {
+    LICENSE_TEST_ONLY: "Voxprint Original Voice - test use only, no public release of generated audio, no commercial use",
+}
 
 #: Known licences: id -> (commercial use allowed, canonical URL).  Order = order in the UI.
 LICENSES: Dict[str, Tuple[bool, str]] = {
@@ -47,6 +53,7 @@ LICENSES: Dict[str, Tuple[bool, str]] = {
     "CC-BY-NC-4.0": (False, "https://creativecommons.org/licenses/by-nc/4.0/"),
     "CC-BY-NC-SA-4.0": (False, "https://creativecommons.org/licenses/by-nc-sa/4.0/"),
     DEFAULT_LICENSE: (False, ""),
+    LICENSE_TEST_ONLY: (False, ""),
 }
 
 
@@ -60,6 +67,20 @@ def license_url_for(license_id: Optional[str]) -> str:
     """The canonical URL of a known licence, or ``""``."""
     entry = LICENSES.get((license_id or "").strip())
     return entry[1] if entry else ""
+
+
+def clean_names(value: Any, clean=None) -> Dict[str, str]:
+    """Localized texts ``{"ru": "...", "en": "..."}`` (names by default, descriptions with ``clean=clean_description``):
+    two-letter lower-case codes, cleaned text, empty ones dropped."""
+    if not isinstance(value, dict):
+        return {}
+    clean = clean or clean_line
+    out = {}
+    for k, v in value.items():
+        code, name = str(k).strip().lower(), clean(str(v or ""))
+        if len(code) == 2 and code.isalpha() and name:
+            out[code] = name
+    return out
 
 
 def normalize_voice_type(value: Optional[str]) -> str:
@@ -153,6 +174,14 @@ def normalize_info(data: Dict[str, Any], fallback_id: str = "") -> Dict[str, Any
         "description": clean_description(str(data.get("description") or "")),
         "commercial_use": license_allows_commercial(lic),
     }
+    if data.get("repo_id"):
+        out["repo_id"] = clean_line(str(data["repo_id"]))   # id in the online voices index: the voice was downloaded from there
+    names = clean_names(data.get("names"))
+    if names:
+        out["names"] = names       # shown instead of ``name`` when the UI language has an entry (e.g. Александр / Alexander)
+    descs = clean_names(data.get("descriptions"), clean_description)
+    if descs:
+        out["descriptions"] = descs     # localized description, like ``names``
     cons = _clean_consent(data.get("consent"))
     if cons:
         out["consent"] = cons      # who allowed what (see core/consent.py); the scope never lifts the licence limits above
