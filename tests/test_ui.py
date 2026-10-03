@@ -52,6 +52,17 @@ def test_selftest_entrypoint_runs_offscreen(app):
     assert vox_main.main(["voxprint", "--selftest"]) == 0
 
 
+def test_selftest_imports_reports_and_writes_log(capsys):
+    import main as vox_main
+    from infra import paths
+    rc = vox_main.main(["voxprint", "--selftest-imports"])
+    out = capsys.readouterr().out
+    log = (paths.logs_dir() / "selftest_imports.txt").read_text(encoding="utf-8")
+    assert "SELFTEST_IMPORTS" in out and log.strip() in out        # libraries may print banners to stdout
+    assert (rc == 0) == ("SELFTEST_IMPORTS OK" in out)
+    assert "OK    torch" in log and "OK    qwen_tts" in log        # core libraries are present in the dev/test env
+
+
 def test_successful_run_shows_ready_and_progress(app, tmp_path):
     seen = []
 

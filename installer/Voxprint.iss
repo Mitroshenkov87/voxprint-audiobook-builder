@@ -16,6 +16,7 @@ DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExe}
+SetupIconFile=..\assets\voxprint-setup.ico
 OutputDir=Output
 OutputBaseFilename=Voxprint-Setup
 Compression=lzma2/max

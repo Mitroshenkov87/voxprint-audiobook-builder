@@ -59,6 +59,7 @@ if /I "%~1"=="onedir" set MODE=--onedir
 
 echo === Сборка (%MODE%) ===
 pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
+  --icon "assets\voxprint.ico" --add-data "assets\voxprint.ico;assets" ^
   --paths . ^
   --add-data "infra\verified_manifest.json;infra" --add-data "infra\assets_manifest.json;infra" ^
   --add-data "locales;locales" --add-data "credits.json;." --add-data "licenses;licenses" ^
@@ -71,7 +72,7 @@ pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --hidden-import infra.version_manager --hidden-import infra.vram_optimizer --hidden-import infra.model_downloader ^
   --hidden-import infra.updater --hidden-import infra.paths --hidden-import infra.platform_win ^
   --hidden-import infra.verified_manifest --hidden-import core.model_locator --hidden-import infra.modelscope_mirror ^
-  --hidden-import infra.assets --hidden-import infra.env_probe --hidden-import infra.install_state ^
+  --hidden-import infra.assets --hidden-import infra.net --hidden-import infra.env_probe --hidden-import infra.install_state ^
   --hidden-import workers.process_worker --hidden-import workers.pipeline_runner --hidden-import ui.main_window ^
   --hidden-import qwen_asr --hidden-import qwen_asr.inference.qwen3_forced_aligner ^
   --hidden-import qwen_asr.core.transformers_backend --hidden-import qwen_tts --hidden-import qwen_tts.inference.qwen3_tts_model ^
@@ -81,7 +82,7 @@ pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --hidden-import onnxruntime --hidden-import sox --hidden-import nagisa ^
   --hidden-import huggingface_hub --hidden-import librosa ^
   --collect-all qwen_asr --collect-all qwen_tts --collect-all nagisa --collect-all imageio_ffmpeg ^
-  --collect-all bitsandbytes --collect-data librosa ^
+  --collect-all bitsandbytes --collect-data librosa --collect-all hf_xet --collect-all certifi ^
   --collect-all ru_normalizr --collect-all rutextnorm --collect-all pymorphy3 --collect-all pymorphy3_dicts_ru ^
   --collect-all num2words --collect-all eng_to_ipa ^
   --copy-metadata transformers --copy-metadata tokenizers --copy-metadata huggingface_hub --copy-metadata safetensors ^
