@@ -187,10 +187,12 @@ def inconsistent_dist_info(site: Path) -> List[str]:
 
 def verify_install(current_torch_flavor: Optional[str] = None, has_module: Callable[[str], bool] = _has_module,
                    modules: Tuple[str, ...] = HEALTH_MODULES, req_root: Optional[Path] = None,
-                   require_manifest: bool = True, deep: bool = False,
+                   require_manifest: Optional[bool] = None, deep: bool = False,
                    importer: Callable[[str], object] = importlib.import_module) -> HealthReport:
     """Quick (milliseconds, no imports, no network) check of the install; ``reasons`` hold stable codes."""
     rep = HealthReport()
+    if require_manifest is None:    # an installer build carries its environment inside; only the source/venv install writes a manifest
+        require_manifest = not getattr(sys, "frozen", False)
     m = read_manifest()
     if m is None:
         if manifest_path().exists():
@@ -326,6 +328,8 @@ def repair_install(run: Callable[[List[str]], Tuple[int, str]], which: Callable[
     from core.i18n import tr
     from infra import env_probe
 
+    if getattr(sys, "frozen", False):   # the installer build has no per-user venv to rebuild: report the state instead of failing on 'uv'
+        return (0 if verify_install().ok else 1), tr("health.frozen_repair")
     uv = which("uv")
     if not uv:
         return 2, tr("health.no_uv")

@@ -174,6 +174,7 @@
  "health.app_version_changed": "Voxprint was updated since the last install ({detail}).",
  "health.dist_info_inconsistent": "Leftovers of an interrupted update were found: {detail}.",
  "health.failed": "The installation needs repair:",
+ "health.frozen_repair": "This installed version has its own built-in environment, so there is nothing to rebuild. If something is broken, run the Voxprint installer again (your voices and models are kept).",
  "health.import_failed": "A component does not load: {detail}.",
  "health.manifest_unreadable": "The installation record is unreadable.",
  "health.model_partial": "A model download was interrupted and will be resumed: {detail}.",

@@ -174,6 +174,7 @@
  "health.app_version_changed": "Voxprint обновлён с момента последней установки ({detail}).",
  "health.dist_info_inconsistent": "Найдены остатки прерванного обновления: {detail}.",
  "health.failed": "Установку нужно восстановить:",
+ "health.frozen_repair": "У этой установленной версии своё встроенное окружение, пересобирать нечего. Если что-то сломалось, запустите установщик Voxprint ещё раз (голоса и модели сохранятся).",
  "health.import_failed": "Компонент не загружается: {detail}.",
  "health.manifest_unreadable": "Запись об установке нечитаема.",
  "health.model_partial": "Загрузка модели была прервана и будет продолжена: {detail}.",

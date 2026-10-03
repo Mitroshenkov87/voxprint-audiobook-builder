@@ -3,7 +3,8 @@
 Flags: ``--prefetch`` (force-download the models; used by the installer), ``--selftest`` (start and quit),
 ``--selftest-imports`` (import every heavy library - checks that a PyInstaller build is complete),
 ``--selftest-narrate [voice]`` (narrate two sentences headless; writes logs/selftest_narrate.txt),
-``--verify-install`` (install check with reason codes), ``--repair`` (rebuild only Voxprint's own environment).
+``--verify-install`` (install check with reason codes; also written to logs/verify_install.txt),
+``--repair`` (rebuild only Voxprint's own environment; logs/repair.txt).
 """
 from __future__ import annotations
 
@@ -76,6 +77,29 @@ def _selftest_imports() -> int:
     return 1 if bad else 0
 
 
+def _cli_printer(name: str):
+    """print() that also appends to ``<logs>/<name>.txt``: a windowed (PyInstaller) build has no console, so the result of
+    ``--verify-install`` / ``--repair`` would otherwise be invisible.  The file is rewritten on the first line of each run."""
+    state = {"first": True}
+
+    def out(line: str) -> None:
+        try:
+            print(line)
+        except Exception:  # noqa: BLE001 - no console
+            pass
+        try:
+            from infra import paths
+
+            f = paths.logs_dir() / f"{name}.txt"
+            f.parent.mkdir(parents=True, exist_ok=True)
+            with open(f, "w" if state["first"] else "a", encoding="utf-8") as fh:
+                fh.write(str(line) + "\n")
+            state["first"] = False
+        except Exception:  # noqa: BLE001
+            pass
+    return out
+
+
 def main(argv=None) -> int:
     """Start the application (or run one of the CLI maintenance flags); returns the process exit code."""
     argv = list(sys.argv if argv is None else argv)
@@ -98,8 +122,8 @@ def main(argv=None) -> int:
         from infra.updater import run_subprocess
 
         if "--repair" in argv:
-            return install_state.cli_repair(run_subprocess, shutil.which)
-        return install_state.cli_verify()
+            return install_state.cli_repair(run_subprocess, shutil.which, _cli_printer("repair"))
+        return install_state.cli_verify(print_fn=_cli_printer("verify_install"))
     if "--selftest-imports" in argv:
         return _selftest_imports()
     if "--selftest-narrate" in argv:   # headless: narrate two sentences with the first voice (argument after the flag = voice id)
