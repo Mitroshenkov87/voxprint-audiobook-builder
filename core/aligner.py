@@ -1,21 +1,21 @@
-"""Принудительное выравнивание (forced alignment) текста по аудио.
+"""Forced alignment of a text onto audio.
 
-Проверено по исходникам PyPI-пакета qwen-asr 0.0.6 и карточке модели HF
-Qwen/Qwen3-ForcedAligner-0.6B (см. README, раздел «Что проверено»):
+Verified against the source of the PyPI package ``qwen-asr`` 0.0.6 and the Hugging Face model card
+``Qwen/Qwen3-ForcedAligner-0.6B``::
 
     from qwen_asr import Qwen3ForcedAligner
     model = Qwen3ForcedAligner.from_pretrained("Qwen/Qwen3-ForcedAligner-0.6B",
                                                dtype=torch.bfloat16, device_map="cuda:0")
     results = model.align(audio=(np_array, sr), text="...", language="Russian")
-    results[0] -> ForcedAlignResult, итерируется по ForcedAlignItem(text, start_time, end_time)  # секунды
+    results[0] -> ForcedAlignResult, iterates ForcedAlignItem(text, start_time, end_time)   # seconds
 
-* Единица выравнивания - слово (или иероглиф для китайского), пунктуация отбрасывается.
-* Модель держит до ~5 минут речи (карточка), пакет сам режет на куски по 180 c (MAX_FORCE_ALIGN_INPUT_SECONDS).
-  Поэтому записи 5-15 минут мы режем по паузам на куски <= 150 c (требование: не больше ~4 мин) и
-  делим текст по предложениям/клаузам (см. align_long).
-* Запасной вариант - ctc-forced-aligner (MahmoudAshraf97, MMS wav2vec2): класс CtcAligner, подключается
-  через FallbackAligner, если основной выравниватель не загрузился или упал.
-* Интерфейс BaseAligner позволяет подставить FakeAligner в тестах.
+* The unit of alignment is a word (or a character for Chinese); punctuation is dropped.
+* The model handles up to ~5 minutes of speech and the package itself cuts at 180 s
+  (``MAX_FORCE_ALIGN_INPUT_SECONDS``).  Recordings of 5-15 minutes are therefore cut at pauses into chunks of at most
+  150 s and the text is divided by sentences/clauses (see :func:`align_long`).
+* Fallback: ``ctc-forced-aligner`` (MahmoudAshraf97, MMS wav2vec2) as :class:`CtcAligner`, used through
+  :class:`FallbackAligner` if the primary aligner cannot load or fails.
+* The :class:`BaseAligner` interface lets tests plug in :class:`FakeAligner`.
 """
 from __future__ import annotations
 
@@ -35,34 +35,34 @@ from core.types import WordTiming
 log = logging.getLogger("voxprint.aligner")
 
 ALIGNER_MODEL_ID = "Qwen/Qwen3-ForcedAligner-0.6B"
-#: Языки, которые поддерживает Qwen3-ForcedAligner-0.6B (карточка модели).
+#: Languages supported by Qwen3-ForcedAligner-0.6B (model card).
 SUPPORTED_LANGUAGES = (
     "Chinese", "English", "Cantonese", "French", "German", "Italian",
     "Japanese", "Korean", "Portuguese", "Russian", "Spanish",
 )
-#: Максимальная длина куска аудио для одного вызова (с запасом: модель - до 300 c, пакет режет сам на 180 c).
+#: Maximum audio length per aligner call (with margin: the model handles up to 300 s, the package itself cuts at 180 s).
 MAX_CHUNK_SEC = 150.0
-#: Код языка ISO-639-3 для ctc-forced-aligner.
+#: ISO-639-3 language codes for ctc-forced-aligner.
 ISO3 = {"Russian": "rus", "English": "eng", "Chinese": "cmn", "Cantonese": "yue", "French": "fra", "German": "deu",
         "Italian": "ita", "Japanese": "jpn", "Korean": "kor", "Portuguese": "por", "Spanish": "spa"}
 
 
 class BaseAligner(abc.ABC):
-    """Интерфейс выравнивателя."""
+    """Interface of an aligner: optional ``load``/``unload`` plus ``align``."""
 
-    def load(self) -> None:  # noqa: B027 - необязательно
-        """Загрузить модель (может быть долгим)."""
+    def load(self) -> None:  # noqa: B027 - optional
+        """Load the model (may take long). Default: nothing to do."""
 
     def unload(self) -> None:  # noqa: B027
-        """Освободить память."""
+        """Free the memory held by the model. Default: nothing to do."""
 
     @abc.abstractmethod
     def align(self, audio: np.ndarray, sr: int, text: str, language: str) -> List[WordTiming]:
-        """Выровнять `text` по `audio` (mono float32). Время - секунды от начала `audio`."""
+        """Align ``text`` onto ``audio`` (mono float32) and return word timings in seconds from the start of ``audio``."""
 
 
 class Qwen3Aligner(BaseAligner):
-    """Обёртка над qwen_asr.Qwen3ForcedAligner (transformers-бэкенд)."""
+    """Wrapper around ``qwen_asr.Qwen3ForcedAligner`` (transformers backend; bfloat16 on CUDA, float32 on CPU)."""
 
     def __init__(self, model_path: str = ALIGNER_MODEL_ID, device: str = "auto") -> None:
         self.model_path = model_path
@@ -71,6 +71,7 @@ class Qwen3Aligner(BaseAligner):
         self.resolved_device = "cpu"
 
     def load(self) -> None:
+        """Import qwen-asr/torch lazily and load the model; maps CUDA out-of-memory to ``OutOfMemoryError_``."""
         if self._model is not None:
             return
         try:
@@ -92,6 +93,7 @@ class Qwen3Aligner(BaseAligner):
             raise OutOfMemoryError_(details=str(exc)) from exc
 
     def unload(self) -> None:
+        """Drop the model and empty the CUDA cache."""
         self._model = None
         gc.collect()
         try:
@@ -103,6 +105,7 @@ class Qwen3Aligner(BaseAligner):
             pass
 
     def align(self, audio: np.ndarray, sr: int, text: str, language: str) -> List[WordTiming]:
+        """Align one chunk (the model must receive at most ~3 minutes; see :func:`align_long`). Raises ``AlignmentError`` for unsupported languages."""
         if self._model is None:
             self.load()
         if language not in SUPPORTED_LANGUAGES:
@@ -122,12 +125,12 @@ class Qwen3Aligner(BaseAligner):
 
 
 class CtcAligner(BaseAligner):
-    """Запасной выравниватель: ctc-forced-aligner (pip install ctc-forced-aligner; MMS wav2vec2, ~1.2 ГБ).
+    """Backup aligner: ``ctc-forced-aligner`` (``pip install ctc-forced-aligner``; MMS wav2vec2, ~1.2 GB).
 
-    API по README пакета: load_alignment_model, generate_emissions, preprocess_text, get_alignments,
-    get_spans, postprocess_results. Метки слов берутся из поля text (слова разделены пробелами).
-    TODO-needs-GPU-test: не запускался здесь (нет пакета/модели/сети); импорты ленивые, формат результата
-    (dict со start/end/text) прочитан из README и обрабатывается защитно.
+    Uses the package's README API: ``load_alignment_model``, ``generate_emissions``, ``preprocess_text``,
+    ``get_alignments``, ``get_spans``, ``postprocess_results``; word labels come from the ``text`` field (words are
+    separated by spaces).  TODO-needs-GPU-test: not exercised on the development machine (no package/model/network);
+    imports are lazy and the result format (dicts with start/end/text) was read from the README and is handled defensively.
     """
 
     def __init__(self, device: str = "auto", batch_size: int = 8) -> None:
@@ -137,6 +140,7 @@ class CtcAligner(BaseAligner):
         self._tokenizer = None
 
     def load(self) -> None:
+        """Load the MMS alignment model on the chosen device (fp16 on CUDA)."""
         if self._model is not None:
             return
         try:
@@ -151,10 +155,12 @@ class CtcAligner(BaseAligner):
             dev, dtype=torch.float16 if dev.startswith("cuda") else torch.float32)
 
     def unload(self) -> None:
+        """Drop the model and tokenizer."""
         self._model = self._tokenizer = None
         gc.collect()
 
     def align(self, audio: np.ndarray, sr: int, text: str, language: str) -> List[WordTiming]:
+        """Resample to 16 kHz, run CTC alignment and return the real words (stars/empty tokens are skipped)."""
         if self._model is None:
             self.load()
         import torch
@@ -180,42 +186,50 @@ class CtcAligner(BaseAligner):
 
 
 def collapse_for_ctc(text: str) -> str:
+    """Normalize whitespace to single spaces for the CTC pre-processor."""
     return " ".join(text.split())
 
 
 class FallbackAligner(BaseAligner):
-    """Основной выравниватель + запасной. Переключается, если основной не загрузился или бросил ошибку
-    выравнивания (но не при нехватке памяти и не при «аудио не совпадает с текстом» - это ошибки данных)."""
+    """Primary aligner plus a backup.
+
+    Switches to the backup if the primary cannot load or raises an alignment error - but *not* on out-of-memory or on
+    "audio does not match the text": those are resource/data problems that a different model cannot fix.
+    """
 
     def __init__(self, primary: BaseAligner, fallback: Optional[BaseAligner]) -> None:
         self.primary, self.fallback = primary, fallback
         self.using_fallback = False
 
     def load(self) -> None:
+        """Load the primary aligner; on failure (other than OOM) try the backup."""
         try:
             self.primary.load()
-        except OutOfMemoryError_:
+        except Exception as fb_exc:  # noqa: BLE001 - backup unavailable: report the original cause
             raise
         except Exception as exc:  # noqa: BLE001
             log.warning("primary aligner failed to load (%s) - switching to fallback", exc)
             self._switch(exc)
 
     def _switch(self, exc: BaseException) -> None:
+        """Activate the backup; if it is unavailable, re-raise the *original* error (the more useful one)."""
         if self.fallback is None:
             raise exc
         try:
             self.fallback.load()
-        except Exception as fb_exc:  # noqa: BLE001 - запасной недоступен: показываем исходную причину
+        except Exception as fb_exc:  # noqa: BLE001 - backup unavailable: report the original cause
             log.warning("fallback aligner unavailable: %s", fb_exc)
             raise exc
         self.using_fallback = True
 
     def unload(self) -> None:
+        """Unload both aligners."""
         self.primary.unload()
         if self.fallback is not None:
             self.fallback.unload()
 
     def align(self, audio: np.ndarray, sr: int, text: str, language: str) -> List[WordTiming]:
+        """Align with the active aligner, switching to the backup on a non-data, non-memory failure."""
         if self.using_fallback:
             return self.fallback.align(audio, sr, text, language)  # type: ignore[union-attr]
         try:
@@ -229,19 +243,21 @@ class FallbackAligner(BaseAligner):
 
 
 def make_default_aligner(model_path: str, device: str = "auto") -> "FallbackAligner":
-    """Qwen3-ForcedAligner + запасной ctc-forced-aligner (используется, только если установлен)."""
+    """Qwen3-ForcedAligner with a ctc-forced-aligner backup (the backup is used only if it is installed)."""
     return FallbackAligner(Qwen3Aligner(model_path, device=device), CtcAligner(device="cpu" if device == "cpu" else "auto"))
 
 
 class FakeAligner(BaseAligner):
-    """Простейший «выравниватель» без нейросети: слова равномерно по длине букв
-    распределяются по участку с речью. Для тестов и сухого прогона (`--fake-aligner`)."""
+    """A trivial "aligner" without a neural network: words are spread over the voiced part of the audio in
+    proportion to their length.  For tests and dry runs (``--fake-aligner``).
+    """
 
     def __init__(self) -> None:
         self.calls = 0
 
     def align(self, audio: np.ndarray, sr: int, text: str, language: str) -> List[WordTiming]:
-        self.calls += 1
+        """Distribute the words evenly (by letter count) across the voiced interval of ``audio``."""
+# --------------------------------------------------------------------------- long audio
         tokens = [clean_token(t) for t in text.split()]
         tokens = [t for t in tokens if t]
         if not tokens:
@@ -257,14 +273,15 @@ class FakeAligner(BaseAligner):
         return out
 
 
-# --------------------------------------------------------------------------- длинное аудио
+# --------------------------------------------------------------------------- long audio
 
 
 def _score_alignment(words: Sequence[WordTiming], chunk: np.ndarray, sr: int) -> float:
-    """Чем меньше, тем лучше текст «подходит» к куску аудио.
+    """How badly the text fits the audio chunk - lower is better.
 
-    Если текста слишком много, хвостовые слова схлопываются в нулевую длительность
-    у конца аудио; если слишком мало - последние слова растягиваются на тишину/чужую речь.
+    If there is too much text, the trailing words collapse to zero duration at the end of the audio; if there is too
+    little, the last words stretch over silence or foreign speech.  The score adds the start/end offsets against the
+    voiced interval and penalizes zero-length and very long words.
     """
     if not words:
         return 1e9
@@ -276,7 +293,7 @@ def _score_alignment(words: Sequence[WordTiming], chunk: np.ndarray, sr: int) ->
 
 
 def _pick_cut(audio: np.ndarray, sr: int, start_s: float, lo_s: float, hi_s: float) -> float:
-    """Выбирает точку разреза в [lo_s, hi_s] (абсолютное время) - центр самой длинной паузы."""
+    """Pick a cut point inside ``[lo_s, hi_s]`` (absolute seconds): the centre of the longest pause (or the quietest frame)."""
     s0, s1 = int(lo_s * sr), int(hi_s * sr)
     seg = audio[s0:s1]
     sil = au.find_silences(seg, sr, min_len_s=0.15)
@@ -297,15 +314,17 @@ def align_long(
     on_progress: Optional[Callable[[float, str], None]] = None,
     cancel_check: Optional[Callable[[], None]] = None,
 ) -> List[WordTiming]:
-    """Выравнивает текст по аудио любой длины. Время в результате - от начала всего аудио.
+    """Align a text onto audio of any length; the returned times are from the start of the *whole* audio.
 
-    Алгоритм для длинных записей (аудио > max_chunk_sec), без ASR:
-      1. разрез аудио - по самой длинной паузе в окне [0.6*max, max] от начала куска;
-      2. позицию разреза в тексте оцениваем пропорционально «речевому времени»
-         (доля озвученных кадров) и числу букв, затем перебираем соседние границы
-         смысловых единиц (клаузы) и берём ту, где выравнивание выглядит лучше всего
-         (_score_alignment). Первый же хороший вариант принимается сразу.
-    TODO-needs-GPU-test: пороги score подобраны на синтетике, на реальной модели возможна подстройка.
+    Algorithm for long recordings (longer than ``max_chunk_sec``), without any ASR:
+
+    1. cut the audio at the longest pause inside the window ``[0.6*max, max]`` from the chunk start;
+    2. estimate where that cut falls in the text, proportionally to the *voiced* time (share of voiced frames) and the
+       letter counts, then try the neighbouring clause boundaries and keep the one whose alignment looks best
+       (:func:`_score_alignment`); the first good candidate (< 0.4) is accepted immediately.
+
+    Short audio goes to the aligner in one call.  TODO-needs-GPU-test: the score thresholds were tuned on synthetic
+    data and may need adjustment with the real model.
     """
     cancel_check = cancel_check or (lambda: None)
     on_progress = on_progress or (lambda f, m: None)
@@ -324,15 +343,15 @@ def align_long(
     voiced_total = au.voiced_seconds(audio, sr)
     words_all: List[WordTiming] = []
     t0 = 0.0
-    ui = 0  # индекс первой необработанной клаузы
+    ui = 0  # index of the first clause not yet aligned
     n_units = len(units)
 
     while True:
         cancel_check()
-        remaining = total - t0
+        # index of the clause where the accumulated letter count is closest to the estimate
         frac_done = min(0.99, t0 / total)
         on_progress(frac_done, tr("progress.aligning_chunk", done=int(t0 // 60), total=int(total // 60) + 1))
-        if remaining <= max_chunk_sec * 1.1 or ui >= n_units - 1:
+        for k in range(1, n_units - ui):  # always leave at least one clause for the remainder
             chunk = audio[int(t0 * sr):]
             chunk_text = " ".join(units[ui:])
             ws = aligner.align(chunk, sr, chunk_text, language)
@@ -348,10 +367,10 @@ def align_long(
         voiced_rest = max(1e-6, au.voiced_seconds(audio[int(t0 * sr):], sr))
         rest_chars = sum(unit_chars[ui:])
         est_chars = rest_chars * min(1.0, voiced_chunk / voiced_rest)
-        # индекс клаузы, на которой накопленное число букв ближе всего к оценке
+        # index of the clause where the accumulated letter count is closest to the estimate
         acc, best_k = 0, 1
         best_d = float("inf")
-        for k in range(1, n_units - ui):  # оставляем хотя бы одну клаузу на остаток
+        for k in range(1, n_units - ui):  # always leave at least one clause for the remainder
             acc += unit_chars[ui + k - 1]
             d = abs(acc - est_chars)
             if d < best_d:
@@ -385,8 +404,11 @@ def align_long(
 
 
 def check_alignment(words: Sequence[WordTiming], audio: np.ndarray, sr: int) -> List[str]:
-    """Проверка результата. Бросает AudioTextMismatchError, если аудио и текст явно не совпадают.
-    Возвращает список мягких предупреждений."""
+    """Sanity-check an alignment result.
+
+    Raises ``AudioTextMismatchError`` if audio and text clearly do not belong together (too many zero-length words,
+    an implausible speaking rate, or more than 15 s of unmatched speech at the start/end).  Returns a list of soft warnings.
+    """
     warnings: List[str] = []
     if not words:
         raise AudioTextMismatchError(tr("err.no_words_found"))

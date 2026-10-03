@@ -108,6 +108,11 @@ _MAX_HEADER = 256 * 1024 * 1024
 
 @dataclass(frozen=True)
 class FoundModel:
+    """A reusable model copy found on this computer.
+
+    ``path`` is the folder to pass to ``from_pretrained`` (it is only ever read); ``location`` is the cache/parent folder it
+    was found in (used in messages); ``kind`` says where it came from; ``match`` says how the revision was confirmed.
+    """
     repo_id: str
     path: Path               # folder to pass to from_pretrained (never written to)
     location: Path           # the cache / parent folder it was found in (for messages)
@@ -118,15 +123,18 @@ class FoundModel:
 
 # ------------------------------------------------------------------------------------------- roots
 def disabled() -> bool:
+    """True if the user switched external-model reuse off with ``VOXPRINT_NO_EXTERNAL_MODELS``."""
     return os.environ.get(ENV_DISABLE, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _env_path(name: str) -> Optional[Path]:
+    """Path from an environment variable with ``~`` and ``%VARS%`` expanded, or ``None`` if it is unset/empty."""
     v = os.environ.get(name, "").strip().strip('"')
     return Path(os.path.expandvars(os.path.expanduser(v))) if v else None
 
 
 def _home() -> Optional[Path]:
+    """The user's home folder, or ``None`` if it cannot be determined."""
     try:
         return Path.home()
     except (RuntimeError, KeyError, OSError):
@@ -134,6 +142,7 @@ def _home() -> Optional[Path]:
 
 
 def _pinokio_homes() -> List[Path]:
+    """Possible Pinokio home folders (``PINOKIO_HOME`` and the default ``~/pinokio``) that exist on disk."""
     homes: List[Path] = []
     p = _env_path("PINOKIO_HOME")
     if p:
@@ -147,6 +156,7 @@ def _pinokio_homes() -> List[Path]:
 
 
 def _is_dir(p: Path) -> bool:
+    """``Path.is_dir`` that never raises (permission errors count as 'no')."""
     try:
         return p.is_dir()
     except OSError:
@@ -277,6 +287,7 @@ def check_safetensors(p: Path) -> Optional[str]:
 
 
 def _read_json(p: Path) -> Optional[dict]:
+    """Parse a JSON object from a non-empty file; ``None`` on any problem or if it is not an object."""
     if not _real_size(p):
         return None
     try:
@@ -288,6 +299,7 @@ def _read_json(p: Path) -> Optional[dict]:
 
 
 def _weight_files(d: Path) -> List[Path]:
+    """The ``*.safetensors`` files directly inside ``d``, sorted by name."""
     try:
         return sorted(x for x in d.iterdir() if x.name.endswith(".safetensors"))
     except OSError:
@@ -351,6 +363,7 @@ def check_model_dir(path: Path, repo_id: str) -> Optional[str]:
 
 
 def _sizes_match_verified(path: Path, repo_id: str, pinned: str) -> bool:
+    """True if the weight files in ``path`` have exactly the sizes of the verified (pinned) revision in :data:`KNOWN_SIZES`."""
     known = KNOWN_SIZES.get(repo_id)
     if not known or known[0] != pinned:
         return False
@@ -362,6 +375,7 @@ def _sizes_match_verified(path: Path, repo_id: str, pinned: str) -> bool:
 
 # ------------------------------------------------------------------------------------------- layouts
 def _name_variants(repo_id: str) -> List[str]:
+    """Folder names a copy of ``repo_id`` may have: plain name, ModelScope ``___`` spelling, ``Owner--Name``, ``Owner/Name``, ``models/...``."""
     owner, _, name = repo_id.rpartition("/")
     ms = name.replace(".", "___")
     out = [name, ms, f"{owner}--{name}", f"{owner}/{name}", f"{owner}/{ms}",
@@ -390,6 +404,7 @@ def _hf_snapshots(root: Path, repo_id: str, pinned: Optional[str]) -> Iterator[T
         pass
 
     def _mtime(n: str) -> float:
+        """Modification time of a snapshot folder (0 if unreadable); newest snapshots are tried first."""
         try:
             return (snaps / n).stat().st_mtime
         except OSError:

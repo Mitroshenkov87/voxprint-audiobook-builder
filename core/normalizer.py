@@ -1,19 +1,21 @@
-"""Нормализация русского текста перед выравниванием: числа, сокращения -> «как произносится».
+"""Russian text normalization before alignment: numbers and abbreviations -> "as pronounced".
 
-Зачем: выравниватель (Qwen3-ForcedAligner) делит текст по пробелам и выбрасывает пунктуацию; цифры и
-сокращения он «читает» иначе, чем диктор («5 км» -> «пять километров»), и разметка сдвигается.
-Поэтому для выравнивания и для поля `text` датасета используется «произносимая» форма; исходный текст
-сохраняется только в report.json (`text_raw`).
+Why: the forced aligner (Qwen3-ForcedAligner) splits text on spaces and drops punctuation; it "reads" digits and
+abbreviations differently from the speaker ("5 км" -> "пять километров") and the alignment would drift.  So the
+*spoken* form is used for alignment and for the ``text`` field of the dataset; the original text is kept only in
+``report.json`` (``text_raw``).
 
-Движок (по убыванию качества, выбирается автоматически; всё необязательно):
-  1. ru-normalizr  (pip install ru-normalizr)  - числа с падежами, даты, римские цифры, сокращения;
-  2. rutextnorm    (pip install rutextnorm)    - один файл, только regexp;
-  3. встроенный запасной вариант (ниже): сокращения «т.д./т.е./т.к./…», целые числа в именительном падеже.
-Любой движок обрабатывается ПО ПРЕДЛОЖЕНИЯМ (иначе потеряются границы предложений: движки убирают точки
-после сокращений), а после него встроенный проход дочитывает оставшиеся цифры.
+Engines, best first, picked automatically (all optional):
 
-Карта токенов: для каждого слова «произносимого» текста хранится диапазон исходного слова/слов
-(difflib по токенам), по ней можно восстановить исходный фрагмент для любого сегмента.
+1. ``ru-normalizr`` (``pip install ru-normalizr``) - numbers with cases, dates, Roman numerals, abbreviations;
+2. ``rutextnorm`` (``pip install rutextnorm``) - a single file, regexps only;
+3. the built-in fallback below: abbreviations such as "т.д./т.е./т.к.", integers in the nominative case.
+
+Every engine is applied *per sentence* (otherwise sentence boundaries get lost: engines remove the period after an
+abbreviation), and afterwards the built-in pass reads out any digits that are left.
+
+Token map: for every word of the spoken text we store the range of the original word(s) (``difflib`` over tokens),
+so the original fragment can be recovered for any segment.  Other languages pass through unchanged.
 """
 from __future__ import annotations
 
@@ -27,7 +29,7 @@ from core.text_utils import collapse_ws, split_sentences
 
 log = logging.getLogger("voxprint.normalizer")
 
-# --------------------------------------------------------------------------- встроенный запасной вариант
+# --------------------------------------------------------------------------- built-in fallback (Russian word tables are data)
 
 _ABBR: List[Tuple[str, str]] = [
     (r"\bт\.\s?е\.", "то есть"), (r"\bт\.\s?д\.", "так далее"), (r"\bт\.\s?п\.", "тому подобное"),
@@ -55,6 +57,7 @@ _SCALES = [("тысяча", "тысячи", "тысяч", True), ("миллио�
 
 
 def _triplet(n: int, feminine: bool) -> List[str]:
+    """Words for a number 0..999 (``feminine`` selects одна/две, needed for "тысяча")."""
     words: List[str] = []
     h, rest = divmod(n, 100)
     if h:
@@ -72,6 +75,7 @@ def _triplet(n: int, feminine: bool) -> List[str]:
 
 
 def _plural(n: int, forms: Tuple[str, str, str]) -> str:
+    """Pick the Russian plural form (1 / 2-4 / 5+ rule, with the 11-14 exception)."""
     n10, n100 = n % 10, n % 100
     if n10 == 1 and n100 != 11:
         return forms[0]
@@ -81,7 +85,7 @@ def _plural(n: int, forms: Tuple[str, str, str]) -> str:
 
 
 def number_to_words(n: int) -> str:
-    """Целое число -> слова (именительный падеж). Числа от 10**15 читаются по цифрам."""
+    """Integer -> Russian words in the nominative case. Numbers from 10**15 up are read digit by digit."""
     if n < 0:
         return "минус " + number_to_words(-n)
     if n == 0:
@@ -107,29 +111,33 @@ _NUM_RE = re.compile(r"\d+(?:[ \u00a0]\d{3})*")
 
 
 def _spell_numbers(text: str) -> str:
+    """Replace every integer in the text (spaces allowed as thousands separators) by its spoken form."""
     def repl(m: re.Match) -> str:
+        """Regex callback for :func:`_spell_numbers`."""
         return number_to_words(int(re.sub(r"\D", "", m.group(0))))
     return _NUM_RE.sub(repl, text)
 
 
 def expand_abbreviations(text: str) -> str:
+    """Expand common Russian abbreviations ("т.д.", "т.е.", "им.", ...) using ``_ABBR``."""
     for rx, rep in _ABBR_RE:
         text = rx.sub(rep, text)
     return text
 
 
 def builtin_normalize(text: str) -> str:
-    """Полный встроенный проход: сокращения, символы (%, №), числа."""
+    """The complete built-in pass: abbreviations, symbols (%, №, &) and numbers."""
     text = expand_abbreviations(text)
     for rx, rep in _SYMS_RE:
         text = rx.sub(rep, text)
     return _spell_numbers(text)
 
 
-# --------------------------------------------------------------------------- движки
+# --------------------------------------------------------------------------- engines
 
 
 def _engine_ru_normalizr() -> Optional[Callable[[str], str]]:
+    """Return the ``ru_normalizr.normalize`` function if the package works, else ``None``."""
     try:
         import warnings
 
@@ -137,7 +145,7 @@ def _engine_ru_normalizr() -> Optional[Callable[[str], str]]:
             warnings.simplefilter("ignore")
             import ru_normalizr  # type: ignore
 
-            ru_normalizr.normalize("тест 1")  # прогрев + проверка, что зависимости на месте
+            ru_normalizr.normalize("тест 1")  # warm-up + check that the dependencies are present
         return ru_normalizr.normalize
     except Exception as exc:  # noqa: BLE001
         log.info("ru-normalizr unavailable: %s", exc)
@@ -145,6 +153,7 @@ def _engine_ru_normalizr() -> Optional[Callable[[str], str]]:
 
 
 def _engine_rutextnorm() -> Optional[Callable[[str], str]]:
+    """Return ``rutextnorm.normalize_russian`` if the package works, else ``None``."""
     try:
         import rutextnorm  # type: ignore
 
@@ -156,6 +165,7 @@ def _engine_rutextnorm() -> Optional[Callable[[str], str]]:
 
 
 def pick_engine() -> Tuple[str, Callable[[str], str]]:
+    """Choose the best available engine as ``(name, function)``; falls back to ``("builtin", identity)``."""
     for name, factory in (("ru-normalizr", _engine_ru_normalizr), ("rutextnorm", _engine_rutextnorm)):
         fn = factory()
         if fn is not None:
@@ -163,34 +173,37 @@ def pick_engine() -> Tuple[str, Callable[[str], str]]:
     return "builtin", lambda s: s
 
 
-# --------------------------------------------------------------------------- результат и карта токенов
+# --------------------------------------------------------------------------- result and token map
 
 _TERMINATORS = ".!?…"
 _TOKEN_RE = re.compile(r"\S+")
 
 
 def _key(tok: str) -> str:
+    """Comparison key of a token: lower-case, ``ё`` -> ``е``, only letters and digits."""
     return "".join(ch for ch in tok.casefold().replace("ё", "е") if ch.isalnum())
 
 
 @dataclass
 class TokenSpan:
-    ns: int   # диапазон слова в «произносимом» тексте
+    """Maps one spoken-text word (``ns``..``ne``) to the original word or group of words (``rs``..``re_``)."""
+    ns: int   # range of the word in the "spoken" text
     ne: int
-    rs: int   # диапазон исходного слова (или группы слов) в `raw`
+    rs: int   # range of the original word (or group of words) in `raw`
     re_: int
 
 
 @dataclass
 class NormalizedText:
-    raw: str                      # исходный текст (для русского - предложения, склеенные пробелом)
-    spoken: str                   # то, что произносится (идёт в выравниватель и в metadata.jsonl)
+    """Result of normalization: the original text, the spoken form, the engine used and the token map."""
+    raw: str                      # original text (for Russian: the sentences joined by a space)
+    spoken: str                   # what is pronounced (goes to the aligner and to metadata.jsonl)
     engine: str = "none"
     tokens: List[TokenSpan] = field(default_factory=list)
     changed: bool = False
 
     def raw_for_span(self, ns: int, ne: int) -> str:
-        """Исходный фрагмент для диапазона [ns, ne) «произносимого» текста."""
+        """The original fragment that corresponds to the range ``[ns, ne)`` of the spoken text."""
         if not self.changed:
             return collapse_ws(self.spoken[ns:ne])
         hit = [t for t in self.tokens if t.ne > ns and t.ns < ne]
@@ -200,6 +213,7 @@ class NormalizedText:
 
 
 def _map_sentence(raw: str, spoken: str, raw_off: int, spoken_off: int) -> List[TokenSpan]:
+    """Align spoken tokens with original tokens (``difflib``) and return their :class:`TokenSpan` list."""
     rt = [(m.start(), m.end(), _key(m.group())) for m in _TOKEN_RE.finditer(raw)]
     st = [(m.start(), m.end(), _key(m.group())) for m in _TOKEN_RE.finditer(spoken)]
     out: List[TokenSpan] = []
@@ -215,7 +229,7 @@ def _map_sentence(raw: str, spoken: str, raw_off: int, spoken_off: int) -> List[
                 rs, re_ = r[0], r[1]
             elif op == "replace":
                 rs, re_ = rt[i1][0], rt[i2 - 1][1]
-            else:  # insert: привязываем к ближайшему исходному слову
+            else:  # insert: attach to the nearest original word
                 k = min(max(i1 - 1, 0), len(rt) - 1)
                 rs, re_ = rt[k][0], rt[k][1]
             out.append(TokenSpan(spoken_off + st[j][0], spoken_off + st[j][1], raw_off + rs, raw_off + re_))
@@ -223,8 +237,9 @@ def _map_sentence(raw: str, spoken: str, raw_off: int, spoken_off: int) -> List[
 
 
 def _fix_sentence(raw_sent: str, norm: str) -> str:
+    """Tidy an engine's output and restore the sentence terminator the engine removed."""
     norm = collapse_ws(norm.replace("\u0301", ""))
-    # движки убирают точку после сокращения - возвращаем знак конца предложения
+    # the engines drop the period after an abbreviation - restore the sentence terminator
     tail = raw_sent.rstrip("\"'»”’)]} ")[-1:]
     if tail and tail in _TERMINATORS and (not norm or norm[-1] not in _TERMINATORS + "\"'»”’)"):
         norm += tail
@@ -233,7 +248,11 @@ def _fix_sentence(raw_sent: str, norm: str) -> str:
 
 def normalize_for_tts(text: str, language: str = "Russian",
                       engine: Optional[Tuple[str, Callable[[str], str]]] = None) -> NormalizedText:
-    """Для русского текста - «произносимая» форма + карта токенов; для остальных языков - без изменений."""
+    """Return the spoken form plus a token map for Russian text; other languages are returned unchanged.
+
+    ``engine`` may be passed as ``(name, function)`` (used by tests). Each sentence is normalized separately; if nothing
+    changed, the text is returned untouched (keeping its original line breaks).
+    """
     if language.lower() not in ("russian", "ru", "русский"):
         return NormalizedText(raw=text, spoken=text, engine="none", changed=False)
     name, fn = engine or pick_engine()
@@ -245,13 +264,13 @@ def normalize_for_tts(text: str, language: str = "Russian",
     raw_off = spoken_off = 0
     changed = False
     for sent in sentences:
-        pre = expand_abbreviations(sent)   # «т.д.», «т.ч.» - до движка (часть движков их не знает)
+        pre = expand_abbreviations(sent)   # "т.д.", "т.ч." - before the engine (some engines do not know them)
         try:
             norm = fn(pre) if name != "builtin" else pre
-        except Exception as exc:  # noqa: BLE001 - плохой ввод не должен ронять сборку датасета
+        except Exception as exc:  # noqa: BLE001 - bad input must not break dataset building
             log.warning("normalizer engine %s failed on %r: %s", name, sent[:40], exc)
             norm = pre
-        norm = builtin_normalize(norm)  # дочитываем то, что движок не тронул (цифры, %, №)
+        norm = builtin_normalize(norm)  # read out what the engine left alone (digits, %, №)
         norm = _fix_sentence(sent, norm) or sent
         if norm != sent:
             changed = True
@@ -262,6 +281,6 @@ def normalize_for_tts(text: str, language: str = "Russian",
     raw = " ".join(sentences)
     spoken = " ".join(spoken_parts)
     if not changed:
-        # ничего не поменялось: оставляем текст как есть (с исходными переносами строк)
+        # nothing changed: keep the text as it is (with the original line breaks)
         return NormalizedText(raw=text, spoken=text, engine=name, changed=False)
     return NormalizedText(raw=raw, spoken=spoken, engine=name, tokens=tokens, changed=True)

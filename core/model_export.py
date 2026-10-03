@@ -1,19 +1,24 @@
-"""Универсальная (merged) модель: базовая Qwen3-TTS + LoRA-адаптер, слитые через PEFT merge_and_unload.
+"""The universal (merged) model: the base Qwen3-TTS plus the LoRA adapter, merged with PEFT ``merge_and_unload``.
 
-Запускается ТОЛЬКО по кнопке пользователя (~4 ГБ на диске). Формат результата - как у официального
-finetuning/sft_12hz.py из QwenLM/Qwen3-TTS (обычная папка HF, загружается Qwen3TTSModel.from_pretrained):
-  * model.safetensors - веса bf16 с влитым адаптером; speaker_encoder удалён, эмбеддинг диктора записан в
-    talker.model.codec_embedding.weight[3000];
-  * config.json - tts_model_type="custom_voice", talker_config.spk_id={<имя>: 3000}, spk_is_dialect={<имя>: false};
-  * speech_tokenizer/, tokenizer/preprocessor/generation_config - копия из базовой модели;
-  * ref_sample.wav, ref_text.txt, speaker_embedding.safetensors, voxprint_voice.json, USAGE.txt - справочно.
-Голос используется так:  model.generate_custom_voice(text=..., language="Russian", speaker="<имя>").
+Runs *only* when the user presses the button (~4 GB on disk).  The output format is that of the official
+``finetuning/sft_12hz.py`` from QwenLM/Qwen3-TTS - a plain Hugging Face folder that loads with
+``Qwen3TTSModel.from_pretrained``:
 
-Эмбеддинг диктора при обучении подставлялся из ref.wav (см. teacher_forcing), поэтому запись его в
-codec_embedding[3000] воспроизводит условия обучения.
+* ``model.safetensors`` - bf16 weights with the adapter merged in; the ``speaker_encoder`` is removed and the speaker
+  embedding is written into ``talker.model.codec_embedding.weight[3000]``;
+* ``config.json`` - ``tts_model_type="custom_voice"``, ``talker_config.spk_id={<name>: 3000}``,
+  ``spk_is_dialect={<name>: false}``;
+* ``speech_tokenizer/``, tokenizer / preprocessor / generation config - copied from the base model;
+* ``ref_sample.wav``, ``ref_text.txt``, ``speaker_embedding.safetensors``, ``voxprint_voice.json``, ``USAGE.txt`` - informational.
 
-TODO-needs-GPU-test: на настоящих весах 1.7B (здесь проверено на tiny-модели из реальных классов qwen-tts:
-эквивалентность слитой и «адаптерной» модели по выходу talker, загрузка папки обратно через from_pretrained).
+The voice is used like this: ``model.generate_custom_voice(text=..., language="Russian", speaker="<name>")``.
+
+During training the speaker embedding came from ``ref.wav`` (see ``teacher_forcing``), so writing it into
+``codec_embedding[3000]`` reproduces the training conditions.
+
+TODO-needs-GPU-test (originally): real 1.7B weights.  Verified on a tiny model built from the real qwen-tts classes:
+the merged and the "adapter" model give equivalent talker output, and the folder loads back with ``from_pretrained``.
+Later also exercised with the real 1.7B model on an RTX 4090.
 """
 from __future__ import annotations
 
@@ -38,12 +43,13 @@ _SKIP_NAMES = {".revision", ".cache", ".gitattributes", "README.md"}
 
 
 def speaker_name(voice_name: str) -> str:
-    """Имя голоса для spk_id (в Qwen3-TTS сравнивается в нижнем регистре)."""
+    """Speaker name for ``spk_id``: lower-case, only word characters and ``-`` (Qwen3-TTS compares names in lower case)."""
     s = re.sub(r"[^\w\-]+", "_", voice_name.strip().lower(), flags=re.UNICODE).strip("_")
     return s or "voice"
 
 
 def read_adapter_meta(adapter_dir: Path) -> Dict[str, Any]:
+    """Read ``training_meta.json`` of an adapter folder; raises ``ExportError`` if the adapter files are missing."""
     f = Path(adapter_dir) / "training_meta.json"
     if not (Path(adapter_dir) / "adapter_model.safetensors").exists() or not f.exists():
         raise ExportError(tr("err.export_no_adapter"))
@@ -51,12 +57,13 @@ def read_adapter_meta(adapter_dir: Path) -> Dict[str, Any]:
 
 
 def required_free_gb(adapter_dir: Path) -> Tuple[float, str]:
-    """(сколько ГБ свободного места нужно, репозиторий базовой модели)."""
+    """``(free disk space needed in GB, base model repo)`` - the base model's approximate size plus 10 %."""
     repo = read_adapter_meta(adapter_dir).get("model_name", "Qwen/Qwen3-TTS-12Hz-1.7B-Base")
     return md.APPROX_SIZE_GB.get(repo, 4.5) * 1.1, repo
 
 
 def check_disk_space(out_parent: Path, need_gb: float) -> None:
+    """Raise ``ExportError`` with a friendly message if ``out_parent`` has less than ``need_gb`` GB free."""
     out_parent.mkdir(parents=True, exist_ok=True)
     free = shutil.disk_usage(out_parent).free / 1024 ** 3
     if free < need_gb:
@@ -64,7 +71,11 @@ def check_disk_space(out_parent: Path, need_gb: float) -> None:
 
 
 def merge_adapter_into_model(hf_model: Any, adapter_dir: Path, spk_id: int = SPK_ID):
-    """Вливает адаптер в talker. Возвращает (state_dict без speaker_encoder, speaker_embedding [1,D])."""
+    """Merge the adapter into the talker.
+
+    Returns ``(state_dict without speaker_encoder, speaker_embedding [1, D])``; the embedding is already stored in the
+    state dict at row ``spk_id`` of ``codec_embedding``.  Tensors sharing memory are cloned because safetensors rejects them.
+    """
     import torch
     from peft import PeftModel
 
@@ -83,7 +94,7 @@ def merge_adapter_into_model(hf_model: Any, adapter_dir: Path, spk_id: int = SPK
             continue
         t = v.detach().cpu().contiguous()
         ptr = t.data_ptr()
-        if ptr in seen:          # safetensors не принимает общую память у разных ключей
+        if ptr in seen:          # safetensors refuses shared memory between different keys
             t = t.clone()
         seen.add(ptr)
         state[k] = t
@@ -95,6 +106,7 @@ def merge_adapter_into_model(hf_model: Any, adapter_dir: Path, spk_id: int = SPK
 
 
 def _copy_base_files(base_dir: Path, dst: Path) -> None:
+    """Copy the base model folder into ``dst``, skipping weights at the root (we write our own) and cache/metadata files."""
     base_dir = Path(base_dir)
 
     def ignore(d: str, names):
@@ -122,7 +134,11 @@ def export_merged_model(adapter_dir, out_dir, base_dir=None, progress: ProgressC
                         cancel: Optional[CancelToken] = None, voice_name: Optional[str] = None,
                         load_model: Optional[Callable[[Path], Any]] = None, spk_id: int = SPK_ID,
                         skip_disk_check: bool = False) -> Path:
-    """Собирает папку merged_model. Пишет в `<out_dir>.partial`, затем переименовывает."""
+    """Build the ``merged_model`` folder from an adapter folder and return its path.
+
+    Writes into ``<out_dir>.partial`` first and renames at the end, so a failure or cancel never leaves a half-written
+    model behind.  ``load_model`` / ``base_dir`` / ``skip_disk_check`` are injection points for tests.
+    """
     import torch
     from safetensors.torch import save_file
 

@@ -1,7 +1,8 @@
-"""Сведения о приложении и сторонних компонентах: единый источник - credits.json в корне ресурсов.
+"""Application metadata and third-party credits; the single source is ``credits.json`` in the resource root.
 
-REPO_URL (ссылка на репозиторий GitHub) тоже хранится в credits.json, ключ "repo_url". Пока там стоит
-заглушка с «OWNER», ссылка в окне «О программе» скрыта. Чтобы показать её, замените OWNER в credits.json.
+The GitHub repository URL (``repo_url`` in ``credits.json``) is a placeholder containing ``OWNER`` until the project
+is published; while it is a placeholder the link is hidden in the About dialog.  Replace ``OWNER`` in
+``credits.json`` to show it.
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ _FALLBACK = {"app": {"name": "Voxprint", "version": "0.1.0", "author": "Aleksand
 
 @lru_cache(maxsize=1)
 def load_credits() -> Dict[str, Any]:
+    """Read ``credits.json`` once (cached); fall back to built-in defaults if it is missing or broken."""
     try:
         return json.loads((resource_dir() / "credits.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -26,17 +28,19 @@ def load_credits() -> Dict[str, Any]:
 
 
 def _app() -> Dict[str, str]:
+    """The ``app`` section of the credits (name, version, author)."""
     return load_credits().get("app", _FALLBACK["app"])
 
 
 APP_NAME: str = _app().get("name", "Voxprint")
 APP_VERSION: str = _app().get("version", "0.1.0")
 APP_AUTHOR: str = _app().get("author", "Aleksandr Mitroshenkov")
-#: Адрес репозитория; единственное место для правки - credits.json ("repo_url").
+#: Repository URL; the only place to edit it is credits.json ("repo_url").
 REPO_URL: str = str(load_credits().get("repo_url", _FALLBACK["repo_url"]))
 
 
 def is_placeholder(url: str) -> bool:
+    """True if ``url`` is empty or still contains the ``OWNER`` placeholder."""
     u = (url or "").strip()
     return not u or REPO_PLACEHOLDER_MARK in u
 
@@ -48,6 +52,7 @@ def public_repo_url(url: Optional[str] = None) -> Optional[str]:
 
 
 def components() -> List[Dict[str, Any]]:
+    """The list of open-source components / models credited in the About dialog."""
     return list(load_credits().get("components", []))
 
 
@@ -59,8 +64,10 @@ def localized(value: Any, lang: str) -> str:
 
 
 def notices_path() -> Path:
+    """Path of ``THIRD_PARTY_NOTICES.md`` shipped with the program."""
     return resource_dir() / "THIRD_PARTY_NOTICES.md"
 
 
 def licenses_dir() -> Path:
+    """Folder with the full license texts shipped with the program."""
     return resource_dir() / "licenses"

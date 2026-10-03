@@ -1,25 +1,30 @@
-"""Обучение голосового LoRA-адаптера для Qwen3-TTS-12Hz-Base - формат и рецепт Alexandria (train_lora.py).
+"""Training of the voice LoRA adapter for Qwen3-TTS-12Hz-Base - the format and recipe of Alexandria (``train_lora.py``).
 
-Источник контракта (исходники прочитаны, см. README): Finrandojin/alexandria-audiobook
-  * train_lora.py - датасет, teacher forcing, LoRA на talker, формат результата;
-  * app/tts.py    - потребитель адаптера: PeftModel.from_pretrained(model.model.talker, adapter_path),
-                    ref_sample.wav + ref_sample_text из training_meta.json;
-  * lora.md       - гиперпараметры (lr 1e-6..2e-6, примеров x эпох ~250-400, предупреждение loss < ~3.5).
+Sources of the contract (read from the code of ``Finrandojin/alexandria-audiobook``):
 
-Что делает этот модуль:
-  1. читает metadata.jsonl ({"audio" | "audio_filepath", "text", "ref_audio"}, пути - относительно папки датасета),
-     ref.wav и ref_text.txt;
-  2. кодирует аудио speech_tokenizer'ом самой Base-модели (он лежит внутри репозитория модели) -> коды [T,16];
-  3. peft применяется к hf_model.talker (НЕ ко всей модели!): ключи адаптера относительны к talker, как ждёт
-     потребитель; target_modules=[q_proj,k_proj,v_proj,o_proj], r=32, alpha=128, dropout 0.05;
-  4. каждый пример - teacher forcing (core/teacher_forcing.py), batch 1, накопление градиента, loss =
-     CE(первая кодовая группа) + 0.3 x loss sub-talker'а; attn_implementation="eager";
-  5. результат - ПАПКА: adapter_model.safetensors, adapter_config.json, ref_sample.wav, training_meta.json;
-     после каждой эпохи копия адаптера кладётся в checkpoints/epoch_NN/.
+* ``train_lora.py`` - dataset, teacher forcing, LoRA on the talker, output format;
+* ``app/tts.py`` - the consumer of the adapter: ``PeftModel.from_pretrained(model.model.talker, adapter_path)``,
+  ``ref_sample.wav`` + ``ref_sample_text`` from ``training_meta.json``;
+* ``lora.md`` - hyper-parameters (lr 1e-6..2e-6, samples x epochs ~250-400, warning when loss < ~3.5).
 
-TODO-needs-GPU-test: загрузка настоящих весов 1.7B-Base, bf16 + eager + gradient checkpointing на Windows,
-8-битный AdamW (bitsandbytes), реальное потребление VRAM, пригодность порога loss 3.5 для русского языка,
-загрузка адаптера на стороне Alexandria с более новой версией peft (она закреплена на peft==0.18.1).
+What this module does:
+
+1. reads ``metadata.jsonl`` (``{"audio" | "audio_filepath", "text", "ref_audio"}``, paths relative to the dataset
+   folder), ``ref.wav`` and ``ref_text.txt``;
+2. encodes the audio with the speech tokenizer of the Base model itself (it ships inside the model repo) -> codes ``[T, 16]``;
+3. applies peft to ``hf_model.talker`` (*not* to the whole model): the adapter keys are relative to the talker, as the
+   consumer expects; ``target_modules=[q_proj,k_proj,v_proj,o_proj]``, r=32, alpha=128, dropout 0.05;
+4. every sample is a teacher-forcing step (``core/teacher_forcing.py``), batch 1 with gradient accumulation,
+   loss = CE(first codec group) + 0.3 x the sub-talker loss; ``attn_implementation="eager"``;
+5. the result is a *folder*: ``adapter_model.safetensors``, ``adapter_config.json``, ``ref_sample.wav``,
+   ``training_meta.json``; after each epoch a copy of the adapter goes to ``checkpoints/epoch_NN/``.
+
+Memory use is planned by ``infra/vram_optimizer.plan_training``; on an out-of-memory error the plan is reduced and the
+run repeated (:func:`train_lora_from_dataset`).
+
+TODO-needs-GPU-test (originally unverified, later exercised on an RTX 4090): real 1.7B-Base weights, bf16 + eager +
+gradient checkpointing on Windows, the 8-bit AdamW (bitsandbytes), real VRAM use, whether the loss threshold of 3.5 suits
+Russian, and loading the adapter in Alexandria with a newer peft (Alexandria pins ``peft==0.18.1``).
 """
 from __future__ import annotations
 
@@ -44,17 +49,21 @@ from infra.vram_optimizer import (LOSS_WARN_BELOW, TrainPlan, VramMonitor, detec
 
 log = logging.getLogger("voxprint.lora")
 
-LORA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj"]   # как в train_lora.py (суффиксное совпадение)
+LORA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj"]   # as in train_lora.py (suffix match)
 LORA_DROPOUT = 0.05
 SUB_TALKER_WEIGHT = 0.3
 ADAPTER_FILES = ("adapter_model.safetensors", "adapter_config.json", "ref_sample.wav", "training_meta.json")
 
 
-# --------------------------------------------------------------------------- данные
+# --------------------------------------------------------------------------- data
 
 
 def load_training_rows(dataset_dir: Path) -> Dict[str, Any]:
-    """Читает датасет так же, как train_lora.py. Возвращает {"rows", "ref_audio", "ref_text"} (пути абсолютные)."""
+    """Read the dataset the same way ``train_lora.py`` does.
+
+    Returns ``{"rows", "ref_audio", "ref_text"}`` with absolute paths.  The reference is the first row's ``ref_audio``,
+    else ``ref.wav``, else the first clip; a missing ``ref_text.txt`` falls back to the first sample's text (as Alexandria does).
+    """
     dataset_dir = Path(dataset_dir)
     meta = dataset_dir / "metadata.jsonl"
     if not meta.exists():
@@ -86,6 +95,7 @@ def load_training_rows(dataset_dir: Path) -> Dict[str, Any]:
 
 
 def build_lora_config(r: int = 32, alpha: int = 128, dropout: float = LORA_DROPOUT):
+    """peft ``LoraConfig`` for the talker's attention projections (r=32, alpha=128 by default)."""
     from peft import LoraConfig
 
     return LoraConfig(r=r, lora_alpha=alpha, target_modules=list(LORA_TARGET_MODULES),
@@ -93,7 +103,7 @@ def build_lora_config(r: int = 32, alpha: int = 128, dropout: float = LORA_DROPO
 
 
 def speaker_embedding_from_ref(model: Any, ref_wav_path: str, device: Any, dtype: Any):
-    """Эмбеддинг диктора из ref.wav (24 кГц) - mel + speaker_encoder, как в train_lora.py."""
+    """Speaker embedding of ``ref.wav`` (24 kHz): mel spectrogram + the model's speaker encoder, as in ``train_lora.py``."""
     import torch
     from qwen_tts.core.models.modeling_qwen3_tts import mel_spectrogram  # type: ignore
 
@@ -109,7 +119,7 @@ def prepare_samples(rows: List[Dict[str, Any]], tokenize: Callable[[str], Any],
                     encode_audio: Callable[[Any, int], Any], spk_embedding: Any, device: Any,
                     max_audio_seconds: float, progress: ProgressCallback, cancel: CancelToken,
                     warnings: List[str]) -> List[Dict[str, Any]]:
-    """Аудио -> коды кодека, текст -> токены (шаблон ассистента). Слишком длинные клипы пропускаются."""
+    """Audio -> codec codes, text -> tokens (assistant template). Clips longer than ``max_audio_seconds`` are skipped with a warning."""
     import torch
 
     samples: List[Dict[str, Any]] = []
@@ -136,11 +146,11 @@ def prepare_samples(rows: List[Dict[str, Any]], tokenize: Callable[[str], Any],
     return samples
 
 
-# --------------------------------------------------------------------------- оптимизатор
+# --------------------------------------------------------------------------- optimizer
 
 
 def check_bitsandbytes(device: str) -> bool:
-    """Проверка, что 8-битный AdamW реально работает (импорт + один шаг на крошечном тензоре)."""
+    """Check that the 8-bit AdamW really works (import + one step on a tiny tensor); False off CUDA."""
     if not device.startswith("cuda"):
         return False
     try:
@@ -158,6 +168,7 @@ def check_bitsandbytes(device: str) -> bool:
 
 
 def make_optimizer(params: List[Any], lr: float, use_8bit: bool, device: str, warnings: List[str]):
+    """AdamW (8-bit via bitsandbytes when requested and usable, otherwise plain torch AdamW with a warning)."""
     import torch
 
     if use_8bit:
@@ -169,11 +180,11 @@ def make_optimizer(params: List[Any], lr: float, use_8bit: bool, device: str, wa
     return torch.optim.AdamW(params, lr=lr, weight_decay=0.01)
 
 
-# --------------------------------------------------------------------------- обучение
+# --------------------------------------------------------------------------- training
 
 
 def compute_sample_loss(sample: Dict[str, Any], hf_model: Any, base_talker: Any, device: Any, language: str):
-    """Один пример: (total_loss, talker_loss, sub_loss) - как в train_lora.py."""
+    """Loss of one sample as ``(total, talker_loss, sub_loss)``: the first-codec-group cross-entropy plus 0.3 x the sub-talker loss (as in ``train_lora.py``)."""
     import torch.nn.functional as F
 
     full_input, labels, all_codec_ids, prefill_len = build_teacher_forcing_input(
@@ -192,6 +203,7 @@ def compute_sample_loss(sample: Dict[str, Any], hf_model: Any, base_talker: Any,
 
 
 def loss_warnings(final_loss: float, first_loss: float) -> List[str]:
+    """User-facing warnings about the final loss: suspiciously low (over-fitting) or barely decreased."""
     out: List[str] = []
     if final_loss < LOSS_WARN_BELOW:
         out.append(tr("warn.loss_low", loss=f"{final_loss:.2f}", threshold=LOSS_WARN_BELOW))
@@ -202,7 +214,7 @@ def loss_warnings(final_loss: float, first_loss: float) -> List[str]:
 
 def save_adapter_folder(peft_talker: Any, out_dir: Path, ref_audio: Optional[str] = None,
                         ref_text: str = "", meta: Optional[Dict[str, Any]] = None) -> None:
-    """peft.save_pretrained(...) (+ ref_sample.wav и training_meta.json, если переданы)."""
+    """``peft.save_pretrained`` into ``out_dir`` (+ ``ref_sample.wav`` and ``training_meta.json`` when given)."""
     out_dir.mkdir(parents=True, exist_ok=True)
     peft_talker.save_pretrained(str(out_dir), safe_serialization=True)
     if ref_audio is not None:
@@ -215,7 +227,12 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
                    data: Dict[str, Any], output_dir: Path, plan: TrainPlan, base_repo: str,
                    progress: ProgressCallback, cancel: CancelToken,
                    warnings_out: Optional[List[str]] = None, seed: int = 1234) -> Path:
-    """Ядро обучения на уже загруженной Qwen3TTSForConditionalGeneration (без сети; тестируется на CPU)."""
+    """Training core for an already loaded ``Qwen3TTSForConditionalGeneration`` (no network; unit-tested on the CPU).
+
+    Freezes the model, wraps the talker with LoRA, then runs ``plan.epochs`` epochs with gradient accumulation, saving a
+    checkpoint folder per epoch and the final adapter, ``training_meta.json`` and ``checkpoints/losses.json``.
+    CUDA out-of-memory is converted to ``OutOfMemoryError_`` so the caller can retry with a lighter plan.
+    """
     import torch
     from peft import get_peft_model
 
@@ -228,7 +245,7 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
     spk = speaker_embedding_from_ref(hf_model, data["ref_audio"], device, dtype)
     samples = prepare_samples(data["rows"], tokenize, encode_audio, spk, device, plan.max_seconds_per_item,
                               progress, cancel, warnings)
-
+    # peft goes on the talker (like train_lora.py): the adapter keys are relative to the talker
     for p in hf_model.parameters():
         p.requires_grad_(False)
     # peft - на talker (как train_lora.py): ключи адаптера относительны к talker
@@ -242,7 +259,7 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
     except Exception as exc:  # noqa: BLE001 - без checkpointing просто больше памяти
         log.warning("gradient checkpointing unavailable: %s", exc)
     params = [p for p in peft_talker.parameters() if p.requires_grad]
-    if not params:
+    for p in params:  # LoRA weights in fp32 for stability (peft usually does this itself)
         raise TrainingError(tr("err.no_lora_layers"))
     for p in params:  # LoRA-веса в fp32 для устойчивости (peft обычно делает это сам)
         p.data = p.data.float()
@@ -312,6 +329,7 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
 
 
 def _free_memory() -> None:
+    """Garbage-collect and empty the CUDA cache (best effort)."""
     gc.collect()
     try:
         import torch
@@ -324,7 +342,7 @@ def _free_memory() -> None:
 
 def _train_once(dataset_dir: Path, output_dir: Path, plan: TrainPlan, progress: ProgressCallback,
                 cancel: CancelToken, warnings_out: Optional[List[str]] = None) -> Path:
-    """Загрузка модели + обучение (требует GPU/сеть; TODO-needs-GPU-test)."""
+    """Load the models and train once with the given plan (needs a GPU and the downloaded models; TODO-needs-GPU-test)."""
     import torch
 
     data = load_training_rows(dataset_dir)
@@ -354,8 +372,12 @@ def train_lora_from_dataset(dataset_dir, output_dir, progress: ProgressCallback 
                             plan: Optional[TrainPlan] = None, language: Optional[str] = None,
                             warnings_out: Optional[List[str]] = None,
                             _run: Callable[..., Path] = _train_once) -> Path:
-    """Подбирает параметры автоматически (см. infra/vram_optimizer.plan_training), при OOM снижает нагрузку
-    и повторяет. Возвращает ПАПКУ адаптера. Если уменьшать больше нечего - OutOfMemoryError_ (UI предложит CPU)."""
+    """Train an adapter from a dataset folder and return the adapter *folder*.
+
+    Chooses the parameters automatically (``infra/vram_optimizer.plan_training``), and on out-of-memory reduces the load and
+    tries again; when nothing is left to reduce it raises ``OutOfMemoryError_`` (the UI then offers the CPU).  ``language``
+    defaults to ``training_language`` from the dataset's ``report.json``.  ``_run`` is the injection point used by tests.
+    """
     cancel = cancel or CancelToken()
     dataset_dir, output_dir = Path(dataset_dir), Path(output_dir)
     n_items = len(read_metadata_jsonl(dataset_dir / "metadata.jsonl"))

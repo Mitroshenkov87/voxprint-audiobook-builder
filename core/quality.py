@@ -1,11 +1,12 @@
-"""Автоматический фильтр качества сегментов (без участия пользователя).
+"""Automatic segment quality filter (no user interaction).
 
-Метрики и пороги - как в voice_clone_lab (audio_stats): клиппинг, уровень (RMS, dBFS) и оценка SNR как
-разница 90-го и 10-го перцентилей покадровой громкости (кадры 30 мс, шаг 10 мс).
-Сегмент отбрасывается, если:
-  * клиппинг: число отсчётов |x| >= 0.999 больше max(10, 0.05 % от длины);
-  * RMS < -42 dBFS (слишком тихо);
-  * SNR < 8 дБ (слишком шумно/неравномерно).
+Metrics and thresholds follow ``voice_clone_lab`` (``audio_stats``): clipping, level (RMS in dBFS) and an SNR estimate
+taken as the difference between the 90th and 10th percentile of frame loudness (30 ms frames, 10 ms hop).
+A segment is dropped when:
+
+* clipping: more than ``max(10, 0.05 % of its length)`` samples have ``|x| >= 0.999``;
+* RMS < -42 dBFS (too quiet);
+* estimated SNR < 8 dB (too noisy or too uneven).
 """
 from __future__ import annotations
 
@@ -20,11 +21,15 @@ CLIP_MIN_SAMPLES = 10
 CLIP_FRACTION = 0.0005
 MIN_RMS_DBFS = -42.0
 MIN_SNR_DB = 8.0
-#: Если фильтр выбросил больше этой доли сегментов, SNR-критерий считается ненадёжным и отключается.
+#: If the filter would drop more than this share of segments, the SNR criterion is considered unreliable and disabled.
 MAX_DROP_FRACTION = 0.5
 
 
 def audio_stats(samples: np.ndarray, sr: int) -> Dict[str, float]:
+    """Compute peak, RMS (dBFS), clipped-sample count and the percentile-based SNR estimate of a clip.
+
+    Multi-channel input is averaged to mono; an empty clip yields zeros (and a very low RMS).
+    """
     x = np.asarray(samples, dtype=np.float32)
     if x.ndim > 1:
         x = x.mean(axis=1)
@@ -65,6 +70,7 @@ def reject_reason(stats: Dict[str, float], use_snr: bool = True) -> Optional[str
 
 @dataclass
 class QualityResult:
+    """Per-segment verdicts of :func:`assess_segments` (parallel lists, one entry per input piece)."""
     keep: List[bool]
     reasons: List[Optional[str]]
     stats: List[Dict[str, float]]
@@ -72,9 +78,11 @@ class QualityResult:
 
     @property
     def n_dropped(self) -> int:
+        """Number of segments that did not pass the filter."""
         return sum(1 for k in self.keep if not k)
 
     def summary(self) -> Dict[str, int]:
+        """Count of dropped segments per reason code (``clipping``, ``too_quiet``, ``low_snr``)."""
         out: Dict[str, int] = {}
         for r in self.reasons:
             if r:

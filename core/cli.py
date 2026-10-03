@@ -1,9 +1,10 @@
-"""CLI для проверки этапов 1-2 на машине с GPU:
+"""Developer command line for the dataset (and optional training) stages, e.g. on a machine with a GPU::
 
     python -m core.cli audio.wav text.txt --out dataset [--language Russian] [--device auto|cuda|cpu]
                        [--fake-aligner] [--train] [--output-dir output]
 
-Только для разработчиков/тестирования; пользователь работает через графическое окно.
+Intended for developers and testing; end users work through the graphical window.  ``--fake-aligner`` runs the whole
+pipeline without any neural network (timings are synthesized), which is what the unit tests use.
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from core.events import Stage
 
 
 def main(argv=None) -> int:
+    """Entry point. Returns 0 on success, 2 after a friendly ``DatasetMakerError`` (message on stderr)."""
     ap = argparse.ArgumentParser(prog="python -m core.cli", description="Voxprint: audio + text -> dataset (developer CLI)")
     ap.add_argument("audio")
     ap.add_argument("text")

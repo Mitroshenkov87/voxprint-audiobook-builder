@@ -1,14 +1,18 @@
-"""Вход для обучения с teacher forcing - порт build_teacher_forcing_input из Alexandria train_lora.py
-(MIT, github.com/Finrandojin/alexandria-audiobook; сам код повторяет сборку входа в generate() Qwen3-TTS).
+"""Input construction for teacher-forced training - a port of ``build_teacher_forcing_input`` from Alexandria's
+``train_lora.py`` (MIT, github.com/Finrandojin/alexandria-audiobook; the code itself mirrors how Qwen3-TTS builds its
+input inside ``generate()``).
 
-Для одного примера:
-  * role: первые 3 токена текста (<|im_start|>assistant\\n);
-  * codec-префикс [think, think_bos, language_id, think_eos] (без языка: [nothink, think_bos, think_eos]);
-  * эмбеддинг диктора, codec_pad, codec_bos;
-  * текст text_ids[:, 3:-5] + tts_eos, поверх - эмбеддинги codec_pad;
-  * конец префилла: tts_pad + codec_bos;
-  * аудио-шаги: сумма эмбеддингов всех 16 кодовых групп + tts_pad.
-Метки: первая кодовая группа на аудио-шагах, -100 на префилле.
+For one training sample the sequence is, in order:
+
+* role: the first 3 text tokens (``<|im_start|>assistant\\n``);
+* codec prefix ``[think, think_bos, language_id, think_eos]`` (without a language: ``[nothink, think_bos, think_eos]``);
+* speaker embedding, ``codec_pad``, ``codec_bos``;
+* text ``text_ids[:, 3:-5]`` + ``tts_eos``, with ``codec_pad`` embeddings added on top;
+* end of prefill: ``tts_pad + codec_bos``;
+* audio steps: the sum of the embeddings of all 16 codec groups + ``tts_pad``.
+
+Labels: the first codec group on the audio steps, ``-100`` (ignored) on the prefill.  Keeping this identical to
+Alexandria is deliberate: adapters trained here load unchanged in Alexandria.
 """
 from __future__ import annotations
 
@@ -16,15 +20,17 @@ from typing import Any, Tuple
 
 
 def build_assistant_text(text: str) -> str:
-    """Шаблон текста, как в train_lora.py."""
+    """Wrap ``text`` in the chat template the Qwen3-TTS tokenizer expects (same as ``train_lora.py``)."""
     return f"<|im_start|>assistant\n{text}<|im_end|>\n<|im_start|>assistant\n"
 
 
 def build_teacher_forcing_input(sample: dict, hf_model: Any, talker: Any, device: Any,
                                 language: str = "russian") -> Tuple[Any, Any, Any, int]:
-    """Возвращает (inputs_embeds [1, prefill+T, D], labels [1, prefill+T], all_codec_ids [T, G], prefill_len).
+    """Build ``(inputs_embeds [1, prefill+T, D], labels [1, prefill+T], all_codec_ids [T, G], prefill_len)``.
 
-    `talker` - исходный (не обёрнутый peft) talker; `hf_model.config` берётся для tts_*_token_id.
+    ``sample`` holds ``codec_ids`` ([T, G]), ``spk_embedding`` ([1, enc_dim]) and ``text_ids`` ([1, L]).  ``talker`` is the
+    original (not peft-wrapped) talker module; ``hf_model.config`` supplies the ``tts_*_token_id`` values.  ``language``
+    selects the codec language id (an unknown language falls back to the "nothink" prefix).
     """
     import torch
 

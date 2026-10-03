@@ -1,9 +1,18 @@
-"""Локализация: простые JSON-каталоги locales/<код>.json (плоские ключи вида "ui.start", параметры {name}).
+"""Localization: plain JSON catalogs ``locales/<code>.json`` with flat keys such as ``"ui.btn_lora"`` and
+``{name}``-style parameters.
 
-Языки: en (по умолчанию), de, ru. Как добавить язык - README, раздел «Adding a language». Порядок выбора языка:
-  1. переменная окружения VOXPRINT_LANG;  2. сохранённый выбор (state/language);
-  3. язык системы (Windows: GetUserDefaultLocaleName, иначе LC_ALL/LC_MESSAGES/LANG);  4. английский.
-`tr(key, **params)` никогда не бросает исключений: нет перевода -> английский текст -> сам ключ.
+Languages: ``en`` (default), ``de``, ``ru``.  To add a language, copy ``locales/en.json`` to ``locales/<code>.json``,
+translate the values, add the code to ``LANGS`` and its native name to ``LANG_NAMES`` (the tests check that every
+catalog has exactly the same keys and placeholders as English).
+
+The UI language is chosen in this order:
+
+1. the ``VOXPRINT_LANG`` environment variable,
+2. the user's saved choice (``state/language``),
+3. the OS language (Windows: ``GetUserDefaultLocaleName``; elsewhere ``LC_ALL``/``LC_MESSAGES``/``LANG``),
+4. English.
+
+``tr(key, **params)`` never raises: a missing translation falls back to English and then to the key itself.
 """
 from __future__ import annotations
 
@@ -19,7 +28,7 @@ log = logging.getLogger("voxprint.i18n")
 
 LANGS = ("en", "de", "ru")
 DEFAULT_LANG = "en"
-#: Названия языков показываются на их собственном языке (в переключателе).
+#: Language names are shown in their own language (in the language selector).
 LANG_NAMES = {"en": "English", "de": "Deutsch", "ru": "Русский"}
 
 _catalogs: Dict[str, Dict[str, str]] = {}
@@ -27,12 +36,14 @@ _current: Optional[str] = None
 
 
 def locales_dir() -> Path:
+    """Folder with the catalogs (next to the program, or the PyInstaller unpack dir when frozen)."""
     from infra.paths import resource_dir
 
     return resource_dir() / "locales"
 
 
 def load_catalog(lang: str) -> Dict[str, str]:
+    """Load and cache the catalog of ``lang``; a missing/broken file yields an empty dict (and a log warning)."""
     if lang not in _catalogs:
         data: Dict[str, str] = {}
         f = locales_dir() / f"{lang}.json"
@@ -53,7 +64,7 @@ def normalize_code(value: Optional[str]) -> Optional[str]:
 
 
 def system_language() -> Optional[str]:
-    """Язык интерфейса ОС (Windows - через ctypes; прочие - переменные окружения/locale)."""
+    """UI language of the operating system, or ``None`` if it is not one of :data:`LANGS`."""
     if sys.platform == "win32":
         try:
             import ctypes
@@ -63,7 +74,7 @@ def system_language() -> Optional[str]:
                 code = normalize_code(buf.value)
                 if code:
                     return code
-        except Exception:  # noqa: BLE001 - язык не критичен
+        except Exception:  # noqa: BLE001 - the UI language is not critical
             pass
     for var in ("LC_ALL", "LC_MESSAGES", "LANG"):
         code = normalize_code(os.environ.get(var))
@@ -76,12 +87,14 @@ def system_language() -> Optional[str]:
 
 
 def _state_file() -> Path:
+    """File where the user's explicit language choice is stored."""
     from infra.paths import state_dir
 
     return state_dir() / "language"
 
 
 def saved_language() -> Optional[str]:
+    """The language the user picked earlier, or ``None``."""
     try:
         return normalize_code(_state_file().read_text(encoding="utf-8"))
     except OSError:
@@ -89,11 +102,13 @@ def saved_language() -> Optional[str]:
 
 
 def detect_language() -> str:
+    """Resolve the language using the order described in the module docstring."""
     return (normalize_code(os.environ.get("VOXPRINT_LANG")) or saved_language() or system_language()
             or DEFAULT_LANG)
 
 
 def get_language() -> str:
+    """The active UI language code (detected lazily on first use)."""
     global _current
     if _current is None:
         _current = detect_language()
@@ -120,6 +135,11 @@ def reset() -> None:
 
 
 def tr(key: str, **params: object) -> str:
+    """Translate ``key`` into the active language and substitute ``{params}``.
+
+    Falls back to English, then to the key.  A bad format string (missing parameter) returns the unformatted text
+    instead of raising, so a translation typo can never crash the app.
+    """
     text = load_catalog(get_language()).get(key)
     if text is None and get_language() != DEFAULT_LANG:
         text = load_catalog(DEFAULT_LANG).get(key)

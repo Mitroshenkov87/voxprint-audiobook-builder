@@ -1,4 +1,9 @@
-"""Аудио: чтение через pydub/ffmpeg (с запасным soundfile), ресемплинг, запись WAV, энергия, тишина."""
+"""Audio helpers: reading any format (ffmpeg / pydub, with soundfile as the primary reader for WAV/FLAC),
+resampling, writing WAV, frame energy, voiced/silence detection, SNR and fades.
+
+All arrays are mono ``float32`` in ``[-1, 1]``.  Heavy imports (pydub, scipy, soundfile) are done lazily so that
+importing this module stays cheap.
+"""
 from __future__ import annotations
 
 from core.i18n import tr
@@ -17,9 +22,12 @@ _FFMPEG_READY = False
 
 
 def ensure_ffmpeg() -> Optional[str]:
-    """Finds ffmpeg and configures pydub.  Order: next to the exe; ffmpeg on PATH ONLY if `ffmpeg -version` works;
-    the pinned LGPL build that Voxprint downloaded itself (infra/assets.py); the imageio-ffmpeg wheel (GPL build,
-    offline fallback)."""
+    """Locate ffmpeg, point pydub at it and return its path (``None`` if nothing was found).
+
+    Search order: next to the executable; ``ffmpeg`` on ``PATH`` *only if* ``ffmpeg -version`` really works (so a broken
+    shim is skipped); the pinned LGPL build Voxprint downloaded itself (``infra/assets.py``); the ``imageio-ffmpeg``
+    wheel (a GPL build, kept as an offline fallback).
+    """
     global _FFMPEG_READY
     candidates: List[str] = []
     exe_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
@@ -59,7 +67,7 @@ def ensure_ffmpeg() -> Optional[str]:
             from pydub import AudioSegment
 
             AudioSegment.converter = path
-            # pydub ищет ffprobe отдельно; он нужен лишь для mediainfo - не требуем
+            # pydub looks for ffprobe separately; it is only needed for mediainfo, so we do not require it
         except Exception:  # noqa: BLE001
             pass
         _FFMPEG_READY = True
@@ -67,6 +75,7 @@ def ensure_ffmpeg() -> Optional[str]:
 
 
 def to_mono_float(x: np.ndarray) -> np.ndarray:
+    """Convert to a mono float32 array (stereo is averaged)."""
     x = np.asarray(x)
     if x.ndim == 2:
         x = x.mean(axis=1)
@@ -74,7 +83,7 @@ def to_mono_float(x: np.ndarray) -> np.ndarray:
 
 
 def resample(x: np.ndarray, sr_from: int, sr_to: int) -> np.ndarray:
-    """Качественный полифазный ресемплинг (scipy)."""
+    """High-quality polyphase resampling (``scipy.signal.resample_poly``), clipped to ``[-1, 1]``."""
     if sr_from == sr_to or x.size == 0:
         return x.astype(np.float32, copy=False)
     from scipy.signal import resample_poly
@@ -85,8 +94,11 @@ def resample(x: np.ndarray, sr_from: int, sr_to: int) -> np.ndarray:
 
 
 def _read_with_ffmpeg(path: Path) -> Tuple[np.ndarray, int]:
-    """Декодирует через ffmpeg напрямую во временный WAV. Не требует ffprobe (его нет в колесе imageio-ffmpeg, а pydub
-    для m4a/aac/mp4 его вызывает - иначе [WinError 2])."""
+    """Decode through ffmpeg directly into a temporary WAV and read that.
+
+    This does not need ``ffprobe`` (the ``imageio-ffmpeg`` wheel ships no ffprobe, and pydub calls it for m4a/aac/mp4,
+    which failed with ``[WinError 2]`` on Windows).
+    """
     import subprocess
     import tempfile
 
@@ -104,6 +116,7 @@ def _read_with_ffmpeg(path: Path) -> Tuple[np.ndarray, int]:
 
 
 def _read_with_pydub(path: Path) -> Tuple[np.ndarray, int]:
+    """Decode with pydub (needs ffmpeg); returns ``(mono float32, sample_rate)``."""
     ensure_ffmpeg()
     from pydub import AudioSegment
 
@@ -118,6 +131,7 @@ def _read_with_pydub(path: Path) -> Tuple[np.ndarray, int]:
 
 
 def _read_with_soundfile(path: Path) -> Tuple[np.ndarray, int]:
+    """Read WAV/FLAC/OGG with libsndfile; returns ``(mono float32, sample_rate)``."""
     import soundfile as sf
 
     data, sr = sf.read(str(path), dtype="float32", always_2d=False)
@@ -125,7 +139,11 @@ def _read_with_soundfile(path: Path) -> Tuple[np.ndarray, int]:
 
 
 def load_audio(path, target_sr: int = 16000) -> Tuple[np.ndarray, int]:
-    """Читает любой аудиофайл -> (mono float32 [-1,1], sr). Сначала soundfile для wav/flac, иначе pydub."""
+    """Read any audio file and return ``(mono float32 in [-1, 1], target_sr)``.
+
+    WAV/FLAC/OGG try soundfile first; every other container goes through ffmpeg, then pydub, then soundfile.  Raises
+    ``AudioReadError`` with the per-reader errors in ``details`` if nothing works.
+    """
     p = Path(path)
     if not p.exists():
         raise AudioReadError(tr("err.audio_missing", path=p))
@@ -147,7 +165,7 @@ def load_audio(path, target_sr: int = 16000) -> Tuple[np.ndarray, int]:
 
 
 def load_audio_multi(path, rates: Tuple[int, ...]) -> dict:
-    """Читает файл один раз и возвращает {sr: samples} для нужных частот (без двойного ресемплинга)."""
+    """Decode the file once and return ``{rate: samples}`` for each requested rate (avoids double resampling)."""
     p = Path(path)
     if not p.exists():
         raise AudioReadError(tr("err.audio_missing", path=p))
@@ -172,6 +190,7 @@ def load_audio_multi(path, rates: Tuple[int, ...]) -> dict:
 
 
 def write_wav(path, samples: np.ndarray, sr: int) -> None:
+    """Write 16-bit PCM WAV (creates parent folders, clips to ``[-1, 1]``)."""
     import soundfile as sf
 
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -179,17 +198,19 @@ def write_wav(path, samples: np.ndarray, sr: int) -> None:
 
 
 def duration(samples: np.ndarray, sr: int) -> float:
+    """Length of ``samples`` in seconds."""
     return len(samples) / float(sr)
 
 
 def rms(x: np.ndarray) -> float:
+    """Root-mean-square level of the signal (0 for empty input)."""
     if x.size == 0:
         return 0.0
     return float(np.sqrt(np.mean(np.square(x.astype(np.float64)))))
 
 
 def frame_rms(x: np.ndarray, sr: int, frame_ms: float = 20.0, hop_ms: float = 10.0) -> np.ndarray:
-    """RMS по кадрам. Возвращает массив длиной n_frames; кадр i начинается в i*hop."""
+    """RMS per frame (default 20 ms frames every 10 ms); frame ``i`` starts at ``i * hop``. Uses a cumulative sum, so it is fast."""
     frame = max(1, int(sr * frame_ms / 1000))
     hop = max(1, int(sr * hop_ms / 1000))
     if x.size < frame:
@@ -203,7 +224,11 @@ def frame_rms(x: np.ndarray, sr: int, frame_ms: float = 20.0, hop_ms: float = 10
 
 
 def voiced_mask(x: np.ndarray, sr: int, hop_ms: float = 10.0) -> np.ndarray:
-    """Булев массив по кадрам: есть речь. Порог адаптивный (шум +12 дБ или пик -40 дБ)."""
+    """Boolean per-frame mask: True where speech is present.
+
+    The threshold is adaptive: noise floor (10th percentile) + 12 dB, but never lower than peak - 40 dB and never higher
+    than peak - 6 dB.
+    """
     fr = frame_rms(x, sr, hop_ms=hop_ms)
     if fr.size == 0 or float(fr.max()) <= 1e-6:
         return np.zeros(fr.size, dtype=bool)
@@ -216,7 +241,7 @@ def voiced_mask(x: np.ndarray, sr: int, hop_ms: float = 10.0) -> np.ndarray:
 
 
 def voiced_bounds(x: np.ndarray, sr: int, hop_ms: float = 10.0) -> Tuple[float, float]:
-    """(начало первой речи, конец последней речи) в секундах внутри x."""
+    """``(start of the first speech, end of the last speech)`` in seconds inside ``x``."""
     m = voiced_mask(x, sr, hop_ms=hop_ms)
     idx = np.flatnonzero(m)
     if idx.size == 0:
@@ -225,11 +250,12 @@ def voiced_bounds(x: np.ndarray, sr: int, hop_ms: float = 10.0) -> Tuple[float, 
 
 
 def voiced_seconds(x: np.ndarray, sr: int, hop_ms: float = 10.0) -> float:
+    """Total duration of voiced frames in seconds."""
     return float(voiced_mask(x, sr, hop_ms=hop_ms).sum()) * hop_ms / 1000.0
 
 
 def find_silences(x: np.ndarray, sr: int, min_len_s: float = 0.25, hop_ms: float = 10.0) -> List[Tuple[float, float]]:
-    """Интервалы тишины (start, end) в секундах длиной >= min_len_s."""
+    """Silence intervals ``(start, end)`` in seconds that are at least ``min_len_s`` long."""
     m = voiced_mask(x, sr, hop_ms=hop_ms)
     hop = hop_ms / 1000.0
     out: List[Tuple[float, float]] = []
@@ -248,12 +274,13 @@ def find_silences(x: np.ndarray, sr: int, min_len_s: float = 0.25, hop_ms: float
 
 
 def noise_floor_rms(x: np.ndarray, sr: int) -> float:
+    """Estimated noise floor: the 10th percentile of frame RMS."""
     fr = frame_rms(x, sr)
     return float(np.percentile(fr, 10)) if fr.size else 0.0
 
 
 def snr_db(x: np.ndarray, sr: int) -> float:
-    """Оценка отношения сигнал/шум: RMS речевых кадров против пола шума (10-й перцентиль)."""
+    """Rough signal-to-noise estimate: RMS of the voiced frames against the noise floor (10th percentile), in dB."""
     fr = frame_rms(x, sr)
     if fr.size == 0:
         return 0.0
@@ -264,11 +291,12 @@ def snr_db(x: np.ndarray, sr: int) -> float:
 
 
 def peak_abs(x: np.ndarray) -> float:
+    """Largest absolute sample value (0 for empty input)."""
     return float(np.max(np.abs(x))) if x.size else 0.0
 
 
 def apply_fade(x: np.ndarray, sr: int, ms: float = 8.0) -> np.ndarray:
-    """Короткие fade-in/out, чтобы не было щелчков на границах вырезки."""
+    """Short fade-in/out (default 8 ms) so cuts do not click."""
     n = min(int(sr * ms / 1000), x.size // 2)
     if n <= 0:
         return x

@@ -1,4 +1,11 @@
-"""Нарезка по словам с временными метками: паузы > 300 мс, сегменты 3-10 с (мин. 2 c, макс. 10 c)."""
+"""Word-timestamp based slicing of a long recording into training clips.
+
+Words are grouped into *phrases* at pauses longer than ``pause_s``; over-long phrases are split at their biggest
+pause.  A small dynamic program then groups consecutive phrases into segments so that the total cost is minimal:
+the cost prefers durations near ``target_mid`` (8 s), punishes anything below ``min_dur`` very hard and likes
+segments that end at a sentence boundary.  Cuts are placed in the middle of the silence between phrases, so no word
+is ever clipped.  Segments outside ``[min_dur, max_dur]`` (3-12 s) are dropped and reported as a warning.
+"""
 from __future__ import annotations
 
 from core.i18n import tr
@@ -14,16 +21,18 @@ from core.types import Segment, WordTiming
 
 @dataclass
 class SliceConfig:
-    pause_s: float = 0.30      # пауза, считающаяся границей фразы
-    min_dur: float = 3.0       # жёсткий минимум длины сегмента (требование: 3-12 с)
-    max_dur: float = 12.0      # жёсткий максимум
-    target_min: float = 4.0    # желательный минимум
-    target_mid: float = 8.0    # желательная «середина»
-    pad: float = 0.10          # запас тишины с каждой стороны (ограничен половиной паузы)
+    """Tunable parameters of the slicer (all times in seconds)."""
+    pause_s: float = 0.30      # a pause longer than this counts as a phrase boundary
+    min_dur: float = 3.0       # hard minimum segment length
+    max_dur: float = 12.0      # hard maximum segment length
+    target_min: float = 4.0    # preferred minimum
+    target_mid: float = 8.0    # preferred "middle" length (the cost is quadratic around it)
+    pad: float = 0.10          # silence kept on each side (limited to half of the neighbouring pause)
 
 
 @dataclass
 class SliceResult:
+    """Kept segments, user-facing warnings and the number of dropped segments."""
     segments: List[Segment]
     warnings: List[str] = field(default_factory=list)
     dropped: int = 0
@@ -31,27 +40,31 @@ class SliceResult:
 
 @dataclass
 class _Phrase:
+    """A run of words without a long pause inside; the unit the dynamic program works with."""
     words: List[WordTiming]
 
     @property
     def start(self) -> float:
+        """Start time of the first word."""
         return self.words[0].start
 
     @property
     def end(self) -> float:
+        """End time of the last word."""
         return self.words[-1].end
 
     @property
     def sentence_end(self) -> bool:
+        """True if the phrase ends a sentence (affects the cost)."""
         return self.words[-1].sentence_end
 
 
 def _split_phrase(words: List[WordTiming], limit: float) -> List[List[WordTiming]]:
-    """Рекурсивно делит слишком длинную фразу по самой большой паузе между словами."""
+    """Recursively split a phrase that is longer than ``limit`` seconds at its biggest pause (near the middle)."""
     if len(words) < 2 or (words[-1].end - words[0].start) <= limit:
         return [words]
     gaps = [(words[i + 1].start - words[i].end, i) for i in range(len(words) - 1)]
-    # предпочитаем разрез ближе к середине среди заметных пауз
+    # prefer a cut near the middle among the noticeable pauses
     mid_t = (words[0].start + words[-1].end) / 2
     best = max(gaps, key=lambda g: (g[0] - 0.15 * abs(words[g[1]].end - mid_t), -g[1]))
     i = best[1]
@@ -59,6 +72,10 @@ def _split_phrase(words: List[WordTiming], limit: float) -> List[List[WordTiming
 
 
 def build_phrases(words: Sequence[WordTiming], cfg: SliceConfig) -> List[_Phrase]:
+    """Group aligned words into phrases (split at pauses > ``cfg.pause_s``, then at most ``max_dur`` long).
+
+    Words without a ``char_start`` (not matched to the text) are ignored.
+    """
     ws = [w for w in words if w.char_start is not None]
     phrases: List[List[WordTiming]] = []
     cur: List[WordTiming] = []
@@ -78,6 +95,9 @@ def build_phrases(words: Sequence[WordTiming], cfg: SliceConfig) -> List[_Phrase
 
 
 def _seg_cost(dur: float, ends_sentence: bool, cfg: SliceConfig) -> float:
+    """Cost of a candidate segment: quadratic around the target length, a huge penalty below the minimum,
+    a small one below the preferred minimum, and +1.5 when it does not end a sentence.
+    """
     cost = 0.08 * (dur - cfg.target_mid) ** 2
     if dur < cfg.min_dur:
         cost += 1000.0 + (cfg.min_dur - dur) * 100.0
@@ -90,7 +110,12 @@ def _seg_cost(dur: float, ends_sentence: bool, cfg: SliceConfig) -> float:
 
 def slice_words(words: Sequence[WordTiming], text: str, total_duration: float,
                 cfg: SliceConfig | None = None) -> SliceResult:
-    """Нарезает слова на сегменты. `words` должны иметь char_start/char_end (attach_spans)."""
+    """Cut ``words`` into segments of 3-12 s.
+
+    ``words`` must carry ``char_start``/``char_end`` (see ``text_utils.attach_spans``) so each segment can take its text
+    from the normalized ``text``.  ``total_duration`` bounds the last cut.  Returns the kept segments (re-indexed from 1)
+    plus warnings; segments that still end up outside the allowed length are counted in ``dropped``.
+    """
     cfg = cfg or SliceConfig()
     phrases = build_phrases(words, cfg)
     n = len(phrases)
@@ -151,6 +176,7 @@ def slice_words(words: Sequence[WordTiming], text: str, total_duration: float,
 
 
 def cut_segments(audio: np.ndarray, sr: int, segments: Sequence[Segment], fade_ms: float = 8.0) -> List[np.ndarray]:
+    """Cut the audio of each segment out of ``audio`` (with short fades to avoid clicks)."""
     out = []
     for s in segments:
         a, b = int(round(s.start * sr)), int(round(s.end * sr))

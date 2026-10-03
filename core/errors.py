@@ -1,11 +1,16 @@
-"""Исключения приложения. Каждое несёт понятное пользователю сообщение (на языке интерфейса, см. core/i18n)."""
+"""Application exceptions.
+
+Every exception carries ``user_message`` - a friendly text in the UI language (see ``core.i18n``) that the GUI and the
+CLI show as is.  Technical details go to ``details`` and into the log, never into the message.  ``kind`` is a short
+stable string the UI uses to pick a dialog title and, for ``oom``, to offer a retry on the CPU.
+"""
 from __future__ import annotations
 
 from core.i18n import tr
 
 
 class DatasetMakerError(Exception):
-    """Базовая ошибка. `user_message` показывается пользователю как есть."""
+    """Base class of all expected errors. ``user_message`` is shown to the user unchanged."""
 
     kind = "error"
 
@@ -16,6 +21,7 @@ class DatasetMakerError(Exception):
 
 
 class CancelledByUser(DatasetMakerError):
+    """Raised by ``CancelToken.check()`` when the user pressed Cancel."""
     kind = "cancelled"
 
     def __init__(self, user_message: str = "") -> None:
@@ -23,25 +29,28 @@ class CancelledByUser(DatasetMakerError):
 
 
 class AudioReadError(DatasetMakerError):
+    """The audio file is missing, unreadable or in an unsupported format."""
     kind = "audio_read"
 
 
 class TextReadError(DatasetMakerError):
+    """The text file is missing, empty or could not be decoded."""
     kind = "text_read"
 
 
 class AlignmentError(DatasetMakerError):
+    """The forced aligner failed or produced an unusable result."""
     kind = "alignment"
 
 
 class AudioTextMismatchError(AlignmentError):
-    """Аудио и текст явно не соответствуют друг другу."""
+    """The audio and the text clearly do not belong together (wrong files or a partial reading)."""
 
     kind = "mismatch"
 
 
 class ModelDownloadError(DatasetMakerError):
-    """Не удалось скачать модель. `url` - ссылка на страницу модели на Hugging Face."""
+    """A model could not be downloaded. ``url`` points to the model page for a manual download."""
 
     kind = "download"
 
@@ -51,7 +60,10 @@ class ModelDownloadError(DatasetMakerError):
 
 
 class OutOfMemoryError_(DatasetMakerError):
-    """Не хватило памяти GPU. UI предлагает повторить на CPU."""
+    """GPU memory ran out. The UI offers to continue on the CPU.
+
+    The trailing underscore avoids shadowing the built-in ``MemoryError`` naming style of torch's own OOM error.
+    """
 
     kind = "oom"
 
@@ -60,14 +72,16 @@ class OutOfMemoryError_(DatasetMakerError):
 
 
 class TrainingError(DatasetMakerError):
+    """LoRA training stopped because of an error."""
     kind = "training"
 
 
 class UpdateError(DatasetMakerError):
+    """A component or model update failed."""
     kind = "update"
 
 
 class ExportError(DatasetMakerError):
-    """Не удалось собрать универсальную модель (нет места на диске, нет адаптера и т.п.)."""
+    """The universal (merged) model could not be built: no disk space, no adapter, etc."""
 
     kind = "export"

@@ -1,4 +1,9 @@
-"""Этапы работы, колбэки прогресса и токен отмены (без зависимостей от Qt)."""
+"""Pipeline stages, the progress callback protocol and the cancellation token (no Qt dependency).
+
+Long-running code reports progress as ``progress(stage, fraction_inside_stage, message)``.  The GUI turns that into a
+progress bar (``overall_percent``) and "chips" for the stages; the CLI prints it.  Cancellation is cooperative:
+workers call ``CancelToken.check()`` at safe points.
+"""
 from __future__ import annotations
 
 from core.i18n import tr
@@ -10,6 +15,7 @@ from core.errors import CancelledByUser
 
 
 class Stage(enum.Enum):
+    """The user-visible phases of a task, in the order they usually run."""
     UPDATES = "updates"
     MODEL = "model"
     ALIGN = "align"
@@ -19,7 +25,7 @@ class Stage(enum.Enum):
 
     @property
     def label(self) -> str:
-        """Название этапа на языке интерфейса (ключ stage.<значение> в locales/*.json)."""
+        """Name of the stage in the UI language (key ``stage.<value>`` in ``locales/*.json``)."""
         return tr("stage." + self.value)
 
 
@@ -38,11 +44,15 @@ STAGE_WEIGHTS: Dict[Stage, float] = {
 
 
 def noop_progress(stage: Stage, fraction: float, message: str = "") -> None:  # pragma: no cover
+    """Progress callback that ignores everything (default argument for headless calls)."""
     return None
 
 
 def overall_percent(plan: Iterable[Stage], stage: Stage, fraction: float) -> int:
-    """Общий процент 0..100 для заданного плана этапов."""
+    """Overall progress 0..100 for ``stage`` at ``fraction`` (0..1) of a task that runs the stages in ``plan``.
+
+    Stages are weighted by ``STAGE_WEIGHTS`` (training dominates), so the bar moves roughly in proportion to wall time.
+    """
     plan_list: List[Stage] = list(plan)
     if stage not in plan_list:
         return 0
@@ -57,18 +67,21 @@ def overall_percent(plan: Iterable[Stage], stage: Stage, fraction: float) -> int
 
 
 class CancelToken:
-    """Потокобезопасный флаг отмены."""
+    """Thread-safe cancellation flag shared between the GUI thread and the worker."""
 
     def __init__(self) -> None:
         self._event = threading.Event()
 
     def cancel(self) -> None:
+        """Request cancellation (idempotent)."""
         self._event.set()
 
     @property
     def is_cancelled(self) -> bool:
+        """True once ``cancel()`` was called."""
         return self._event.is_set()
 
     def check(self) -> None:
+        """Raise :class:`CancelledByUser` if cancellation was requested; call this at safe points."""
         if self._event.is_set():
             raise CancelledByUser()

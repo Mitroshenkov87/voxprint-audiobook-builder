@@ -1,12 +1,17 @@
-"""Сборка датасета в формате Alexandria (train_lora.py): аудио + текст -> segment_XXX.wav, ref.wav,
-ref_text.txt, metadata.jsonl.
+"""Dataset builder in the Alexandria format (``train_lora.py``): audio + text -> ``segment_XXX.wav``, ``ref.wav``,
+``ref_text.txt``, ``metadata.jsonl`` (plus ``report.json`` with diagnostics).
 
-Контракт (прочитан по исходнику Alexandria train_lora.py):
-  * metadata.jsonl: строки {"audio","text","ref_audio"}, пути относительно папки датасета;
-  * рядом лежат ref.wav и ref_text.txt (точная транскрипция ref.wav);
-  * все wav - 24 кГц моно (16 кГц только на входе выравнивателя), у обучающих клипов ~1 с тишины в конце,
-    длина 3-12 с, разрезы не посреди слова;
-  * `text` - «произносимая» форма (числа и сокращения раскрыты); исходный текст лежит в report.json (text_raw).
+The contract, read from Alexandria's ``train_lora.py``:
+
+* ``metadata.jsonl`` rows are ``{"audio", "text", "ref_audio"}`` with paths relative to the dataset folder;
+* ``ref.wav`` and ``ref_text.txt`` (the exact transcript of ``ref.wav``) sit next to it;
+* every wav is 24 kHz mono (16 kHz exists only as the aligner's input); training clips carry ~1 s of trailing silence,
+  are 3-12 s long and are never cut in the middle of a word;
+* ``text`` is the *spoken* form (numbers and abbreviations expanded); the original text is kept in ``report.json``
+  (``text_raw``).
+
+Pipeline inside :meth:`DatasetBuilder.run`: read text -> normalize -> load audio (16 + 24 kHz) -> align -> slice ->
+quality filter -> choose the reference clip -> write files.
 """
 from __future__ import annotations
 
@@ -32,34 +37,36 @@ from core.types import Segment
 
 log = logging.getLogger("voxprint.dataset")
 
-ALIGNER_SR = 16000   # только вход выравнивателя
-TRAIN_SR = 24000     # Qwen3-TTS-Tokenizer-12Hz, speaker encoder и train_lora.py работают с 24 кГц
+ALIGNER_SR = 16000   # only the aligner's input is 16 kHz
+TRAIN_SR = 24000     # Qwen3-TTS-Tokenizer-12Hz, the speaker encoder and train_lora.py all work at 24 kHz
 TRAIL_SILENCE_SEC = 1.0
 METADATA_KEYS = ("audio", "text", "ref_audio")
 
 
 def training_language(language: str) -> str:
-    """Значение флага --language обучения: строчными буквами («russian»), у Alexandria по умолчанию english."""
+    """Value for the trainer's ``--language`` flag: lower case (``"russian"``); Alexandria defaults to English."""
     return (language or "english").strip().lower()
 
 
 @dataclass
 class BuildConfig:
-    sample_rate: int = TRAIN_SR       # частота wav датасета (24 кГц моно)
-    language: Optional[str] = None    # None -> определить автоматически
+    """Options of :class:`DatasetBuilder`; the defaults are what the GUI uses."""
+    sample_rate: int = TRAIN_SR       # sample rate of the dataset wavs (24 kHz mono)
+    language: Optional[str] = None    # None -> detect automatically
     trail_silence: float = TRAIL_SILENCE_SEC
-    normalize: bool = True            # раскрывать числа/сокращения (только русский)
-    quality_filter: bool = True       # отбраковка сегментов (клиппинг, тихие, шумные)
+    normalize: bool = True            # expand numbers/abbreviations (Russian only)
+    quality_filter: bool = True       # drop bad segments (clipping, too quiet, too noisy)
     ref_min: float = 5.0
     ref_max: float = 10.0
     max_chunk_sec: float = MAX_CHUNK_SEC
     slice: SliceConfig = field(default_factory=SliceConfig)
-    #: переопределение движка нормализации (для тестов): (имя, функция)
+    #: override of the normalization engine (for tests): (name, function)
     normalizer_engine: Optional[Tuple[str, Callable[[str], str]]] = None
 
 
 @dataclass
 class BuildResult:
+    """What :meth:`DatasetBuilder.run` returns: the folder, counts, language, warnings and the reference sample."""
     dataset_dir: Path
     n_segments: int
     total_seconds: float
@@ -72,6 +79,7 @@ class BuildResult:
 
     @property
     def training_language(self) -> str:
+        """The detected language in the form the trainer expects (see :func:`training_language`)."""
         return training_language(self.language)
 
 
@@ -79,7 +87,7 @@ class BuildResult:
 
 
 def write_metadata_jsonl(path, rows: Sequence[Dict[str, Any]]) -> None:
-    """Пишет JSONL: UTF-8 без BOM, '\\n' на всех ОС, кириллица без \\u-экранирования."""
+    """Write JSONL: UTF-8 without BOM, ``\\n`` line ends on every OS, non-ASCII text without ``\\u`` escapes."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     with open(p, "w", encoding="utf-8", newline="\n") as f:
@@ -88,6 +96,7 @@ def write_metadata_jsonl(path, rows: Sequence[Dict[str, Any]]) -> None:
 
 
 def read_metadata_jsonl(path) -> List[Dict[str, Any]]:
+    """Read a JSONL file into a list of dicts (blank lines are skipped)."""
     rows: List[Dict[str, Any]] = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
@@ -98,14 +107,16 @@ def read_metadata_jsonl(path) -> List[Dict[str, Any]]:
 
 
 def make_rows(segments: Sequence[Segment], ref_name: str = "ref.wav") -> List[Dict[str, Any]]:
+    """Build the ``metadata.jsonl`` rows (audio file, spoken text, reference file) for the segments."""
     return [{"audio": s.filename, "text": s.text, "ref_audio": ref_name} for s in segments]
 
 
-# --------------------------------------------------------------------------- ref
+# --------------------------------------------------------------------------- reference sample
 
 
 @dataclass
 class RefChoice:
+    """The chosen reference clip: time range, quality score, samples and its exact text."""
     start: float
     end: float
     score: float
@@ -114,7 +125,7 @@ class RefChoice:
 
 
 def _ref_score(x: np.ndarray, sr: int) -> float:
-    """Чистота: SNR (RMS речи / пол шума), штраф за клиппинг и слишком тихую запись."""
+    """Cleanliness score of a candidate reference: SNR, minus penalties for clipping and a very quiet recording."""
     score = au.snr_db(x, sr)
     if au.peak_abs(x) >= 0.99:
         score -= 12.0
@@ -125,10 +136,11 @@ def _ref_score(x: np.ndarray, sr: int) -> float:
 
 def select_ref(audio: np.ndarray, sr: int, segments: Sequence[Segment],
                lo: float = 5.0, hi: float = 10.0) -> Optional[RefChoice]:
-    """Выбирает самый чистый фрагмент 5-10 с вместе с его ТОЧНЫМ текстом (ref_text.txt).
+    """Choose the cleanest 5-10 s clip together with its *exact* text (``ref_text.txt``).
 
-    Кандидаты: сегменты и склейки двух соседних (подряд идущих по тексту и без разрыва по времени).
-    Если ничего не подходит - самый длинный сегмент (с пометкой в отчёте)."""
+    Candidates are single segments and merges of two consecutive segments (adjacent in the text and with a gap of less
+    than 0.6 s).  If nothing fits the length window, the longest segment is used (and a warning is reported).
+    """
     cands: List[Tuple[float, float, str]] = []
     for i, s in enumerate(segments):
         if lo <= s.duration <= hi:
@@ -153,6 +165,7 @@ def select_ref(audio: np.ndarray, sr: int, segments: Sequence[Segment],
 
 
 def with_trailing_silence(x: np.ndarray, sr: int, seconds: float) -> np.ndarray:
+    """Append ``seconds`` of digital silence (the training clips end with ~1 s of it)."""
     return np.concatenate([x.astype(np.float32), np.zeros(int(round(seconds * sr)), dtype=np.float32)])
 
 
@@ -160,22 +173,29 @@ def with_trailing_silence(x: np.ndarray, sr: int, seconds: float) -> np.ndarray:
 
 
 class DatasetBuilder:
+    """Runs the whole audio+text -> dataset pipeline with a given aligner."""
     def __init__(self, aligner: BaseAligner, config: Optional[BuildConfig] = None,
                  save_stage: Stage = Stage.SAVE) -> None:
         self.aligner = aligner
         self.cfg = config or BuildConfig()
-        #: этап, под которым показывается запись файлов (при обучении LoRA этап SAVE - в самом конце)
+        #: the stage under which file writing is shown (when training a LoRA, SAVE is reserved for the very end)
         self.save_stage = save_stage
 
     def run(self, audio_path, text_path, out_dir,
             progress: ProgressCallback = noop_progress,
             cancel: Optional[CancelToken] = None) -> BuildResult:
+        """Build the dataset in ``out_dir`` and return a :class:`BuildResult`.
+
+        Reports progress per stage, honours ``cancel`` at every stage boundary and raises friendly
+        ``DatasetMakerError`` subclasses (empty text, too short audio, text/audio mismatch, nothing left after the quality
+        filter, ...).  Existing Voxprint files in ``out_dir`` are replaced; unrelated files are left alone.
+        """
         cancel = cancel or CancelToken()
         cfg = self.cfg
         out = Path(out_dir)
         warnings: List[str] = []
 
-        # --- чтение входов
+        # --- read the inputs
         txt = read_text_file(text_path)
         warnings.extend(txt.warnings)
         language = cfg.language or detect_language(txt.text)
@@ -198,13 +218,13 @@ class DatasetBuilder:
                  total, len(text), len(sentences), language, norm.engine, norm.changed)
         cancel.check()
 
-        # --- загрузка модели
+        # --- load the model
         progress(Stage.MODEL, 0.0, tr("progress.aligner_loading"))
         self.aligner.load()
         progress(Stage.MODEL, 1.0, tr("progress.model_ready"))
         cancel.check()
 
-        # --- выравнивание (по «произносимому» тексту; 16 кГц - только здесь)
+        # --- alignment (on the "spoken" text; 16 kHz is used only here)
         words = align_long(
             self.aligner, a_align, ALIGNER_SR, text, language, cfg.max_chunk_sec,
             on_progress=lambda f, m: progress(Stage.ALIGN, f, m),
@@ -214,7 +234,7 @@ class DatasetBuilder:
         warnings.extend(attach_spans(words, text))
         cancel.check()
 
-        # --- нарезка
+        # --- slicing
         progress(Stage.SLICE, 0.0, tr("progress.slicing"))
         sres = slice_words(words, text, total, cfg.slice)
         warnings.extend(sres.warnings)
@@ -226,7 +246,7 @@ class DatasetBuilder:
             if norm.changed and a is not None:
                 seg.extra["text_raw"] = norm.raw_for_span(a, b)
 
-        # --- автоматическая отбраковка по качеству (24 кГц)
+        # --- automatic quality filter (24 kHz)
         main_audio = audios[cfg.sample_rate]
         pieces = cut_segments(main_audio, cfg.sample_rate, sres.segments)
         n_dropped_q = 0
@@ -250,7 +270,7 @@ class DatasetBuilder:
             segments = sres.segments
         progress(Stage.SLICE, 1.0, tr("progress.pieces", n=len(segments)))
 
-        # --- сохранение
+        # --- saving
         progress(self.save_stage, 0.0, tr("progress.saving_dataset"))
         self._clean_old(out)
         out.mkdir(parents=True, exist_ok=True)
@@ -293,14 +313,14 @@ class DatasetBuilder:
 
     @staticmethod
     def _clean_old(out: Path) -> None:
-        """Удаляет только наши прежние файлы (segment_NNN.wav, ref.wav, ref_text.txt, metadata.jsonl, report.json)."""
+        """Delete only our own earlier outputs (``segment_NNN.wav``, ``ref.wav``, ``ref_text.txt``, ``metadata.jsonl``, ``report.json``)."""
         if not out.exists():
             return
         for p in out.iterdir():
             if p.is_file() and (re.fullmatch(r"segment_\d+\.wav", p.name) or p.name in
                                 ("ref.wav", "ref_text.txt", "metadata.jsonl", "report.json")):
                 p.unlink()
-        t = out / "train_24k"       # устаревшая папка прежних версий
+        t = out / "train_24k"       # obsolete folder from earlier versions
         if t.is_dir():
             for p in t.glob("*.wav"):
                 p.unlink()
