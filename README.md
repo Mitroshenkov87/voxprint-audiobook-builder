@@ -250,7 +250,7 @@ adapter files, size limits). A voice without a declared licence is treated as `c
 `commercial_use` in `voice.json` is always derived from the licence, never trusted from a file you import. The badge is information, not legal advice.
 
 **Download voices from repository.** The button reads a static `index.json` (schema 1) from a configurable URL: environment variable `VOXPRINT_VOICES_INDEX`, or the first line of
-`%LOCALAPPDATA%\Voxprint\state\voice_index_url.txt`. The built-in default is a placeholder (`.../OWNER/voxprint-voices/...`): until a real repository exists the dialog says "not set up yet". An empty list and no network
+`%LOCALAPPDATA%\Voxprint\state\voice_index_url.txt`. The built-in default is `voices/index.json` of this repository (`raw.githubusercontent.com/Mitroshenkov87/voxprint/main/voices/index.json`); the voice zips are release assets (tag `voices-v1`). A placeholder URL makes the dialog say "not set up yet". An empty list and no network
 are handled with friendly messages. Downloads are HTTPS-only, size-capped, **resumable** (a `.part` file named by the SHA-256 and an HTTP `Range` request; a server that ignores `Range` restarts the download), the SHA-256 from the index must match, and the licence in the index is the one shown. The last good index is cached (`state\voice_index_cache.json`), so the list still shows offline. Index format:
 ```json
 {"schema": 1, "voices": [{"id": "anna-ru", "name": "Anna", "language": "russian", "author": "...", "license": "CC-BY-4.0",
@@ -267,13 +267,15 @@ Start. A downloaded voice remembers its index id (`repo_id`) and is then shown o
 
 **Voice packages.** A voice package is a zip with the LoRA adapter and a `voice.json` (name, localized `names` / `descriptions`, licence, consent block). Packages are **not** part of this repository or the installer;
 they are hosted separately (a model host or a release asset) and listed in the voices index. Voices meant for testing carry the licence **`custom/test-use-only`** - *Test use only - no public release of generated audio, no commercial use*;
-their consent block has `method: "owner"` (the publisher owns the voice). **The voice "Alexander" (Александр).** A male Russian voice, the first one trained with Voxprint (10 minutes of the author's own recording). It is **not in this repository and not in the installer**; it is hosted separately
-(release asset / model host, see `tools/voice_specs/alexander.json`) and listed in the voices index. Licence: **personal use only - no public use of the output, no commercial projects** (`custom/personal-only`, scope *private only*, shown as a badge; voice type: male).
+their consent block has `method: "owner"` (the publisher owns the voice).
+
+**The voice "Alexander" (Александр).** A male Russian voice, the first one trained with Voxprint (10 minutes of the author's own recording). It is **not in this repository and not in the installer**; it is hosted separately
+(release asset `voices-v1`, spec `tools/voice_specs/alexander.json`) and listed in the public voices index (`voices/index.json`). Licence: **personal use only - no public use of the output, no commercial projects** (`custom/personal-only`, scope *private only*, shown as a badge; voice type: male).
 
 **The open universal voice ("Open universal voice" / "Открытый универсальный голос" / "Offene Universalstimme").** A fully open English voice for anyone who has no recording of their own: trained with Voxprint's own pipeline
 (LoRA, learning rate 1e-6, 10 epochs, 66 clips = 7.5 min) **only** from the public-domain **LJ Speech 1.1** dataset (reader Linda Johnson, LibriVox recordings; compiled by Keith Ito, <https://keithito.com/LJ-Speech-Dataset/>;
 the dataset is dedicated to the public domain, the Hugging Face copy `keithito/lj_speech` is tagged `unlicense`) on top of `Qwen/Qwen3-TTS-12Hz-1.7B-Base`, which is **Apache-2.0** (commercial use of the model, its outputs and adapters is allowed).
-The voice package is licensed **CC0-1.0** (free for any use, also commercial; attribution to the LJ Speech dataset is appreciated). It is not stored in this repository: the spec is `tools/voice_specs/open-universal.json`, the zip is hosted separately and listed in the voices index.
+The voice package is licensed **CC0-1.0** (free for any use, also commercial; attribution to the LJ Speech dataset is appreciated). It is not stored in this repository: the spec is `tools/voice_specs/open-universal.json`, the zip is a release asset (`voices-v1`) listed in `voices/index.json`.
 Measured on the finished voice: a 15.8 s sample was recognised back with WER 0.04 and a pitch shift of +1.0 semitone from the reference clip.
 
 The programme shows a "test use only" reminder on its card, in Narrate and when an audiobook made with it is ready. To publish a voice package yourself:
@@ -497,8 +499,7 @@ Ukrainian and Belarusian were dropped on purpose (fewer languages to keep in syn
 5. Mention it in this README.
 
 ### Repository link
-The GitHub URL lives in one place: `"repo_url"` in `credits.json` (read as `core.appinfo.REPO_URL`). While it still contains the placeholder `OWNER`
-the link is hidden in **About**; replace it with the real URL and the button appears.
+The GitHub URL lives in one place: `"repo_url"` in `credits.json` (read as `core.appinfo.REPO_URL`). A placeholder containing `OWNER` hides the link in **About**.
 
 ### Versions: "verified by Voxprint"
 `infra/verified_manifest.json` pins the package versions and model revisions (HF commit shas) Voxprint was tested with. The updater installs exactly those

@@ -92,8 +92,7 @@ def test_about_info_matches_credits():
 
 # ------------------------------------------------------------------ repository link
 def test_repo_url_placeholder_is_hidden():
-    assert "OWNER" in DATA["repo_url"]                         # still the placeholder
-    assert appinfo.public_repo_url() is None
+    assert DATA["repo_url"] == "https://github.com/Mitroshenkov87/voxprint" and appinfo.public_repo_url() == DATA["repo_url"]
     assert appinfo.public_repo_url("https://github.com/OWNER/voxprint") is None
     assert appinfo.public_repo_url("") is None
     assert appinfo.public_repo_url("https://github.com/alex/voxprint") == "https://github.com/alex/voxprint"
@@ -109,7 +108,7 @@ def test_about_dialog_hides_link_for_placeholder_and_shows_for_real_url(app):
     from PySide6.QtCore import QUrl
     from ui.about_dialog import AboutDialog
     opened = []
-    d = AboutDialog(None, open_url=lambda u: opened.append(u.toString()) or True)
+    d = AboutDialog(None, repo_url="https://github.com/OWNER/voxprint", open_url=lambda u: opened.append(u.toString()) or True)
     d.show()
     assert d.btn_repo.isHidden() and d.repo_link is None          # OWNER placeholder -> no link
     assert d.open_repo() is False and opened == []
@@ -151,6 +150,6 @@ def test_main_window_about_button_opens_dialog(app):
     dlg = w.settings_dialog()
     assert dlg.btn_about.isEnabled()
     dlg.btn_about.click()
-    assert w._about.isVisible() and w._about.btn_repo.isHidden()
+    assert w._about.isVisible() and not w._about.btn_repo.isHidden()
     w._about.close()
     w.close()

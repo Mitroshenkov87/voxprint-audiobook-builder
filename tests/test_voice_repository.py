@@ -50,9 +50,11 @@ def index_doc(data):
         "garbage"]}
 
 
-def test_default_url_is_placeholder_so_not_configured(monkeypatch):
+def test_default_url_points_to_the_project_index_and_a_placeholder_is_not_configured(monkeypatch):
     monkeypatch.delenv(repo.ENV_INDEX_URL, raising=False)
-    assert repo.index_url() == repo.DEFAULT_INDEX_URL and not repo.is_configured()
+    assert repo.index_url() == repo.DEFAULT_INDEX_URL and repo.is_configured() and "OWNER" not in repo.DEFAULT_INDEX_URL
+    monkeypatch.setattr(repo, "DEFAULT_INDEX_URL", "https://raw.githubusercontent.com/OWNER/voxprint-voices/main/index.json")
+    assert not repo.is_configured()
     res = repo.fetch_index(opener=lambda *a, **k: pytest.fail("no network for an unconfigured repository"))
     assert res.error == "not_configured" and res.voices == []
 
