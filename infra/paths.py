@@ -120,7 +120,7 @@ def previous_homes() -> list:
     return out
 
 
-#: Маленькие файлы настроек, которые переносим из прежней установки (копируем только если их ещё нет).
+#: Small settings files carried over from an earlier installation (copied only if they do not exist yet).
 ADOPTED_STATE_FILES = ("language", "privacy_ack", "updater_state.json", "last_adapter.json")
 
 

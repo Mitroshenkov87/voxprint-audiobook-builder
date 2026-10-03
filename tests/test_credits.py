@@ -1,3 +1,4 @@
+"""About dialog, credits.json / THIRD_PARTY_NOTICES consistency and the repository-link placeholder logic."""
 import json
 import re
 from pathlib import Path
@@ -54,7 +55,7 @@ def test_soynlp_gpl_dependency_is_not_shipped():
     bat = (ROOT / "build.bat").read_bytes().decode("utf-8")
     assert "--exclude-module soynlp" in bat
     assert "--hidden-import soynlp" not in bat and "--collect-data soynlp" not in bat
-    assert "soynlp" in (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")   # объяснение в notices
+    assert "soynlp" in (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")   # the explanation is in the notices
 
 
 def test_notices_in_sync_with_credits_json():
@@ -89,9 +90,9 @@ def test_about_info_matches_credits():
     assert appinfo.notices_path().exists() and appinfo.licenses_dir().is_dir()
 
 
-# ------------------------------------------------------------------ ссылка на репозиторий
+# ------------------------------------------------------------------ repository link
 def test_repo_url_placeholder_is_hidden():
-    assert "OWNER" in DATA["repo_url"]                         # пока заглушка
+    assert "OWNER" in DATA["repo_url"]                         # still the placeholder
     assert appinfo.public_repo_url() is None
     assert appinfo.public_repo_url("https://github.com/OWNER/voxprint") is None
     assert appinfo.public_repo_url("") is None
@@ -110,7 +111,7 @@ def test_about_dialog_hides_link_for_placeholder_and_shows_for_real_url(app):
     opened = []
     d = AboutDialog(None, open_url=lambda u: opened.append(u.toString()) or True)
     d.show()
-    assert d.btn_repo.isHidden() and d.repo_link is None          # заглушка OWNER -> ссылки нет
+    assert d.btn_repo.isHidden() and d.repo_link is None          # OWNER placeholder -> no link
     assert d.open_repo() is False and opened == []
     d.close()
     d = AboutDialog(None, repo_url="https://github.com/alex/voxprint",
@@ -118,7 +119,7 @@ def test_about_dialog_hides_link_for_placeholder_and_shows_for_real_url(app):
     d.show()
     assert not d.btn_repo.isHidden() and d.btn_repo.toolTip() == "https://github.com/alex/voxprint"
     d.btn_repo.click()
-    assert opened == ["https://github.com/alex/voxprint"]          # открывается в браузере по умолчанию
+    assert opened == ["https://github.com/alex/voxprint"]          # opens in the default browser
     d.close()
 
 

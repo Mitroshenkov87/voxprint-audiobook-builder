@@ -57,7 +57,7 @@ def audio_stats(samples: np.ndarray, sr: int) -> Dict[str, float]:
 
 
 def reject_reason(stats: Dict[str, float], use_snr: bool = True) -> Optional[str]:
-    """Причина отбраковки (код) или None, если сегмент годится."""
+    """Reason code for rejecting a segment, or None if the segment is fine."""
     limit = max(CLIP_MIN_SAMPLES, int(CLIP_FRACTION * stats["samples"]))
     if stats["clipped_samples"] > limit:
         return "clipping"
@@ -91,7 +91,7 @@ class QualityResult:
 
 
 def assess_segments(pieces: Sequence[np.ndarray], sr: int) -> QualityResult:
-    """Оценивает каждый фрагмент. Если отбраковано слишком много (>50 %), SNR-критерий отключается."""
+    """Assess every piece.  If too many are rejected (> 50 %), the SNR criterion is switched off."""
     stats = [audio_stats(p, sr) for p in pieces]
     reasons = [reject_reason(s) for s in stats]
     snr_disabled = False

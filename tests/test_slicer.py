@@ -1,3 +1,4 @@
+"""Phrase building and cutting of aligned words into training segments."""
 import numpy as np
 
 from core.slicer import SliceConfig, build_phrases, cut_segments, slice_words
@@ -22,11 +23,11 @@ def test_segment_constraints_and_text_coverage():
     for s in res.segments:
         assert cfg.min_dur <= s.duration <= cfg.max_dur, s
         assert s.text and "\n" not in s.text
-    # сегменты не пересекаются и идут по порядку
+    # segments do not overlap and are in order
     for a, b in zip(res.segments, res.segments[1:]):
         assert a.end <= b.start + 1e-6
     assert [s.index for s in res.segments] == list(range(1, len(res.segments) + 1))
-    # покрытие текста: чистые буквы сегментов - непрерывная подпоследовательность текста
+    # text coverage: the clean letters of the segments form a contiguous subsequence of the text
     joined = "".join(clean_token(s.text) for s in res.segments)
     full = clean_token(text)
     assert len(joined) >= 0.9 * len(full)
@@ -43,7 +44,7 @@ def test_most_segments_end_at_sentence_boundaries_and_cut_on_pauses():
 
 
 def test_long_phrase_without_pauses_is_split():
-    # 40 слов подряд без пауз > 300 мс (по 0.5 с на слово = 20 с)
+    # 40 words in a row without pauses > 300 ms (0.5 s per word = 20 s)
     toks = [f"слово{chr(1072 + i % 20)}" for i in range(40)]
     text = " ".join(toks) + "."
     ws = [WordTiming(t, i * 0.5, i * 0.5 + 0.4) for i, t in enumerate(toks)]
@@ -57,7 +58,7 @@ def test_pause_threshold():
     ws = [WordTiming("а", 0, 0.3), WordTiming("б", 0.5, 0.8), WordTiming("в", 1.2, 1.5)]
     attach_spans(ws, "а б в")
     ph = build_phrases(ws, SliceConfig())
-    assert [len(p.words) for p in ph] == [2, 1]  # пауза 0.2 < 0.3, пауза 0.4 > 0.3
+    assert [len(p.words) for p in ph] == [2, 1]  # pause 0.2 < 0.3, pause 0.4 > 0.3
 
 
 def test_cut_segments_shapes():

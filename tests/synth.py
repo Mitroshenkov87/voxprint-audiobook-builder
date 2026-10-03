@@ -1,4 +1,7 @@
-"""Синтетическое «чтение»: аудио с известной разметкой + имитация выравнивателя с реальным поведением."""
+"""Synthetic "reading": audio with a known ground-truth timeline plus an aligner that mimics the real one.
+
+Used by the dataset-builder, slicer and quality tests, so the whole pipeline can be exercised without any model.
+The vocabulary is Russian on purpose (the main target language of the text normalizer); it is test data."""
 from __future__ import annotations
 
 import random
@@ -16,6 +19,7 @@ VOCAB = ("дом лес река небо город человек время �
 
 
 def make_text(n_sentences: int, seed: int = 1) -> str:
+    """Deterministic pseudo-random Russian text of ``n_sentences`` sentences with commas and sentence-final punctuation."""
     rnd = random.Random(seed)
     sents = []
     for _ in range(n_sentences):
@@ -28,6 +32,7 @@ def make_text(n_sentences: int, seed: int = 1) -> str:
 
 
 def gap_after(word: str, char_dur_gap=(0.06, 0.4, 0.7)) -> float:
+    """Pause (seconds) after a word: long after ``.!?``, medium after ``,;:``, short otherwise."""
     if word and word[-1] in ".!?…":
         return char_dur_gap[2]
     if word and word[-1] in ",;:":
@@ -36,6 +41,7 @@ def gap_after(word: str, char_dur_gap=(0.06, 0.4, 0.7)) -> float:
 
 
 def truth_timeline(text: str, start: float = 0.5, char_dur: float = 0.07) -> List[Tuple[str, float, float]]:
+    """Ground truth: ``[(clean_word, start, end)]`` for the text at a constant speaking rate (``char_dur`` s per letter)."""
     out, t = [], start
     for tok in text.split():
         c = clean_token(tok)
@@ -48,6 +54,7 @@ def truth_timeline(text: str, start: float = 0.5, char_dur: float = 0.07) -> Lis
 
 
 def synth_reading(text: str, sr: int = 16000, seed: int = 0, noise: float = 0.002, tail: float = 0.8):
+    """Synthesize audio for the text from :func:`truth_timeline` (harmonic bursts over noise); returns ``(samples, timeline)``."""
     tl = truth_timeline(text)
     total = tl[-1][2] + tail
     rnd = np.random.default_rng(seed)
@@ -63,17 +70,20 @@ def synth_reading(text: str, sr: int = 16000, seed: int = 0, noise: float = 0.00
 
 
 class TrueRateAligner(BaseAligner):
-    """Ведёт себя как настоящий: читает текст с «реальным» темпом от начала речи в куске.
-    Лишний текст схлопывается в нулевые слова у конца аудио; нехватка текста оставляет хвост."""
+    """Behaves like the real aligner: reads the text at the \"true\" speaking rate from the start of speech in the chunk.
+    Surplus text collapses into zero-length words at the end of the audio; too little text leaves a tail."""
 
     def __init__(self):
+        """Counts the calls and remembers whether load() was called."""
         self.calls = 0
         self.loaded = False
 
     def load(self):
+        """Mark the aligner as loaded."""
         self.loaded = True
 
     def align(self, audio, sr, text, language):
+        """Time the words as if spoken at the true rate starting at the first voiced sample of ``audio``."""
         self.calls += 1
         vs, _ = au.voiced_bounds(audio, sr)
         end = len(audio) / sr

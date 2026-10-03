@@ -1,3 +1,4 @@
+"""Main window behaviour under the offscreen Qt platform: core buttons, Settings dialog, scrolling, voice fields, progress, errors, theme contrast."""
 import os
 import time
 from pathlib import Path
@@ -45,7 +46,7 @@ def test_main_window_keeps_only_core_buttons_plus_gear(app):
         assert not hasattr(w, gone)
     assert w.btn_settings.isEnabled() and w.btn_settings.toolTip() == "Настройки"
     assert w.windowTitle() == "Voxprint"
-    assert not w.btn_lora.isEnabled() and not w.btn_dataset.isEnabled()  # нет файлов
+    assert not w.btn_lora.isEnabled() and not w.btn_dataset.isEnabled()  # no files
     assert [s.label for s in plan_for(KIND_LORA)] == [
         "Проверка обновлений", "Загрузка модели", "Выравнивание", "Нарезка", "Обучение LoRA", "Сохранение"]
     w.close()
@@ -85,7 +86,7 @@ def test_successful_run_shows_ready_and_progress(app, tmp_path):
     w.progress.valueChanged.connect(seen.append)
     w.btn_lora.click()
     assert wait_for(lambda: not w.lbl_ready.isHidden())
-    assert w.progress.value() == 100 and seen == sorted(seen)  # прогресс монотонный
+    assert w.progress.value() == 100 and seen == sorted(seen)  # progress is monotonic
     assert not w.btn_open.isHidden() and w.result_dir == tmp_path
     assert "12" in w.lbl_status.text()
     assert w.btn_lora.isEnabled()
@@ -114,7 +115,7 @@ def test_friendly_errors(app, tmp_path, exc, kind):
     if kind == "download":
         assert exc.url
     if kind == "other":
-        assert "boom" not in w.last_error_text  # технические детали не показываем в основном тексте
+        assert "boom" not in w.last_error_text  # technical details are not shown in the main text
     w.close()
 
 
@@ -161,7 +162,7 @@ def test_os_check_and_backdrop_plain_on_linux():
     bad = pw.check_os(build=22631, is_windows=True)
     assert not bad.ok and "26H2" in bad.message and "22631" in bad.message
     assert not pw.check_os(is_windows=False).ok
-    assert pw.apply_backdrop(0) == "plain"  # на Linux - без эффекта и без исключений
+    assert pw.apply_backdrop(0) == "plain"  # on Linux: no effect and no exceptions
 
 
 def test_style_modes():
@@ -217,7 +218,7 @@ def test_first_run_prefetch_message_and_buttons(app, tmp_path):
     w.set_text(tmp_path / "t.txt")
     w.show()
     w.start_prefetch()
-    assert not w.btn_lora.isEnabled()  # во время первичной загрузки кнопки заблокированы
+    assert not w.btn_lora.isEnabled()  # the buttons are locked during the first-run download
     gate.set()
     assert wait_for(lambda: "готово" in w.lbl_status.text().lower() and not w.busy)
     assert calls and w.btn_lora.isEnabled()
@@ -243,7 +244,7 @@ def test_privacy_footer_and_one_time_notice(app, tmp_path):
     w = mw.MainWindow(runner=lambda *a, **k: None, autocheck=False, auto_open_folder=False)
     assert "собственный голос" in w.lbl_privacy.text() and "только на этом компьютере" in w.lbl_privacy.text()
     assert not mw.privacy_acknowledged()
-    assert w.maybe_show_privacy_notice() is False          # offscreen: окно не показываем
+    assert w.maybe_show_privacy_notice() is False          # offscreen: the window is not shown
     assert not mw.privacy_acknowledged()
     mw.acknowledge_privacy()
     assert mw.privacy_acknowledged() and mw.privacy_marker().parent == mw.paths.state_dir()

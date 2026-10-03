@@ -1,3 +1,4 @@
+"""Shared pytest setup: every test gets an isolated app-data folder, a fixed language and no network/model-cache access."""
 import os
 import sys
 from pathlib import Path
@@ -12,15 +13,15 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 @pytest.fixture(autouse=True)
 def _isolated_home(tmp_path, monkeypatch):
-    """Тесты никогда не пишут в настоящий каталог данных приложения."""
+    """Tests never write to the real application data folder."""
     monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "voxprint_home"))
-    # Старые проверки сравнивают русские сообщения; язык по умолчанию в тестах - русский.
-    # (Тесты локализации задают VOXPRINT_LANG сами.)
+    # Many tests compare Russian messages, so the default test language is Russian.
+    # (The localization tests set VOXPRINT_LANG themselves.)
     monkeypatch.setenv("VOXPRINT_LANG", "ru")
-    # %APPDATA%/%LOCALAPPDATA% реальной машины не должны попадать в поиск прежних установок (Windows)
+    # The real machine's %APPDATA%/%LOCALAPPDATA% must not leak into the search for earlier installs (Windows)
     monkeypatch.setenv("APPDATA", str(tmp_path / "appdata_roaming"))
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "appdata_local"))
-    # Никаких обращений к сети/чужим кэшам моделей из обычных тестов (отдельные тесты включают их сами).
+    # Ordinary tests never touch the network or other programs' model caches (dedicated tests switch them on).
     monkeypatch.setenv("VOXPRINT_NO_EXTERNAL_MODELS", "1")
     monkeypatch.setenv("VOXPRINT_NO_MIRROR", "1")
     monkeypatch.setenv("VOXPRINT_NO_ENV_PROBE", "1")

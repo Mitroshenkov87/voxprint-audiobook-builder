@@ -1,3 +1,4 @@
+"""Infrastructure without network: version logic, the verified manifest, model downloader, updater, VRAM planning."""
 import json
 from pathlib import Path
 
@@ -19,7 +20,7 @@ def home(tmp_path, monkeypatch):
     return tmp_path / "home"
 
 
-# ---------------- версии
+# ---------------- versions
 def test_compare_versions():
     assert compare_versions("1.2.0", "1.10.0") == -1
     assert compare_versions("2.0", "2.0.0") == 0
@@ -50,7 +51,7 @@ def test_check_versions_report_latest_channel():
     rep = check_versions({"M/a": "OLD", "M/b": "NEW"}, fetch, inst, packages={"qwen-asr": "", "peft": "", "zzz": ""},
                          models=("M/a", "M/b", "M/c"), channel=CHANNEL_LATEST)
     names = {p.name: p.update_available for p in rep.packages}
-    assert names == {"qwen-asr": True, "peft": False, "zzz": True}  # zzz не установлен -> можно поставить
+    assert names == {"qwen-asr": True, "peft": False, "zzz": True}  # zzz is not installed -> can be installed
     mod = {m.repo_id: m.update_available for m in rep.models}
     assert mod == {"M/a": True, "M/b": False, "M/c": False}
     assert rep.has_updates and rep.network_ok and rep.channel == "latest"
@@ -68,12 +69,12 @@ def test_verified_channel_uses_manifest_pins_and_only_reports_newer():
                          models=("M/a",), manifest=man)
     st = {p.name: p for p in rep.packages}
     assert st["qwen-asr"].target == "0.0.7" and st["qwen-asr"].update_available and st["qwen-asr"].pinned
-    assert st["peft"].target == "0.0.6" and st["peft"].update_available       # откат вниз к проверенной
-    assert st["other"].target is None and not st["other"].update_available     # без пина - не трогаем...
-    assert st["other"].newer_unverified                                        # ...но сообщаем про 0.0.8
-    assert st["bitsandbytes"].target is None                                   # необязательный и не установлен
+    assert st["peft"].target == "0.0.6" and st["peft"].update_available       # roll back down to the verified version
+    assert st["other"].target is None and not st["other"].update_available     # no pin - leave it alone...
+    assert st["other"].newer_unverified                                        # ...but report 0.0.8
+    assert st["bitsandbytes"].target is None                                   # optional and not installed
     assert rep.models[0].target_sha == "P" * 40 and rep.models[0].update_available
-    assert rep.models[0].newer_unverified                                      # HEAD != проверенная ревизия
+    assert rep.models[0].newer_unverified                                      # HEAD != verified revision
     assert "qwen-asr 0.0.8" in rep.unverified_newer and rep.manifest_date == "2026-10-02"
 
 
@@ -91,8 +92,8 @@ def test_plan_16gb_follows_alexandria_recipe():
     assert p.batch_size == 1 and p.grad_accum in (4, 5, 6, 7, 8) and p.gradient_checkpointing
     assert p.dtype == "bfloat16" and p.lora_r == 32 and p.lora_alpha == 128
     assert p.language == "russian" and p.attn_implementation == "eager"
-    assert p.lr == 1e-6                      # < 90 примеров
-    assert 250 <= 61 * p.epochs <= 400       # правило lora.md
+    assert p.lr == 1e-6                      # < 90 examples
+    assert 250 <= 61 * p.epochs <= 400       # the lora.md rule
 
 
 def test_hyperparameters_auto_rules():
@@ -128,12 +129,12 @@ def test_reduce_after_oom_chain():
     assert reduce_after_oom(plan_training(GpuInfo(False), 10)) is None
 
 
-# ---------------- манифест «проверено Voxprint»
+# ---------------- the "verified by Voxprint" manifest
 def test_bundled_manifest_is_valid_and_consistent():
     m = load_bundled()
     assert m.packages["transformers"].startswith("4.57") and m.packages["peft"] == "0.18.1"
     assert set(m.packages) <= set(TRACKED_PACKAGES) and set(m.models) == set(TRACKED_MODELS)
-    # requirements-verified.txt и requirements-nodeps.txt выведены из манифеста
+    # requirements-verified.txt and requirements-nodeps.txt are derived from the manifest
     root = Path(__file__).resolve().parent.parent
     ver = {ln.strip() for ln in (root / "requirements-verified.txt").read_text(encoding="utf-8").splitlines()
            if ln.strip() and not ln.startswith("#")}
@@ -156,10 +157,10 @@ def test_remote_manifest_used_only_if_valid_and_not_older():
     newer = {"schema": 1, "date": "2027-01-01", "packages": {"peft": "0.19.0"}, "models": {}}
     m = load_manifest(lambda u: newer, url="https://example.invalid/m.json")
     assert m.source == "remote" and m.packages == {"peft": "0.19.0"}
-    # результат кэшируется и используется офлайн
+    # the result is cached and used offline
     off = load_manifest(lambda u: (_ for _ in ()).throw(OSError("offline")), url="https://example.invalid/m.json")
     assert off.source == "cache" and off.packages == {"peft": "0.19.0"}
-    # старее встроенного / повреждён - игнорируется
+    # older than the bundled one / corrupt - ignored
     older = {"schema": 1, "date": "2020-01-01", "packages": {"peft": "0.1.0"}, "models": {}}
     paths_cache = paths.state_dir() / "verified_manifest.json"
     paths_cache.unlink()
@@ -168,7 +169,7 @@ def test_remote_manifest_used_only_if_valid_and_not_older():
     assert load_manifest(lambda u: {"schema": 1, "packages": {"evil": "1"}}, url="https://x").source == "bundled"
 
 
-# ---------------- загрузчик моделей
+# ---------------- model downloader
 def _fake_snapshot(files=("config.json", "model.safetensors"), fail=False):
     def sd(repo_id, local_dir, tqdm_class=None, **kw):
         if fail:
@@ -192,7 +193,7 @@ def test_ensure_model_downloads_then_reuses(tmp_path):
     assert md.verify_local_model(p) and md.local_revision("Org/Model", tmp_path) == "abc123"
     assert not (tmp_path / "Org--Model.partial").exists()
     assert any(f == 1.0 for f, _ in calls) and any("Первый запуск" in m for _, m in calls)
-    # повторно - без обращения к сети
+    # a second time - without touching the network
     p2 = md.ensure_model("Org/Model", prog, root=tmp_path, snapshot_download=_fake_snapshot(fail=True))
     assert p2 == p
 
@@ -212,7 +213,7 @@ def test_incomplete_download_rejected(tmp_path):
                         get_remote_sha=lambda r: None)
 
 
-# ---------------- апдейтер
+# ---------------- updater
 def _updater(tmp_path, pip_ok=True, smoke_ok=True, now=1_000_000.0, **kw):
     from infra.updater import Updater
     log = {"pip": [], "smoke": []}
@@ -259,7 +260,7 @@ def test_update_success_swaps_and_reports(tmp_path):
     assert res.after == {"qwen-asr": "0.0.7"} and res.before == {"qwen-asr": "0.0.6"}
     assert res.needs_restart and not res.rolled_back
     assert (paths.packages_dir() / "qwen_asr" / "NEW").exists()
-    assert (paths.packages_dir() / "old_pkg" / "f").exists()  # прежние обновления сохранены
+    assert (paths.packages_dir() / "old_pkg" / "f").exists()  # earlier updates are preserved
     assert list(paths.app_home().glob("packages.bak-*"))
     assert "0.0.6 → 0.0.7" in res.summary_ru()
     assert "--no-deps" in log["pip"][0] and "qwen-asr==0.0.7" in log["pip"][0]
@@ -271,12 +272,12 @@ def test_update_success_swaps_and_reports(tmp_path):
 
 def test_verified_channel_ignores_newer_pypi_but_reports_it_and_restore_downgrades(tmp_path):
     u, log = _updater(tmp_path)
-    # PyPI знает 0.0.7, проверена 0.0.7; установлена 0.0.9 -> restore_verified откатывает к проверенной
+    # PyPI knows 0.0.7, 0.0.7 is verified; 0.0.9 is installed -> restore_verified rolls back to the verified one
     u.installed_fn = {"qwen-asr": "0.0.9"}.get
     u.fetch_json = lambda url: {"releases": {"0.0.7": [{}], "0.0.9": [{}]}} if "pypi" in url else {"sha": "x"}
     res = u.restore_verified()
     assert "qwen-asr==0.0.7" in log["pip"][0] and res.after == {"qwen-asr": "0.0.7"}
-    # а обычная проверка в verified-канале без пина не трогает пакет
+    # while a normal check in the verified channel without a pin leaves the package alone
     u2, log2 = _updater(tmp_path)
     u2._manifest = Manifest(date="2026-10-02", packages={})
     u2.fetch_json = lambda url: {"releases": {"0.0.6": [{}], "0.0.9": [{}]}} if "pypi" in url else {"sha": "x"}
@@ -299,7 +300,7 @@ def test_pinned_model_revision_is_requested(tmp_path):
         return _fake_snapshot()(repo_id, local_dir, tqdm_class)
     md.ensure_model("Org/M2", root=tmp_path, snapshot_download=sd, revision="b" * 40)
     assert seen["revision"] == "b" * 40 and md.local_revision("Org/M2", tmp_path) == "b" * 40
-    # закреплённая ревизия недоступна -> один повтор без ревизии
+    # the pinned revision is unavailable -> one retry without a revision
     calls = []
 
     def sd2(repo_id, local_dir, tqdm_class=None, **kw):
@@ -371,7 +372,7 @@ def test_offline_check_and_apply(tmp_path):
     u = Updater(fetch_json=fetch, python_exe="python", installed_fn=lambda n: "1", packages={"a": ""}, models=())
     rep, res = u.check_and_apply()
     assert not rep.network_ok and "интернет" in res.summary_ru()
-    assert u.should_autocheck()  # неудачная проверка не сбрасывает таймер
+    assert u.should_autocheck()  # a failed check does not reset the timer
 
 
 def test_net_urlopen_retries_with_certifi_on_cert_error(monkeypatch):

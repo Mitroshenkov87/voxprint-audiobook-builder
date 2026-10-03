@@ -1,3 +1,4 @@
+"""Russian text normalizer (numbers, abbreviations) and its position map back to the original text."""
 import pytest
 
 from core import normalizer as nz
@@ -25,7 +26,7 @@ def test_normalize_builtin_engine_keeps_sentence_ends_and_map(engine):
     assert r.changed and "двадцать пять человек." in r.spoken
     assert r.spoken.count(".") + r.spoken.count("!") == 3
     assert not any(ch.isdigit() for ch in r.spoken)
-    # карта: фрагмент «двадцать пять» -> исходное «25»
+    # map: the fragment "двадцать пять" -> the original "25"
     i = r.spoken.index("двадцать пять")
     assert r.raw_for_span(i, i + len("двадцать пять")) == "25"
     j = r.spoken.index("Конец")

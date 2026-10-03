@@ -65,6 +65,7 @@ class Qwen3Aligner(BaseAligner):
     """Wrapper around ``qwen_asr.Qwen3ForcedAligner`` (transformers backend; bfloat16 on CUDA, float32 on CPU)."""
 
     def __init__(self, model_path: str = ALIGNER_MODEL_ID, device: str = "auto") -> None:
+        """``device``: ``auto`` (CUDA if available, else CPU), ``cuda:0`` or ``cpu``.  The model is loaded lazily by :meth:`load`."""
         self.model_path = model_path
         self.device = device
         self._model = None
@@ -134,6 +135,7 @@ class CtcAligner(BaseAligner):
     """
 
     def __init__(self, device: str = "auto", batch_size: int = 8) -> None:
+        """``batch_size`` is the number of audio windows the emission model processes at once."""
         self.device = device
         self.batch_size = batch_size
         self._model = None
@@ -198,6 +200,7 @@ class FallbackAligner(BaseAligner):
     """
 
     def __init__(self, primary: BaseAligner, fallback: Optional[BaseAligner]) -> None:
+        """``fallback`` may be None, in which case a primary failure is simply reported."""
         self.primary, self.fallback = primary, fallback
         self.using_fallback = False
 
@@ -253,6 +256,7 @@ class FakeAligner(BaseAligner):
     """
 
     def __init__(self) -> None:
+        """``calls`` counts the align() calls (handy in tests)."""
         self.calls = 0
 
     def align(self, audio: np.ndarray, sr: int, text: str, language: str) -> List[WordTiming]:

@@ -1,3 +1,4 @@
+"""The task runner and the command-line flags, driven with a fake aligner (no models, no network)."""
 import shutil
 import subprocess
 from pathlib import Path
@@ -57,7 +58,7 @@ def test_run_task_lora_passes_language_and_warnings_to_trainer(tmp_path, monkeyp
     assert called["cpu"] is True and res.adapter_path == tmp_path / "out" / "output" / "Мой голос"
     assert called["lang"] == "russian" and "предупреждение обучения" in res.warnings
     assert called["o"] == tmp_path / "out" / "output" / "Мой голос"
-    assert Stage.SAVE not in stages  # SAVE показывает только тренер; запись датасета идёт под «Нарезка»
+    assert Stage.SAVE not in stages  # only the trainer reports SAVE; writing the dataset is reported under "Slicing"
 
 
 def test_overall_percent_monotonic_over_plan():

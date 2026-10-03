@@ -31,7 +31,7 @@ def certifi_context() -> Optional[ssl.SSLContext]:
             import certifi
 
             _certifi_ctx = ssl.create_default_context(cafile=certifi.where())
-        except Exception:  # noqa: BLE001 - certifi не установлен: запасного пути нет
+        except Exception:  # noqa: BLE001 - certifi is not installed: there is no fallback
             return None
     return _certifi_ctx
 
@@ -39,7 +39,7 @@ def certifi_context() -> Optional[ssl.SSLContext]:
 def urlopen(req, timeout: float = 10.0):
     """Like :func:`urllib.request.urlopen`, but retries once through certifi on a certificate verification error."""
     try:
-        return urllib.request.urlopen(req, timeout=timeout)  # noqa: S310 - только https
+        return urllib.request.urlopen(req, timeout=timeout)  # noqa: S310 - https only
     except (urllib.error.URLError, ssl.SSLError, OSError) as exc:
         ctx = certifi_context() if _is_cert_error(exc) else None
         if ctx is None:

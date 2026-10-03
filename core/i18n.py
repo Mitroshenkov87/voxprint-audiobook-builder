@@ -56,7 +56,7 @@ def load_catalog(lang: str) -> Dict[str, str]:
 
 
 def normalize_code(value: Optional[str]) -> Optional[str]:
-    """'ru-RU' / 'de_AT.UTF-8' / 'EN' -> 'ru' / 'de' / 'en'; неподдерживаемый (в т.ч. uk, be) -> None."""
+    """'ru-RU' / 'de_AT.UTF-8' / 'EN' -> 'ru' / 'de' / 'en'; an unsupported language (incl. uk, be) -> None."""
     if not value:
         return None
     code = value.strip().lower().replace("_", "-").split(".")[0].split("@")[0].split("-")[0]
@@ -116,7 +116,7 @@ def get_language() -> str:
 
 
 def set_language(lang: str, *, persist: bool = False) -> str:
-    """Переключает язык. persist=True запоминает выбор пользователя в state/language."""
+    """Switch the language.  ``persist=True`` remembers the user's choice in ``state/language``."""
     global _current
     code = normalize_code(lang) or DEFAULT_LANG
     _current = code
@@ -129,7 +129,7 @@ def set_language(lang: str, *, persist: bool = False) -> str:
 
 
 def reset() -> None:
-    """Сбрасывает выбранный язык (повторное автоопределение). Для тестов."""
+    """Forget the selected language (auto-detection runs again).  For tests."""
     global _current
     _current = None
 
@@ -154,7 +154,7 @@ def tr(key: str, **params: object) -> str:
 
 
 def tr_lang(key: str, lang: str, **params: object) -> str:
-    """Перевод на указанный язык (без смены текущего) - для данных из credits.json и тестов."""
+    """Translate into the given language without changing the current one - for data from credits.json and for tests."""
     text = load_catalog(lang).get(key) or load_catalog(DEFAULT_LANG).get(key) or key
     try:
         return text.format(**params) if params else text

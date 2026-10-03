@@ -1,3 +1,4 @@
+"""LoRA trainer on a tiny randomly initialised Qwen3-TTS-like model: data prep, adapter format, checkpoints, meta files."""
 import json
 import re
 
@@ -32,7 +33,7 @@ def tiny_model():
     return Qwen3TTSForConditionalGeneration(cfg)
 
 
-G = 4  # кодовых групп в крошечной модели
+G = 4  # codec groups in the tiny model
 
 
 def _dataset(tmp_path, n=6):
@@ -70,7 +71,7 @@ def test_load_training_rows_follows_alexandria_contract(tmp_path):
     data = load_training_rows(d)
     assert len(data["rows"]) == 6 and data["ref_audio"].endswith("ref.wav")
     assert data["ref_text"] == "Образец голоса."
-    # audio_filepath тоже допустим (как в train_lora.py); ref_text.txt нет -> текст первого примера
+    # audio_filepath is accepted too (as in train_lora.py); no ref_text.txt -> the text of the first example
     (d / "ref_text.txt").unlink()
     assert load_training_rows(d)["ref_text"] == "Текст номер 1."
 
@@ -83,11 +84,11 @@ def test_teacher_forcing_input_layout_matches_alexandria():
     sample = {"codec_ids": torch.randint(0, 50, (T, G)), "spk_embedding": torch.randn(1, 32),
               "text_ids": torch.randint(1, 80, (1, L))}
     full, labels, codes, prefill = build_teacher_forcing_input(sample, m, m.talker, torch.device("cpu"), "russian")
-    # prefill = 3 роли + (4 codec-префикс + spk + pad + bos - 1) + (L-8 текста + eos) + 1 конец
+    # prefill = 3 roles + (4 codec prefix + spk + pad + bos - 1) + (L-8 text + eos) + 1 end
     assert prefill == 3 + 6 + (L - 8 + 1) + 1
     assert full.shape == (1, prefill + T, tc.hidden_size) and labels.shape == (1, prefill + T)
     assert (labels[0, :prefill] == -100).all() and (labels[0, prefill:] == sample["codec_ids"][:, 0]).all()
-    # язык не найден -> nothink-вариант: на один токен короче
+    # language not found -> the nothink variant: one token shorter
     full2, _, _, prefill2 = build_teacher_forcing_input(sample, m, m.talker, torch.device("cpu"), "klingon")
     assert prefill2 == prefill - 1
 
@@ -109,24 +110,24 @@ def test_train_on_tiny_model_end_to_end_writes_alexandria_adapter_folder(tmp_pat
     cfg = json.loads((out / "adapter_config.json").read_text())
     assert cfg["r"] == 4 and cfg["lora_alpha"] == 16
     assert sorted(cfg["target_modules"]) == ["k_proj", "o_proj", "q_proj", "v_proj"]
-    # ключи относительны к talker (не к всей модели): base_model.model.model.layers.N.self_attn.q_proj...
+    # keys are relative to the talker (not to the whole model): base_model.model.model.layers.N.self_attn.q_proj...
     with safe_open(str(out / "adapter_model.safetensors"), "pt") as f:
         keys = list(f.keys())
     assert keys and all("lora_" in k for k in keys)
     assert any(k.startswith("base_model.model.model.layers.0.self_attn.q_proj.lora_A") for k in keys)
     assert not any(".talker." in k or k.startswith("base_model.model.talker") for k in keys)
-    assert any("code_predictor" in k for k in keys)      # как у Alexandria: суффиксное совпадение q/k/v/o_proj
-    # training_meta.json - те же ключи, что у Alexandria
+    assert any("code_predictor" in k for k in keys)      # as in Alexandria: suffix match of q/k/v/o_proj
+    # training_meta.json has the same keys as Alexandria's
     meta = json.loads((out / "training_meta.json").read_text(encoding="utf-8"))
     assert set(meta) == {"model_name", "epochs", "lr", "lora_r", "lora_alpha", "gradient_accumulation_steps",
                          "batch_size", "num_samples", "final_loss", "best_loss", "training_time_seconds",
                          "language", "ref_sample_audio", "ref_sample_text"}
     assert meta["language"] == "russian" and meta["ref_sample_text"] == "Образец голоса."
     assert meta["batch_size"] == 1 and meta["num_samples"] == 6 and meta["epochs"] == 2
-    # чекпойнты по эпохам
+    # per-epoch checkpoints
     for e in (1, 2):
         assert (out / "checkpoints" / f"epoch_{e:02d}" / "adapter_model.safetensors").exists()
-    # потребитель (Alexandria): PeftModel.from_pretrained(talker, adapter_path) на свежей модели
+    # the consumer (Alexandria): PeftModel.from_pretrained(talker, adapter_path) on a fresh model
     from peft import PeftModel
     fresh = tiny_model()
     reloaded = PeftModel.from_pretrained(fresh.talker, str(out))

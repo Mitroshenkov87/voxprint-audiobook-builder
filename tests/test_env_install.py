@@ -572,5 +572,5 @@ def test_ensure_ffmpeg_in_audio_utils_requires_smoke_test(monkeypatch, tmp_path)
 
 
 def test_default_venv_python_matches_supported_runtime():
-    # --verify-install сравнивает версию Python из манифеста с запущенным интерпретатором (3.11): venv по умолчанию - тоже 3.11
+    # --verify-install compares the manifest's Python version with the running interpreter (3.11): the default venv is 3.11 too
     assert ist.PYTHON_VERSION_DEFAULT == "3.11"

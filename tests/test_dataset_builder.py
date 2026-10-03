@@ -1,3 +1,4 @@
+"""Dataset builder end to end on synthetic audio: segments, reference clip, metadata.jsonl, long recordings, quality filter."""
 import json
 import wave
 
@@ -31,7 +32,7 @@ def test_jsonl_roundtrip_utf8_no_bom(tmp_path):
     write_metadata_jsonl(p, make_rows(segs))
     raw = p.read_bytes()
     assert not raw.startswith(b"\xef\xbb\xbf") and b"\r" not in raw
-    assert "Привет" in raw.decode("utf-8")  # без \u-экранирования
+    assert "Привет" in raw.decode("utf-8")  # no \u escaping
     rows = read_metadata_jsonl(p)
     assert rows[0] == {"audio": "segment_001.wav", "text": "Привет, мир!", "ref_audio": "ref.wav"}
     assert list(rows[0].keys()) == ["audio", "text", "ref_audio"]
@@ -51,24 +52,24 @@ def test_full_pipeline_with_true_rate_aligner(tmp_path):
         with wave.open(str(f)) as w:
             assert w.getframerate() == 24000 and w.getnchannels() == 1
             dur = w.getnframes() / 24000
-        # 3-12 с речи + ~1 с тишины в конце
+        # 3-12 s of speech + ~1 s of silence at the end
         assert 3.0 + 0.95 <= dur <= 12.0 + 1.05
         x, _ = au.load_audio(f, 24000)
         assert np.abs(x[-int(0.9 * 24000):]).max() < 1e-3
         assert r["text"] and not any(ch in r["text"] for ch in "\n\r\t")
     with wave.open(str(out / "ref.wav")) as w:
         assert w.getframerate() == 24000 and 5.0 <= w.getnframes() / 24000 <= 10.0
-    # ref_text.txt - точная транскрипция ref.wav (подстрока текста чтения)
+    # ref_text.txt is the exact transcript of ref.wav (a substring of the reading text)
     ref_text = (out / "ref_text.txt").read_text(encoding="utf-8").strip()
     assert ref_text and ref_text in " ".join(text.split()) and ref_text == res.ref_text.strip()
     assert res.training_language == "russian"
     assert set(p.name for p in out.iterdir()) >= {"metadata.jsonl", "ref.wav", "ref_text.txt", "report.json"}
     assert all(set(r) == {"audio", "text", "ref_audio"} for r in rows)
-    # текст сегментов - подстроки исходного (чистый, с пунктуацией)
+    # the segment texts are substrings of the source (clean, with punctuation)
     flat = " ".join(text.split())
     for r in rows:
         assert r["text"] in flat
-    # сегмент реально содержит речь в нужном месте: первая буква сегмента совпадает по времени
+    # the segment really contains speech at the right place: its first letter matches in time
     assert Stage.ALIGN in stages and Stage.SLICE in stages and Stage.SAVE in stages and Stage.MODEL in stages
     report = json.loads((out / "report.json").read_text(encoding="utf-8"))
     assert report["segments"] == res.n_segments and report["language"] == "Russian"
@@ -87,7 +88,7 @@ def test_rerun_cleans_old_files(tmp_path):
 def test_quality_filter_drops_clipped_segments_automatically(tmp_path):
     wav, txt, text, audio, tl = _write_inputs(tmp_path, n_sent=40)
     clean = DatasetBuilder(TrueRateAligner()).run(wav, txt, tmp_path / "a")
-    # забиваем клиппингом участок записи в середине
+    # fill a section in the middle of the recording with clipping
     mid = int(len(audio) / 2)
     bad = audio.copy()
     bad[mid:mid + 16000 * 2] = np.sign(np.sin(np.arange(16000 * 2) * 0.05)).astype(np.float32)
@@ -96,7 +97,7 @@ def test_quality_filter_drops_clipped_segments_automatically(tmp_path):
     assert res.n_dropped_quality >= 1 and res.n_segments < clean.n_segments
     rep = json.loads((tmp_path / "b" / "report.json").read_text(encoding="utf-8"))
     assert rep["quality_dropped"] == res.n_dropped_quality and "clipping" in rep["quality_dropped_reasons"]
-    # индексы файлов идут подряд и совпадают с metadata.jsonl
+    # file indices are consecutive and match metadata.jsonl
     rows = read_metadata_jsonl(tmp_path / "b" / "metadata.jsonl")
     assert [r["audio"] for r in rows] == [f"segment_{i:03d}.wav" for i in range(1, len(rows) + 1)]
     assert all((tmp_path / "b" / r["audio"]).exists() for r in rows)
@@ -123,7 +124,7 @@ def test_digits_are_normalized_before_alignment_and_raw_kept_in_report(tmp_path)
 
 def test_mismatch_detected(tmp_path):
     wav, txt, text, *_ = _write_inputs(tmp_path, n_sent=30)
-    txt.write_text(make_text(120, seed=9), encoding="utf-8")  # текст в 4 раза длиннее
+    txt.write_text(make_text(120, seed=9), encoding="utf-8")  # text 4 times longer
     with pytest.raises(AudioTextMismatchError):
         DatasetBuilder(TrueRateAligner()).run(wav, txt, tmp_path / "o")
 
@@ -147,7 +148,7 @@ def test_bad_audio(tmp_path):
 
 
 def test_long_audio_chunking_matches_truth():
-    # ~9 минут: обязательно разбивается на несколько кусков
+    # ~9 minutes: must be split into several chunks
     text = make_text(330, seed=11)
     audio, tl = synth_reading(text, seed=2)
     total = len(audio) / 16000

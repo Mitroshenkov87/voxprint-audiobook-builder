@@ -32,7 +32,7 @@ class Stage(enum.Enum):
 #: progress(stage, fraction_inside_stage 0..1, message)
 ProgressCallback = Callable[[Stage, float, str], None]
 
-#: Относительные «веса» этапов для общего процента.
+#: Relative "weights" of the stages for the overall percentage.
 STAGE_WEIGHTS: Dict[Stage, float] = {
     Stage.UPDATES: 2,
     Stage.MODEL: 8,
@@ -70,6 +70,7 @@ class CancelToken:
     """Thread-safe cancellation flag shared between the GUI thread and the worker."""
 
     def __init__(self) -> None:
+        """Create a token in the not-cancelled state."""
         self._event = threading.Event()
 
     def cancel(self) -> None:

@@ -1,3 +1,4 @@
+"""Text helpers: decoding, language detection, sentence/clause splitting, word-to-text alignment spans."""
 from core.text_utils import (attach_spans, decode_bytes, detect_language, normalize_text, split_clauses,
                              split_sentences, text_for_words)
 from core.types import WordTiming

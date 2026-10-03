@@ -46,7 +46,7 @@ def is_placeholder(url: str) -> bool:
 
 
 def public_repo_url(url: Optional[str] = None) -> Optional[str]:
-    """Ссылка для показа пользователю или None, если адрес ещё не задан (заглушка)."""
+    """The repository link to show the user, or None while the address is still the placeholder."""
     u = REPO_URL if url is None else url
     return None if is_placeholder(u) else u.strip()
 
@@ -57,7 +57,7 @@ def components() -> List[Dict[str, Any]]:
 
 
 def localized(value: Any, lang: str) -> str:
-    """Значение вида {"en": ..., "ru": ...} -> строка на нужном языке (иначе английская)."""
+    """A value like ``{"en": ..., "ru": ...}`` -> the string in the requested language (English as the fallback)."""
     if isinstance(value, dict):
         return str(value.get(lang) or value.get("en") or "")
     return str(value or "")

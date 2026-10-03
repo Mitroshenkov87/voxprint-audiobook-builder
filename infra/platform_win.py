@@ -49,7 +49,7 @@ def windows_build() -> Optional[int]:
 
 
 def check_os(build: Optional[int] = None, is_windows: Optional[bool] = None) -> OsCheck:
-    """Мягкая проверка ОС: сообщение для пользователя, исключений не бросает."""
+    """Soft OS check: returns a message for the user and never raises."""
     win = IS_WINDOWS if is_windows is None else is_windows
     if not win:
         return OsCheck(False, None, tr("os.unsupported"))
@@ -62,9 +62,9 @@ def check_os(build: Optional[int] = None, is_windows: Optional[bool] = None) -> 
 
 
 def apply_backdrop(hwnd: int, dark: bool = True) -> str:
-    """Включает Acrylic через DwmSetWindowAttribute. Возвращает 'acrylic' или 'plain'.
+    """Enable Acrylic through ``DwmSetWindowAttribute``.  Returns ``'acrylic'`` or ``'plain'``.
 
-    Без Windows 11 22H2+ (или при любой ошибке) возвращает 'plain' - окно останется просто тёмным.
+    Without Windows 11 22H2+ (or on any error) it returns ``'plain'`` - the window just stays plainly dark.
     """
     if not IS_WINDOWS:
         return "plain"

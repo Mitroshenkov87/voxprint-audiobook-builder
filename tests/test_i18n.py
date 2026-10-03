@@ -1,3 +1,4 @@
+"""Localization: key/placeholder parity of en/ru/de, language detection and switching, no hard-coded user strings in code."""
 import json
 import re
 from pathlib import Path
@@ -50,23 +51,23 @@ def test_every_key_used_in_code_exists():
                                                       ("updates", "model", "align", "slice", "train", "save")}
     used |= {f"about.kind_{k}" for k in ("model", "library", "tool", "asset")}
     from infra.install_state import ALL_CODES
-    used |= {f"health.{c}" for c in ALL_CODES}          # коды причин проверки установки (динамический ключ)
+    used |= {f"health.{c}" for c in ALL_CODES}          # install-check reason codes (dynamic key)
     en = _cat("en")
-    used.discard("stage.")             # префикс для динамических ключей stage.<этап>
+    used.discard("stage.")             # prefix of the dynamic keys stage.<stage>
     assert used and not (used - set(en)), used - set(en)
     unused = set(en) - used
-    assert not unused, unused            # лишних ключей в каталоге нет
+    assert not unused, unused            # no unused keys in the catalog
 
 
 def test_no_cyrillic_user_literals_left_in_code():
-    """Все пользовательские сообщения идут через tr(): в коде не осталось русских строковых литералов
-    (кроме таблиц сокращений нормализатора и текста для проверочного скрипта)."""
+    """All user messages go through tr(): no Russian string literals are left in the code
+    (except the normalizer's abbreviation tables and the text of the update smoke-test script)."""
     import ast
     bad = []
     for f in list(ROOT.glob("core/*.py")) + list(ROOT.glob("infra/*.py")) + list(ROOT.glob("workers/*.py")) + \
             list(ROOT.glob("ui/*.py")):
-        # исключения: таблицы сокращений, названия языков, двуязычный USAGE.txt, проверочный скрипт обновлений,
-        # служебные комментарии генератора requirements-файлов
+        # exceptions: abbreviation tables, language names, the bilingual USAGE.txt, the update smoke-test script,
+        # service comments of the requirements-file generator
         if f.name in ("normalizer.py", "text_utils.py", "i18n.py", "model_export.py", "updater.py",
                       "verified_manifest.py"):
             continue
@@ -85,9 +86,9 @@ def test_tr_fallbacks(monkeypatch):
     i18n.set_language("de")
     assert tr("ui.btn_dataset") == "Datensatz erstellen"
     assert tr("no.such.key") == "no.such.key"
-    assert tr("progress.pieces") == _cat("de")["progress.pieces"]            # нет параметра - без исключения
+    assert tr("progress.pieces") == _cat("de")["progress.pieces"]            # missing parameter - no exception
     assert tr("progress.pieces", n=3) == "Erhaltene Fragmente: 3"
-    # нет перевода в языке -> английский
+    # no translation in that language -> English
     monkeypatch.setitem(i18n.load_catalog("de"), "ui.cancel", "")
     del i18n.load_catalog("de")["ui.cancel"]
     i18n.set_language("de")
@@ -106,20 +107,20 @@ def test_detection_order(monkeypatch, tmp_path):
     for v in ("LC_ALL", "LC_MESSAGES", "LANG", "VOXPRINT_LANG"):
         monkeypatch.delenv(v, raising=False)
     monkeypatch.setattr(i18n.locale, "getlocale", lambda *a: (None, None))
-    monkeypatch.setattr(i18n.sys, "platform", "linux")      # на Windows язык ОС берётся из GetUserDefaultLocaleName, а не из LANG
-    assert i18n.detect_language() == "en"                       # по умолчанию - английский
+    monkeypatch.setattr(i18n.sys, "platform", "linux")      # on Windows the OS language comes from GetUserDefaultLocaleName, not from LANG
+    assert i18n.detect_language() == "en"                       # the default is English
     i18n.reset()
     assert tr("ui.btn_lora") == "Create voice (LoRA)"
     monkeypatch.setenv("LANG", "uk_UA.UTF-8")
     assert i18n.detect_language() == "en"                       # unsupported system language -> English
     monkeypatch.setenv("LANG", "ru_RU.UTF-8")
-    assert i18n.detect_language() == "ru"                       # язык системы
+    assert i18n.detect_language() == "ru"                       # the system language
     i18n.set_language("de", persist=True)
-    assert i18n.saved_language() == "de" and i18n.detect_language() == "de"   # сохранённый выбор важнее системы
+    assert i18n.saved_language() == "de" and i18n.detect_language() == "de"   # a saved choice beats the system language
     monkeypatch.setenv("VOXPRINT_LANG", "de")
-    assert i18n.detect_language() == "de"                       # переменная окружения важнее всего
+    assert i18n.detect_language() == "de"                       # the environment variable beats everything
     monkeypatch.setenv("VOXPRINT_LANG", "xx")
-    assert i18n.detect_language() == "de"                       # неизвестный код игнорируется
+    assert i18n.detect_language() == "de"                       # an unknown code is ignored
 
 
 def test_windows_locale_name(monkeypatch):
@@ -185,7 +186,7 @@ def test_ui_language_switcher_retranslates_and_persists(app):
     assert w.settings_dialog().btn_update.text() == _cat("ru")["ui.btn_update"]
     w.set_language("uk")                                         # not offered any more: ignored
     assert i18n.get_language() == "ru" and w.settings_dialog().cmb_lang.currentData() == "ru"
-    # выбранный файл не сбрасывается при смене языка
+    # the chosen file is kept when the language changes
     w.set_audio(Path("/tmp/voice.wav"))
     w.set_language("en")
     assert w.lbl_audio.text() == "voice.wav"
@@ -201,7 +202,7 @@ def test_ui_language_switch_disabled_while_busy(app, monkeypatch):
     assert not dlg.cmb_lang.isEnabled() and not dlg.btn_update.isEnabled()
     before = i18n.get_language()
     dlg.cmb_lang.setCurrentIndex(dlg.cmb_lang.findData("en") if before != "en" else 1)
-    assert i18n.get_language() == before                       # во время работы язык не меняется
+    assert i18n.get_language() == before                       # the language does not change while a task is running
     w.close()
 
 

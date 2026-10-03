@@ -1,4 +1,4 @@
-"""Универсальная (merged) модель: слияние адаптера, формат папки, диск, запуск через runner и кнопка в UI."""
+"""Universal (merged) model: adapter merge, folder format, disk check, running through the runner and the UI button."""
 import json
 import shutil
 from pathlib import Path
@@ -14,7 +14,7 @@ from core.events import CancelToken, Stage
 from tests.test_lora_trainer import _dataset, _encode, _plan, _tok, tiny_model
 
 REPO = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
-SPK = 100   # < vocab_size(128) крошечной модели
+SPK = 100   # < vocab_size (128) of the tiny model
 
 
 @pytest.fixture()
@@ -32,7 +32,7 @@ def base_dir(tmp_path):
     d = tmp_path / "base"
     tiny_model().save_pretrained(d)
     cfg = json.loads((d / "config.json").read_text(encoding="utf-8"))
-    cfg["speaker_encoder_config"].pop("model_type", None)       # у настоящих config.json этого ключа нет
+    cfg["speaker_encoder_config"].pop("model_type", None)       # real config.json files do not have this key
     (d / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
     (d / "speech_tokenizer").mkdir()
     (d / "speech_tokenizer" / "config.json").write_text("{}", encoding="utf-8")
@@ -43,7 +43,7 @@ def base_dir(tmp_path):
 
 
 def _load(d):
-    # Загружаем веса без речевого токенайзера (в тесте он - заглушка): родительский from_pretrained.
+    # Load the weights without the speech tokenizer (a stub in the test): the parent from_pretrained.
     from qwen_tts.core.models import Qwen3TTSForConditionalGeneration as M
     return super(M, M).from_pretrained(str(d), dtype=torch.float32)
 
@@ -53,7 +53,7 @@ def test_merged_talker_matches_adapter_model(adapter):
     from core.model_export import merge_adapter_into_model
     from safetensors import safe_open
     with safe_open(str(adapter / "adapter_model.safetensors"), "pt") as f:
-        assert any(float(f.get_tensor(k).abs().sum()) > 0 for k in f.keys() if "lora_B" in k)  # адаптер обучен
+        assert any(float(f.get_tensor(k).abs().sum()) > 0 for k in f.keys() if "lora_B" in k)  # the adapter is trained
     x = torch.randn(1, 5, 32)
     ref = PeftModel.from_pretrained(tiny_model().talker, str(adapter)).eval()
     with torch.no_grad():
@@ -66,7 +66,7 @@ def test_merged_talker_matches_adapter_model(adapter):
     base = tiny_model().talker
     with torch.no_grad():
         plain = base.model(inputs_embeds=x).last_hidden_state
-    assert not torch.allclose(plain, got, atol=1e-4)           # слияние реально изменило модель
+    assert not torch.allclose(plain, got, atol=1e-4)           # merging really changed the model
     assert not any("lora_" in k or k.startswith("speaker_encoder") for k in state)
     assert torch.allclose(state["talker.model.codec_embedding.weight"][SPK], spk[0])
 
@@ -98,9 +98,9 @@ def test_export_folder_format_and_reload(adapter, base_dir, tmp_path):
     meta = json.loads((out / "voxprint_voice.json").read_text(encoding="utf-8"))
     assert meta["speaker"] == "мой_голос" and meta["base_model"] == REPO
     assert "generate_custom_voice" in (out / "USAGE.txt").read_text(encoding="utf-8")
-    assert _load(out).config.tts_model_type == "custom_voice"   # папка снова грузится как обычная модель
+    assert _load(out).config.tts_model_type == "custom_voice"   # the folder loads again as an ordinary model
     assert any(s is Stage.MODEL for s, _, _ in prog) and prog[-1][:2] == (Stage.SAVE, 1.0)
-    assert (adapter / "adapter_model.safetensors").exists()      # исходный адаптер не тронут
+    assert (adapter / "adapter_model.safetensors").exists()      # the source adapter is untouched
 
 
 def test_export_cancel_leaves_no_partial(adapter, base_dir):
@@ -154,7 +154,7 @@ def test_runner_merge_kind_and_last_adapter(adapter, monkeypatch, tmp_path):
     assert res.merged_path == adapter / "merged_model" and res.open_dir == res.merged_path
     assert res.speaker == "мой_голос"
     shutil.rmtree(adapter)
-    assert pr.last_adapter() is None                              # папку удалили - кнопка снова неактивна
+    assert pr.last_adapter() is None                              # the folder was deleted - the button is disabled again
     with pytest.raises(ExportError):
         pr.run_task(pr.TaskRequest(pr.KIND_MERGE))
 

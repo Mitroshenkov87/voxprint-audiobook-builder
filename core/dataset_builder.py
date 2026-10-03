@@ -176,6 +176,7 @@ class DatasetBuilder:
     """Runs the whole audio+text -> dataset pipeline with a given aligner."""
     def __init__(self, aligner: BaseAligner, config: Optional[BuildConfig] = None,
                  save_stage: Stage = Stage.SAVE) -> None:
+        """``save_stage`` is the progress stage reported while the dataset files are written (the trainer reports SAVE itself)."""
         self.aligner = aligner
         self.cfg = config or BuildConfig()
         #: the stage under which file writing is shown (when training a LoRA, SAVE is reserved for the very end)
