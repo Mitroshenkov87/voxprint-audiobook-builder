@@ -242,7 +242,7 @@ def test_first_run_prefetch_failure_is_friendly(app):
 def test_privacy_footer_and_one_time_notice(app, tmp_path):
     from ui import main_window as mw
     w = mw.MainWindow(runner=lambda *a, **k: None, autocheck=False, auto_open_folder=False)
-    assert "собственный голос" in w.lbl_privacy.text() and "только на этом компьютере" in w.lbl_privacy.text()
+    assert "с разрешения владельца голоса" in w.lbl_privacy.text() and "только на этом компьютере" in w.lbl_privacy.text()
     assert not mw.privacy_acknowledged()
     assert w.maybe_show_privacy_notice() is False          # offscreen: the window is not shown
     assert not mw.privacy_acknowledged()

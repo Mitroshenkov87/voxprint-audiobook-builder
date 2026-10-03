@@ -2,7 +2,7 @@
 
 *Train a voice, narrate books.* (Short name and technical identifier: **Voxprint** - the package, the executable and the data folder keep that name.)
 
-**Your voice from a recording in one click - and then whole books in that voice.** Give Voxprint a 5-15 minute recording of your own voice and
+**Your voice from a recording in one click - and then whole books in that voice.** Give Voxprint a 5-15 minute recording of a voice (yours, or of a person who has given permission) and
 the text you read: it aligns the text to the audio, cuts a training dataset and trains your voice as a LoRA adapter for
 [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) (optionally merged into a standalone model for any app that runs Qwen3-TTS).
 The voice goes into your **voice library**; then pick a book (TXT, FB2, EPUB) and a voice and get a finished audiobook with chapters
@@ -150,7 +150,7 @@ Use **← Studio** in any window to come back; the gear (top right) opens Settin
 6. The **gear** button opens **Settings**: language, *Check for updates* (also checked weekly in the background), open the models / data & log folders,
    *Repair the installation*, and *About* (help, authors, open-source components with their licences, third-party notices).
 
-Use only your own voice (or the voice of someone who explicitly agreed).
+Use voices responsibly: only with the voice owner's permission, in line with the voice's licence (see *Privacy* below).
 
 ### Narrate a book
 1. **Choose book…**: `.txt` (UTF-8 / cp1251; headings like "Chapter 1", "Глава 2", "Part I" become chapters), `.fb2` / `.fb2.zip`, `.epub`. The book title, author and cover are read when present.
@@ -383,7 +383,7 @@ Cosmetic: the `sox` package prints a "SoX could not be found" notice on import; 
 The Linux test-suite (`QT_QPA_PLATFORM=offscreen python -m pytest`) covers the pipeline with synthetic audio and a tiny randomly initialised model.
 
 ## Privacy
-**Use only your own voice, or the voice of someone who explicitly agreed.** Recordings, text and the finished voice stay on your computer.
+**Use voices responsibly.** A voice is personal data and a personality right of its owner: use it only with the owner's explicit permission and within the licence in `voice.json` (for example CC BY-NC means personal use only). No impersonation, fraud or misleading content; label synthetic speech where required; you are responsible for lawful use. Never commit recordings of other people without their permission. Recordings, text and the finished voice stay on your computer.
 Voxprint sends nothing to the internet except: downloading models (Hugging Face, or the ModelScope mirror), checking PyPI / the Hugging Face API for
 updates, the voice repository (only when you open *Download voices from repository*, and only the index and the voices you pick), and (only if you accept an offer) installing packages. There is no telemetry and no account. A notice is shown on first start and a reminder
 sits at the bottom of the window. Logs (`%LOCALAPPDATA%\Voxprint\logs`) stay local too.

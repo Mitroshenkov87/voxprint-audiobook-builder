@@ -126,7 +126,7 @@ Speaker / голос: {speaker}
     wavs, sr = model.generate_custom_voice(text="...", language="{language}", speaker="{speaker}")
 
 Reference sample for voice-clone apps / образец для приложений с клонированием: ref_sample.wav + ref_text.txt
-Only use your own voice. / Используйте только свой голос.
+Use this voice only with its owner's permission and within its licence. / Используйте этот голос только с разрешения его владельца и в рамках лицензии.
 """
 
 

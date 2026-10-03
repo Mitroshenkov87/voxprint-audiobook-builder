@@ -4,7 +4,7 @@ Thanks for your interest! Voxprint is a young project; small, focused contributi
 Please read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) first - it explains the module map and the data flow.
 
 ## Ground rules
-* **Use only your own voice** (or someone's who explicitly agreed) in examples, issues, test data and screenshots. Never commit recordings of other people.
+* **Voices need consent.** Use your own voice, or the voice of someone who has explicitly given permission, in examples, issues, test data and screenshots. Never commit recordings of other people without their permission.
 * Be kind and constructive. Assume good intent.
 * Mind licences: do not add GPL/AGPL Python dependencies to the shipped program (e.g. `soynlp` is deliberately not installed - a test guards this); the README's
   licence section explains the existing exceptions. Everything third-party must be listed in `credits.json` (see "Third-party components" below).
