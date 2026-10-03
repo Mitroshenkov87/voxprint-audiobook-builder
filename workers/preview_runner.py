@@ -30,11 +30,18 @@ MAX_EPOCHS = 4
 SYNTH_CHECK_SEC = 25.0       # measured on an RTX 4090: engine load + ~7 s sample + pitch/WER per variant (~31 s wall minus the trainer's own load)
 ASR_LOAD_SEC = 10.0          # measured: 8 s for Qwen3-ASR-0.6B
 MAX_SECONDS = 180.0           # time cap of one quick training (estimated)
-#: The ~10 s sentence the sample says, per language (the engine needs the language of the voice).
+#: The ~10 s phrase of the quick preview and of the automatic voice check, per language (the engine needs the language of the voice).
+#: Technical, developer-blog style about Voxprint itself, gender-neutral (no first-person past tense in Russian / German).
 SAMPLE_TEXT = {
-    "russian": "Здравствуйте! Это короткий образец моего голоса: так программа будет читать вам книги вслух, неторопливо и внятно, не пропуская ни слова.",
-    "english": "Hello! This is a short sample of my voice, the way the program will read books aloud to you, calmly and clearly, without skipping a single word.",
-    "german": "Guten Tag! Das ist eine kurze Hörprobe meiner Stimme, so liest Ihnen das Programm Bücher vor, ruhig und deutlich, ohne ein einziges Wort auszulassen.",
+    "russian": "Voxprint — офлайн-приложение, которое читает книги вашим голосом. Запись в десять минут режется на фрагменты, и на них обучается LoRA-адаптер поверх Qwen3-TTS.",
+    "english": "Voxprint is an offline app that reads books in your voice. A ten-minute recording is cut into clips, and a LoRA adapter is trained on them on top of Qwen3-TTS.",
+    "german": "Voxprint ist eine Offline-App, die Bücher mit Ihrer Stimme vorliest. Eine zehnminütige Aufnahme wird in Clips geschnitten, darauf wird ein LoRA-Adapter auf Qwen3-TTS trainiert.",
+}
+#: The ~15-25 s demo passage (final narration sample, demo text in the docs): SAMPLE_TEXT plus how narration and consent work.
+DEMO_TEXT = {
+    "russian": SAMPLE_TEXT["russian"] + " Далее пайплайн нарезает книгу на чанки, синтезирует их с кэшем и умеет продолжить после сбоя. Перед обучением фиксируется согласие владельца голоса, а готовый адаптер проверяется по WER и высоте тона.",
+    "english": SAMPLE_TEXT["english"] + " The pipeline then splits a book into chunks, synthesizes them with a cache and can resume after a crash. The voice owner's consent is recorded before training, and the finished adapter is checked by WER and pitch.",
+    "german": SAMPLE_TEXT["german"] + " Danach zerlegt die Pipeline ein Buch in Chunks, synthetisiert sie mit Cache und kann nach einem Absturz fortsetzen. Vor dem Training wird die Einwilligung des Stimmeninhabers festgehalten, und der fertige Adapter wird per WER und Tonhöhe geprüft.",
 }
 
 

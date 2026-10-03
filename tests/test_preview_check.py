@@ -239,3 +239,22 @@ def test_gpu_factor_table_is_ordered_by_speed():
     assert f["4090"] == 1.0
     vals = [f[k] for k in order]
     assert vals == sorted(vals)
+
+
+def test_demo_text_is_technical_gender_neutral_and_fits_the_durations():
+    import re
+
+    from workers import preview_runner as pr
+
+    ru, short = pr.DEMO_TEXT["russian"], pr.SAMPLE_TEXT["russian"]
+    assert ru.startswith(short) and set(pr.DEMO_TEXT) == set(pr.SAMPLE_TEXT) == {"russian", "english", "german"}
+    assert 8 <= len(short.split()) / 2.4 <= 13                          # ~10 s at ~2.4 words/s
+    assert 45 <= len(ru.split()) <= 65                                    # ~15-25 s when read
+    for term in ("LoRA", "Qwen3-TTS", "WER"):
+        assert term in ru
+    for w in ("согласие", "адаптер", "пайплайн"):
+        assert w in ru
+    # gender-neutral: no first-person past tense / short adjectives that show the speaker's gender
+    assert not re.search(r"\bя\b[^.]*?\w+(?:л|ла|лся|лась)\b", ru.lower())
+    for lang in ("english", "german"):
+        assert pr.DEMO_TEXT[lang].startswith(pr.SAMPLE_TEXT[lang]) and "LoRA" in pr.DEMO_TEXT[lang]
