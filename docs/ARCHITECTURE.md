@@ -35,12 +35,20 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 | `teacher_forcing.py`, `lora_trainer.py` | teacher-forced input construction; LoRA training of Qwen3-TTS-12Hz-Base (adapter, `training_meta.json`) |
 | `model_export.py` | merged "universal" model (`merge_and_unload`) |
 | `model_locator.py` | finds models downloaded by other apps (Hugging Face cache, Pinokio/Alexandria, ModelScope) - read-only |
-| `voice_info.py` | `voice.json`: schema, voice types, description cleanup, read/write |
+| `voice_info.py` | `voice.json` (schema 2): fields, voice types, **licences** (`LICENSES`, `license_allows_commercial`, derived `commercial_use`), migration of schema 1, read/write |
+| `voice_library.py` | the voice library under `voices/<id>/`: `VoiceLibrary`, `VoiceRecord`, register / import (folder, hardened zip) / update / delete / list |
+| `book_parsers.py` | TXT (heading detection), FB2 (+ `.fb2.zip`, entity guard, cover), EPUB (nav / NCX / spine) -> `Book` / `Chapter`; stdlib only |
+| `chunker.py` | chapter text -> sentence-sized chunks (reuses the clause splitter), pause lengths |
+| `narration.py` | `narrate_book`: `TTSEngine` protocol, `ChunkCache` (atomic per-chunk FLAC, key = sha256(engine tag + text)), `synthesize_chunks` (lazy engine, retry, ETA), `assemble_chapters`, `PauseToken`, `NarrationOptions` (formats, bitrates, `allow_aac`, `preprocessors`) |
+| `tts_engine.py` | the real engine `Qwen3AdapterEngine` (qwen-tts + PEFT adapter, voice-clone prompt from `ref_sample.wav`) - **not yet run on a GPU** |
+| `audiobook_export.py` | format registry, file naming, `ffmetadata` chapters, `.m3u8`, ffmpeg command builders, encoder pre-check, `export_formats` (injectable `run`) |
 
 ### `infra/`
 | Module | Purpose |
 |---|---|
-| `paths.py` | application folders (`%LOCALAPPDATA%\Voxprint`, override `VOXPRINT_HOME`): `models/`, `packages/`, `state/`, `logs/`, `.staging/` |
+| `paths.py` | application folders (`%LOCALAPPDATA%\Voxprint`, override `VOXPRINT_HOME`): `models/`, `packages/`, `voices/`, `state/`, `logs/`, `.staging/` |
+| `voice_repository.py` | online voice index (`index.json`, URL configurable, placeholder default) and verified downloads (HTTPS, size cap, SHA-256); never raises to the UI |
+| `features.py` | feature flags; today `aac_enabled()` (env `VOXPRINT_ENABLE_AAC` > `state/features.json` > `AAC_DEFAULT`) |
 | `net.py` | HTTPS through the stdlib; retries with certifi roots on `CERTIFICATE_VERIFY_FAILED` |
 | `platform_win.py` | OS check, dark title bar, Acrylic backdrop (all guarded by `sys.platform`) |
 | `assets.py` | pinned non-pip assets (ffmpeg): download -> sha256 -> staging -> smoke test -> atomic swap -> rollback; ownership marker `.voxprint-owned` |
@@ -54,9 +62,12 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 ### `workers/`
 `pipeline_runner.py` holds the Qt-free scenarios ("dataset", "voice (LoRA)", "universal model", first-run prefetch) with injectable collaborators;
 `process_worker.py` wraps them in `QThread` workers whose only interface to the UI is signals (`progress`, `finished`, `failed`, `cancelled`).
+`narration_runner.py` (`NarrationJob`, `run_narration`, `format_eta`) is the Qt-free narrator scenario; `narrate_worker.py` has `NarrateWorker` (narration with pause / cancel) and the repository workers
+(`RepoIndexWorker`, `RepoDownloadWorker`). Training registers the finished voice in the library (`pipeline_runner._register_voice`, `TaskResult.voice_id`).
 
 ### `ui/`
-`main_window.py` (core workflow + theme), `settings_dialog.py` (gear), `about_dialog.py`, `upgrade_dialog.py`.
+`studio.py` (**`StudioWindow`**: the first window, owns the other three), `main_window.py` (the *Train your voice* window + theme constants), `voices_window.py` (*My voices*, voice cards, edit dialog, repository dialog),
+`narrate_window.py` (*Narrate a book*), `window_base.py` (`SubWindow`: backdrop, back button / gear, common cards), `audio_preview.py` (QtMultimedia `Previewer`), `settings_dialog.py` (gear), `about_dialog.py`, `upgrade_dialog.py`.
 
 ## 3. Data flow of voice training
 ```
@@ -77,6 +88,17 @@ model_export                            merged universal model with the voice as
 Every stage reports `(stage, fraction, message)` through the progress callback and polls the cancellation token between units of work; a cancelled run leaves no half-written
 result in the output folder.
 
+## 3a. Data flow of narration
+```
+book file --book_parsers.load_book--> Book(chapters) --chunker.chunk_book--> chunks (sentence-sized, per chapter)
+   narration.synthesize_chunks: for each chunk  cache hit?  yes -> reuse   no -> TTSEngine.synthesize (Qwen3AdapterEngine: base model + voice adapter + reference clip) -> ChunkCache (atomic FLAC)
+   narration.assemble_chapters: stream chunks into one WAV per chapter, pauses between sentences / paragraphs, a tail after each chapter
+   audiobook_export.export_formats: ffmpeg  ->  .opus (chapters in ffmetadata)  /  per-chapter .mp3 + .m3u8  /  .m4b (AAC, only if allowed)  / ...
+```
+The job folder is `<output>/<book>/` with `.cache/` (chunks) and `.work/` (temporary WAVs); both are removed after success unless `keep_cache` is set. Start after a cancel / crash simply finds the cached chunks again.
+Pause is a `PauseToken` polled between chunks; cancel uses the usual `CancelToken`. Before synthesis the needed ffmpeg encoders are checked so a missing `libopus` / `libmp3lame` / `aac` fails in seconds, not after hours.
+Extension points: `NarrationOptions.preprocessors` (functions applied to each chunk's text - clean-up / translation) and the engine protocol (a different TTS can be injected; the tests use a fake one).
+
 ## 4. Installation, environment and updates
 * **Installer** (Inno Setup, per user) installs the PyInstaller `onedir` build and runs the first-start setup: environment probe, optional Python venv with the right torch build
   (`uv`), model download. Everything is recorded in the **completion manifest** (`state/`); `main.py --verify-install` re-checks it and prints stable reason codes; `--repair` rebuilds the venv.
@@ -89,10 +111,15 @@ result in the output folder.
 
 ## 5. Threading
 The UI thread never blocks. A `QThread` worker runs a runner scenario; progress/finish/failure/cancel arrive as signals. Cancellation is cooperative (a token, see `core/events.py`);
-the main window disables the controls that must not change while a worker runs (including the UI language switch).
+the training window disables the controls that must not change while a worker runs. The Studio treats "training or narration is running" as busy: the language switch is refused meanwhile and the window titles/cards show it.
+Narration and the repository dialog use their own `QThread`s (`workers/narrate_worker.py`); `StudioWindow.shutdown()` (connected to `aboutToQuit`) cancels all of them and waits.
 
 ## 6. UI structure and theme
-* The main window contains the core workflow only: choose audio + text, optional voice name / type / description, one button, progress and result. Everything else lives in the
+* **Studio navigation.** `StudioWindow` is the first window. The other three windows (`MainWindow` = *Train your voice*, `VoicesWindow`, `NarrateWindow`) are separate top-level windows shown **one at a time**:
+  `StudioWindow.navigate(page)` hides the current one and shows the target (geometry is carried over), every sub-window has a *← Studio* button (signal `go("studio")`), and the narrator / voices windows can jump to each other
+  (*Train your voice*, *Narrate with this voice*). The trainer window is the former main window, reused unchanged except for the back button; the Studio mirrors its status and progress on the home page, and the settings
+  dialog (gear) is shared. Closing any window closes the application (`shutdown()`). A 1-second timer refreshes the home cards (voice count, "no voices yet" hint).
+* The training window contains the core workflow only: choose audio + text, optional voice name / type / description, one button, progress and result. Everything else lives in the
   **Settings dialog** behind the gear button: language, updates, model and data folders, repair, About. The whole content sits in a scroll area, so the window fits small screens.
 * Windows 11 gets an Acrylic backdrop (`platform_win`) under a **strong dark tint**; panels and controls are solid and all text colours are opaque. The palette constants
   (`TEXT`, `TEXT_MUTED`, `CARD_GLASS`, ...) and `CONTRAST_PAIRS` live at the top of `ui/main_window.py`; `tests/test_ui.py::test_theme_contrast` checks WCAG AA (>= 4.5:1),
@@ -100,21 +127,31 @@ the main window disables the controls that must not change while a worker runs (
 * All text goes through `tr()`; changing the language retranslates live.
 
 ## 7. File formats
-**Adapter folder** (output of training): `adapter_model.safetensors`, `adapter_config.json`, `training_meta.json`, `voice.json`.
+**Adapter folder** (output of training): `adapter_model.safetensors`, `adapter_config.json`, `ref_sample.wav` (+ text in `training_meta.json`, used as the voice reference), `training_meta.json`, `voice.json`.
 
-**`voice.json`** (`core/voice_info.py`, `VOICE_SCHEMA = 1`):
+**`voice.json`** (`core/voice_info.py`, `VOICE_SCHEMA = 2`):
 ```json
 {
-  "schema": 1, "voice_name": "...", "language": "Russian", "created": "2026-10-03T12:00:00Z",
-  "speech_seconds": 1543.2, "epochs": 5, "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-  "voice_type": "", "description": ""
+  "schema": 2, "id": "anna", "name": "Anna", "language": "russian", "created": "2026-10-03T12:00:00Z",
+  "duration": 1543.2, "epochs": 5, "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base", "author": "",
+  "license": "custom/personal-only", "license_url": "", "voice_type": "", "description": "", "commercial_use": false
 }
 ```
-`voice_type` is `male | female | child | other` or empty; `description` has collapsed whitespace and at most 500 characters.
+`voice_type` is `male | female | child | other` or empty; `description` has collapsed whitespace and at most 500 characters. `license` is one of `LICENSES` (CC0-1.0, CC-BY-4.0, CC-BY-SA-4.0 allow commercial use;
+CC-BY-NC-4.0, CC-BY-NC-SA-4.0 and `custom/personal-only` do not); unknown or missing values become `custom/personal-only`. `commercial_use` is always recomputed from the licence when a file is read, so an imported file cannot
+claim more than its licence gives. Schema 1 (`voice_name`, `speech_seconds`) is migrated on read. **Library layout:** `voices/<id>/{adapter_model.safetensors, adapter_config.json, ref_sample.wav, training_meta.json, voice.json}`.
+
+**Repository index** (`infra/voice_repository.py`): `{"schema": 1, "voices": [{id, name, language, author, license, license_url, description, voice_type, base_model, url, sha256, size_bytes}]}`.
+
+**Audiobook output**: see README "Output format"; format keys and defaults are in `core/audiobook_export.py` (`DEFAULT_FORMATS = (opus_single,)`).
+
+**Feature flag**: `aac_m4b` in `state/features.json` / `VOXPRINT_ENABLE_AAC` (`infra/features.py`). AAC is patent-encumbered; see the notice in `THIRD_PARTY_NOTICES.md`.
 
 ## 8. Testing strategy
 * No test needs a GPU, a network connection or a model: aligners are replaced by `TrueRateAligner` (`tests/synth.py` synthesizes readings with a known ground truth),
   and network/process access is injected (`opener`, `run`, `which`, `runner`, `updater`).
 * `tests/conftest.py` isolates app-data folders and the language for every test.
 * `tests/test_i18n.py` guards the localization rules; `tests/test_credits.py` keeps `credits.json`, the notices and the installer in sync.
-* Windows-only behaviour (Acrylic, real GPU training) is verified manually - see the "Tested on Windows" section of the README.
+* The narrator is tested with a fake `TTSEngine` and a fake ffmpeg runner (`tests/test_narration.py`): chunk cache and resume, cancel / pause, ETA, chapter assembly, ffmetadata / m3u8 content, command lines, the AAC flag.
+  Parsers and the chunker: `tests/test_books.py`; the library, licences and repository: `tests/test_voice_*.py`; the windows (navigation, language switch, cards, formats, disclaimer, run / pause / cancel): `tests/test_studio.py`.
+* Windows-only behaviour (Acrylic, real GPU training, the real Qwen3-TTS engine, the real ffmpeg encoders) is verified manually - see the "Tested on Windows" section of the README.

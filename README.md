@@ -1,11 +1,14 @@
-# Voxprint
+# Voxprint AI Audiobook Builder
 
-**Your voice from a recording in one click.** Give Voxprint a 5-15 minute recording of your own voice and the text you read:
-it aligns the text to the audio, cuts a training dataset, trains your voice as a LoRA adapter for
-[Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) and, if you want, merges it into a standalone model that works in any
-app that runs Qwen3-TTS. A native Windows 11 window - no command line, no browser, no Gradio, no WSL.
+*Train a voice, narrate books.* (Short name and technical identifier: **Voxprint** - the package, the executable and the data folder keep that name.)
 
-<p align="center"><img src="docs/screenshots/main_files_chosen.png" alt="Voxprint main window" width="720"></p>
+**Your voice from a recording in one click - and then whole books in that voice.** Give Voxprint a 5-15 minute recording of your own voice and
+the text you read: it aligns the text to the audio, cuts a training dataset and trains your voice as a LoRA adapter for
+[Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) (optionally merged into a standalone model for any app that runs Qwen3-TTS).
+The voice goes into your **voice library**; then pick a book (TXT, FB2, EPUB) and a voice and get a finished audiobook with chapters
+(one Opus file, per-chapter MP3, ...). A native Windows 11 application - no command line, no browser, no Gradio, no WSL.
+
+<p align="center"><img src="docs/screenshots/studio_home.png" alt="Voxprint Studio" width="560"></p>
 
 > **Requires Windows 11 (24H2 / build 26100 or newer) and an NVIDIA GPU (16 GB VRAM recommended).**
 > Without an NVIDIA GPU the dataset is still created, but voice training falls back to the CPU (very slow, with a warning).
@@ -17,7 +20,8 @@ app that runs Qwen3-TTS. A native Windows 11 window - no command line, no browse
 
 ## Contents
 [Concept](#concept-and-philosophy) · [Features](#features) · [Screenshots](#screenshots) · [Installation](#installation) ·
-[Using Voxprint](#using-voxprint) · [How it works](#how-it-works) · [Output format](#output-format) ·
+[Using Voxprint](#using-voxprint) · [Narrate a book](#narrate-a-book) · [My voices](#my-voices-and-licences) · [AAC / M4B notice](#aac--m4b-patents-please-read) ·
+[How it works](#how-it-works) · [Output format](#output-format) ·
 [Hardware requirements](#hardware-requirements) · [Model reuse](#reusing-what-is-already-on-your-computer) ·
 [Tested on Windows](#tested-on-windows) · [Privacy](#privacy) · [Roadmap](#roadmap) · [Contributing](#contributing) ·
 [Licences](#licences-and-third-party-components)
@@ -37,6 +41,14 @@ voice recording and a text file to ready output files you can load into a neural
 * **Windows first**, other platforms later. Built jointly by a human and an AI - an honest attempt.
 
 ## Features
+* **Studio** - the first window: three big cards (*Narrate a book*, *Train your voice*, *My voices*) and a gear button for Settings. Every other window has a *← Studio* button.
+* **Narrate a book** - TXT / FB2 (also `.fb2.zip`) / EPUB parsing with chapters (pure standard library), sentence-sized chunks, synthesis
+  chunk by chunk with your voice (Qwen3-TTS + LoRA adapter), progress and time left, **pause / cancel / resume** (finished chunks are kept on disk).
+* **Audiobook formats** - default: **one `.opus` file with chapter markers**; **MP3 per chapter** (most compatible, ID3 tags + `.m3u8`); opt-in **M4B (AAC)** for Apple Books
+  (patent notice below); more under *Other formats and quality* (M4B with Opus, Opus/FLAC/WAV per chapter, one MP3 with chapter marks) and bitrate settings.
+* **Voice library** (`%LOCALAPPDATA%\Voxprint\voices\`) - every trained voice is registered automatically; preview, licence badge, delete, **import** from a folder or a zip,
+  and **download voices from a repository** (index URL is configurable; SHA-256 checked).
+* **Voice licences** - each voice carries a licence (CC0, CC-BY, CC-BY-SA, CC-BY-NC, CC-BY-NC-SA or custom/personal-only) and the UI shows whether *commercial use* is allowed.
 * Forced alignment of your text onto the recording with `Qwen/Qwen3-ForcedAligner-0.6B` (+ optional CTC backup aligner);
   long recordings are cut at pauses and aligned in chunks.
 * Automatic **dataset in the Alexandria `train_lora.py` format**: 3-12 s clips cut at pauses (never mid-word), a clean reference
@@ -45,14 +57,27 @@ voice recording and a text file to ready output files you can load into a neural
 * **LoRA voice training** with the Alexandria recipe (r=32, alpha=128 on the talker), parameters chosen from your VRAM
   (1.7B or 0.6B base, 8-bit Adam, CPU fallback, automatic retry plan after out-of-memory).
 * Optional **universal model** (~4 GB, `custom_voice` format) merged from the adapter - works in any Qwen3-TTS app.
-* **`voice.json`** next to the adapter: voice name, language, creation date, speech duration, epochs, base model and (optional) voice type and description.
+* **`voice.json`** next to the adapter (schema 2): id, name, language, creation date, speech duration, epochs, base model, author, licence (+ URL), voice type, description and the derived `commercial_use`.
 * **Settings** dialog (gear): language (English, Deutsch, Русский), update check, model/data folders, repair, About.
 * Scrollable window that stays usable on small screens (e.g. 1366x768 at 150% scaling).
 * Safe self-maintenance: verified-version updates with staging + smoke test + rollback, a repair command, a completion manifest.
 * Acrylic (glass) look on Windows 11 with a dark, high-contrast (WCAG AA) theme and a plain fallback.
 
 ## Screenshots
-All screenshots are English-UI renders of the current theme (offscreen Qt; see `docs/screenshots/`).
+All screenshots are English-UI renders of the current theme (offscreen Qt; see `docs/screenshots/`; Russian and German renders are in `docs/screenshots/ru/` and `docs/screenshots/de/`).
+
+| Studio (no voices yet) | Studio | My voices |
+|---|---|---|
+| <img src="docs/screenshots/studio_empty.png" width="300"> | <img src="docs/screenshots/studio_home.png" width="300"> | <img src="docs/screenshots/voices.png" width="300"> |
+
+| Narrate a book | Formats, AAC notice, quality | Narration running |
+|---|---|---|
+| <img src="docs/screenshots/narrate.png" width="300"> | <img src="docs/screenshots/narrate_aac.png" width="300"> | <img src="docs/screenshots/narrate_running.png" width="300"> |
+
+Same windows in Russian and German: [`ru/studio_home`](docs/screenshots/ru/studio_home.png), [`ru/voices`](docs/screenshots/ru/voices.png), [`ru/narrate_aac`](docs/screenshots/ru/narrate_aac.png),
+[`de/studio_home`](docs/screenshots/de/studio_home.png), [`de/voices`](docs/screenshots/de/voices.png), [`de/narrate_aac`](docs/screenshots/de/narrate_aac.png).
+
+Training window ("Train your voice"):
 
 | Choose files | Running | Done |
 |---|---|---|
@@ -103,6 +128,10 @@ App data lives in `%LOCALAPPDATA%\Voxprint` (`models\`, `logs\`, `state\`, ...; 
 Interface language override: `VOXPRINT_LANG=en|de|ru`.
 
 ## Using Voxprint
+Start the program: the **Studio** opens. *Narrate a book* is the main card; if the library has no voices yet it says so and points to *Train your voice* / *My voices*.
+Use **← Studio** in any window to come back; the gear (top right) opens Settings.
+
+### Train your voice
 1. Press **Choose audio** and **Choose text** (or drag the files into the window). The text is a UTF-8 `.txt` of what you read.
 2. Optional, under the main button: pick a **voice type** (male / female / child / other) and type a short **description** - both are saved in `voice.json`.
 3. Press **Create voice (LoRA)** - everything else is automatic. When it finishes, the folder opens:
@@ -111,10 +140,63 @@ Interface language override: `VOXPRINT_LANG=en|de|ru`.
 4. Optional: **Build universal model (~4 GB)** merges the trained adapter into a standalone model in `...\output\<voice name>\merged_model`
    (Qwen3-TTS `custom_voice` format; the voice is `speaker=<voice name>`). The small adapter works only in a few apps (e.g. Alexandria);
    the merged model works in any app that runs Qwen3-TTS. Voxprint checks the free disk space and asks for confirmation first; the big model is never built automatically.
-5. The **gear** button opens **Settings**: language, *Check for updates* (also checked weekly in the background), open the models / data & log folders,
+5. When training finishes the voice is **registered in the library** automatically (status line "voice registered"; if that fails you get a warning, the adapter folder is still there).
+6. The **gear** button opens **Settings**: language, *Check for updates* (also checked weekly in the background), open the models / data & log folders,
    *Repair the installation*, and *About* (help, authors, open-source components with their licences, third-party notices).
 
 Use only your own voice (or the voice of someone who explicitly agreed).
+
+### Narrate a book
+1. **Choose book…**: `.txt` (UTF-8 / cp1251; headings like "Chapter 1", "Глава 2", "Part I" become chapters), `.fb2` / `.fb2.zip`, `.epub`. The book title, author and cover are read when present.
+2. Pick the **voice** (a licence badge is shown; for a personal-use-only voice you are reminded not to publish or sell the narration). No voices yet? The window offers *Train your voice* / *My voices*.
+3. Pick the **format** (see below), optionally the output folder (default `Documents\Voxprint\Audiobooks`) and whether chapter titles are read aloud, then **Start narration**.
+4. Progress with the time left; **Pause / Resume** and **Cancel** are always available. Every synthesized fragment is stored (`<output>\<book>\.cache`), so after a cancel, a crash or closing the program
+   **Start continues where it stopped**; the cache is deleted after a successful run. Texts are split into chunks at sentence/clause boundaries (reusing the clause splitter of the aligner), chapters get a pause between them.
+
+| Format | What you get | Where it plays |
+|---|---|---|
+| **Opus, one file** (default) | `Author - Title.opus` with chapter markers (32 kbit/s mono), open and royalty-free, small | VLC, Audiobookshelf, Voice (Android), Smart AudioBook Player and other free players; chapter support varies by player |
+| **MP3, one file per chapter** | folder `... - MP3\NN - Chapter.mp3` + `.m3u8` playlist, ID3 tags (title, album, artist, track n/N, cover); 96 kbit/s mono | practically everything (old players, car radios, phones) |
+| **M4B (AAC)** - opt-in, [see the notice](#aac--m4b-patents-please-read) | `Author - Title.m4b` with chapters, 64 kbit/s mono | Apple Books (iPhone/Mac) and most audiobook apps |
+| *Other formats and quality* | M4B with Opus audio, Opus per chapter, one MP3 with chapter marks (ID3 CHAP frames), FLAC / WAV per chapter; bitrate spin boxes | - |
+
+Extension points (not implemented, shown as a "coming later" line): text clean-up, translation and multi-voice roles plug into `NarrationOptions.preprocessors` (`core/narration.py`).
+
+### My voices and licences
+*My voices* lists the library as cards: name, language, length of speech, epochs, voice type, author, a **licence badge** (green: commercial use allowed, amber: personal use only), **Preview** (plays the reference sample),
+*Narrate with this voice*, *Details…* (edit name, author, licence, description) and *Delete* (asks first). **Import voice…** accepts an adapter folder or a `.zip` (archives are checked: no path tricks, only the
+adapter files, size limits). A voice without a declared licence is treated as `custom/personal-only`.
+
+| Licence | Commercial use |
+|---|---|
+| CC0-1.0, CC-BY-4.0, CC-BY-SA-4.0 | allowed (attribution / share-alike per the licence) |
+| CC-BY-NC-4.0, CC-BY-NC-SA-4.0 | not allowed |
+| custom/personal-only (default) | not allowed |
+
+`commercial_use` in `voice.json` is always derived from the licence, never trusted from a file you import. The badge is information, not legal advice.
+
+**Download voices from repository.** The button reads a static `index.json` (schema 1) from a configurable URL: environment variable `VOXPRINT_VOICES_INDEX`, or the first line of
+`%LOCALAPPDATA%\Voxprint\state\voice_index_url.txt`. The built-in default is a placeholder (`.../OWNER/voxprint-voices/...`): until a real repository exists the dialog says "not set up yet". An empty list and no network
+are handled with friendly messages. Downloads are HTTPS-only, size-capped, the SHA-256 from the index must match, and the licence in the index is the one shown. Index format:
+```json
+{"schema": 1, "voices": [{"id": "anna-ru", "name": "Anna", "language": "russian", "author": "...", "license": "CC-BY-4.0",
+  "description": "...", "voice_type": "female", "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+  "url": "https://example.org/anna-ru.zip", "sha256": "<64 hex digits>", "size_bytes": 61000000}]}
+```
+
+### AAC / M4B: patents (please read)
+> The **M4B (AAC)** export exists only as a convenience for **Apple Books compatibility**. The **AAC codec is patent-encumbered** and not fully open. **This project does not provide a patent licence** for it.
+> **You are solely responsible for any legal compliance** (patent licensing, royalties, distribution rules that apply to you) when you choose this format. The default formats (Opus, MP3 per chapter, FLAC, WAV) are not affected.
+
+The same text (localized into English, Russian and German) is shown in the program when M4B is selected, and in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+**Hide or disable AAC.** One switch, three ways (highest priority first):
+* environment variable `VOXPRINT_ENABLE_AAC=0` (`1` forces it on);
+* `%LOCALAPPDATA%\Voxprint\state\features.json` containing `{"aac_m4b": false}`;
+* the default `AAC_DEFAULT` in `infra/features.py` (a distributor can set it to `False`).
+
+When disabled the M4B entry disappears from the window and the narrator refuses to produce M4B/AAC even if asked programmatically. The encoders themselves (`aac`, `libopus`, `libmp3lame`) come from the ffmpeg build in use; the export checks for them
+before synthesis starts and stops with a clear message if one is missing (whether the pinned ffmpeg build contains all three has **not** been verified yet).
 
 ## How it works
 ```
@@ -133,6 +215,8 @@ Use only your own voice (or the voice of someone who explicitly agreed).
                                                                               ▼
                                                                    merged "universal" model (~4 GB)
 ```
+Narration: `book → chapters → chunks → (cache hit or Qwen3-TTS + adapter) → WAV with pauses per chapter → ffmpeg → .opus / .mp3 / .m4b ...`
+(`core/book_parsers.py`, `core/chunker.py`, `core/narration.py`, `core/tts_engine.py`, `core/audiobook_export.py`).
 Heavy work runs in background threads (`workers/`); the UI only reacts to progress signals. Before anything else a quiet weekly update
 check runs (it never changes components in *your* environment without asking). See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the module map and data flow.
 
@@ -153,13 +237,19 @@ output\<voice name>\  adapter_model.safetensors, adapter_config.json, ref_sample
           tts_model_type=custom_voice + talker_config.spk_id, speech_tokenizer\, ref_sample.wav, ref_text.txt,
           speaker_embedding.safetensors, voxprint_voice.json, USAGE.txt)
 ```
-`voice.json` (schema 1) example:
+`voice.json` (schema 2) example:
 ```json
-{"schema": 1, "voice_name": "my_voice", "language": "russian", "created": "2026-10-03T12:00:00Z",
- "speech_seconds": 412.7, "epochs": 15, "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
- "voice_type": "female", "description": "Warm narrator voice, calm pace"}
+{"schema": 2, "id": "my-voice", "name": "My voice", "language": "russian", "created": "2026-10-03T12:00:00Z",
+ "duration": 412.7, "epochs": 15, "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base", "author": "Aleksandr",
+ "license": "custom/personal-only", "license_url": "", "voice_type": "female",
+ "description": "Warm narrator voice, calm pace", "commercial_use": false}
 ```
-`voice_type` (`male|female|child|other`) and `description` (whitespace collapsed, ≤ 500 characters) are optional: when you leave them empty they are written as empty strings. The other fields are filled in automatically.
+`voice_type` (`male|female|child|other`) and `description` (whitespace collapsed, ≤ 500 characters) are optional (empty strings when unset). `license` is an SPDX-like id (see the table above; default
+`custom/personal-only`), `license_url` is filled for the known licences, and `commercial_use` is **derived** from the licence. Schema-1 files (`voice_name`, `speech_seconds`) are migrated when read.
+Library layout: `%LOCALAPPDATA%\Voxprint\voices\<id>\` = `adapter_model.safetensors`, `adapter_config.json`, `ref_sample.wav`, `training_meta.json`, `voice.json`.
+
+Audiobook output: `<output>\<Book title>\` with the chosen files (`Author - Title.opus` / `.m4b` / `.mp3`, or folders `... - MP3`, `... - Opus`, `... - FLAC`, `... - WAV` with `NN - Chapter` files and a `.m3u8`);
+the resumable chunk cache lives in `.cache\` and temporary files in `.work\` inside that folder and are removed after success.
 
 Using the merged model: `Qwen3TTSModel.from_pretrained(folder).generate_custom_voice(text, language="Russian", speaker="<voice name>")`.
 
@@ -236,14 +326,15 @@ The Linux test-suite (`QT_QPA_PLATFORM=offscreen python -m pytest`) covers the p
 ## Privacy
 **Use only your own voice, or the voice of someone who explicitly agreed.** Recordings, text and the finished voice stay on your computer.
 Voxprint sends nothing to the internet except: downloading models (Hugging Face, or the ModelScope mirror), checking PyPI / the Hugging Face API for
-updates, and (only if you accept an offer) installing packages. There is no telemetry and no account. A notice is shown on first start and a reminder
+updates, the voice repository (only when you open *Download voices from repository*, and only the index and the voices you pick), and (only if you accept an offer) installing packages. There is no telemetry and no account. A notice is shown on first start and a reminder
 sits at the bottom of the window. Logs (`%LOCALAPPDATA%\Voxprint\logs`) stay local too.
 
 ## Roadmap
 Ideas, not promises:
-* **Audiobook Studio** - a second module that uses your trained voice to read whole books (chapters, queue, export to common audio formats).
-* **Translation** - translate a text and speak it in your own voice in another language.
-* **Multi-voice markup** - mark up a text with several speakers / voices and render them in one pass.
+* **Narrator improvements** - a queue of several books, text clean-up (footnotes, headers), more book formats (e.g. PDF, DOCX).
+* **Translation** - translate a text and speak it in your own voice in another language (extension point exists, not implemented).
+* **Multi-voice markup** - mark up a text with several speakers / voices and render them in one pass (extension point exists, not implemented).
+* A real **voices repository** (the index URL in the program is a placeholder today).
 * **Android** - later: convert the merged model for phones (GGUF / LiteRT; today the merged folder is a plain Hugging Face directory a converter can start from).
 * **Installer channels** - *online* (small installer, downloads components), *offline* (everything included), and *beta* (pre-releases).
 * English and German installer wizard texts (the current Inno Setup wizard is Russian-only), a public repository URL and a published licence for the Voxprint source code.
@@ -256,7 +347,7 @@ Contributions are welcome - see [`CONTRIBUTING.md`](CONTRIBUTING.md) (setup, tes
 python -m venv .venv && . .venv/bin/activate        # Linux: enough to run the tests
 pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt
 pip install --no-deps -r requirements-nodeps.txt
-QT_QPA_PLATFORM=offscreen python -m pytest          # ~250 tests, no GPU, no network
+QT_QPA_PLATFORM=offscreen python -m pytest          # ~350 tests, no GPU, no network
 python -m core.cli audio.wav text.txt --out dataset --fake-aligner     # dry run of the pipeline without a neural network
 ```
 CLI for stage-by-stage checks on a GPU machine: `python -m core.cli audio.wav text.txt --out dataset [--language Russian] [--device cuda] [--train --output-dir output]`.
@@ -297,6 +388,8 @@ before the first public release. Important points:
 * **FFmpeg is a GPL-3.0 build.** The ffmpeg binary inside the `imageio-ffmpeg` wheel was built with `--enable-gpl --enable-version3` (verified in the Windows 7.1 binary of
   imageio-ffmpeg 0.6.0). It is a separate executable started as a subprocess, but you are distributing a GPL binary: keep `licenses\gpl-3.0.txt` and the source link,
   or ship an LGPL ffmpeg build / require ffmpeg on `PATH`.
+* **AAC (M4B) is patent-encumbered.** Voxprint provides no patent licence for it; the option is a convenience for Apple Books, is off by default, carries a disclaimer and can be disabled completely (see
+  [AAC / M4B](#aac--m4b-patents-please-read)). The same notice is in `THIRD_PARTY_NOTICES.md`.
 * **soynlp (GPLv3) is excluded.** `qwen-asr` imports it lazily, only for Korean. It is not in `requirements.txt` and the build excludes it (`--exclude-module soynlp`),
   so **Korean alignment is unavailable**.
 * **CC-BY-NC-4.0 model.** The optional backup aligner model `MahmoudAshraf/mms-300m-1130-forced-aligner` (used only if you install the optional `ctc-forced-aligner`) is
@@ -320,6 +413,9 @@ before the first public release. Important points:
   torch flavor mapping, completion manifest + reason codes, pinned-asset installer (sha256, staging, smoke test, rollback).
 
 ## Still to verify (TODO-needs-GPU-test)
+* **The narrator on real hardware.** `core/tts_engine.py` (loading Qwen3-TTS with the LoRA adapter and `generate_voice_clone`) is written against the qwen-tts API but has **never run on a GPU**; everything around it (parsers, chunker, cache/resume,
+  assembly, ffmpeg command lines, UI) is tested with a fake engine and a fake ffmpeg. Also untested: the real encoders in the pinned ffmpeg build (`libopus`, `libmp3lame`, `aac`, MP4 with Opus, Opus chapter markers, ID3 CHAP frames),
+  preview playback (QtMultimedia) on Windows, how chapters show up in the listed players, and the Studio/Acrylic look on a real desktop.
 * Reuse against a **real** Alexandria/Pinokio install on Windows; a real ModelScope download after the certificate fix; the pinned LGPL ffmpeg download and swap on Windows (file locking).
 * Alignment quality/speed and the `align_long` and quality-filter thresholds on real (non-synthetic, non-English) recordings.
 * Training thresholds (loss 3.5, lr 1e-6...2e-6) for **Russian**; reading the adapter in Alexandria with its pinned `peft==0.18.1`; the optional `ctc-forced-aligner`.

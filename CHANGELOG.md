@@ -6,6 +6,15 @@ The project is not released yet; everything below is the history of the 0.1.0 de
 ## [Unreleased]
 
 ### Added
+- **Studio** - new home window with three cards (*Narrate a book*, *Train your voice*, *My voices*) and the gear; every sub-window has a *← Studio* button; language changes apply to all windows.
+- **Voice library** (`%LOCALAPPDATA%\Voxprint\voices\<id>\`): trained voices are registered automatically; *My voices* with licence badge, preview, details, delete, import from folder / zip (hardened), and
+  *Download voices from repository* (configurable index URL, placeholder by default, SHA-256 verified).
+- **`voice.json` schema 2**: id, name, author, licence (+ URL), derived `commercial_use`; schema-1 files are migrated. Licence logic in `core/voice_info.py`.
+- **Narrate a book**: TXT / FB2 / EPUB parsers (standard library only), chapters, sentence chunks, resumable chunk-by-chunk synthesis with a Qwen3-TTS voice adapter (`core/tts_engine.py`, not yet run on a GPU),
+  progress with ETA, pause / cancel, exports through ffmpeg: Opus with chapters (default), MP3 per chapter, M4B (AAC) opt-in, plus M4B-Opus, Opus / FLAC / WAV per chapter, one MP3 with chapter marks, bitrate settings.
+- **AAC / M4B patent notice** (UI in en / ru / de, README, `THIRD_PARTY_NOTICES.md`) and a feature flag to hide / disable the option (`VOXPRINT_ENABLE_AAC`, `state/features.json`, `infra/features.py`).
+- Extension points (not implemented) for text clean-up, translation and multi-voice roles: `NarrationOptions.preprocessors` and a "coming later" line.
+- New docs screenshots: Studio, My voices, Narrate (incl. Russian and German renders).
 - **Settings dialog** behind a gear button: language, *Check for updates*, open models folder, open data & log folder, *Repair the installation*, *About*.
   The main screen keeps only the core workflow.
 - **Scroll area** around the whole main UI: the window is usable when the work area is shorter than the layout (e.g. 1366x768 at 150% scaling).
@@ -16,6 +25,8 @@ The project is not released yet; everything below is the history of the 0.1.0 de
 - Repository documentation in English: rewritten `README.md`, `CONTRIBUTING.md`, `docs/ARCHITECTURE.md`, this changelog, and English screenshots in `docs/screenshots/`.
 
 ### Changed
+- **Product name**: *Voxprint AI Audiobook Builder* (tagline "Train a voice, narrate books") in window titles, About, installer display name and docs. Technical names (`voxprint`, `Voxprint.exe`, `%LOCALAPPDATA%\Voxprint`) are unchanged.
+- The previous main window became the *Train your voice* window of the Studio (same workflow).
 - **Darker, more opaque theme**: strong dark tint over the Acrylic backdrop, solid panels and buttons, opaque text colours; the plain fallback uses the same palette.
 - All code comments and docstrings are English (UI strings stay localized in en / ru / de); comments in `build.bat`, the installer script and the requirements files are English too.
 - Repo docs no longer carry a Russian section; Russian-only development notes were translated or dropped.

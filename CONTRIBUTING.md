@@ -47,7 +47,7 @@ On Windows, never run `uv run` without `--no-sync` (it replaces CUDA torch with 
 
 ## Localization
 All user-visible text goes through `tr("some.key")` and lives in `locales/en.json`, `de.json`, `ru.json` (identical keys and `{placeholders}`, and every key used in code must exist - all enforced by `tests/test_i18n.py`, which also rejects Cyrillic string literals in code). New UI text therefore means three catalog entries. See "Adding a language" in the README.
-Russian *data* (abbreviation tables of the text normalizer, test fixtures) legitimately contains Cyrillic.
+Russian *data* (abbreviation tables of the text normalizer, the Russian heading words of `core/book_parsers.py`, test fixtures) legitimately contains Cyrillic; such modules are listed in the exception list of `tests/test_i18n.py`.
 
 ## Third-party components
 `credits.json` is the single source for the About dialog, `THIRD_PARTY_NOTICES.md` and the `licenses/` folder. After adding a dependency: add its entry (en/de/ru purpose,
