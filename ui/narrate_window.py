@@ -24,11 +24,12 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Set, Tuple
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QProgressBar,
+from PySide6.QtWidgets import (QSlider, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QProgressBar,
                                QPushButton, QSpinBox, QToolButton, QVBoxLayout, QWidget)
 
 from core import audiobook_export as ex
 from core import narration as nr
+from core import pauses as pz
 from core import text_prep
 from core.book_parsers import SUPPORTED_EXTENSIONS, Book, load_book
 from core.errors import DatasetMakerError
@@ -350,6 +351,25 @@ class NarrateWindow(SubWindow):
         v.addWidget(self.other_box)
         self.btn_other.toggled.connect(self._on_other_toggled)
         # advanced (collapsed): exact bitrates, output folder, chapter titles, text sample
+        # pause strength: explicit silence between commas, sentences, paragraphs ... (core/pauses.py)
+        self.lbl_pauses = QLabel()
+        self.sld_pauses = QSlider(Qt.Orientation.Horizontal)
+        self.sld_pauses.setRange(0, len(pz.LEVELS) - 1)
+        self.sld_pauses.setPageStep(1)
+        self.sld_pauses.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.sld_pauses.setTickInterval(1)
+        self.sld_pauses.setFixedWidth(260)
+        self.sld_pauses.setValue(pz.load_level())
+        self.lbl_pauses_value = QLabel()
+        prow2 = QHBoxLayout()
+        prow2.addWidget(self.lbl_pauses)
+        prow2.addWidget(self.sld_pauses)
+        prow2.addWidget(self.lbl_pauses_value)
+        prow2.addStretch(1)
+        v.addLayout(prow2)
+        self.lbl_pauses_hint = hint_label()
+        v.addWidget(self.lbl_pauses_hint)
+        self.sld_pauses.valueChanged.connect(self._on_pauses_changed)
         self.btn_advanced = QToolButton()
         self.btn_advanced.setObjectName("expander")
         self.btn_advanced.setCheckable(True)
@@ -499,6 +519,9 @@ class NarrateWindow(SubWindow):
         self.btn_out.setText(tr("narr.choose_folder"))
         self.lbl_out.setText(str(self.out_dir))
         self.chk_titles.setText(tr("narr.speak_titles"))
+        self.lbl_pauses.setText(tr("narr.pauses"))
+        self.lbl_pauses_hint.setText(tr("narr.pauses_hint"))
+        self._on_pauses_changed(self.sld_pauses.value(), save=False)
         self.btn_start.setText(tr("narr.start"))
         self.btn_pause.setText(tr("narr.resume") if self._paused() else tr("narr.pause"))
         self.btn_cancel.setText(tr("ui.cancel"))
@@ -509,6 +532,19 @@ class NarrateWindow(SubWindow):
             self.lbl_status.setText(tr("narr.idle"))
         self._render_voice_info()
         self._refresh_buttons()
+
+    def _on_pauses_changed(self, level: int, save: bool = True) -> None:
+        """Show the name of the chosen pause strength (and the sentence / paragraph lengths); remember the choice."""
+        prof = pz.PauseProfile(level)
+        names = (tr("narr.pauses_1"), tr("narr.pauses_2"), tr("narr.pauses_3"), tr("narr.pauses_4"), tr("narr.pauses_5"))
+        self.lbl_pauses_value.setText(tr("narr.pauses_value", name=names[prof.level], sentence=prof.ms(pz.SENTENCE),
+                                         paragraph=prof.ms(pz.PARAGRAPH)))
+        if save:
+            pz.save_level(prof.level)
+
+    def pause_profile(self) -> pz.PauseProfile:
+        """The pause lengths chosen with the slider."""
+        return pz.PauseProfile(self.sld_pauses.value())
 
     def _on_other_toggled(self, open_: bool) -> None:
         """Expand / collapse "Other formats"."""
@@ -822,7 +858,7 @@ class NarrateWindow(SubWindow):
         """Build the narration options from the controls."""
         return nr.NarrationOptions(
             formats=self.selected_formats(), bitrates=self.bitrates(),
-            speak_titles=self.chk_titles.isChecked(), allow_aac=self.aac_allowed,
+            speak_titles=self.chk_titles.isChecked(), allow_aac=self.aac_allowed, pauses=self.pause_profile(),
             prep=self.plan_builder(self.selected_rule_steps(), self.selected_neural_steps()))
 
     # ------------------------------------------------------------------ state
@@ -848,6 +884,7 @@ class NarrateWindow(SubWindow):
         self._refresh_model_row()
         self._sync_preset()
         self.cmb_voice.setEnabled(not busy)
+        self.sld_pauses.setEnabled(not busy)
         self.btn_pause.setVisible(busy)
         self.btn_cancel.setVisible(busy)
 

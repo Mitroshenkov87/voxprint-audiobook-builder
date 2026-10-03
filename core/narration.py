@@ -40,6 +40,7 @@ from core import audiobook_export as ex
 from core.audio_utils import resample
 from core.book_parsers import Book
 from core.book_prep import PrepPlan, run_preparation
+from core import pauses as pz
 from core.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_book
 from core.errors import CancelledByUser, DatasetMakerError, NarrationError
 from core.events import CancelToken
@@ -104,6 +105,9 @@ class NarrationOptions:
     preprocessors: List[Callable[[str], str]] = field(default_factory=list)
     #: Automatic book preparation (rules + optional neural clean-up); ``None`` = the text is used as it is.
     prep: Optional[PrepPlan] = None
+    #: Explicit silence between the pieces (comma, sentence, ellipsis, dash, paragraph, chapter ...), independent of the model's
+    #: prosody (:mod:`core.pauses`).  ``None`` = the earlier packed chunks with fixed pauses.
+    pauses: Optional[pz.PauseProfile] = field(default_factory=pz.PauseProfile)
 
 
 @dataclass
@@ -346,7 +350,8 @@ def _synth_with_retry(engine: TTSEngine, text: str, index: int, attempts: int = 
 
 
 def assemble_chapters(book: Book, chunks: Sequence[Chunk], engine_tag: str, cache: ChunkCache,
-                      texts: Dict[int, str], work_dir: Path) -> List[ex.ChapterAudio]:
+                      texts: Dict[int, str], work_dir: Path,
+                      pauses: Optional[pz.PauseProfile] = None) -> List[ex.ChapterAudio]:
     """Join the cached chunks of every chapter with their pauses into lossless chapter WAV files (streamed to disk)."""
     work_dir.mkdir(parents=True, exist_ok=True)
     by_chapter: Dict[int, List[Chunk]] = {}
@@ -372,7 +377,8 @@ def assemble_chapters(book: Book, chunks: Sequence[Chunk], engine_tag: str, cach
                 sf_out.write(data)
                 frames += len(data)
                 is_last = c is by_chapter[ci][-1]
-                gap = int(sr_out * (CHAPTER_TAIL_MS if is_last else c.pause_ms) / 1000)
+                tail_ms = pauses.ms(pz.CHAPTER) if pauses is not None else CHAPTER_TAIL_MS
+                gap = int(sr_out * (tail_ms if is_last else c.pause_ms) / 1000)
                 sf_out.write(np.zeros(gap, dtype=np.float32))
                 frames += gap
         finally:
@@ -419,7 +425,7 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
             book, plan, language, debug_dir=job_dir / ".debug", cache_dir=job_dir / ".cache",
             progress=lambda f, m: progress(NarrationProgress(int(f * 100), 100, None, tr("narr.preparing_neural", done=m), "prepare")),
             cancel=cancel)
-    chunk_list = chunk_book(book, options.max_chars, chapters, options.speak_titles)
+    chunk_list = chunk_book(book, options.max_chars, chapters, options.speak_titles, options.pauses)
     if not chunk_list:
         raise NarrationError(tr("err.book_empty"))
     normalizer = None if (plan is not None and plan.spells_out_numbers) else default_normalizer(language)
@@ -434,7 +440,7 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
     progress(NarrationProgress(total, total, 0.0, tr("narr.assembling"), "assemble"))
     work = job_dir / ".work"
     shutil.rmtree(work, ignore_errors=True)
-    chapter_audio = assemble_chapters(source_book, chunk_list, engine_tag, cache, texts, work)
+    chapter_audio = assemble_chapters(source_book, chunk_list, engine_tag, cache, texts, work, options.pauses)
     cancel.check()
 
     cover_path: Optional[Path] = None

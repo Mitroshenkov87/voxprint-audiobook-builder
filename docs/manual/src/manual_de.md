@@ -146,6 +146,8 @@ Bei M4B erscheint ein gelber Patenthinweis: „{{narr.aac_note}}“ Kurz gesagt:
 | {{narr.preset_standard}} | {{narr.preset_standard_d}} | 32 / 96 / 64 kbit/s | 14 / 43 / 29 MB |
 | {{narr.preset_high}} | {{narr.preset_high_d}} | 48 / 128 / 96 kbit/s | 22 / 58 / 43 MB |
 
+**{{narr.pauses}}** – ein Regler mit fünf Stufen, von *{{narr.pauses_1}}* über *{{narr.pauses_3}}* (Standard) bis *{{narr.pauses_5}}*. Voxprint schneidet den Text an jedem Komma, Satzende, jeder Auslassung, jedem Gedankenstrich, Absatz, Szenenwechsel und Kapitelende und fügt dort **Stille exakter Länge** ein, sodass die Pausen hörbar sind, egal wie das Stimmmodell den Text phrasiert. Bei *{{narr.pauses_3}}* folgen auf einen Satz 430 ms, auf einen Absatz 1,05 s und auf ein Kapitel 1,9 s – etwas länger als in früheren Versionen; jede Art hat ihre eigene Länge (Komma 240 ms, Auslassung 680 ms, Gedankenstrich 320 ms, Szenenwechsel 1,9 s), der Regler skaliert alle. Die Wahl wird gespeichert. Ändert man sie für ein bereits vertontes Buch, werden die gespeicherten Fragmente neu zusammengefügt statt erneut gesprochen, solange die Textteile gleich bleiben.
+
 **▸ {{narr.advanced}}** (eingeklappt) enthält: die genauen Bitraten je Format (ändern Sie eine, wird die Qualität „benutzerdefiniert“: keine Schaltfläche ist hervorgehoben); **{{narr.choose_folder}}** – den Ordner, in dem das Hörbuch abgelegt wird; das Kontrollkästchen **{{narr.speak_titles}}**; und das schreibgeschützte Feld „{{narr.sample}}“, das zeigt, wie der erste geänderte Absatz nach der Vorbereitung aussieht.
 
 ## Starten, pausieren, anhalten

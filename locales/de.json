@@ -578,5 +578,13 @@
  "auto.downloading": "Lade {names} (ca. {gb} GB)…",
  "auto.done": "Fertig: {n} Modell(e) geladen. Alle empfohlenen Optionen sind gewählt.",
  "auto.failed": "Download fehlgeschlagen: {error}. Die Optionen sind gewählt; drücken Sie die Schaltfläche erneut, um fortzufahren.",
- "preview.best": "Beste Variante"
+ "preview.best": "Beste Variante",
+ "narr.pauses": "Pausen",
+ "narr.pauses_1": "deutlich kürzer",
+ "narr.pauses_2": "kürzer",
+ "narr.pauses_3": "normal",
+ "narr.pauses_4": "länger",
+ "narr.pauses_5": "deutlich länger",
+ "narr.pauses_value": "{name} (Satz {sentence} ms, Absatz {paragraph} ms)",
+ "narr.pauses_hint": "Nach jedem Komma, Satz, jeder Auslassung, jedem Gedankenstrich, Absatz, Szenenwechsel und Kapitel wird Stille exakter Länge eingefügt, unabhängig davon, wie das Stimmmodell den Text phrasiert, damit die Pausen deutlich hörbar sind. „Normal“ ist etwas länger als die frühere Vertonung. Eine spätere Änderung verwendet bereits gesprochene Textteile weiter."
 }

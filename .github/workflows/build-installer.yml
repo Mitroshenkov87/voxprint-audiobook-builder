@@ -25,7 +25,7 @@ permissions:
 jobs:
   online-smoke:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     env:
       PYTHONUTF8: "1"
     steps:
@@ -80,14 +80,17 @@ jobs:
           Write-Host "unreachable manifest -> exit code $($p.ExitCode)"
           if ($p.ExitCode -eq 0) { throw "the setup reported success for an unreachable manifest" }
           # uninstall removes the downloaded files
-          $p = Start-Process C:\vxsmoke\unins000.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -Wait -PassThru
-          Start-Sleep 3
-          if (Test-Path C:\vxsmoke\Voxprint.exe) { throw "files left after the uninstall" }
+          # no -Wait: the uninstaller starts a temporary copy of itself and Start-Process would wait for the whole tree
+          $p = Start-Process C:\vxsmoke\unins000.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/LOG=C:\vxsmoke-un.log" -PassThru
+          for ($i = 0; $i -lt 60 -and (Test-Path C:\vxsmoke\Voxprint.exe); $i++) { Start-Sleep 2 }
+          Get-Process | Where-Object { $_.ProcessName -like "unins*" -or $_.ProcessName -like "*vxsmoke*" } | Format-Table Id, ProcessName
+          if (Test-Path C:\vxsmoke\Voxprint.exe) { if (Test-Path C:\vxsmoke-un.log) { Get-Content C:\vxsmoke-un.log -Tail 30 }; throw "files left after the uninstall" }
+          "uninstalled"
       - name: Logs
         if: always()
         shell: pwsh
         run: |
-          foreach ($l in "C:\vxsmoke1.log","C:\vxsmoke2.log","C:\vxsmoke3.log") { if (Test-Path $l) { "== $l"; Get-Content $l -Tail 25 } }
+          foreach ($l in "C:\vxsmoke1.log","C:\vxsmoke2.log","C:\vxsmoke3.log","C:\vxsmoke-un.log") { if (Test-Path $l) { "== $l"; Get-Content $l -Tail 25 } }
 
   build:
     runs-on: windows-latest

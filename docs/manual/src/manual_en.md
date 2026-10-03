@@ -146,6 +146,8 @@ Choosing M4B shows a yellow patent notice: *{{narr.aac_note}}* In short, AAC is 
 | {{narr.preset_standard}} | {{narr.preset_standard_d}} | 32 / 96 / 64 kbit/s | 14 / 43 / 29 MB |
 | {{narr.preset_high}} | {{narr.preset_high_d}} | 48 / 128 / 96 kbit/s | 22 / 58 / 43 MB |
 
+**{{narr.pauses}}** – a slider with five positions, from *{{narr.pauses_1}}* through *{{narr.pauses_3}}* (the default) to *{{narr.pauses_5}}*. Voxprint cuts the text at every comma, sentence end, ellipsis, dash, paragraph, scene break and chapter end and inserts **measured silence** there, so the pauses are audible no matter how the voice model phrases the text. At *{{narr.pauses_3}}* a sentence is followed by 430 ms, a paragraph by 1.05 s and a chapter by 1.9 s – a little longer than in earlier versions; each kind has its own length (a comma 240 ms, an ellipsis 680 ms, a dash 320 ms, a scene break 1.9 s) and the slider scales them all. The choice is remembered. Changing it for a book that was already narrated re-joins the stored fragments instead of speaking them again, as long as the text pieces stay the same.
+
 **▸ {{narr.advanced}}** (collapsed) contains: the exact bitrates per format (changing one switches the quality to "custom": no button is highlighted); **{{narr.choose_folder}}** – the folder where the audiobook is placed; the check box **{{narr.speak_titles}}**; and a read-only *{{narr.sample}}* showing how the first changed paragraph looks after preparation.
 
 ## Starting, pausing, stopping
