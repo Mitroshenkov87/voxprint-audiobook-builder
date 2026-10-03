@@ -134,9 +134,34 @@ def _ref_score(x: np.ndarray, sr: int) -> float:
     return score
 
 
+#: How much (dB) a reference candidate loses for pauses and for an unusual speaking rate.  Found in the first real-voice
+#: test: the plain "cleanest" clip was a counting list ("one, two, three ...") with long pauses (34 % voiced), and the
+#: voice cloning prompt built from it gave an off-tone voice.
+REF_PAUSE_PENALTY_DB = 20.0
+REF_RATE_PENALTY_DB = 20.0
+
+
+def _ref_naturalness_penalty(x: np.ndarray, sr: int, text: str, median_wps: float) -> float:
+    """Penalty (dB, >= 0) for a clip full of pauses or spoken at an unusual words-per-second rate."""
+    penalty = 0.0
+    try:
+        voiced = float(np.mean(au.voiced_mask(x, sr)))
+    except Exception:  # noqa: BLE001 - never let a heuristic stop the dataset
+        voiced = 1.0
+    penalty += REF_PAUSE_PENALTY_DB * max(0.0, 0.8 - voiced) / 0.8
+    dur = len(x) / sr
+    words = len(re.findall(r"\w+", text))
+    if median_wps > 0 and dur > 0 and words:
+        penalty += REF_RATE_PENALTY_DB * min(1.0, abs(words / dur - median_wps) / median_wps)
+    return penalty
+
+
 def select_ref(audio: np.ndarray, sr: int, segments: Sequence[Segment],
                lo: float = 5.0, hi: float = 10.0) -> Optional[RefChoice]:
-    """Choose the cleanest 5-10 s clip together with its *exact* text (``ref_text.txt``).
+    """Choose a clean, natural 5-10 s clip together with its *exact* text (``ref_text.txt``).
+
+    The score is the SNR minus a penalty for long pauses (lists, counting) and for an unusual speaking rate compared
+    with the rest of the recording.
 
     Candidates are single segments and merges of two consecutive segments (adjacent in the text and with a gap of less
     than 0.6 s).  If nothing fits the length window, the longest segment is used (and a warning is reported).
@@ -155,10 +180,12 @@ def select_ref(audio: np.ndarray, sr: int, segments: Sequence[Segment],
             return None
         s = max(segments, key=lambda q: q.duration)
         cands = [(s.start, s.end, s.text)]
+    rates = sorted(len(re.findall(r"\w+", q.text)) / q.duration for q in segments if q.duration > 0)
+    median_wps = rates[len(rates) // 2] if rates else 0.0
     best: Optional[RefChoice] = None
     for a, b, t in cands:
         x = audio[int(a * sr): int(b * sr)]
-        sc = _ref_score(x, sr)
+        sc = _ref_score(x, sr) - _ref_naturalness_penalty(x, sr, t, median_wps)
         if best is None or sc > best.score:
             best = RefChoice(a, b, sc, x, t)
     return best

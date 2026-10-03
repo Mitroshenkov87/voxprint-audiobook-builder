@@ -187,3 +187,19 @@ def test_voiced_bounds_and_silences():
     assert abs(vs - tl[0][1]) < 0.1 and abs(ve - tl[-1][2]) < 0.1
     sil = au.find_silences(audio, 16000, 0.5)
     assert any(a > 1.0 for a, b in sil)
+
+
+def test_select_ref_avoids_a_clip_with_long_pauses_and_an_unusual_rate():
+    """Real-voice test: the 'cleanest' clip was a counting list with long pauses; it must lose to a natural sentence."""
+    sr = 24000
+    rng = np.random.default_rng(1)
+    t = np.arange(8 * sr) / sr
+    tone = np.sin(2 * np.pi * 150 * t) * 0.3
+    sparse = (tone * (np.arange(8 * sr) % 12000 < 2400) + rng.normal(0, 0.0005, 8 * sr)).astype(np.float32)   # 20 % voiced, very clean
+    natural = (tone * (np.arange(8 * sr) % 12000 < 10000) + rng.normal(0, 0.004, 8 * sr)).astype(np.float32)  # 83 % voiced, a bit noisier
+    audio = np.concatenate([sparse, natural, natural])
+    segs = [Segment(1, 0, 8, "один два три четыре пять шесть семь"),
+            Segment(2, 8, 16, "Мне кажется что хороший голос в книге это когда ты перестаёшь замечать что читают тебе вслух"),
+            Segment(3, 16, 24, "Мне кажется что хороший голос в книге это когда ты перестаёшь замечать что читают тебе вслух")]
+    ref = select_ref(audio, sr, segs)
+    assert ref.start >= 8
