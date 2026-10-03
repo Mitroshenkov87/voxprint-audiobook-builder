@@ -27,12 +27,14 @@ log = logging.getLogger("voxprint.preview")
 MAX_CLIPS = 12
 MIN_CLIPS = 4
 MAX_EPOCHS = 4
+SYNTH_CHECK_SEC = 25.0       # measured on an RTX 4090: engine load + ~7 s sample + pitch/WER per variant (~31 s wall minus the trainer's own load)
+ASR_LOAD_SEC = 10.0          # measured: 8 s for Qwen3-ASR-0.6B
 MAX_SECONDS = 180.0           # time cap of one quick training (estimated)
 #: The ~10 s sentence the sample says, per language (the engine needs the language of the voice).
 SAMPLE_TEXT = {
-    "russian": "Здравствуйте! Это короткий образец моего голоса: так программа будет читать вам книги вслух.",
-    "english": "Hello! This is a short sample of my voice, the way the program will read books aloud to you.",
-    "german": "Guten Tag! Das ist eine kurze Hörprobe meiner Stimme, so liest Ihnen das Programm Bücher vor.",
+    "russian": "Здравствуйте! Это короткий образец моего голоса: так программа будет читать вам книги вслух, неторопливо и внятно, не пропуская ни слова.",
+    "english": "Hello! This is a short sample of my voice, the way the program will read books aloud to you, calmly and clearly, without skipping a single word.",
+    "german": "Guten Tag! Das ist eine kurze Hörprobe meiner Stimme, so liest Ihnen das Programm Bücher vor, ruhig und deutlich, ohne ein einziges Wort auszulassen.",
 }
 
 

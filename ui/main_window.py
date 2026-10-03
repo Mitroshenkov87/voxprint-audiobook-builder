@@ -933,7 +933,7 @@ class MainWindow(QWidget):
         from workers import preview_runner
 
         vs = preview_runner.make_variants(plan, self.chk_compare.isChecked())
-        quick = sum(train_presets.estimate_seconds(v.plan, min(preview_runner.MAX_CLIPS, n), gpu) + 30 for v in vs) + 30
+        quick = sum(train_presets.estimate_seconds(v.plan, min(preview_runner.MAX_CLIPS, n), gpu) + preview_runner.SYNTH_CHECK_SEC for v in vs) + preview_runner.ASR_LOAD_SEC
         self.lbl_preview_estimate.setText(tr("preview.estimate", time=train_presets.format_duration(
             quick, tr("preset.unit_min"), tr("preset.unit_sec"), tr("preset.unit_hour")), n=len(vs)))
         fmt = dict(time=dur, epochs=plan.epochs, rank=plan.lora_r, n=n, gpu=where)

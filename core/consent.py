@@ -19,6 +19,8 @@ from dataclasses import dataclass
 from datetime import date as _date
 from typing import Any, Dict, Optional
 
+from core import spoken_date
+
 COMMERCIAL, PUBLIC_NC, PRIVATE = "commercial", "public_noncommercial", "private_only"
 SCOPES = (COMMERCIAL, PUBLIC_NC, PRIVATE)
 DEFAULT_SCOPE = PRIVATE                       # the most restrictive level wins whenever the statement is unclear
@@ -108,7 +110,8 @@ def _parse_date(t: str) -> str:
         if not m or m.group(2) not in _MONTHS:
             m2 = re.search(r"\b([a-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b", t)
             if not m2 or m2.group(1) not in _MONTHS:
-                return ""
+                return spoken_date.find_date(t)     # the recogniser wrote the date in words
+
             mo, d, y = _MONTHS[m2.group(1)], int(m2.group(2)), int(m2.group(3))
         else:
             d, mo, y = int(m.group(1)), _MONTHS[m.group(2)], int(m.group(3))
@@ -118,11 +121,17 @@ def _parse_date(t: str) -> str:
         return ""
 
 
+#: Words that end the name in "I, <name>, today ..." (recognisers often drop the commas, so the end is found by these words).
+_NAME_END = (r"(?:сегодня|heute|today|am\b|разрешаю|даю|согласен|согласна|erlaube|gestatte|give|grant|hereby|hiermit|permit|\d)")
+
+
 def _parse_name(text: str) -> str:
+    """The speaker's name from "I, <name>, today, <date>, ..." with or without commas (1-4 words); "" if not found."""
     t = re.sub(r"\s+", " ", text.strip())
-    m = (re.search(r"(?:^|[.!?]\s)\s*(?:я|ich|i)\s*,?\s+([^,.]{2,60}?)\s*,\s*(?:сегодня|heute|today|am\b|\d)", t, re.I)
-         or re.search(r"(?:^|[.!?]\s)\s*(?:я|ich|i)\s*,?\s+([^,.]{2,60}?)\s*,?\s+(?:разрешаю|даю|erlaube|gestatte|give|grant|hereby)", t, re.I))
-    name = m.group(1).strip(" ,") if m else ""
+    m = re.search(r"(?:^|[.!?]\s|\s)(?:я|ich|i)[\s,]+((?:[^\s,.]+[\s,]+){0,3}?[^\s,.]+)[\s,.]+" + _NAME_END, t, re.I)
+    name = m.group(1).strip(" ,.") if m else ""
+    if name and name == name.lower():
+        name = name.title()
     return name if 2 <= len(name) <= 60 and not re.search(r"\d", name) else ""
 
 
