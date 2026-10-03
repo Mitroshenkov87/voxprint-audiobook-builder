@@ -51,6 +51,49 @@ CHANNEL_LATEST = "latest"
 
 FetchJson = Callable[[str], Any]
 
+# ---- решение по компоненту: использовать готовое / обновить / поставить
+ACTION_REUSE = "reuse"        # установлено и подходит - ничего не трогаем
+ACTION_UPGRADE = "upgrade"    # установлено, но старее целевой версии - обновляем в СОБСТВЕННОМ окружении Voxprint
+ACTION_INSTALL = "install"    # нет (или несовместимо) - ставим целевую версию в собственное окружение
+ACTION_IGNORE = "ignore"      # не используем (например Unsloth: Qwen3-TTS он пока не поддерживает)
+#: Версии, прогнанные вместе с Voxprint, но новее закреплённой в манифесте: их тоже можно использовать как есть.
+#: peft: закреплён 0.18.1 (как у Alexandria), на CPU с крошечной моделью проверена и 0.21.2.
+TESTED_COMPATIBLE: Dict[str, frozenset] = {"peft": frozenset({"0.18.1", "0.21.2"})}
+#: Известные пакеты, которые Voxprint намеренно не использует, и причина (стабильный код).
+IGNORED_PACKAGES: Dict[str, str] = {"unsloth": "no_qwen3_tts_training"}
+
+
+@dataclass(frozen=True)
+class Decision:
+    name: str
+    installed: Optional[str]
+    target: Optional[str]
+    action: str
+    reason: str           # стабильный код: current | compatible_newer | outdated | missing | incompatible | ...
+
+
+def decide_package(name: str, installed: Optional[str], target: Optional[str], constraint: str = "") -> Decision:
+    """Правило: готовое используем, если оно актуально или проверенно совместимо; старее - обновляем (в окружении
+    Voxprint, чужие окружения не трогаем); нет - ставим. target - закреплённая (или новейшая стабильная) версия."""
+    if name in IGNORED_PACKAGES:
+        return Decision(name, installed, None, ACTION_IGNORE, IGNORED_PACKAGES[name])
+    if target is None:
+        return Decision(name, installed, None, ACTION_REUSE if installed else ACTION_IGNORE,
+                        "no_target" if installed else "optional_absent")
+    if installed is None:
+        return Decision(name, None, target, ACTION_INSTALL, "missing")
+    iv = parse_version(installed)
+    if constraint and iv is not None and iv not in SpecifierSet(constraint):
+        return Decision(name, installed, target, ACTION_INSTALL, "incompatible")
+    c = compare_versions(installed, target)
+    if c == 0:
+        return Decision(name, installed, target, ACTION_REUSE, "current")
+    if c < 0:
+        return Decision(name, installed, target, ACTION_UPGRADE, "outdated")
+    if installed in TESTED_COMPATIBLE.get(name, ()):
+        return Decision(name, installed, target, ACTION_REUSE, "compatible_newer")
+    return Decision(name, installed, target, ACTION_INSTALL, "unverified_newer")
+
 
 def parse_version(s: str) -> Optional[Version]:
     try:
@@ -82,7 +125,7 @@ def installed_version(name: str) -> Optional[str]:
         return None
 
 
-def http_fetch_json(url: str, timeout: float = 15.0) -> Any:
+def http_fetch_json(url: str, timeout: float = 6.0) -> Any:
     req = urllib.request.Request(url, headers={"User-Agent": "Voxprint-updater"})
     with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 - только https к PyPI/HF
         return json.loads(r.read().decode("utf-8"))
@@ -128,7 +171,11 @@ class PackageStatus:
     @property
     def update_available(self) -> bool:
         """Нужно менять установленную версию (в т.ч. откатить к проверенной)."""
-        return self.target is not None and (self.installed is None or compare_versions(self.target, self.installed) != 0)
+        return self.decision.action in (ACTION_UPGRADE, ACTION_INSTALL)
+
+    @property
+    def decision(self) -> Decision:
+        return decide_package(self.name, self.installed, self.target, self.constraint)
 
     @property
     def newer_unverified(self) -> bool:

@@ -131,6 +131,7 @@ def test_about_dialog_content_in_every_language(app):
         assert "Aleksandr Mitroshenkov" in text and "Qwen3-TTS" in text and "PySide6" in text
         assert "26H2" in text and "16" in text and "LGPL" in text
         assert i18n.tr("about.step1") in text and i18n.tr("about.privacy") in text
+        assert i18n.tr("about.concept_title") in text and i18n.tr("about.concept")[:60] in text
         assert d.windowTitle() == i18n.tr("about.title") and d.btn_notices.text() == i18n.tr("about.btn_notices")
         d.close()
 

@@ -306,6 +306,15 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 
 ## Build tools (not shipped, except the PyInstaller bootloader and the Inno Setup installer runtime)
 
+### FFmpeg LGPL build (BtbN/FFmpeg-Builds, downloaded when needed)
+
+* Purpose: Audio decoding. Used only if no working ffmpeg is installed on the computer; downloaded once and checked by a pinned checksum
+* Licence: LGPL-2.1-or-later (no GPL components)
+* Project: <https://github.com/BtbN/FFmpeg-Builds>
+* Status: downloaded on first start
+* Licence text: [`licenses/ffmpeg-lgpl-2.1.txt`](licenses/ffmpeg-lgpl-2.1.txt)
+* Note: Separate executable, not linked into Voxprint. Source code: https://ffmpeg.org/download.html#get-sources (build scripts: https://github.com/BtbN/FFmpeg-Builds).
+
 ### uv
 
 * Purpose: Installs packages when building (not shipped)

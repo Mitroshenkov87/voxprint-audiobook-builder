@@ -68,6 +68,7 @@ class AboutDialog(QDialog):
         steps = "".join(f"<li>{e(tr(f'about.step{i}'))}</li>" for i in range(1, 6))
         parts = [
             f"<p>{e(tr('about.what'))}</p>",
+            f"<h3>{e(tr('about.concept_title'))}</h3><p>{e(tr('about.concept'))}</p>",
             f"<h3>{e(tr('about.steps_title'))}</h3><ul>{steps}</ul>",
             f"<p>{e(tr('about.requirements'))}</p>",
             f"<p>{e(tr('about.privacy'))}</p>",

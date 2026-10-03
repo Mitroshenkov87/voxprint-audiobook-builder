@@ -59,3 +59,63 @@ def resource_dir() -> Path:
     if base:
         return Path(base)
     return Path(__file__).resolve().parent.parent
+
+
+def previous_homes() -> list:
+    """Папки данных более ранних установок Voxprint (только чтение): в них можно найти модели и настройки.
+
+    Обновление через установщик сохраняет %LOCALAPPDATA%\\Voxprint (то же app_home) - это и есть основной случай.
+    Дополнительно смотрим типичные прежние места и VOXPRINT_PREVIOUS_HOMES (список через os.pathsep)."""
+    cur = None
+    try:
+        cur = app_home().resolve()
+    except OSError:
+        pass
+    cands = []
+    for part in os.environ.get("VOXPRINT_PREVIOUS_HOMES", "").split(os.pathsep):
+        if part.strip():
+            cands.append(Path(part.strip().strip('"')))
+    if sys.platform == "win32":
+        for var in ("APPDATA", "LOCALAPPDATA"):
+            base = os.environ.get(var)
+            if base:
+                cands.append(Path(base) / APP_NAME)
+                cands.append(Path(base) / APP_NAME.lower())
+    try:
+        home = Path.home()
+        cands += [home / ".voxprint", home / ".local" / "share" / APP_NAME]
+    except (RuntimeError, OSError):
+        pass
+    out = []
+    for c in cands:
+        try:
+            r = c.resolve()
+            if r == cur or r in [o.resolve() for o in out] or not c.is_dir():
+                continue
+            if any((c / n).is_dir() for n in ("models", "state", "packages")):
+                out.append(c)
+        except OSError:
+            continue
+    return out
+
+
+#: Маленькие файлы настроек, которые переносим из прежней установки (копируем только если их ещё нет).
+ADOPTED_STATE_FILES = ("language", "privacy_ack", "updater_state.json", "last_adapter.json")
+
+
+def adopt_previous_settings() -> list:
+    """Копирует настройки из прежней установки Voxprint в текущий каталог состояния (старая папка не меняется).
+    Возвращает список перенесённых файлов."""
+    done = []
+    dst_dir = state_dir()
+    for home in previous_homes():
+        src_dir = home / "state"
+        for name in ADOPTED_STATE_FILES:
+            src, dst = src_dir / name, dst_dir / name
+            try:
+                if src.is_file() and not dst.exists():
+                    dst.write_bytes(src.read_bytes())
+                    done.append(name)
+            except OSError:
+                continue
+    return done

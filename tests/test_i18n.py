@@ -48,6 +48,8 @@ def test_every_key_used_in_code_exists():
     used |= {f"about.step{i}" for i in range(1, 6)} | {f"stage.{s}" for s in
                                                       ("updates", "model", "align", "slice", "train", "save")}
     used |= {f"about.kind_{k}" for k in ("model", "library", "tool", "asset")}
+    from infra.install_state import ALL_CODES
+    used |= {f"health.{c}" for c in ALL_CODES}          # коды причин проверки установки (динамический ключ)
     en = _cat("en")
     used.discard("stage.")             # префикс для динамических ключей stage.<этап>
     assert used and not (used - set(en)), used - set(en)

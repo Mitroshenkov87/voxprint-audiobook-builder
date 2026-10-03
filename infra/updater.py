@@ -32,7 +32,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from core.errors import UpdateError
 from core.events import ProgressCallback, Stage, noop_progress
@@ -113,6 +113,15 @@ def find_python() -> Optional[str]:
     """Python для pip/дымового теста: текущий интерпретатор или системный (для собранного exe)."""
     if not getattr(sys, "frozen", False):
         return sys.executable
+    try:   # для собранного exe нужен Python той же версии (бинарные колёса), pip --target пишет только в нашу папку
+        from infra import env_probe
+
+        envs = [e for e in (env_probe.probe_python(x, src) for x, src in env_probe.candidate_pythons()) if e]
+        exe = env_probe.pick_pip_python(envs)
+        if exe:
+            return exe
+    except Exception:  # noqa: BLE001 - выбор необязателен, ниже прежний запасной путь
+        pass
     for name in ("python", "python3", "py"):
         w = shutil.which(name)
         if w:
@@ -159,8 +168,10 @@ class Updater:
                  snapshot_download: Optional[Callable[..., str]] = None,
                  get_remote_sha: Optional[Callable[[str], Optional[str]]] = None,
                  packages: Optional[Dict[str, str]] = None, models: Optional[tuple] = None,
-                 manifest: Optional[Manifest] = None, channel: Optional[str] = None) -> None:
+                 manifest: Optional[Manifest] = None, channel: Optional[str] = None,
+                 probe_env: Optional[Callable[[], Any]] = None) -> None:
         setup_log()
+        self.probe_env = probe_env
         self._manifest = manifest
         self._channel = channel
         self.fetch_json = fetch_json
@@ -362,9 +373,26 @@ class Updater:
         res.unverified_newer = rep.unverified_newer
         return res
 
+    def _report_environment(self, progress: ProgressCallback) -> None:
+        """Только чтение: что уже установлено и что с этим будет (использовать / обновить / поставить)."""
+        if self.probe_env is None and os.environ.get("VOXPRINT_NO_ENV_PROBE"):
+            return
+        try:
+            from infra import env_probe
+
+            env = (self.probe_env or (lambda: env_probe.probe_environment(
+                manifest_pins=dict(self.manifest().packages), installed_fn=self.installed_fn,
+                scan_other_pythons=False)))()
+            self.last_env = env
+            for line in env_probe.user_messages(env):
+                progress(Stage.UPDATES, 0.0, line)
+        except Exception as exc:  # noqa: BLE001 - диагностика не должна мешать обновлению
+            log.warning("environment probe failed: %s", exc)
+
     # ---- «всё сразу» для UI
     def check_and_apply(self, progress: ProgressCallback = noop_progress) -> Tuple[VersionReport, UpdateResult]:
         progress(Stage.UPDATES, 0.0, tr("upd.checking"))
+        self._report_environment(progress)
         rep = self.check()
         if not rep.network_ok:
             r = UpdateResult(messages=[tr("upd.no_net_check")])

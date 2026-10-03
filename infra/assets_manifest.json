@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "note": "Pinned non-pip assets. Every download is verified by sha256 before use, staged, smoke-tested and swapped in atomically; on any failure the previous copy is kept. The ffmpeg build is BtbN/FFmpeg-Builds, LGPL variant (no GPL components), release n8.1.3; sha256 computed on 2026-10-03 from the downloaded file. Old autobuild tags may be removed by the publisher: then the download fails cleanly and the bundled imageio-ffmpeg is used.",
+  "assets": {
+    "ffmpeg": {
+      "version": "n8.1.3",
+      "license": "LGPL-2.1-or-later (BtbN lgpl static build)",
+      "platforms": {
+        "win32": {
+          "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-26-13-03/ffmpeg-n8.1.3-win64-lgpl-8.1.zip",
+          "sha256": "933b9625fb4b0dc2e1e96cf20fb54b94ed24ba561858418de29531fb7c88ad74",
+          "size": 170607374,
+          "archive": "zip",
+          "extract": {
+            "ffmpeg-n8.1.3-win64-lgpl-8.1/bin/ffmpeg.exe": "ffmpeg.exe",
+            "ffmpeg-n8.1.3-win64-lgpl-8.1/bin/ffprobe.exe": "ffprobe.exe",
+            "ffmpeg-n8.1.3-win64-lgpl-8.1/LICENSE.txt": "LICENSE.txt"
+          },
+          "exe": "ffmpeg.exe",
+          "smoke": ["-hide_banner", "-version"],
+          "smoke_expect": "ffmpeg version"
+        }
+      }
+    }
+  }
+}

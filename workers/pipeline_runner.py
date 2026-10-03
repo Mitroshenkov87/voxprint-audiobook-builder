@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -187,8 +188,10 @@ def required_model_repos() -> List[str]:
 
 
 def models_missing(repos: Optional[List[str]] = None) -> List[str]:
+    """Модели, которых нет ни в каталоге Voxprint, ни у других программ (их надо скачивать)."""
     repos = repos if repos is not None else required_model_repos()
-    return [r for r in repos if not md.verify_local_model(md.local_dir_for(r))]
+    return [r for r in repos
+            if not md.verify_local_model(md.local_dir_for(r)) and md.external_model(r) is None]
 
 
 def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[List[str]] = None,
@@ -197,6 +200,13 @@ def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[
     ensure = ensure or md.ensure_model
     repos = repos if repos is not None else required_model_repos()
     todo = models_missing(repos)
+    for repo in repos:   # копии других программ: мгновенно, только сообщение «найдено, используем»
+        if repo not in todo and not md.verify_local_model(md.local_dir_for(repo)):
+            ensure(repo, lambda s, f, m: progress(Stage.MODEL, 0.0, m))
     for i, repo in enumerate(todo):
         ensure(repo, lambda s, f, m, i=i: progress(Stage.MODEL, (i + f) / max(1, len(todo)), m))
+    if ensure is md.ensure_model and sys.platform == "win32":
+        from infra import assets   # системный ffmpeg, иначе закреплённая LGPL-сборка (best effort, не блокирует)
+
+        assets.ensure_ffmpeg_tool(lambda f, m: progress(Stage.MODEL, 0.0, m))
     return todo

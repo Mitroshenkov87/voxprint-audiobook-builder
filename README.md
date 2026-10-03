@@ -8,8 +8,49 @@ Voxprint aligns the text to the recording with a neural forced aligner (`Qwen/Qw
 adapter into a standalone ~4 GB model that works in any app that runs Qwen3-TTS. No browser, no Gradio, no WSL, no web server.
 
 > **Privacy.** Use only your own voice (or the voice of someone who explicitly agreed). Recordings, text and the finished
-> voice stay on your computer; the program sends nothing to the internet except downloading models and checking for updates.
+> voice stay on your computer; the program sends nothing to the internet except downloading models (Hugging Face, or the ModelScope mirror) and checking for updates.
 > A notice is shown on first start and a reminder sits at the bottom of the window.
+
+## The idea
+Voxprint grew out of a search for a truly **one-button voice-cloning tool**. The tools we found needed a command line, manual
+setup of components or hand-prepared files, or covered only a single step. Voxprint covers the **whole path**: from a voice
+recording and a text file to ready output files you can load into a neural network. Your effort is minimal: **read a text aloud
+and attach two files**. It was built jointly by a human and an AI - an honest attempt. It is **economical**: models (and tools)
+that other apps have already downloaded are reused instead of being downloaded again. **Windows first**, other operating systems later.
+
+## Reusing what is already on your computer (read-only)
+Before downloading a Qwen model Voxprint looks for a complete copy left by another app and uses it **in place - read-only, nothing
+is copied, moved, changed or deleted** (`core/model_locator.py`). Where it looks (confidence: high = verified in code/docs, medium = derived, not checked on a real install):
+
+| Source | Location | Confidence |
+|---|---|---|
+| Standard Hugging Face cache (also what **Alexandria** uses: `try_to_load_from_cache` + `from_pretrained("Qwen/Qwen3-TTS-12Hz-1.7B-...")`, no folder of its own) | `$HF_HUB_CACHE`, else `$HF_HOME/hub`, else `$XDG_CACHE_HOME/huggingface/hub`, else `~/.cache/huggingface/hub` (Windows: `%USERPROFILE%\.cache\huggingface\hub`); layout `models--Qwen--<Name>/{blobs,refs/main,snapshots/<sha>}`, symlinks or plain files | high |
+| Alexandria installed via **Pinokio** (its README's recommended route; Pinokio sets `HF_HOME=./cache/HF_HOME`) | `<pinokio>\api\alexandria-audiobook.git\cache\HF_HOME\hub` (the folder name is inferred, so `api\*\cache\...` is scanned), or the shared `<pinokio>\cache\HF_HOME\hub`; `<pinokio>` = `%USERPROFILE%\pinokio`, `C:\pinokio` or `%PINOKIO_HOME%` | medium |
+| Alexandria in Docker | volume `hf_cache:/root/.cache/huggingface` inside Docker - not reachable from the host (use `VOXPRINT_MODEL_DIRS` with a bind mount) | high |
+| ModelScope cache | `%MODELSCOPE_CACHE%` or `~/.cache/modelscope`, then `hub/models/<Owner>/<Name>` (dots in the name become `___`, e.g. `Qwen3-TTS-12Hz-1___7B-Base`) | medium |
+| Manual downloads (`--local_dir`) | `~/models`, `./models`, the working folder: `<Name>`, `<Owner>/<Name>`, `<Owner>--<Name>`; a previous Voxprint install: `~/.voxprint`, `%APPDATA%\Voxprint`, `VOXPRINT_PREVIOUS_HOMES` | medium |
+| Your own list | `VOXPRINT_MODEL_DIRS` (paths separated by `;` on Windows) - searched first. `VOXPRINT_NO_EXTERNAL_MODELS=1` switches reuse off. No GUI setting on purpose | - |
+
+A copy is accepted only if it is **complete**: valid `config.json`, every file of the repository (for the Qwen3-TTS Base models including
+`speech_tokenizer/`), every `*.safetensors` has a consistent header and is not truncated, all shards of `model.safetensors.index.json`
+exist, symlinks resolve, no `*.incomplete` leftovers. It must also match the **verified revision** from `infra/verified_manifest.json`:
+the HF snapshot folder name is the commit sha; folders without a sha (ModelScope, plain folders) are accepted only when the sizes of the
+weight files equal the verified commit. On a mismatch the verified revision is downloaded and the log says so. The updater never touches
+reused copies (it only refreshes Voxprint's own). The message "Found the model ... from another app" is shown in all five languages.
+
+**Download mirror.** If Hugging Face is slow or unreachable (a 6 s probe; skipped when you set your own `HF_ENDPOINT`) or fails, Voxprint
+downloads from **ModelScope** (modelscope.cn, org `Qwen`; the same repository ids, byte-identical file sizes - verified 2026-10-03) and
+confirms the revision by file sizes. Downloads resume after an interruption (`<model>.partial`, `*.incomplete`). `VOXPRINT_NO_MIRROR=1` disables it.
+
+**Components.** The same idea for Python packages and tools (`infra/env_probe.py`, read-only): *installed and current or proven compatible* -> reused;
+*older than the newest verified version* -> upgraded **inside Voxprint's own environment**; *missing/incompatible* -> installed there. Other environments (system Python,
+Pinokio apps, conda) are only asked for versions (`importlib.metadata`, isolated, nothing imported or written) and are **never modified**. torch: any
+build is reusable, but its CUDA flavor must fit the NVIDIA driver (`nvidia-smi` CUDA version -> cu118/124/126/128/130, else CPU). ffmpeg: a system one is used
+only if `ffmpeg -version` works, otherwise a pinned LGPL build (sha256, staging, smoke test, atomic swap, rollback; `infra/assets_manifest.json`).
+After an install/repair Voxprint writes a **completion manifest** (app/Python version, requirement hashes, torch flavor) last and atomically;
+`main.py --verify-install` shows stable reason codes (localized, no tracebacks) and `main.py --repair` rebuilds only what differs in the Voxprint venv (`uv`).
+Settings of an earlier Voxprint install are adopted (copied, never overwriting). **Unsloth is deliberately not used**: as of 2026-10-03 it has no Qwen3-TTS
+fine-tuning support (issue #3951 open, depends on the unmerged transformers PR #44517) and its dependency pins conflict with the verified set; Voxprint trains with its own LoRA loop.
 
 ## For users
 1. Install `Voxprint-Setup.exe` (on first start the program downloads the models, ~7 GB, once; internet needed).
@@ -115,7 +156,14 @@ Important points:
   backdrop types AUTO 0, NONE 1, MAINWINDOW 2, **TRANSIENTWINDOW 3 (Acrylic)**, TABBEDWINDOW 4.
 * Licences in `credits.json` were read from PyPI metadata, GitHub and Hugging Face cards on 2026-10-03.
 
+* **Model reuse / mirror / environment probe** (tests with fake directory trees and fake machines): HF cache layouts incl. symlinks, refs/snapshots, truncated and sharded weights,
+  Pinokio/Alexandria-style tree, ModelScope layout, pinned-revision mismatch, read-only guarantee, ModelScope listing and resumable download (fake server), reuse/upgrade/install decisions,
+  torch flavor mapping, completion manifest + reason codes, pinned-asset installer (sha256, staging, smoke test, rollback). Real endpoints checked 2026-10-03: ModelScope repo ids and file sizes equal the pinned HF commits;
+  Qwen has no newer Qwen3-TTS/aligner than the ones used (new in the org: `Qwen3-ForcedAligner-0.6B-hf` and `Qwen3-ASR-*-hf`, transformers-native variants - not adopted, noted only).
+
 ## Still to verify on Windows / GPU (TODO-needs-GPU-test)
+* Reuse against a **real** Alexandria/Pinokio install on Windows (folder names, real symlink/no-symlink caches, `%USERPROFILE%` paths); a real ModelScope download; the real `nvidia-smi` mapping; `uv venv`/`uv pip` repair end to end;
+  the pinned LGPL ffmpeg download and swap on Windows (file locking); a GUI "Repair" button (today: `--verify-install` / `--repair`) and a per-model missing/partial/ready indicator (the state is available as `model_states()`).
 * Real weights, alignment quality/speed, `align_long` and quality-filter thresholds on real recordings.
 * Training on an RTX 4090 Mobile 16 GB (bf16 + eager + checkpointing + peft, 8-bit AdamW on Windows, loss threshold 3.5 and lr 1e-6...2e-6 for Russian).
 * **Building the universal model from real 1.7B weights** (memory, time, ~4 GB size, loading with `Qwen3TTSModel` and `generate_custom_voice`) and the real adapter size.
@@ -137,6 +185,40 @@ LoRA-адаптер (папка с `adapter_model.safetensors`, `adapter_config.
 > **Конфиденциальность.** Используйте только свой собственный голос (или голос человека, давшего явное согласие).
 > Записи, текст и готовый голос хранятся только на вашем компьютере; программа ничего не отправляет в интернет,
 > кроме скачивания моделей и проверки обновлений. При первом запуске показывается памятка, внизу окна — напоминание.
+
+### Идея
+Voxprint вырос из поиска по-настоящему **«однокнопочного» инструмента для клонирования голоса**. Найденным инструментам требовались командная
+строка, ручная установка компонентов или заранее подготовленные вручную файлы, либо они закрывали лишь один шаг. Voxprint проходит **весь путь**:
+от записи голоса и текстового файла до готовых выходных файлов, которые можно загрузить в нейросеть. Усилия пользователя минимальны:
+**прочитать текст вслух и приложить два файла**. Программа создана совместно человеком и ИИ - как честная попытка. Она **экономная**: модели
+(и инструменты), уже скачанные другими программами, используются повторно. **Сначала Windows**, другие системы - позже.
+
+### Использование уже имеющегося (только чтение)
+Перед скачиванием модели Qwen Voxprint ищет полную копию, оставленную другой программой, и использует её **на месте - только для чтения, ничего не
+копируется, не переносится, не изменяется и не удаляется** (`core/model_locator.py`). Где ищет: стандартный кэш Hugging Face (`HF_HUB_CACHE`,
+`HF_HOME\hub`, `~\.cache\huggingface\hub`) - **именно сюда пишет Alexandria** (достоверно, по её коду; своей папки моделей у неё нет); при установке
+Alexandria через **Pinokio** - `<pinokio>\api\alexandria-audiobook.git\cache\HF_HOME\hub` или общий `<pinokio>\cache\HF_HOME\hub` (уверенность средняя: выведено
+из документации Pinokio, на живой установке не проверено; `api\*\cache` сканируется целиком); кэш ModelScope (`~\.cache\modelscope\hub\models\Qwen\...`, точки в имени → `___`);
+ручные загрузки (`~\models`, `.\models`), прежняя установка Voxprint; свой список - переменная `VOXPRINT_MODEL_DIRS` (пути через `;`).
+`VOXPRINT_NO_EXTERNAL_MODELS=1` отключает повторное использование. Настроек в окне нет намеренно. Alexandria в Docker хранит модели внутри тома Docker - с хоста недоступно.
+
+Копия принимается, только если **полная** (валидный `config.json`, все файлы репозитория, включая `speech_tokenizer/`; заголовки и размеры `*.safetensors` согласованы,
+все шарды на месте, симлинки ведут к существующим файлам, нет `*.incomplete`) и совпадает с **проверенной ревизией** из манифеста (у кэша HF - имя папки снимка = sha коммита;
+у папок без sha - совпадение размеров весов с проверенным коммитом). При несовпадении скачивается проверенная ревизия, в журнале пишется причина. Сообщение
+«Найдена модель ... из другой программы» показывается на пяти языках; обновление чужие копии не трогает.
+
+**Зеркало ModelScope.** Если Hugging Face медленный/недоступен (проба 6 с; при вашем `HF_ENDPOINT` не вмешиваемся) или загрузка не удалась, модели скачиваются с **ModelScope**
+(modelscope.cn, организация `Qwen`; те же идентификаторы репозиториев и те же размеры файлов - проверено 2026-10-03), ревизия подтверждается по размерам. Загрузки
+докачиваются после обрыва. `VOXPRINT_NO_MIRROR=1` отключает зеркало.
+
+**Компоненты.** Тот же принцип для пакетов и программ (`infra/env_probe.py`, только чтение): установлено и актуально/проверенно совместимо → используется; **старее новейшей
+проверенной версии → обновляется в собственном окружении Voxprint**; нет/несовместимо → ставится туда же. Чужие окружения (системный Python, приложения Pinokio, conda) лишь опрашиваются
+(`importlib.metadata`, ничего не импортируется и не пишется) и **никогда не изменяются**. torch: подходит любая сборка, но вариант CUDA должен соответствовать драйверу NVIDIA
+(`nvidia-smi` → cu118/124/126/128/130, иначе CPU). ffmpeg: системный используется, только если `ffmpeg -version` работает, иначе закреплённая LGPL-сборка (sha256, staging,
+проверочный запуск, атомарная подмена, откат). После установки/восстановления последним и атомарно пишется **манифест завершения**; `main.py --verify-install` показывает коды причин
+(на выбранном языке, без трейсбеков), `main.py --repair` восстанавливает только отличающееся в venv Voxprint (`uv`). Настройки прежней установки Voxprint подхватываются (копируются, не перезаписывая).
+**Unsloth намеренно не используется**: на 2026-10-03 он не поддерживает дообучение Qwen3-TTS (issue #3951 открыт, зависит от не принятого PR transformers #44517), а его зависимости конфликтуют с проверенным набором;
+Voxprint обучает собственным циклом LoRA.
 
 ### Для пользователя
 1. Установите `Voxprint-Setup.exe` (при первом запуске программа сама скачает модели ~7 ГБ — один раз, нужен интернет).
@@ -220,7 +302,14 @@ python -m core.cli audio.wav text.txt --out dataset --fake-aligner     :: сух
   `DWM_SYSTEMBACKDROP_TYPE`: AUTO 0, NONE 1, MAINWINDOW 2 (Mica), **TRANSIENTWINDOW 3 (Acrylic)**, TABBEDWINDOW 4 (Mica Alt).
 * Нормализация русского текста: `ru-normalizr` 0.3.0 и `rutextnorm` 2.1.0 запущены на примерах (числа с падежами, т.д./т.е./т.ч., даты); встроенный запасной вариант покрыт тестами.
 
+* **Повторное использование моделей / зеркало / проба окружения** (тесты с поддельными деревьями каталогов и «компьютерами»): раскладки кэша HF (симлинки, refs/snapshots, обрезанные и шардированные веса),
+  дерево в стиле Pinokio/Alexandria, раскладка ModelScope, несовпадение ревизии, гарантия «только чтение», листинг и докачка ModelScope (поддельный сервер), решения «использовать/обновить/поставить»,
+  соответствие драйвер → вариант torch, манифест завершения и коды причин, установщик закреплённых программ (sha256, staging, проверочный запуск, откат). Реальные адреса проверены 2026-10-03: идентификаторы и размеры
+  на ModelScope совпадают с закреплёнными коммитами HF; новее используемых Qwen3-TTS/выравнивателя у Qwen нет (появились `Qwen3-ForcedAligner-0.6B-hf` и `Qwen3-ASR-*-hf` - варианты под transformers; не внедрялись).
+
 ### Что ещё нужно проверить на Windows/GPU (TODO-needs-GPU-test)
+* Повторное использование на **настоящей** установке Alexandria/Pinokio под Windows (названия папок, реальные кэши с симлинками и без), реальная загрузка с ModelScope, реальный `nvidia-smi`, восстановление через `uv`
+  целиком, скачивание и подмена LGPL-ffmpeg на Windows (блокировки файлов), кнопка «Восстановить» в окне (сейчас `--verify-install` / `--repair`) и индикатор состояния моделей в окне (данные есть: `model_states()`).
 * Загрузка реальных весов, качество и скорость выравнивания, пороги `align_long` и фильтра качества (клиппинг, −42 dBFS, SNR 8 дБ) на реальных записях.
 * Обучение на RTX 4090 Mobile 16 ГБ: bf16 + eager + gradient checkpointing + peft, реальная VRAM, 8-bit AdamW (bitsandbytes на Windows),
   пригодность порога loss 3,5 и lr 1e-6…2e-6 для **русского** (рецепт Alexandria описан для английского).

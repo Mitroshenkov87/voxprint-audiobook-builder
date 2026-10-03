@@ -669,6 +669,31 @@
    }
   },
   {
+   "id": "ffmpeg-lgpl",
+   "name": "FFmpeg LGPL build (BtbN/FFmpeg-Builds, downloaded when needed)",
+   "kind": "tool",
+   "ship": "download",
+   "license": "LGPL-2.1-or-later (no GPL components)",
+   "license_files": [
+    "ffmpeg-lgpl-2.1"
+   ],
+   "url": "https://github.com/BtbN/FFmpeg-Builds",
+   "purpose": {
+    "en": "Audio decoding. Used only if no working ffmpeg is installed on the computer; downloaded once and checked by a pinned checksum",
+    "de": "Audio-Dekodierung. Nur genutzt, wenn auf dem Computer kein funktionierendes ffmpeg installiert ist; einmalig geladen und per fester Prüfsumme geprüft",
+    "ru": "Декодирование звука. Используется, только если на компьютере нет рабочего ffmpeg; скачивается один раз и проверяется по закреплённой контрольной сумме",
+    "uk": "Декодування звуку. Використовується, лише якщо на комп'ютері немає робочого ffmpeg; завантажується один раз і перевіряється за закріпленою контрольною сумою",
+    "be": "Дэкадаванне гуку. Выкарыстоўваецца, толькі калі на камп'ютары няма працоўнага ffmpeg; спампоўваецца адзін раз і правяраецца па замацаванай кантрольнай суме"
+   },
+   "note": {
+    "en": "Separate executable, not linked into Voxprint. Source code: https://ffmpeg.org/download.html#get-sources (build scripts: https://github.com/BtbN/FFmpeg-Builds).",
+    "de": "Eigenständige ausführbare Datei, nicht in Voxprint eingebunden. Quellcode: https://ffmpeg.org/download.html#get-sources (Build-Skripte: https://github.com/BtbN/FFmpeg-Builds).",
+    "ru": "Отдельный исполняемый файл, не скомпонован с Voxprint. Исходный код: https://ffmpeg.org/download.html#get-sources (скрипты сборки: https://github.com/BtbN/FFmpeg-Builds).",
+    "uk": "Окремий виконуваний файл, не скомпонований із Voxprint. Вихідний код: https://ffmpeg.org/download.html#get-sources (скрипти збирання: https://github.com/BtbN/FFmpeg-Builds).",
+    "be": "Асобны выканальны файл, не скампанаваны з Voxprint. Зыходны код: https://ffmpeg.org/download.html#get-sources (скрыпты зборкі: https://github.com/BtbN/FFmpeg-Builds)."
+   }
+  },
+  {
    "id": "uv",
    "name": "uv",
    "kind": "tool",

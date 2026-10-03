@@ -17,6 +17,10 @@ def _isolated_home(tmp_path, monkeypatch):
     # Старые проверки сравнивают русские сообщения; язык по умолчанию в тестах - русский.
     # (Тесты локализации задают VOXPRINT_LANG сами.)
     monkeypatch.setenv("VOXPRINT_LANG", "ru")
+    # Никаких обращений к сети/чужим кэшам моделей из обычных тестов (отдельные тесты включают их сами).
+    monkeypatch.setenv("VOXPRINT_NO_EXTERNAL_MODELS", "1")
+    monkeypatch.setenv("VOXPRINT_NO_MIRROR", "1")
+    monkeypatch.setenv("VOXPRINT_NO_ENV_PROBE", "1")
     from core import i18n
 
     i18n.reset()

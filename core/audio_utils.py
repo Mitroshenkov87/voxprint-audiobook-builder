@@ -17,7 +17,9 @@ _FFMPEG_READY = False
 
 
 def ensure_ffmpeg() -> Optional[str]:
-    """Находит ffmpeg: рядом с exe, в PATH или в пакете imageio-ffmpeg. Настраивает pydub."""
+    """Finds ffmpeg and configures pydub.  Order: next to the exe; ffmpeg on PATH ONLY if `ffmpeg -version` works;
+    the pinned LGPL build that Voxprint downloaded itself (infra/assets.py); the imageio-ffmpeg wheel (GPL build,
+    offline fallback)."""
     global _FFMPEG_READY
     candidates: List[str] = []
     exe_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
@@ -26,10 +28,25 @@ def ensure_ffmpeg() -> Optional[str]:
         p = d / exe_name
         if p.exists():
             candidates.append(str(p))
-    found = shutil.which("ffmpeg")
-    if found:
-        candidates.append(found)
     path = candidates[0] if candidates else None
+    if path is None:
+        try:
+            from infra import env_probe
+
+            info = env_probe.probe_ffmpeg()
+            if info and info.ok:
+                path = info.path
+        except Exception:  # noqa: BLE001
+            path = None
+    if path is None:
+        try:
+            from infra import assets
+
+            spec = assets.spec_for("ffmpeg")
+            managed = assets.installed_path(spec) if spec else None
+            path = str(managed) if managed else None
+        except Exception:  # noqa: BLE001
+            path = None
     if path is None:
         try:
             import imageio_ffmpeg  # type: ignore

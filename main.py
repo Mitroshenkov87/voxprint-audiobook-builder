@@ -1,6 +1,7 @@
 """Точка входа Voxprint (Windows 11).
 
-Флаги: --prefetch (принудительно докачать модели; ставится установщиком), --selftest (запуск и выход).
+Флаги: --prefetch (принудительно докачать модели; ставится установщиком), --selftest (запуск и выход),
+--verify-install (проверка установки, коды причин), --repair (восстановить только собственное окружение Voxprint).
 """
 from __future__ import annotations
 
@@ -28,6 +29,22 @@ def main(argv=None) -> int:
 
     activate_overlay()
     _setup_logging()
+    try:   # настройки прежней установки Voxprint (копируются, если ещё нет; старая папка не меняется)
+        from infra import paths
+
+        adopted = paths.adopt_previous_settings()
+        if adopted:
+            logging.getLogger("voxprint").info("adopted settings from a previous install: %s", adopted)
+    except Exception:  # noqa: BLE001
+        pass
+    if "--verify-install" in argv or "--repair" in argv:
+        import shutil
+        from infra import install_state
+        from infra.updater import run_subprocess
+
+        if "--repair" in argv:
+            return install_state.cli_repair(run_subprocess, shutil.which)
+        return install_state.cli_verify()
     selftest = "--selftest" in argv  # запуск и автоматический выход (проверка в offscreen)
 
     from PySide6.QtCore import QTimer

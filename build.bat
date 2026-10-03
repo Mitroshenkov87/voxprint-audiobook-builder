@@ -60,7 +60,7 @@ if /I "%~1"=="onedir" set MODE=--onedir
 echo === Сборка (%MODE%) ===
 pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --paths . ^
-  --add-data "infra\verified_manifest.json;infra" ^
+  --add-data "infra\verified_manifest.json;infra" --add-data "infra\assets_manifest.json;infra" ^
   --add-data "locales;locales" --add-data "credits.json;." --add-data "licenses;licenses" ^
   --add-data "build\notices\THIRD_PARTY_NOTICES.md;." ^
   --hidden-import core.i18n --hidden-import core.appinfo --hidden-import core.model_export ^
@@ -70,7 +70,8 @@ pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --hidden-import core.text_utils --hidden-import core.events --hidden-import core.errors --hidden-import core.types ^
   --hidden-import infra.version_manager --hidden-import infra.vram_optimizer --hidden-import infra.model_downloader ^
   --hidden-import infra.updater --hidden-import infra.paths --hidden-import infra.platform_win ^
-  --hidden-import infra.verified_manifest ^
+  --hidden-import infra.verified_manifest --hidden-import core.model_locator --hidden-import infra.modelscope_mirror ^
+  --hidden-import infra.assets --hidden-import infra.env_probe --hidden-import infra.install_state ^
   --hidden-import workers.process_worker --hidden-import workers.pipeline_runner --hidden-import ui.main_window ^
   --hidden-import qwen_asr --hidden-import qwen_asr.inference.qwen3_forced_aligner ^
   --hidden-import qwen_asr.core.transformers_backend --hidden-import qwen_tts --hidden-import qwen_tts.inference.qwen3_tts_model ^
