@@ -49,6 +49,8 @@ class TaskRequest:
     out_root: Optional[Path] = None
     force_cpu: bool = False
     adapter_dir: Optional[Path] = None   # только для KIND_MERGE: папка обученного адаптера
+    voice_type: str = ""                 # optional, goes to voice.json: male / female / child / other
+    voice_description: str = ""          # optional free text, goes to voice.json
 
     def voice_name(self) -> str:
         """Имя голоса = имя файла записи (или папки адаптера). Это и имя папки результата в output/."""
@@ -124,6 +126,24 @@ def last_adapter() -> Optional[Path]:
     return d if (d / "adapter_model.safetensors").exists() else None
 
 
+def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech_seconds: float) -> None:
+    """Write voice.json next to the adapter. A failure here must not fail a finished training run."""
+    from core import voice_info
+
+    epochs, base_model = 0, ""
+    try:   # epochs and base model are recorded by the trainer in training_meta.json
+        meta = json.loads((Path(adapter_dir) / "training_meta.json").read_text(encoding="utf-8"))
+        epochs, base_model = int(meta.get("epochs", 0)), str(meta.get("model_name", ""))
+    except (OSError, ValueError, TypeError):
+        log.warning("training_meta.json unreadable; voice.json will lack epochs/base model")
+    info = voice_info.build_voice_info(req.voice_name(), language, speech_seconds, epochs, base_model,
+                                       req.voice_type, req.voice_description)
+    try:
+        voice_info.write_voice_json(adapter_dir, info)
+    except OSError as exc:
+        log.warning("cannot write voice.json: %s", exc)
+
+
 def _run_merge(req: TaskRequest, progress: ProgressCallback, cancel: CancelToken) -> TaskResult:
     from core.errors import ExportError
     from core.model_export import MERGED_DIRNAME, export_merged_model, speaker_name
@@ -173,6 +193,7 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
         res.adapter_path = train_lora_from_dataset(dataset_dir, output_dir, progress, cancel, req.force_cpu,
                                                    language=build.training_language, warnings_out=res.warnings)
         remember_adapter(res.adapter_path, req.voice_name())
+        _write_voice_json(req, res.adapter_path, build.language, build.total_seconds)
     return res
 
 

@@ -9,6 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
+from core import i18n
 from core.errors import AudioTextMismatchError, ModelDownloadError, OutOfMemoryError_
 from core.events import Stage
 from workers.pipeline_runner import KIND_DATASET, KIND_LORA, TaskResult, plan_for
@@ -34,12 +35,15 @@ def make_window(runner):
     return MainWindow(runner=runner, autocheck=False, auto_open_folder=False)
 
 
-def test_main_window_imports_and_has_five_buttons(app):
+def test_main_window_keeps_only_core_buttons_plus_gear(app):
     w = make_window(lambda *a: None)
     w.show()
-    texts = {b.text() for b in (w.btn_audio, w.btn_text, w.btn_dataset, w.btn_lora, w.btn_update)}
-    assert texts == {"Выбрать аудио", "Выбрать текст", "Создать датасет", "Создать голос (LoRA)",
-                     "Проверить обновления"}
+    texts = {b.text() for b in (w.btn_audio, w.btn_text, w.btn_dataset, w.btn_lora)}
+    assert texts == {"Выбрать аудио", "Выбрать текст", "Создать датасет", "Создать голос (LoRA)"}
+    # service items moved to the Settings dialog
+    for gone in ("btn_update", "btn_about", "cmb_lang"):
+        assert not hasattr(w, gone)
+    assert w.btn_settings.isEnabled() and w.btn_settings.toolTip() == "Настройки"
     assert w.windowTitle() == "Voxprint"
     assert not w.btn_lora.isEnabled() and not w.btn_dataset.isEnabled()  # нет файлов
     assert [s.label for s in plan_for(KIND_LORA)] == [
@@ -144,7 +148,8 @@ def test_drop_and_update_button(app, tmp_path):
     w = make_window(lambda *a: None)
     w.updater_factory = FakeUpdater
     w.show()
-    w.btn_update.click()
+    w.open_settings()
+    w.settings_dialog().btn_update.click()
     assert wait_for(lambda: "peft: 1 → 2" in w.lbl_status.text())
     w.close()
 
@@ -213,13 +218,50 @@ def test_privacy_footer_and_one_time_notice(app, tmp_path):
     assert mw.privacy_acknowledged() and mw.privacy_marker().parent == mw.paths.state_dir()
 
 
-def test_window_size_adapts_to_small_screens(app):
-    from ui.main_window import MainWindow
-    w = MainWindow(runner=lambda *a: None, autocheck=False, auto_open_folder=False)
-    need = w.layout().minimumSize()
-    assert w.minimumWidth() == need.width() and w.minimumHeight() == need.height()
-    assert w.width() >= need.width() and w.height() >= need.height()
+def test_window_size_adapts_to_screen_and_content_scrolls(app):
+    from ui.main_window import MIN_WINDOW_H, MIN_WINDOW_W
+    w = make_window(lambda *a: None)
+    assert (w.minimumWidth(), w.minimumHeight()) == (MIN_WINDOW_W, MIN_WINDOW_H)
     avail = w.screen().availableGeometry()
-    assert w.width() <= max(need.width(), 820) and w.height() <= max(need.height(), 780)
-    assert w.height() <= max(need.height(), int(avail.height() * 0.90)) + 1
+    assert w.width() >= MIN_WINDOW_W and w.height() >= MIN_WINDOW_H
+    assert w.height() <= max(MIN_WINDOW_H, int(avail.height() * 0.90)) + 1
+    # the whole UI sits in a scroll area, so it stays usable below the content's natural height
+    assert w.scroll.widget() is w.content and w.scroll.widgetResizable()
+    w.resize(MIN_WINDOW_W, MIN_WINDOW_H)
+    w.show()
+    QApplication.processEvents()
+    assert w.scroll.verticalScrollBar().maximum() > 0
+    w.close()
+
+
+def test_settings_dialog_holds_service_items(app, monkeypatch):
+    w = make_window(lambda *a: None)
+    w.show()
+    w.open_settings()
+    dlg = w.settings_dialog()
+    assert dlg.isVisible() and w.settings_dialog() is dlg          # one reused instance
+    assert dlg.cmb_lang.count() == 3 and dlg.cmb_lang.currentData() == "ru"
+    assert dlg.btn_update.text() == "Проверить обновления"
+    dlg.cmb_lang.setCurrentIndex(dlg.cmb_lang.findData("en"))
+    assert i18n.get_language() == "en" and w.btn_lora.text() == "Create voice (LoRA)"
+    assert dlg.btn_update.text() == "Check for updates" and dlg.windowTitle() == "Settings"
+    opened = []
+    import ui.main_window as mw
+    monkeypatch.setattr(mw, "open_folder", lambda p: opened.append(Path(p).name))
+    dlg.btn_models.click()
+    assert opened == ["models"]
+    dlg.close()
+    w.close()
+
+
+def test_voice_fields_are_passed_to_the_task_request(app):
+    seen = {}
+    w = make_window(lambda req, *a, **k: seen.update(req=req) or None)
+    w.set_audio(Path("/tmp/a.wav"))
+    w.set_text(Path("/tmp/a.txt"))
+    w.cmb_voice_type.setCurrentIndex(w.cmb_voice_type.findData("female"))
+    w.edt_voice_desc.setText("  warm  alto ")
+    w.start(KIND_LORA)
+    assert wait_for(lambda: "req" in seen)
+    assert seen["req"].voice_type == "female" and seen["req"].voice_description == "warm  alto"
     w.close()

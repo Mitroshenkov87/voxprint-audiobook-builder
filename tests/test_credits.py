@@ -146,8 +146,10 @@ def test_about_notices_button_opens_file(app):
 def test_main_window_about_button_opens_dialog(app):
     from ui.main_window import MainWindow
     w = MainWindow(runner=lambda *a: None, autocheck=False, auto_open_folder=False)
-    assert w.btn_about.isEnabled()
-    w.btn_about.click()
+    w.open_settings()
+    dlg = w.settings_dialog()
+    assert dlg.btn_about.isEnabled()
+    dlg.btn_about.click()
     assert w._about.isVisible() and w._about.btn_repo.isHidden()
     w._about.close()
     w.close()

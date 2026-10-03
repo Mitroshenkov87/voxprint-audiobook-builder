@@ -10,21 +10,24 @@ from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
-from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QMessageBox,
-                               QProgressBar, QPushButton, QSizePolicy, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
+                               QMessageBox, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
-from core import i18n, model_export
+from core import i18n, model_export, voice_info
 from core.errors import DatasetMakerError
 from core.events import Stage
 from core.i18n import tr
 from infra import paths, platform_win
 from workers.pipeline_runner import (KIND_DATASET, KIND_LORA, KIND_MERGE, TaskRequest, last_adapter, plan_for,
                                      run_task)
+from ui.settings_dialog import SettingsDialog
 from workers.process_worker import PrefetchWorker, ProcessWorker, RepairWorker, StatusWorker, UpdateWorker
 
 log = logging.getLogger("voxprint.ui")
 
 APP_TITLE = "Voxprint"
+#: Hard minimum of the window; the content scrolls below its natural size (see ``_fit_to_screen``).
+MIN_WINDOW_W, MIN_WINDOW_H = 480, 320
 AUDIO_EXT = {".wav", ".mp3", ".flac", ".m4a", ".ogg", ".aac", ".wma", ".opus", ".mp4"}
 TEXT_EXT = {".txt"}
 ALL_STAGES: List[Stage] = [Stage.UPDATES, Stage.MODEL, Stage.ALIGN, Stage.SLICE, Stage.TRAIN, Stage.SAVE]
@@ -61,6 +64,16 @@ QComboBox {{ background: rgba(255,255,255,30); border: 1px solid rgba(255,255,25
 QComboBox:disabled {{ color: rgba(242,242,245,90); }}
 QComboBox QAbstractItemView {{ background: #23232b; border: 1px solid rgba(255,255,255,50);
                               selection-background-color: rgba(96,165,250,160); }}
+QLineEdit {{ background: rgba(255,255,255,30); border: 1px solid rgba(255,255,255,50); border-radius: 8px;
+            padding: 6px 12px; selection-background-color: rgba(96,165,250,160); }}
+QPushButton#gear {{ padding: 6px 12px; font-size: 18px; }}
+QScrollArea {{ background: transparent; border: none; }}
+QWidget#content {{ background: transparent; }}
+QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}
+QScrollBar::handle:vertical {{ background: rgba(255,255,255,70); border-radius: 4px; min-height: 30px; }}
+QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 2px; }}
+QScrollBar::handle:horizontal {{ background: rgba(255,255,255,70); border-radius: 4px; min-width: 30px; }}
+QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; }}
 QDialog#root, QTextBrowser {{ color: #f2f2f5; }}
 QDialog#root {{ background: #17171c; }}
 """
@@ -129,6 +142,7 @@ class MainWindow(QWidget):
         self._chips: dict = {}
         self.backdrop = "plain"
         self.last_error_text = ""
+        self._settings: Optional[SettingsDialog] = None
 
         self.setWindowTitle(APP_TITLE)
         self.setObjectName("root")
@@ -146,19 +160,22 @@ class MainWindow(QWidget):
             QTimer.singleShot(1500, self._startup_checks)
 
     def _fit_to_screen(self) -> None:
-        """Размер по умолчанию 820x780, но не больше ~90% рабочей области экрана (логические пиксели, т.е. с учётом
-        масштаба 125%/150%); ниже минимума раскладки не опускаем (около 720x610, зависит от языка)."""
-        need = self.layout().minimumSize() if self.layout() is not None else None
-        min_w, min_h = (need.width(), need.height()) if need is not None else (640, 560)
-        w, h = 820, 780
+        """Pick the initial window size and a small hard minimum.
+
+        The content lives in a scroll area, so the window may be smaller than the content: the default size is the
+        content's natural size (at least 820 px wide) limited to ~94% / ~90% of the screen's work area, in logical
+        pixels, i.e. already divided by the Windows display scale (125%, 150%...).  On a short screen (1366x768 at
+        150% gives ~510 logical px) vertical scrolling takes over instead of the window overflowing the screen.
+        """
+        hint = self.content.sizeHint()
+        w, h = max(820, hint.width()), max(560, hint.height() + 8)
         try:
-            scr = self.screen() or QApplication.primaryScreen()
-            avail = scr.availableGeometry()
+            avail = (self.screen() or QApplication.primaryScreen()).availableGeometry()
             w, h = min(w, int(avail.width() * 0.94)), min(h, int(avail.height() * 0.90))
-        except Exception:  # noqa: BLE001 - без экрана (тесты) остаётся размер по умолчанию
+        except Exception:  # noqa: BLE001 - no screen (tests): keep the natural size
             pass
-        self.setMinimumSize(min_w, min_h)
-        self.resize(max(w, min_w), max(h, min_h))
+        self.setMinimumSize(MIN_WINDOW_W, MIN_WINDOW_H)
+        self.resize(max(w, MIN_WINDOW_W), max(h, MIN_WINDOW_H))
 
     # ------------------------------------------------------------------ интерфейс
     def _card(self) -> QFrame:
@@ -167,7 +184,18 @@ class MainWindow(QWidget):
         return f
 
     def _build(self) -> None:
-        root = QVBoxLayout(self)
+        # The window is a thin shell around a scroll area; all widgets live in ``self.content``.
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.content = QWidget()
+        self.content.setObjectName("content")
+        self.scroll.setWidget(self.content)
+        self.scroll.viewport().setAutoFillBackground(False)
+        outer.addWidget(self.scroll)
+        root = QVBoxLayout(self.content)
         root.setContentsMargins(28, 24, 28, 24)
         root.setSpacing(14)
         head = QHBoxLayout()
@@ -175,13 +203,9 @@ class MainWindow(QWidget):
         title.setObjectName("title")
         head.addWidget(title)
         head.addStretch(1)
-        self.cmb_lang = QComboBox()
-        for code in i18n.LANGS:
-            self.cmb_lang.addItem(i18n.LANG_NAMES[code], code)
-        self.cmb_lang.setCurrentIndex(max(0, self.cmb_lang.findData(i18n.get_language())))
-        self.btn_about = QPushButton()
-        head.addWidget(self.cmb_lang)
-        head.addWidget(self.btn_about)
+        self.btn_settings = QPushButton("\u2699")          # gear: opens the Settings dialog
+        self.btn_settings.setObjectName("gear")
+        head.addWidget(self.btn_settings)
         root.addLayout(head)
         self.lbl_sub = QLabel()
         self.lbl_sub.setObjectName("subtitle")
@@ -214,6 +238,18 @@ class MainWindow(QWidget):
         self.lbl_hint_lora.setWordWrap(True)
         root.addWidget(self.lbl_hint_lora)
 
+        # Two optional fields; they only end up in voice.json next to the adapter.
+        vrow = QHBoxLayout()
+        self.cmb_voice_type = QComboBox()
+        self.cmb_voice_type.addItem("", "")
+        for code in voice_info.VOICE_TYPES:
+            self.cmb_voice_type.addItem("", code)
+        self.edt_voice_desc = QLineEdit()
+        self.edt_voice_desc.setMaxLength(voice_info.MAX_DESCRIPTION_CHARS)
+        vrow.addWidget(self.cmb_voice_type)
+        vrow.addWidget(self.edt_voice_desc, 1)
+        root.addLayout(vrow)
+
         self.btn_merge = QPushButton()      # шестая кнопка: универсальная модель (~4 ГБ), только по нажатию
         root.addWidget(self.btn_merge)
         self.lbl_hint_merge = QLabel()
@@ -221,12 +257,8 @@ class MainWindow(QWidget):
         self.lbl_hint_merge.setWordWrap(True)
         root.addWidget(self.lbl_hint_merge)
 
-        row2 = QHBoxLayout()
         self.btn_dataset = QPushButton()
-        self.btn_update = QPushButton()
-        row2.addWidget(self.btn_dataset)
-        row2.addWidget(self.btn_update)
-        root.addLayout(row2)
+        root.addWidget(self.btn_dataset)
 
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
@@ -289,9 +321,7 @@ class MainWindow(QWidget):
         self.btn_dataset.clicked.connect(lambda: self.start(KIND_DATASET))
         self.btn_lora.clicked.connect(lambda: self.start(KIND_LORA))
         self.btn_merge.clicked.connect(self.start_merge)
-        self.btn_about.clicked.connect(self.open_about)
-        self.cmb_lang.currentIndexChanged.connect(self._on_language_changed)
-        self.btn_update.clicked.connect(self.check_updates)
+        self.btn_settings.clicked.connect(self.open_settings)
         self.btn_open.clicked.connect(self.open_result)
         self.btn_cancel.clicked.connect(self.cancel)
         self.btn_repair.clicked.connect(self.start_repair)
@@ -312,10 +342,17 @@ class MainWindow(QWidget):
         self.lbl_hint_merge.setText(tr("ui.hint_merge"))
         self.btn_dataset.setText(tr("ui.btn_dataset"))
         self.btn_dataset.setToolTip(tr("ui.tip_dataset"))
-        self.btn_update.setText(tr("ui.btn_update"))
-        self.btn_about.setText(tr("ui.about"))
-        self.btn_about.setToolTip(tr("ui.about_tip"))
-        self.cmb_lang.setToolTip(tr("ui.language"))
+        self.btn_settings.setToolTip(tr("ui.settings_tip"))
+        self.cmb_voice_type.setToolTip(tr("ui.voice_type_tip"))
+        type_labels = {"": tr("ui.voice_type_none"), "male": tr("ui.voice_type_male"),
+                       "female": tr("ui.voice_type_female"), "child": tr("ui.voice_type_child"),
+                       "other": tr("ui.voice_type_other")}
+        for i in range(self.cmb_voice_type.count()):
+            self.cmb_voice_type.setItemText(i, type_labels[self.cmb_voice_type.itemData(i)])
+        self.edt_voice_desc.setPlaceholderText(tr("ui.voice_desc_placeholder"))
+        if self._settings is not None:
+            self._settings.retranslate()
+            self._settings.sync_language()
         for st, chip in self._chips.items():
             chip.setText(st.label)
         self.lbl_ready.setText(tr("ui.ready"))
@@ -328,18 +365,37 @@ class MainWindow(QWidget):
             self.lbl_status.setText(tr("ui.status_idle"))
         self._refresh_buttons()
 
-    def _on_language_changed(self, _index: int = 0) -> None:
-        code = self.cmb_lang.currentData()
-        if not code or self.busy:
+    def set_language(self, code: str) -> None:
+        """Switch the UI language (persisted). Ignored for unknown codes and while a task is running."""
+        if self.busy or code not in i18n.LANGS or code == i18n.get_language():
             return
-        i18n.set_language(str(code), persist=True)
+        i18n.set_language(code, persist=True)
         self.retranslate()
 
-    def set_language(self, code: str) -> None:
-        """Программная смена языка (как выбор в списке)."""
-        idx = self.cmb_lang.findData(code)
-        if idx >= 0:
-            self.cmb_lang.setCurrentIndex(idx)
+    # ------------------------------------------------------------------ settings dialog
+    def settings_dialog(self) -> SettingsDialog:
+        """Return the (lazily created, reused) Settings dialog."""
+        if self._settings is None:
+            self._settings = SettingsDialog(self)
+        return self._settings
+
+    def open_settings(self) -> None:
+        """Show the Settings dialog (modal, except in the offscreen test platform where it must not block)."""
+        dlg = self.settings_dialog()
+        dlg.setStyleSheet(self.styleSheet())
+        dlg.refresh()
+        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+            dlg.show()
+            return
+        dlg.exec()
+
+    def open_models_folder(self) -> None:
+        """Open the folder where Voxprint keeps its downloaded models."""
+        open_folder(paths.models_dir())
+
+    def open_data_folder(self) -> None:
+        """Open Voxprint's data folder (settings, logs, models)."""
+        open_folder(paths.app_home())
 
     def open_about(self) -> None:
         from ui.about_dialog import AboutDialog
@@ -402,19 +458,31 @@ class MainWindow(QWidget):
         return bool((self.worker and self.worker.isRunning()) or
                     (self.prefetch_worker and self.prefetch_worker.isRunning()))
 
+    @property
+    def updating(self) -> bool:
+        """True while an update check is running."""
+        return bool(self.update_worker and self.update_worker.isRunning())
+
+    @property
+    def repairing(self) -> bool:
+        """True while a repair of Voxprint's own environment is running."""
+        return bool(self.repair_worker and self.repair_worker.isRunning())
+
     def _refresh_buttons(self) -> None:
         busy = self.busy
         ready = bool(self.audio and self.text) and not busy
         self.btn_audio.setEnabled(not busy)
         self.btn_text.setEnabled(not busy)
-        self.cmb_lang.setEnabled(not busy)
-        self.btn_about.setEnabled(True)
+        self.btn_settings.setEnabled(True)
+        self.cmb_voice_type.setEnabled(not busy)
+        self.edt_voice_desc.setEnabled(not busy)
         has_adapter = last_adapter() is not None
         self.btn_merge.setEnabled(not busy and has_adapter)
         self.btn_merge.setToolTip(tr("ui.tip_merge") if has_adapter else tr("ui.tip_merge_disabled"))
         self.btn_lora.setEnabled(ready)
         self.btn_dataset.setEnabled(ready)
-        self.btn_update.setEnabled(not busy and not (self.update_worker and self.update_worker.isRunning()))
+        if self._settings is not None:
+            self._settings.refresh()
         self.btn_cancel.setVisible(bool(self.worker and self.worker.isRunning()))
 
     def _set_chip(self, stage_label: str) -> None:
@@ -433,7 +501,9 @@ class MainWindow(QWidget):
     def start(self, kind: str, force_cpu: bool = False) -> None:
         if self.busy or not (self.audio and self.text):
             return
-        self._launch(TaskRequest(kind=kind, audio=self.audio, text=self.text, force_cpu=force_cpu))
+        self._launch(TaskRequest(kind=kind, audio=self.audio, text=self.text, force_cpu=force_cpu,
+                                 voice_type=str(self.cmb_voice_type.currentData() or ""),
+                                 voice_description=self.edt_voice_desc.text().strip()))
 
     def start_merge(self) -> bool:
         """Кнопка «универсальная модель»: проверка места на диске, подтверждение, запуск. True - запущено."""

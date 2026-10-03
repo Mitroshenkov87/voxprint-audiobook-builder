@@ -170,8 +170,9 @@ def test_ui_language_switcher_retranslates_and_persists(app):
     from ui.main_window import MainWindow
     w = MainWindow(runner=lambda *a: None, autocheck=False, auto_open_folder=False)
     w.show()
-    assert w.cmb_lang.count() == 3 and w.cmb_lang.currentData() == "ru"
-    assert [w.cmb_lang.itemText(i) for i in range(3)] == ["English", "Deutsch", "Русский"]
+    cmb = w.settings_dialog().cmb_lang
+    assert cmb.count() == 3 and cmb.currentData() == "ru"
+    assert [cmb.itemText(i) for i in range(3)] == ["English", "Deutsch", "Русский"]
     w.set_language("en")
     assert w.btn_lora.text() == "Create voice (LoRA)" and w.btn_merge.text() == "Build universal model (~4 GB)"
     assert w.lbl_status.text() == "Choose the audio and the text - I will do the rest."
@@ -181,9 +182,9 @@ def test_ui_language_switcher_retranslates_and_persists(app):
     w.set_language("de")
     assert w.btn_dataset.text() == "Datensatz erstellen"
     w.set_language("ru")
-    assert w.btn_update.text() == _cat("ru")["ui.btn_update"]
+    assert w.settings_dialog().btn_update.text() == _cat("ru")["ui.btn_update"]
     w.set_language("uk")                                         # not offered any more: ignored
-    assert w.cmb_lang.currentData() == "ru"
+    assert i18n.get_language() == "ru" and w.settings_dialog().cmb_lang.currentData() == "ru"
     # выбранный файл не сбрасывается при смене языка
     w.set_audio(Path("/tmp/voice.wav"))
     w.set_language("en")
@@ -196,9 +197,10 @@ def test_ui_language_switch_disabled_while_busy(app, monkeypatch):
     w = MainWindow(runner=lambda *a: None, autocheck=False, auto_open_folder=False)
     monkeypatch.setattr(MainWindow, "busy", property(lambda self: True))
     w._refresh_buttons()
-    assert not w.cmb_lang.isEnabled()
+    dlg = w.settings_dialog()
+    assert not dlg.cmb_lang.isEnabled() and not dlg.btn_update.isEnabled()
     before = i18n.get_language()
-    w.cmb_lang.setCurrentIndex(0)
+    dlg.cmb_lang.setCurrentIndex(dlg.cmb_lang.findData("en") if before != "en" else 1)
     assert i18n.get_language() == before                       # во время работы язык не меняется
     w.close()
 
@@ -210,5 +212,5 @@ def test_ui_defaults_to_english_without_settings(app, monkeypatch):
     i18n.reset()
     from ui.main_window import MainWindow
     w = MainWindow(runner=lambda *a: None, autocheck=False, auto_open_folder=False)
-    assert w.btn_audio.text() == "Choose audio" and w.cmb_lang.currentData() == "en"
+    assert w.btn_audio.text() == "Choose audio" and w.settings_dialog().cmb_lang.currentData() == "en"
     w.close()
