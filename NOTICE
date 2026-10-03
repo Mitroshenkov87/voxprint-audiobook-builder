@@ -12,3 +12,6 @@ Not covered by that licence (each has its own terms):
     dataset) is CC0-1.0; "Alexander" (the author's own voice) is personal use only - no public use of the output, no commercial
     projects (custom/personal-only).
   * The models downloaded at run time (for example Qwen3-TTS, Qwen3-ASR) - see their model cards for their licences.
+
+Voxprint AI Audiobook Builder is an independent project and is not affiliated with other products or services
+with similar names.

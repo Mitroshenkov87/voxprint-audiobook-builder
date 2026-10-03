@@ -42,7 +42,7 @@ from infra import net, paths
 
 log = logging.getLogger("voxprint.voicerepo")
 
-DEFAULT_INDEX_URL = "https://raw.githubusercontent.com/Mitroshenkov87/voxprint/main/voices/index.json"
+DEFAULT_INDEX_URL = "https://raw.githubusercontent.com/Mitroshenkov87/voxprint-audiobook-builder/main/voices/index.json"
 ENV_INDEX_URL = "VOXPRINT_VOICES_INDEX"
 INDEX_SCHEMA = 1
 MAX_INDEX_BYTES = 2_000_000

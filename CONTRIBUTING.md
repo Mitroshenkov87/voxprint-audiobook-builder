@@ -15,7 +15,7 @@ The test-suite runs on Linux, macOS or Windows **without a GPU and without netwo
 
 ```bash
 git clone <your fork>
-cd voxprint
+cd voxprint-audiobook-builder
 python -m venv .venv && . .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install torch --index-url https://download.pytorch.org/whl/cpu    # CPU torch is enough for the tests
 pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt

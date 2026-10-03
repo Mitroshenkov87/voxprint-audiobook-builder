@@ -6,7 +6,7 @@
 param(
     [string]$Dist = "dist\Voxprint",
     [Parameter(Mandatory = $true)][string]$Tag,
-    [string]$Repo = "Mitroshenkov87/voxprint",
+    [string]$Repo = "Mitroshenkov87/voxprint-audiobook-builder",
     [string]$BaseUrl = "",          # where the payload zips will be served (default: the release assets of $Tag)
     [string]$ManifestUrl = "",      # baked into the installer (default: the manifest asset of the release $Tag)
     [int]$LimitMib = 1800,          # part size limit: a release asset must be below 2 GiB

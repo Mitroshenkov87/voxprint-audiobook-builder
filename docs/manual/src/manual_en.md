@@ -494,3 +494,5 @@ The training preset stays at *{{preset.balanced}}* on purpose: in our tests long
 > **This manual and the licence badges are information, not legal advice.** The consent card records what a speaker said; it does not replace the law of your country.
 
 *Voxprint AI Audiobook Builder 0.1.0 (beta). Manual of 3 October 2026.*
+
+*Voxprint AI Audiobook Builder is an independent project and is not affiliated with other products or services with similar names.*

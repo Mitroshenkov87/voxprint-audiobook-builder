@@ -22,7 +22,7 @@
  "about.step4": "Optionally it trains a small voice adapter (LoRA) on your graphics card.",
  "about.step5": "Optionally it merges the adapter into a universal model (~4 GB) that works in any app running Qwen3-TTS.",
  "about.steps_title": "How it works",
- "about.title": "About Voxprint",
+ "about.title": "About Voxprint AI Audiobook Builder",
  "about.version": "Version {version}",
  "about.what": "Voxprint turns a recording of a voice (yours, or of a person who has given permission) into a voice for Qwen3-TTS. Everything happens on your computer.",
  "asr.checkbox": "I have no transcript - recognise the speech automatically",

@@ -19,7 +19,7 @@
 #define AppVersion "0.1.0"
 #define AppExe "Voxprint.exe"
 #ifndef ManifestUrl
-#define ManifestUrl "https://github.com/Mitroshenkov87/voxprint/releases/latest/download/manifest-stable.json"
+#define ManifestUrl "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/latest/download/manifest-stable.json"
 #endif
 
 [Setup]

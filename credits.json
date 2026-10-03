@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "author": "Aleksandr Mitroshenkov"
  },
- "repo_url": "https://github.com/Mitroshenkov87/voxprint",
+ "repo_url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder",
  "components": [
   {
    "id": "qwen3-tts",

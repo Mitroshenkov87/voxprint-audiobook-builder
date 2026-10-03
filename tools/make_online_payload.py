@@ -1,7 +1,7 @@
 """Split a PyInstaller ``--onedir`` build into the release assets of the ONLINE installer.
 
     python tools/make_online_payload.py --dist dist/Voxprint --out build/online --tag v0.1.0-beta \
-        --repo Mitroshenkov87/voxprint [--channel beta|stable] [--base-url URL] [--limit-mib 1800]
+        --repo Mitroshenkov87/voxprint-audiobook-builder [--channel beta|stable] [--base-url URL] [--limit-mib 1800]
 
 Writes ``Voxprint-payload-01.zip`` ... (every zip stays under ``--limit-mib`` MiB: a GitHub release asset must be below
 2 GiB) and ``manifest-<channel>.json`` (schema 1: id, file, url, size, sha256, unpacked_bytes, markers per component).  The
@@ -101,7 +101,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--dist", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--tag", required=True)
-    ap.add_argument("--repo", default="Mitroshenkov87/voxprint")
+    ap.add_argument("--repo", default="Mitroshenkov87/voxprint-audiobook-builder")
     ap.add_argument("--channel", choices=("beta", "stable"))
     ap.add_argument("--base-url", default="")
     ap.add_argument("--limit-mib", type=int, default=DEFAULT_LIMIT_MIB)

@@ -92,7 +92,7 @@ def test_about_info_matches_credits():
 
 # ------------------------------------------------------------------ repository link
 def test_repo_url_placeholder_is_hidden():
-    assert DATA["repo_url"] == "https://github.com/Mitroshenkov87/voxprint" and appinfo.public_repo_url() == DATA["repo_url"]
+    assert DATA["repo_url"] == "https://github.com/Mitroshenkov87/voxprint-audiobook-builder" and appinfo.public_repo_url() == DATA["repo_url"]
     assert appinfo.public_repo_url("https://github.com/OWNER/voxprint") is None
     assert appinfo.public_repo_url("") is None
     assert appinfo.public_repo_url("https://github.com/alex/voxprint") == "https://github.com/alex/voxprint"

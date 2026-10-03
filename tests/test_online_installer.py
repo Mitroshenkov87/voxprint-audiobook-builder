@@ -95,7 +95,7 @@ def test_channel_for_tag():
 
 def test_payload_parts_and_manifest(tmp_path, dist):
     out = tmp_path / "o"
-    mp = mk.build(dist, out, "v0.1.0-beta", "Mitroshenkov87/voxprint", limit_mib=0)
+    mp = mk.build(dist, out, "v0.1.0-beta", "Mitroshenkov87/voxprint-audiobook-builder", limit_mib=0)
     assert mp.name == "manifest-beta.json"
     man = json.loads(mp.read_text(encoding="utf-8"))
     assert man["schema"] == 1 and man["channel"] == "beta" and man["tag"] == "v0.1.0-beta"
@@ -105,7 +105,7 @@ def test_payload_parts_and_manifest(tmp_path, dist):
     for c in comps:
         p = out / c["file"]
         assert c["size"] == p.stat().st_size and c["sha256"] == hashlib.sha256(p.read_bytes()).hexdigest()
-        assert c["url"] == f"https://github.com/Mitroshenkov87/voxprint/releases/download/v0.1.0-beta/{c['file']}"
+        assert c["url"] == f"https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.1.0-beta/{c['file']}"
         with zipfile.ZipFile(p) as z:
             names += z.namelist()
     want = sorted(f.relative_to(dist).as_posix() for f in dist.rglob("*") if f.is_file())

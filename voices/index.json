@@ -10,7 +10,7 @@
       "voice_type": "male",
       "description": "Male Russian voice, the first voice trained with Voxprint. Personal use only: no public use of the output, no commercial projects.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-      "url": "https://github.com/Mitroshenkov87/voxprint/releases/download/voices-v1/alexander.zip",
+      "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/alexander.zip",
       "sha256": "b58664ba28b578a3b8a4d45c5d3044f73e21ec83ba8ec7a1dabdb1a37c5698e7",
       "size_bytes": 53635659,
       "names": {
@@ -33,7 +33,7 @@
       "voice_type": "female",
       "description": "Open universal voice: trained only from public-domain speech (LJ Speech 1.1, reader Linda Johnson, LibriVox). Free for any use, also commercial. Attribution appreciated: LJ Speech dataset, Keith Ito, https://keithito.com/LJ-Speech-Dataset/",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-      "url": "https://github.com/Mitroshenkov87/voxprint/releases/download/voices-v1/open-universal.zip",
+      "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/open-universal.zip",
       "sha256": "6541163cddfbb3ba340b24163a056281f6aa717037162df9adf884960c170f73",
       "size_bytes": 53643566,
       "names": {

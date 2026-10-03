@@ -494,3 +494,5 @@ Die Trainingsvorgabe bleibt absichtlich bei „{{preset.balanced}}“: In unsere
 > **Dieses Handbuch und die Lizenz-Badges sind Informationen, keine Rechtsberatung.** Die Einverständniskarte hält fest, was eine sprechende Person gesagt hat; sie ersetzt nicht das Recht Ihres Landes.
 
 *Voxprint AI Audiobook Builder 0.1.0 (Beta). Handbuch vom 3. Oktober 2026.*
+
+*Voxprint AI Audiobook Builder ist ein unabhängiges Projekt und steht in keiner Verbindung zu anderen Produkten oder Diensten mit ähnlichen Namen.*

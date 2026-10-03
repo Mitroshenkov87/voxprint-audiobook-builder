@@ -2,6 +2,8 @@
 
 *Train a voice, narrate books.* (Short name and technical identifier: **Voxprint** - the package, the executable and the data folder keep that name.)
 
+> **Independent project.** Voxprint AI Audiobook Builder is an independent, non-commercial open-source project by Aleksandr Mitroshenkov. It is **not affiliated with, endorsed by or connected to** any other product, service, company or project that has a similar name (for example web transcription services or voice-identity tools called "VoxPrint"/"Voxprint", or printing companies). All product names mentioned belong to their owners.
+
 **Your voice from a recording in one click - and then whole books in that voice.** Give Voxprint a 5-15 minute recording of a voice (yours, or of a person who has given permission) and
 the text you read: it aligns the text to the audio, cuts a training dataset and trains your voice as a LoRA adapter for
 [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) (optionally merged into a standalone model for any app that runs Qwen3-TTS).
@@ -16,7 +18,7 @@ The voice goes into your **voice library**; then pick a book (TXT, FB2, EPUB) an
 
 > ## Beta / experimental software (0.1.0)
 > Voxprint is **beta**: the whole pipeline (alignment, training, narration, installer) has been run end to end on a real RTX 4090 / Windows Server 2025 machine
-> (see [Tested on Windows](#tested-on-windows)), but the only release so far is the pre-release [`v0.1.0-beta`](https://github.com/Mitroshenkov87/voxprint/releases/tag/v0.1.0-beta), only one machine and one speaker were tested, voice *quality* is judged by ear of one person,
+> (see [Tested on Windows](#tested-on-windows)), but the only release so far is the pre-release [`v0.1.0-beta`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.0-beta), only one machine and one speaker were tested, voice *quality* is judged by ear of one person,
 > and many settings are defaults that may change. Expect rough edges; back up your recordings and voices ([Backup](#backup-restore-and-existing-models)); report problems as issues.
 > Voices are personal data - read [Voice owner's consent](#voice-owners-consent-and-usage-scope) and the licence notes before sharing anything.
 
@@ -84,7 +86,7 @@ Russian: [`studio_home`](docs/screenshots/ru/studio_home.png) · German: [`studi
 Screenshots that show voice lists are not included (they would show the maintainers' private voices); the voices window and the narration window with the mini player are described in the sections below.
 
 ## Installation
-The first pre-release is **[v0.1.0-beta](https://github.com/Mitroshenkov87/voxprint/releases/tag/v0.1.0-beta)** (marked *pre-release*). Planned installer channels are listed in the [Roadmap](#roadmap).
+The first pre-release is **[v0.1.0-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.0-beta)** (marked *pre-release*). Planned installer channels are listed in the [Roadmap](#roadmap).
 
 ### Download the installer (Windows 11 x64, NVIDIA GPU)
 The release has two builds of the **same program**; take either one:
@@ -273,7 +275,7 @@ adapter files, size limits). A voice without a declared licence is treated as `c
 `commercial_use` in `voice.json` is always derived from the licence, never trusted from a file you import. The badge is information, not legal advice.
 
 **Download voices from repository.** The button reads a static `index.json` (schema 1) from a configurable URL: environment variable `VOXPRINT_VOICES_INDEX`, or the first line of
-`%LOCALAPPDATA%\Voxprint\state\voice_index_url.txt`. The built-in default is `voices/index.json` of this repository (`raw.githubusercontent.com/Mitroshenkov87/voxprint/main/voices/index.json`); the voice zips are release assets (tag `voices-v1`). A placeholder URL makes the dialog say "not set up yet". An empty list and no network
+`%LOCALAPPDATA%\Voxprint\state\voice_index_url.txt`. The built-in default is `voices/index.json` of this repository (`raw.githubusercontent.com/Mitroshenkov87/voxprint-audiobook-builder/main/voices/index.json`); the voice zips are release assets (tag `voices-v1`). A placeholder URL makes the dialog say "not set up yet". An empty list and no network
 are handled with friendly messages. Downloads are HTTPS-only, size-capped, **resumable** (a `.part` file named by the SHA-256 and an HTTP `Range` request; a server that ignores `Range` restarts the download), the SHA-256 from the index must match, and the licence in the index is the one shown. The last good index is cached (`state\voice_index_cache.json`), so the list still shows offline. Index format:
 ```json
 {"schema": 1, "voices": [{"id": "anna-ru", "name": "Anna", "language": "russian", "author": "...", "license": "CC-BY-4.0",
