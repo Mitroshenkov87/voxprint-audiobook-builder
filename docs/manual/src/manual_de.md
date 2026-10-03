@@ -199,7 +199,7 @@ Weitere Hinweise aus dem Skript: Gefühle müssen nicht gespielt werden – es g
 | Bedienelement | Was es tut und wann Sie es benutzen |
 |---|---|
 | **{{ui.choose_audio}}** | Wählen Sie die Stimmaufnahme (die Datei lässt sich auch ins Fenster ziehen). Vor der Auswahl: „{{ui.audio_none}}“ |
-| **{{ui.choose_text}}** | Wählen Sie die Textdatei, die Sie gelesen haben (`.txt`, UTF-8; zum Beispiel das Aufnahmeskript). Vor der Auswahl: „{{ui.text_none}}“ Im Modus „kein Text“ ausgeblendet. |
+| **{{ui.choose_text}}** | Wählen Sie die Textdatei, die Sie gelesen haben (`.txt`, UTF-8; zum Beispiel das Aufnahmeskript). Vor der Auswahl: „{{ui.text_none}}“ Im Modus „kein Text“ wird diese Zeile zu „{{asr.choose_script}}“ (optional). |
 | Kontrollkästchen „{{asr.checkbox}}“ | Nur Audio, ohne Text: siehe Abschnitt 6.4. |
 | **{{preset.label}}** | Auswahlliste der Trainingsstufen: siehe Abschnitt 6.3. Darunter zeigt das Programm eine kurze Beschreibung und eine Schätzung der Trainingszeit für Ihre Grafikkarte. |
 | ▶ **{{preset.advanced}}** | Zeigt die Zahlen von Hand (nur bei „{{preset.manual}}“ änderbar). |
@@ -244,7 +244,7 @@ Unter **{{preset.advanced}}** sehen Sie die Zahlen hinter einer Stufe:
 
 ## Kein Text? (nur Audio)
 
-Haken Sie „{{asr.checkbox}}“ an, und das Programm erkennt die Sprache selbst (Qwen3-ASR, offline; das Erkennungsmodell, etwa 1,9 GB, wird bei der ersten Nutzung geladen). Die Zeile **{{ui.choose_text}}** verschwindet; stattdessen haben Sie:
+Haken Sie „{{asr.checkbox}}“ an, und das Programm erkennt die Sprache selbst (Qwen3-ASR, offline; das Erkennungsmodell, etwa 1,9 GB, wird bei der ersten Nutzung geladen). Die Textzeile bleibt als **optionales Skript** („{{asr.choose_script}}“, oder ziehen Sie eine `.txt` ins Fenster): Wählen Sie den vorgelesenen Text, wird jedes erkannte Stück tolerant damit abgeglichen (Versprecher und wiederholte Zeilen werden berücksichtigt), sodass der richtige Text statt des erkannten verwendet wird. Außerdem haben Sie:
 
 * **{{ui.choose_audio}}** – jetzt können Sie **viele Dateien** auf einmal wählen; die Zeile zeigt „N Audiodatei(en) gewählt“;
 * **{{asr.choose_folder}}** – einen ganzen Ordner mit Clips, samt Unterordnern;

@@ -71,9 +71,9 @@ def test_pascal_blocks_are_balanced():
 
 def test_models_page_is_optional_skippable_and_only_remembers_the_path():
     code = section("Code")
-    assert "CreateInputDirPage(wpSelectDir" in code                       # right after the install folder
+    assert "CreateCustomPage(wpSelectDir" in code and "CreateInputDirPage(wpSelectDir" not in code.split("InitializeWizard")[1].split("end;")[0]   # right after the install folder; a custom page, because the input-dir page rejects an empty field
     assert "{param:ModelsDir|}" in code                                    # silent installs: /ModelsDir="D:\models"
-    assert "Trim(ModelsPage.Values[0])" in code and "Dir <> ''" in code     # empty = skipped
+    assert "Trim(ModelsEdit.Text)" in code and "Dir <> ''" in code     # empty = skipped
     assert "not DirExists(Dir)" in code                                    # a typo is caught before installing
     assert "ssPostInstall" in code and "SaveStringsToUTF8File" in code
     assert f"\\state" in code and existing_models.CONFIG_NAME in code

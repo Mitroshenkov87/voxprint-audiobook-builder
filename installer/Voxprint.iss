@@ -101,7 +101,8 @@ Filename: "{app}\{#AppExe}"; Parameters: "--prefetch"; Description: "{cm:RunPref
 
 [Code]
 var
-  ModelsPage: TInputDirWizardPage;
+  ModelsPage: TWizardPage;
+  ModelsEdit: TNewEdit;
 
 function InitializeSetup(): Boolean;
 var
@@ -114,14 +115,53 @@ begin
       mbConfirmation, MB_YESNO) = IDYES;
 end;
 
-{ Optional page after the install folder: a folder with models from a previous install. Nothing is copied here. }
-procedure InitializeWizard();
+{ Callback of the Browse button on the models page. }
+procedure ModelsBrowseClick(Sender: TObject);
+var
+  Dir: String;
 begin
-  ModelsPage := CreateInputDirPage(wpSelectDir,
-    CustomMessage('ModelsPageCaption'), CustomMessage('ModelsPageDescription'),
-    CustomMessage('ModelsPageSubCaption'), False, '');
-  ModelsPage.Add(CustomMessage('ModelsPagePrompt'));
-  ModelsPage.Values[0] := ExpandConstant('{param:ModelsDir|}');
+  Dir := ModelsEdit.Text;
+  if BrowseForFolder(CustomMessage('ModelsPagePrompt'), Dir, False) then
+    ModelsEdit.Text := Dir;
+end;
+
+{ Optional page after the install folder: a folder with models from a previous install. Nothing is copied here.
+  A plain custom page, NOT CreateInputDirPage: that one refuses an empty field ("You must enter a full path"), which broke
+  both the silent install without /ModelsDir and "leave the field empty to skip" (found in the final installer test). }
+procedure InitializeWizard();
+var
+  Info, Prompt: TNewStaticText;
+  Browse: TNewButton;
+begin
+  ModelsPage := CreateCustomPage(wpSelectDir, CustomMessage('ModelsPageCaption'), CustomMessage('ModelsPageDescription'));
+  Info := TNewStaticText.Create(ModelsPage);
+  Info.Parent := ModelsPage.Surface;
+  Info.WordWrap := True;
+  Info.AutoSize := False;
+  Info.Left := 0;
+  Info.Top := 0;
+  Info.Width := ModelsPage.SurfaceWidth;
+  Info.Height := ScaleY(90);
+  Info.Caption := CustomMessage('ModelsPageSubCaption');
+  Prompt := TNewStaticText.Create(ModelsPage);
+  Prompt.Parent := ModelsPage.Surface;
+  Prompt.Left := 0;
+  Prompt.Top := ScaleY(98);
+  Prompt.Caption := CustomMessage('ModelsPagePrompt');
+  ModelsEdit := TNewEdit.Create(ModelsPage);
+  ModelsEdit.Parent := ModelsPage.Surface;
+  ModelsEdit.Left := 0;
+  ModelsEdit.Top := ScaleY(116);
+  ModelsEdit.Width := ModelsPage.SurfaceWidth - ScaleX(96);
+  ModelsEdit.Text := ExpandConstant('{param:ModelsDir|}');
+  Browse := TNewButton.Create(ModelsPage);
+  Browse.Parent := ModelsPage.Surface;
+  Browse.Left := ModelsEdit.Width + ScaleX(8);
+  Browse.Top := ModelsEdit.Top - ScaleY(1);
+  Browse.Width := ScaleX(88);
+  Browse.Height := ModelsEdit.Height + ScaleY(2);
+  Browse.Caption := WizardForm.DirBrowseButton.Caption;
+  Browse.OnClick := @ModelsBrowseClick;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -131,7 +171,7 @@ begin
   Result := True;
   if CurPageID = ModelsPage.ID then
   begin
-    Dir := Trim(ModelsPage.Values[0]);
+    Dir := Trim(ModelsEdit.Text);
     if (Dir <> '') and not DirExists(Dir) then
     begin
       MsgBox(FmtMessage(CustomMessage('ModelsPageBadFolder'), [Dir]), mbError, MB_OK);
@@ -148,7 +188,7 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    Dir := Trim(ModelsPage.Values[0]);
+    Dir := Trim(ModelsEdit.Text);
     if Dir <> '' then
     begin
       StateDir := ExpandConstant('{localappdata}\Voxprint\state');

@@ -80,6 +80,8 @@ def _selftest_imports() -> int:
         pass
     try:
         print(text)
+    except UnicodeEncodeError:
+        print(text.encode('ascii', 'backslashreplace').decode('ascii'))
     except (OSError, ValueError):      # windowed build without stdout
         pass
     return 1 if bad else 0
@@ -93,6 +95,8 @@ def _cli_printer(name: str):
     def out(line: str) -> None:
         try:
             print(line)
+        except UnicodeEncodeError:
+            print(line.encode('ascii', 'backslashreplace').decode('ascii'))
         except Exception:  # noqa: BLE001 - no console
             pass
         try:

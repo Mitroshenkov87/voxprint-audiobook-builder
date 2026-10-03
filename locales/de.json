@@ -566,5 +566,7 @@
  "warn.text_not_utf8": "Die Textdatei ist nicht UTF-8-kodiert (sieht nach {enc} aus). Ich habe sie gelesen, aber speichern Sie den Text besser als UTF-8, um Fehler zu vermeiden.",
  "warn.text_utf16": "Die Textdatei ist UTF-16-kodiert. Es wird empfohlen, sie als UTF-8 zu speichern.",
  "warn.very_low_vram": "Der Grafikspeicher ist gering: Es wird ein leichteres Modell verwendet, die Stimmqualität kann geringer sein.",
- "warn.voice_not_registered": "Die Stimme wurde gespeichert, konnte aber nicht automatisch zu „Meine Stimmen“ hinzugefügt werden – importieren Sie den Ausgabeordner dort."
+ "warn.voice_not_registered": "Die Stimme wurde gespeichert, konnte aber nicht automatisch zu „Meine Stimmen“ hinzugefügt werden – importieren Sie den Ausgabeordner dort.",
+ "asr.choose_script": "Skript (optional): der vorgelesene Text…",
+ "asr.script_none": "(kein Skript: die Sprache wird ohne erkannt)"
 }

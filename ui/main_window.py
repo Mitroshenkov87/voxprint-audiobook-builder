@@ -639,7 +639,7 @@ class MainWindow(QWidget):
             self.setWindowTitle(f"{APP_TITLE} - {tr('train.title')}")
         self.lbl_sub.setText(tr("ui.subtitle"))
         self.btn_audio.setText(tr("ui.choose_audio"))
-        self.btn_text.setText(tr("ui.choose_text"))
+        self._apply_text_row()
         self.lbl_consent.setText(tr("consent.title"))
         for i, code in enumerate(("auto", "manual", "none")):
             self.cmb_consent.setItemText(i, tr("consent.mode_" + code))
@@ -663,7 +663,6 @@ class MainWindow(QWidget):
         self.lbl_asr_warning.setText(tr("asr.warning"))
         self.chk_asr_ok.setText(tr("asr.confirm"))
         self._show_audio_label()
-        self.lbl_text.setText(self.text.name if self.text else tr("ui.text_none"))
         self.btn_preview.setText(tr("preview.button"))
         self.chk_compare.setText(tr("preview.compare"))
         self.chk_check.setText(tr("check.checkbox"))
@@ -968,10 +967,18 @@ class MainWindow(QWidget):
             return
         self.chk_asr_ok.setChecked(False)
         self.asr_box.setVisible(on)
-        self.btn_text.setVisible(not on)
-        self.lbl_text.setVisible(not on)
+        self._apply_text_row()      # the text row stays: in this mode it is the OPTIONAL script that was read aloud
         self._show_audio_label()
         self._refresh_buttons()
+
+    def _apply_text_row(self) -> None:
+        """Texts of the text row: the transcript (normal mode) or the optional recording script (audio-only mode)."""
+        if self.no_transcript:
+            self.btn_text.setText(tr("asr.choose_script"))
+            self.lbl_text.setText(self.text.name if self.text else tr("asr.script_none"))
+        else:
+            self.btn_text.setText(tr("ui.choose_text"))
+            self.lbl_text.setText(self.text.name if self.text else tr("ui.text_none"))
 
     def set_audio_files(self, paths: List[Path]) -> None:
         """No-transcript mode: remember several audio files and/or folders."""
@@ -1025,6 +1032,9 @@ class MainWindow(QWidget):
         """Dropped ``.txt`` files become the text, known audio extensions become the recording."""
         if self.no_transcript:   # many files and/or folders at once
             dropped = [Path(u.toLocalFile()) for u in e.mimeData().urls()]
+            scripts = [p for p in dropped if p.suffix.lower() in TEXT_EXT]
+            if scripts:
+                self.set_text(scripts[0])       # a dropped .txt is the optional recording script
             dropped = [p for p in dropped if p.is_dir() or p.suffix.lower() in AUDIO_EXT]
             if dropped:
                 self.set_audio_files(self.audio_files + dropped)
@@ -1101,6 +1111,7 @@ class MainWindow(QWidget):
             if self.busy or not (self.audio_files and self.chk_asr_ok.isChecked()):
                 return
             self._launch(TaskRequest(kind=kind, no_transcript=True, audio_files=list(self.audio_files), force_cpu=force_cpu,
+                                     text=self.text,      # optional script: the recognised pieces are matched to it (core.script_match)
                                      voice_type=str(self.cmb_voice_type.currentData() or ""),
                                      voice_description=self.edt_voice_desc.text().strip(),
                                      preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None,

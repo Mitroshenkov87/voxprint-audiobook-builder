@@ -30,7 +30,12 @@ def run(voice_id: str = "", out_dir: Optional[Path] = None, library=None, narrat
             log.write_text(text + "\n", encoding="utf-8")
         except OSError:
             pass
-        print(text)
+        try:
+            print(text)
+        except UnicodeEncodeError:       # redirected console in a cp1252 session: voice names may be Cyrillic
+            print(text.encode('ascii', 'backslashreplace').decode('ascii'))
+        except (OSError, ValueError):
+            pass
 
     try:
         if library is None:

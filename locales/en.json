@@ -566,5 +566,7 @@
  "warn.text_not_utf8": "The text file is not UTF-8 (looks like {enc}). I read it, but it is better to save the text as UTF-8 to avoid errors.",
  "warn.text_utf16": "The text file is UTF-16. Saving it as UTF-8 is recommended.",
  "warn.very_low_vram": "Video memory is low: a lighter model is used, voice quality may be lower.",
- "warn.voice_not_registered": "The voice was saved, but could not be added to “My voices” automatically - import the output folder there."
+ "warn.voice_not_registered": "The voice was saved, but could not be added to “My voices” automatically - import the output folder there.",
+ "asr.choose_script": "Script (optional): the text that was read aloud…",
+ "asr.script_none": "(no script: the speech is recognised without one)"
 }

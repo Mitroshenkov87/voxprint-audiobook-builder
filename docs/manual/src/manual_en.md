@@ -199,7 +199,7 @@ Open it from the **{{studio.train_title}}** card. {{ui.subtitle}}
 | Control | What it does and when to use it |
 |---|---|
 | **{{ui.choose_audio}}** | Choose the voice recording (you can also drag the file into the window). Before a choice: *{{ui.audio_none}}* |
-| **{{ui.choose_text}}** | Choose the text file you read (UTF-8 `.txt`; the recording script, for example). Before a choice: *{{ui.text_none}}* Hidden in no-transcript mode. |
+| **{{ui.choose_text}}** | Choose the text file you read (UTF-8 `.txt`; the recording script, for example). Before a choice: *{{ui.text_none}}* In no-transcript mode the same row becomes *{{asr.choose_script}}* (optional). |
 | Check box *{{asr.checkbox}}* | Audio only, no text: see section 6.4. |
 | **{{preset.label}}** | Drop-down with the training presets: see section 6.3. Below it the program shows a short description and an estimate of the training time for your graphics card. |
 | ▶ **{{preset.advanced}}** | Shows the manual numbers (only editable in *{{preset.manual}}*). |
@@ -244,7 +244,7 @@ Under **{{preset.advanced}}** you see the numbers behind a preset:
 
 ## No transcript? (audio only)
 
-Tick *{{asr.checkbox}}* and the program recognises the speech itself (Qwen3-ASR, offline; the recognition model, about 1.9 GB, is downloaded on first use). The **{{ui.choose_text}}** row disappears; instead you have:
+Tick *{{asr.checkbox}}* and the program recognises the speech itself (Qwen3-ASR, offline; the recognition model, about 1.9 GB, is downloaded on first use). The text row stays as an **optional script** (*{{asr.choose_script}}*, or drop a `.txt` into the window): if you choose the text that was read aloud, every recognised piece is matched to it tolerantly (stumbles and re-read lines are handled), so the final text is the correct one, not the recognised one. In addition you have:
 
 * **{{ui.choose_audio}}** – now you can pick **many files** at once; the line shows "N audio file(s) chosen";
 * **{{asr.choose_folder}}** – a whole folder of clips, searched with its subfolders;

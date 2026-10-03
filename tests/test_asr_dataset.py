@@ -156,7 +156,8 @@ def test_train_window_no_transcript_flow(app, tmp_path):
     w = MainWindow(runner=lambda req, p, c: seen.append(req), autocheck=False, auto_open_folder=False)
     assert not w.no_transcript and w.asr_box.isHidden() and w.btn_text.isVisibleTo(w)
     w.chk_no_text.setChecked(True)
-    assert w.no_transcript and not w.asr_box.isHidden() and not w.btn_text.isVisibleTo(w)
+    assert w.no_transcript and not w.asr_box.isHidden() and w.btn_text.isVisibleTo(w)      # the text row stays: optional script
+    assert w.btn_text.text() == tr("asr.choose_script") and w.lbl_text.text() == tr("asr.script_none")
     assert "ошибаться" in w.lbl_asr_warning.text()
     for f in ("a.wav", "b.mp3"):
         (tmp_path / f).write_bytes(b"x")
@@ -176,13 +177,24 @@ def test_train_window_no_transcript_flow(app, tmp_path):
         QApplication.processEvents(); time.sleep(0.01)
     assert seen and seen[0].no_transcript and seen[0].audio_files == [tmp_path] and seen[0].text is None
     w.worker.wait(3000)
+    # audio + script: the chosen script text file travels with the request (matched tolerantly by core.script_match)
+    script = tmp_path / "script.txt"
+    script.write_text("Первая строка.\nВторая строка.", encoding="utf-8")
+    w.set_text(script)
+    assert w.lbl_text.text() == "script.txt"
+    w.start("dataset")
+    deadline = time.time() + 5
+    while len(seen) < 2 and time.time() < deadline:
+        QApplication.processEvents(); time.sleep(0.01)
+    assert len(seen) == 2 and seen[1].no_transcript and seen[1].text == script
+    w.worker.wait(3000)
 
 
 def test_asr_texts_exist_in_every_language():
     from core import i18n
     for lang in ("en", "ru", "de"):
         i18n.set_language(lang, persist=False)
-        for k in ("asr.checkbox", "asr.warning", "asr.confirm", "asr.report", "err.asr_nothing_kept", "warn.asr_unverified"):
+        for k in ("asr.checkbox", "asr.warning", "asr.confirm", "asr.report", "asr.choose_script", "asr.script_none", "err.asr_nothing_kept", "warn.asr_unverified"):
             assert tr(k) != k
     i18n.set_language("en", persist=False)
     assert "mistakes" in tr("asr.warning") and "{kept}" not in tr("warn.asr_unverified", kept=3, files=2)
