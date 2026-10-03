@@ -4,15 +4,91 @@ name: build-installer
 # the same build.bat flow as the local build (venv, PyTorch via uv, PyInstaller --onedir, Inno Setup).
 # Triggers: a pushed tag "v*" (the installer is attached to the GitHub release of that tag, with its SHA-256)
 # or a manual run (the installer is only uploaded as a workflow artifact).
+# Besides the full installer (Voxprint-Setup-github-build.exe) the "build" job also builds the ONLINE installer:
+# Voxprint-Setup-online.exe (a few MB + vc_redist) that downloads the payload parts (Voxprint-payload-NN.zip, each < 2 GiB)
+# listed in manifest-<channel>.json from the release assets, verified by SHA-256 and resumable.  The quick job
+# "online-smoke" tests that chain (payload split, manifest, Inno /DONLINE compile, silent install, reuse, failure, uninstall)
+# with a fake program folder in a few minutes.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Attach the builds to this existing release tag (empty = artifacts only)"
+        required: false
+        default: ""
 
 permissions:
   contents: write      # attach the installer to the release
 
 jobs:
+  online-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Inno Setup 6
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: PyInstaller
+        shell: pwsh
+        run: python -m pip install --quiet pyinstaller
+      - name: A fake program folder and the licence files the script expects
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist\Voxprint\_internal\lib, build\notices | Out-Null
+          Copy-Item "$env:WINDIR\System32\whoami.exe" dist\Voxprint\Voxprint.exe
+          python -c "import os; [open(f'dist/Voxprint/_internal/lib/blob{i}.bin','wb').write(os.urandom(6*1024*1024)) for i in range(5)]"
+          Copy-Item THIRD_PARTY_NOTICES.md build\notices\
+      - name: Build the online installer (small parts, served from localhost)
+        shell: pwsh
+        run: |
+          ./installer/build_online.ps1 -Tag v0.0.0-beta -BaseUrl http://127.0.0.1:8099 -ManifestUrl http://127.0.0.1:8099/manifest-beta.json -LimitMib 8 -Python python
+      - name: Serve the parts
+        shell: pwsh
+        run: |
+          Start-Process python -ArgumentList "-m","http.server","8099","--bind","127.0.0.1","--directory","build\online-release" -WindowStyle Hidden
+          Start-Sleep 3
+          (Invoke-WebRequest http://127.0.0.1:8099/manifest-beta.json -UseBasicParsing).StatusCode
+      - name: Silent install, reuse, failure and uninstall
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $setup = "build\online-release\Voxprint-Setup-online.exe"
+          Write-Host ("setup size: {0:N0} bytes" -f (Get-Item $setup).Length)
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke1.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content C:\vxsmoke1.log -Tail 60; throw "install exit code $($p.ExitCode)" }
+          foreach ($f in Get-ChildItem dist\Voxprint -Recurse -File) {
+            $rel = $f.FullName.Substring((Resolve-Path dist\Voxprint).Path.Length + 1)
+            $t = Join-Path C:\vxsmoke $rel
+            if (-not (Test-Path $t)) { throw "missing after install: $rel" }
+            if ((Get-FileHash $t).Hash -ne (Get-FileHash $f.FullName).Hash) { throw "different content: $rel" }
+          }
+          Get-Content C:\vxsmoke\voxprint-components.json
+          if (Test-Path C:\vxsmoke\unins000.exe) { "uninstaller present" } else { throw "no uninstaller" }
+          # second run: everything is reused (no component is downloaded again)
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke2.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content C:\vxsmoke2.log -Tail 60; throw "second install exit code $($p.ExitCode)" }
+          # an unreachable manifest must fail the setup (and leave a message, not a crash)
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=C:\vxsmoke-bad","/Manifest=http://127.0.0.1:9/manifest.json","/LOG=C:\vxsmoke3.log" -Wait -PassThru
+          Write-Host "unreachable manifest -> exit code $($p.ExitCode)"
+          if ($p.ExitCode -eq 0) { throw "the setup reported success for an unreachable manifest" }
+          # uninstall removes the downloaded files
+          $p = Start-Process C:\vxsmoke\unins000.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -Wait -PassThru
+          Start-Sleep 3
+          if (Test-Path C:\vxsmoke\Voxprint.exe) { throw "files left after the uninstall" }
+      - name: Logs
+        if: always()
+        shell: pwsh
+        run: |
+          foreach ($l in "C:\vxsmoke1.log","C:\vxsmoke2.log","C:\vxsmoke3.log") { if (Test-Path $l) { "== $l"; Get-Content $l -Tail 25 } }
+
   build:
     runs-on: windows-latest
     timeout-minutes: 150
@@ -71,3 +147,34 @@ jobs:
           gh release view ${{ github.ref_name }} 2>$null
           if ($LASTEXITCODE -ne 0) { gh release create ${{ github.ref_name }} --prerelease --title "${{ github.ref_name }}" --notes "Built from source by GitHub Actions." }
           gh release upload ${{ github.ref_name }} installer\Output\Voxprint-Setup-github-build.exe installer\Output\Voxprint-Setup-github-build.exe.sha256 --clobber
+
+      - name: Online installer - free the space of the full installer, build helper + payload parts + Voxprint-Setup-online.exe
+        shell: pwsh
+        env:
+          REL_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
+        run: |
+          Remove-Item installer\Output\* -Force -ErrorAction SilentlyContinue
+          Get-PSDrive C | Format-Table Used, Free
+          $tag = if ($env:REL_TAG) { $env:REL_TAG } else { "v0.0.0-dev" }
+          ./installer/build_online.ps1 -Tag $tag -Repo "${{ github.repository }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Voxprint-Setup-online
+          path: |
+            build/online-release/Voxprint-Setup-online.exe
+            build/online-release/Voxprint-Setup-online.exe.sha256
+            build/online-release/manifest-*.json
+          retention-days: 14
+
+      - name: Attach the online installer, the manifest and the payload parts to the release
+        if: ${{ startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REL_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
+        run: |
+          $files = Get-ChildItem build\online-release | ForEach-Object { $_.FullName }
+          # the small files first (installer, hash, manifest), then the big parts; --clobber replaces an older build of the same tag
+          $sorted = $files | Sort-Object { (Get-Item $_).Length }
+          foreach ($f in $sorted) { gh release upload $env:REL_TAG $f --clobber; if ($LASTEXITCODE -ne 0) { throw "upload failed: $f" } }

@@ -6,12 +6,21 @@
 ; REMEMBERED (written to %LOCALAPPDATA%\Voxprint\state\existing_models_dir.txt); the installer copies nothing. On the first start
 ; the program imports the models from there (hard link on the same drive, else copy, checked by checksum) before downloading.
 ; Silent installs can pass it with /ModelsDir="D:\old\models". Wizard languages: English, Russian, German.
+;
+; ONLINE variant:  ISCC /DONLINE /DONEDIR /DManifestUrl=<https://.../manifest-beta.json> installer\Voxprint.iss  ->  Output\Voxprint-Setup-online.exe
+; A small installer (a few MB + vc_redist): it embeds build\online\voxprint-fetch.exe (tools/online_fetch.py), which downloads the
+; payload parts listed in the manifest (release assets, each < 2 GiB, verified by SHA-256, resumable, parts that are already
+; installed are skipped) and unpacks them into {app}.  One UAC prompt (PrivilegesRequired=admin) covers everything; the
+; user data stays in %LOCALAPPDATA%\Voxprint.  /Manifest=<url or file> overrides the baked-in manifest (tests, mirrors).
 
 #define AppName "Voxprint"
 ; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
 #define AppDisplayName "Voxprint AI Audiobook Builder"
 #define AppVersion "0.1.0"
 #define AppExe "Voxprint.exe"
+#ifndef ManifestUrl
+#define ManifestUrl "https://github.com/Mitroshenkov87/voxprint/releases/latest/download/manifest-stable.json"
+#endif
 
 [Setup]
 AppId={{6F1D2B7A-3C54-4E0B-9A41-7B5E0C9D2F18}
@@ -24,7 +33,12 @@ DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExe}
 SetupIconFile=..\assets\voxprint-setup.ico
 OutputDir=Output
+#ifdef ONLINE
+OutputBaseFilename=Voxprint-Setup-online
+ExtraDiskSpaceRequired=4500000000
+#else
 OutputBaseFilename=Voxprint-Setup
+#endif
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
@@ -69,14 +83,29 @@ english.ModelsPageBadFolder=The folder %1 does not exist. Choose an existing fol
 russian.ModelsPageBadFolder=Папка %1 не существует. Выберите существующую папку или очистите поле, чтобы пропустить этот шаг.
 german.ModelsPageBadFolder=Der Ordner %1 existiert nicht. Wählen Sie einen vorhandenen Ordner oder leeren Sie das Feld, um diesen Schritt zu überspringen.
 
+english.OnlineStatus=Downloading and unpacking the Voxprint components (the download can be resumed if it is interrupted)...
+russian.OnlineStatus=Загрузка и распаковка компонентов Voxprint (при обрыве загрузку можно продолжить)...
+german.OnlineStatus=Voxprint-Komponenten werden geladen und entpackt (bei einem Abbruch kann der Download fortgesetzt werden)...
+english.OnlineFailed=The download of the Voxprint components failed:%n%n%1%n%nCheck the internet connection and run the setup again: finished parts are kept and the download continues where it stopped.
+russian.OnlineFailed=Не удалось загрузить компоненты Voxprint:%n%n%1%n%nПроверьте подключение к интернету и запустите установку снова: готовые части сохранены, загрузка продолжится с места остановки.
+german.OnlineFailed=Der Download der Voxprint-Komponenten ist fehlgeschlagen:%n%n%1%n%nPrüfen Sie die Internetverbindung und starten Sie das Setup erneut: Fertige Teile bleiben erhalten, der Download wird fortgesetzt.
+english.OnlineStalled=The downloader stopped responding.
+russian.OnlineStalled=Загрузчик перестал отвечать.
+german.OnlineStalled=Der Downloader antwortet nicht mehr.
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Files]
+#ifdef ONLINE
+; the program itself is downloaded by voxprint-fetch.exe (see [Code]); only the downloader and the notices are inside
+Source: "..\build\online\voxprint-fetch.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+#else
 #ifdef ONEDIR
 Source: "..\dist\Voxprint\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 #else
 Source: "..\dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
+#endif
 #endif
 ; Third-party licences (LGPL/GPL/Apache etc.): the component list and the full licence texts.
 Source: "..\build\notices\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
@@ -87,6 +116,12 @@ Source: "..\credits.json"; DestDir: "{app}"; Flags: ignoreversion
 ; Optional: put vc_redist.x64.exe into installer\redist and it will be installed silently (PyTorch needs it).
 #ifexist "redist\vc_redist.x64.exe"
 Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+#endif
+
+#ifdef ONLINE
+[UninstallDelete]
+; the downloaded program files are not in the uninstall log (the setup did not copy them): remove the folder
+Type: filesandordirs; Name: "{app}"
 #endif
 
 [Icons]
@@ -180,6 +215,97 @@ begin
   end;
 end;
 
+#ifdef ONLINE
+function VxTick(): Cardinal;
+external 'GetTickCount@kernel32.dll stdcall';
+
+{ Online variant: run voxprint-fetch.exe in the background and show its progress.  The downloader writes three lines to a
+  status file (state running/done/error, permille, message) plus a heartbeat counter in line 4 every second or two; a counter
+  that stops changing for 120 s means that the process died. }
+function ReadFetchStatus(const StatusFile: String; var State: String; var Permille: Integer; var Msg, Beat: String): Boolean;
+var
+  Lines: TArrayOfString;
+begin
+  Result := False;
+  if FileExists(StatusFile) and LoadStringsFromFile(StatusFile, Lines) and (GetArrayLength(Lines) >= 3) then
+  begin
+    State := Trim(Lines[0]);
+    Permille := StrToIntDef(Trim(Lines[1]), 0);
+    Msg := Trim(Lines[2]);
+    if GetArrayLength(Lines) >= 4 then Beat := Trim(Lines[3]) else Beat := '';
+    Result := True;
+  end;
+end;
+
+procedure RunOnlineDownload();
+var
+  Manifest, Cache, StatusFile, Exe, Params, State, Msg, Beat, LastBeat, Err: String;
+  Pm, ResultCode: Integer;
+  Page: TOutputProgressWizardPage;
+  LastChange: Cardinal;
+  Finished: Boolean;
+begin
+  Manifest := Trim(ExpandConstant('{param:Manifest|}'));
+  if Manifest = '' then Manifest := '{#ManifestUrl}';
+  Cache := ExpandConstant('{localappdata}\Voxprint\setup-cache');
+  ForceDirectories(Cache);
+  StatusFile := Cache + '\status.txt';
+  DeleteFile(StatusFile);
+  Exe := ExpandConstant('{tmp}\voxprint-fetch.exe');
+  Params := '--manifest ' + AddQuotes(Manifest) + ' --dest ' + AddQuotes(ExpandConstant('{app}')) +
+            ' --cache ' + AddQuotes(Cache) + ' --status ' + AddQuotes(StatusFile);
+  Page := CreateOutputProgressPage(CustomMessage('OnlineStatus'), '');
+  Page.Show;
+  Err := '';
+  try
+    Page.SetText(CustomMessage('OnlineStatus'), '');
+    Page.SetProgress(0, 1000);
+    if not Exec(Exe, Params, '', SW_HIDE, ewNoWait, ResultCode) then
+      Err := SysErrorMessage(ResultCode)
+    else
+    begin
+      Finished := False;
+      LastBeat := '';
+      LastChange := VxTick;
+      while not Finished do
+      begin
+        Sleep(300);
+        if ReadFetchStatus(StatusFile, State, Pm, Msg, Beat) then
+        begin
+          Page.SetText(CustomMessage('OnlineStatus'), Msg);
+          Page.SetProgress(Pm, 1000);
+          if Beat <> LastBeat then
+          begin
+            LastBeat := Beat;
+            LastChange := VxTick;
+          end;
+          if State = 'done' then Finished := True
+          else if State = 'error' then
+          begin
+            Err := Msg;
+            Finished := True;
+          end;
+        end;
+        if (not Finished) and (VxTick - LastChange > 120000) then
+        begin
+          Err := CustomMessage('OnlineStalled');
+          Finished := True;
+        end;
+      end;
+    end;
+  finally
+    Page.Hide;
+  end;
+  if Err <> '' then
+  begin
+    if not WizardSilent then
+      MsgBox(FmtMessage(CustomMessage('OnlineFailed'), [Err]), mbError, MB_OK);
+    Abort;
+  end;
+  DelTree(Cache, True, True, True);
+end;
+#endif
+
 { Only the path is remembered (UTF-8 file); the app imports the models on its first start. }
 procedure CurStepChanged(CurStep: TSetupStep);
 var
@@ -188,6 +314,9 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
+#ifdef ONLINE
+    RunOnlineDownload();
+#endif
     Dir := Trim(ModelsEdit.Text);
     if Dir <> '' then
     begin

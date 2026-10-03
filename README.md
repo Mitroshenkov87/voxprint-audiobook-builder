@@ -103,6 +103,9 @@ Get-FileHash .\Voxprint-Setup-github-build.exe -Algorithm SHA256     # compare w
 ```
 Hashes of the current release assets: github-build `4e4bd86e48510fc7a908d4c25c7c58229b56f6007b82c13b001b174e7f57fdbd`, grokbot-build `c2f8f01dc02568a55b60a1c5ed1f456c2f0c03fa4468f27fdc54a93cb53ebc24`.
 
+### Online installer (small download)
+`Voxprint-Setup-online.exe` (a few MB, from the same release) is the **smart installer**: it downloads the program in parts (`Voxprint-payload-NN.zip`, each below the 2 GiB GitHub limit) listed in `manifest-beta.json` / `manifest-stable.json` (the channel follows the release: a pre-release such as `v0.1.0-beta` is *beta*). Every part is **verified by its SHA-256** from the manifest, a broken or interrupted download is **resumed** (HTTP `Range`; a corrupt part is discarded), and parts that are **already installed** (same SHA-256 recorded in `voxprint-components.json` in the install folder) are skipped on a re-run or repair. It asks for administrator rights **once** (UAC); your data (models, voices, logs) stays in `%LOCALAPPDATA%\Voxprint`. Silent install: `Voxprint-Setup-online.exe /VERYSILENT /DIR="C:\Voxprint"`; `/Manifest=<url or file>` uses another manifest (a mirror, a test). Unlike the full installer it needs the internet during the setup (about 2 GB of parts, then about 7 GB of models on the first start). Source: `tools/online_fetch.py` (downloader), `tools/make_online_payload.py` (splitter), `installer/Voxprint.iss /DONLINE`, `installer/build_online.ps1`.
+
 **The installer is not code-signed.** Windows SmartScreen will show *"Windows protected your PC - Unknown publisher"*: click **More info -> Run anyway** (only after the SHA-256 above matches). The installer asks for administrator rights once (per-machine install). Antivirus programs may warn about large unsigned PyInstaller programs; the source is in this repository and you can build the installer yourself (below).
 
 ### Build the installer locally
