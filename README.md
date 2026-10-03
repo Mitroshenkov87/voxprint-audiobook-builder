@@ -20,6 +20,8 @@ The voice goes into your **voice library**; then pick a book (TXT, FB2, EPUB) an
 > and many settings are defaults that may change. Expect rough edges; back up your recordings and voices ([Backup](#backup-restore-and-existing-models)); report problems as issues.
 > Voices are personal data - read [Voice owner's consent](#voice-owners-consent-and-usage-scope) and the licence notes before sharing anything.
 
+**User manual (PDF, same structure in three languages):** [English](docs/manual/Voxprint-Manual-en.pdf) · [Русский](docs/manual/Voxprint-Manual-ru.pdf) · [Deutsch](docs/manual/Voxprint-Manual-de.pdf) - every screen, button and field, recording the voice, consent, presets, narration, voice library and licences, glossary, FAQ (sources and build script: [`docs/manual/`](docs/manual/)).
+
 ## Contents
 [Concept](#concept-and-philosophy) · [Features](#features) · [Screenshots](#screenshots) · [Installation](#installation) ·
 [Using Voxprint](#using-voxprint) · [Narrate a book](#narrate-a-book) · [My voices](#my-voices-and-licences) · [AAC / M4B notice](#aac--m4b-patents-please-read) ·

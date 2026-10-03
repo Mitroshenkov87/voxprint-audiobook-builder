@@ -35,7 +35,7 @@ There is no command line, no browser and no account. Recordings, texts, voices a
 
 ## The installer
 
-Run **Voxprint-Setup.exe** (Inno Setup, per-machine installation, about 1.8 GB because the PyTorch libraries are inside). The wizard is available in English, Russian and German. After the install-folder page there is an optional page **Existing models**: if you already have downloaded models from an earlier installation or from a backup, choose that folder; otherwise leave the field empty. The installer copies nothing – it only remembers the folder, and the first start of the program imports the models from there instead of downloading them.
+Run **Voxprint-Setup.exe** (Inno Setup, per-machine installation, about 1.8 GB because the PyTorch libraries are inside). The wizard is available in English, Russian and German. After the install-folder page there is an optional page **Existing models (optional)**: if you already have downloaded models from an earlier installation or from a backup, choose that folder; otherwise leave the field empty. The installer copies nothing – it only remembers the folder, and the first start of the program imports the models from there instead of downloading them.
 
 Silent installation for administrators: `Voxprint-Setup.exe /VERYSILENT /ModelsDir="D:\old\models"`.
 
