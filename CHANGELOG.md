@@ -13,7 +13,13 @@ The project is not released yet; everything below is the history of the 0.1.0 de
 - **Narrate a book**: TXT / FB2 / EPUB parsers (standard library only), chapters, sentence chunks, resumable chunk-by-chunk synthesis with a Qwen3-TTS voice adapter (`core/tts_engine.py`, not yet run on a GPU),
   progress with ETA, pause / cancel, exports through ffmpeg: Opus with chapters (default), MP3 per chapter, M4B (AAC) opt-in, plus M4B-Opus, Opus / FLAC / WAV per chapter, one MP3 with chapter marks, bitrate settings.
 - **AAC / M4B patent notice** (UI in en / ru / de, README, `THIRD_PARTY_NOTICES.md`) and a feature flag to hide / disable the option (`VOXPRINT_ENABLE_AAC`, `state/features.json`, `infra/features.py`).
-- Extension points (not implemented) for text clean-up, translation and multi-voice roles: `NarrationOptions.preprocessors` and a "coming later" line.
+- **Book preparation** (fully automatic, no editor): rule-based steps for Russian and English - layout, footnotes / page numbers, quotes and dashes, links, chapter headings, numbers in words (own `core/num_words.py`
+  with Russian declension), abbreviations - as check boxes (all on by default) in the Narrate window; prepared text and a report are saved to `.debug/` next to the job cache. Tests for every rule step in both languages.
+- **AI clean-up for Russian (optional, on demand)**: SAGE `sage-fredt5-distilled-95m` (MIT, ~365 MB, pinned revision) downloaded on request; its proposals pass a strict rule-based validator
+  (close spelling fixes, `ё`, commas only), cached per paragraph. Engine written but **not run on real hardware**; tests use fakes.
+- **Registry of text models** (`infra/text_models.py`) with placeholders (greyed out under *More preparation (coming later)*): RUPunct punctuation, stress / `ё`, en / de spelling, translation, speaker roles.
+- **Quality presets** *Compact / Standard / High* with a size-per-hour hint; exact bitrates moved to a collapsed *Advanced* section (also: output folder, chapter titles, sample of the prepared text); *Other formats* holds only formats.
+- Extension point `NarrationOptions.preprocessors` (translation / roles will plug in there).
 - New docs screenshots: Studio, My voices, Narrate (incl. Russian and German renders).
 - **Settings dialog** behind a gear button: language, *Check for updates*, open models folder, open data & log folder, *Repair the installation*, *About*.
   The main screen keeps only the core workflow.

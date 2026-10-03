@@ -45,7 +45,8 @@ voice recording and a text file to ready output files you can load into a neural
 * **Narrate a book** - TXT / FB2 (also `.fb2.zip`) / EPUB parsing with chapters (pure standard library), sentence-sized chunks, synthesis
   chunk by chunk with your voice (Qwen3-TTS + LoRA adapter), progress and time left, **pause / cancel / resume** (finished chunks are kept on disk).
 * **Audiobook formats** - default: **one `.opus` file with chapter markers**; **MP3 per chapter** (most compatible, ID3 tags + `.m3u8`); opt-in **M4B (AAC)** for Apple Books
-  (patent notice below); more under *Other formats and quality* (M4B with Opus, Opus/FLAC/WAV per chapter, one MP3 with chapter marks) and bitrate settings.
+  (patent notice below); more under *Other formats* (M4B with Opus, Opus/FLAC/WAV per chapter, one MP3 with chapter marks). Quality is three buttons (*Compact / Standard / High*); exact bitrates sit under *Advanced*.
+* **Book preparation** - fully automatic text clean-up before synthesis (no editor, nothing to review): rule-based steps for Russian and English (layout, footnotes/page numbers, quotes and dashes, links, chapter headings, **numbers in words** with Russian case/gender agreement, abbreviations) and an optional on-demand AI typo/comma fixer for Russian that is checked by a strict validator ([details](#prepare-the-text)).
 * **Voice library** (`%LOCALAPPDATA%\Voxprint\voices\`) - every trained voice is registered automatically; preview, licence badge, delete, **import** from a folder or a zip,
   and **download voices from a repository** (index URL is configurable; SHA-256 checked).
 * **Voice licences** - each voice carries a licence (CC0, CC-BY, CC-BY-SA, CC-BY-NC, CC-BY-NC-SA or custom/personal-only) and the UI shows whether *commercial use* is allowed.
@@ -70,12 +71,12 @@ All screenshots are English-UI renders of the current theme (offscreen Qt; see `
 |---|---|---|
 | <img src="docs/screenshots/studio_empty.png" width="300"> | <img src="docs/screenshots/studio_home.png" width="300"> | <img src="docs/screenshots/voices.png" width="300"> |
 
-| Narrate a book | Formats, AAC notice, quality | Narration running |
+| Narrate a book (sections collapsed) | Everything expanded, AAC notice | Narration running |
 |---|---|---|
 | <img src="docs/screenshots/narrate.png" width="300"> | <img src="docs/screenshots/narrate_aac.png" width="300"> | <img src="docs/screenshots/narrate_running.png" width="300"> |
 
-Same windows in Russian and German: [`ru/studio_home`](docs/screenshots/ru/studio_home.png), [`ru/voices`](docs/screenshots/ru/voices.png), [`ru/narrate_aac`](docs/screenshots/ru/narrate_aac.png),
-[`de/studio_home`](docs/screenshots/de/studio_home.png), [`de/voices`](docs/screenshots/de/voices.png), [`de/narrate_aac`](docs/screenshots/de/narrate_aac.png).
+Same windows in Russian and German: [`ru/studio_home`](docs/screenshots/ru/studio_home.png), [`ru/voices`](docs/screenshots/ru/voices.png), [`ru/narrate`](docs/screenshots/ru/narrate.png), [`ru/narrate_aac`](docs/screenshots/ru/narrate_aac.png),
+[`de/studio_home`](docs/screenshots/de/studio_home.png), [`de/voices`](docs/screenshots/de/voices.png), [`de/narrate`](docs/screenshots/de/narrate.png), [`de/narrate_aac`](docs/screenshots/de/narrate_aac.png).
 
 Training window ("Train your voice"):
 
@@ -149,8 +150,9 @@ Use only your own voice (or the voice of someone who explicitly agreed).
 ### Narrate a book
 1. **Choose book…**: `.txt` (UTF-8 / cp1251; headings like "Chapter 1", "Глава 2", "Part I" become chapters), `.fb2` / `.fb2.zip`, `.epub`. The book title, author and cover are read when present.
 2. Pick the **voice** (a licence badge is shown; for a personal-use-only voice you are reminded not to publish or sell the narration). No voices yet? The window offers *Train your voice* / *My voices*.
-3. Pick the **format** (see below), optionally the output folder (default `Documents\Voxprint\Audiobooks`) and whether chapter titles are read aloud, then **Start narration**.
-4. Progress with the time left; **Pause / Resume** and **Cancel** are always available. Every synthesized fragment is stored (`<output>\<book>\.cache`), so after a cancel, a crash or closing the program
+3. **Prepare the text** (automatic, see [below](#prepare-the-text)): all rule-based steps are on by default; leave them as they are or untick what you do not want.
+4. Pick the **format** (see below) and a **quality** button (*Compact / Standard / High*), then **Start narration**. Rarely needed things are collapsed: *Other formats*, and *Advanced* (exact bitrates per format, the output folder - default `Documents\Voxprint\Audiobooks` - whether chapter titles are read aloud, and a read-only sample of how the first changed paragraph looks after preparation).
+5. Progress with the time left; **Pause / Resume** and **Cancel** are always available. Every synthesized fragment is stored (`<output>\<book>\.cache`), so after a cancel, a crash or closing the program
    **Start continues where it stopped**; the cache is deleted after a successful run. Texts are split into chunks at sentence/clause boundaries (reusing the clause splitter of the aligner), chapters get a pause between them.
 
 | Format | What you get | Where it plays |
@@ -158,9 +160,46 @@ Use only your own voice (or the voice of someone who explicitly agreed).
 | **Opus, one file** (default) | `Author - Title.opus` with chapter markers (32 kbit/s mono), open and royalty-free, small | VLC, Audiobookshelf, Voice (Android), Smart AudioBook Player and other free players; chapter support varies by player |
 | **MP3, one file per chapter** | folder `... - MP3\NN - Chapter.mp3` + `.m3u8` playlist, ID3 tags (title, album, artist, track n/N, cover); 96 kbit/s mono | practically everything (old players, car radios, phones) |
 | **M4B (AAC)** - opt-in, [see the notice](#aac--m4b-patents-please-read) | `Author - Title.m4b` with chapters, 64 kbit/s mono | Apple Books (iPhone/Mac) and most audiobook apps |
-| *Other formats and quality* | M4B with Opus audio, Opus per chapter, one MP3 with chapter marks (ID3 CHAP frames), FLAC / WAV per chapter; bitrate spin boxes | - |
+| *Other formats* | M4B with Opus audio, Opus per chapter, one MP3 with chapter marks (ID3 CHAP frames), FLAC / WAV per chapter | - |
 
-Extension points (not implemented, shown as a "coming later" line): text clean-up, translation and multi-voice roles plug into `NarrationOptions.preprocessors` (`core/narration.py`).
+**Quality presets** (mono speech; `core/audiobook_export.py: QUALITY_PRESETS`):
+
+| Preset | Opus | MP3 | AAC | About per hour of audio (Opus / MP3 / AAC) |
+|---|---|---|---|---|
+| Compact | 24 kbit/s | 64 kbit/s | 48 kbit/s | 11 / 29 / 22 MB |
+| **Standard** (default) | 32 kbit/s | 96 kbit/s | 64 kbit/s | 14 / 43 / 29 MB |
+| High | 48 kbit/s | 128 kbit/s | 96 kbit/s | 22 / 58 / 43 MB |
+
+Changing a bitrate by hand under *Advanced* switches the quality to "Custom" (no button highlighted).
+
+### Prepare the text
+Pipeline: **rules** (deterministic, instant) -> optional **AI clean-up** (small model, on demand) -> **synthesis**. Nothing is shown for review; the original book is never modified, and chapter titles in the output
+files / metadata / cover come from the original, unprepared book. For debugging, the prepared text is written next to the job cache: `<output>\<book>\.debug\prepared_text.txt` and `prep_report.json`
+(counts per step, skipped steps, model revision). Unlike `.cache` they are **kept** after a successful run, so you can see exactly what was read; delete the `.debug` folder if you do not need it.
+
+| Step (checkbox) | What it does |
+|---|---|
+| Tidy the layout | joins hard-wrapped lines and hyphenated line ends, removes soft hyphens, zero-width and odd space characters, ligatures, double spaces |
+| Remove footnote marks and page numbers | `[1]`, superscripts, lone page numbers, running headers repeated on many pages |
+| Normalize quotes and dashes | typographic quotes/apostrophes, dialogue dashes, `--`, ellipses |
+| Shorten links and e-mail addresses | a URL / address is read as "ссылка" / "link" instead of being spelled out |
+| Fix chapter headings | `ГЛАВА XII` -> "Глава двенадцатая", `CHAPTER IV` -> "Chapter four"; ALL-CAPS headings become normal text |
+| Say numbers in words | integers, decimals, ordinals (`5-му` -> "пятому"), years ("в 1999 г." -> "в тысяча девятьсот девяносто девятом году"), dates, percents, money, units; Russian case/gender/number agreement is derived from the surrounding words |
+| Expand abbreviations | `т. д.`, `и т. п.`, `им.`, `г.`, `Dr.`, `etc.` ... (context-aware: "г." after a year vs. "г. Москва") |
+| AI: fix typos and add missing commas | Russian only; see below |
+
+Languages: the rule steps cover **Russian and English** completely (own number-to-words code in `core/num_words.py`; `num2words` was not used because it is LGPL-2.1 and does not decline numbers by the following word). For other languages
+(German is the first one with a UI translation) only the language-neutral steps (layout, quotes, noise, links) run; digits and abbreviations are left for the TTS engine's own normalizer. The language is taken from the book's metadata, else
+detected from the text. Very long sentences are not split by the preparation step: the chunker already splits them at clause boundaries.
+
+**AI clean-up (Russian).** Model: `ai-forever/sage-fredt5-distilled-95m` (SAGE, MIT licence, about 365 MB, pinned revision `ed51b4a`...). It is **not shipped**: the row shows "Needs a one-time download (365 MB)" with a *Download* button; afterwards the
+box is ticked by default for Russian books and greyed out ("Russian books only") for others. The model is only a *proposer*; a rule-based **validator** (`core/text_cleanup.py`) decides what is applied: it accepts only close spelling fixes of
+a word (edit distance <= 2-3, the source word rare in the book itself, no names, no digits, same letter case), `е` -> `ё` in known cases and inserted commas / semicolons / colons / dashes (at most one per four words); everything else - deletions, rewording, changed
+punctuation, case changes - is rejected, and a paragraph where the model wants to change more than 5 % of the words is left untouched. Results are cached per paragraph (`.cache\cleanup.json`), so a resumed job does not run the model again.
+*Not verified on real hardware*: the `SageEngine` (transformers `AutoModelForSeq2SeqLM`, greedy generation) and the real download have never run - tests use a fake engine and a fake `snapshot_download`.
+
+**Announced, not available yet** (greyed out under *More preparation (coming later)*, entries exist in the registry `infra/text_models.py` as placeholders): punctuation model for fluent reading pauses (RUPunct), Russian stress marks and `ё`, translation before narrating
+(Opus-MT / MADLAD), multi-voice speaker markup, and English / German neural spell checkers.
 
 ### My voices and licences
 *My voices* lists the library as cards: name, language, length of speech, epochs, voice type, author, a **licence badge** (green: commercial use allowed, amber: personal use only), **Preview** (plays the reference sample),
@@ -331,9 +370,10 @@ sits at the bottom of the window. Logs (`%LOCALAPPDATA%\Voxprint\logs`) stay loc
 
 ## Roadmap
 Ideas, not promises:
-* **Narrator improvements** - a queue of several books, text clean-up (footnotes, headers), more book formats (e.g. PDF, DOCX).
-* **Translation** - translate a text and speak it in your own voice in another language (extension point exists, not implemented).
-* **Multi-voice markup** - mark up a text with several speakers / voices and render them in one pass (extension point exists, not implemented).
+* **Narrator improvements** - a queue of several books, more book formats (e.g. PDF, DOCX).
+* **Preparation, next steps** - punctuation restoration for Russian (RUPunct), stress marks and `ё`, English / German neural spelling, and tuning of the abbreviation / unit tables on real books (the rule steps themselves are done).
+* **Translation** - translate a text and speak it in your own voice in another language (a registry entry and a greyed-out placeholder exist, not implemented).
+* **Multi-voice markup** - mark up a text with several speakers / voices and render them in one pass (placeholder only).
 * A real **voices repository** (the index URL in the program is a placeholder today).
 * **Android** - later: convert the merged model for phones (GGUF / LiteRT; today the merged folder is a plain Hugging Face directory a converter can start from).
 * **Installer channels** - *online* (small installer, downloads components), *offline* (everything included), and *beta* (pre-releases).
@@ -416,6 +456,7 @@ before the first public release. Important points:
 * **The narrator on real hardware.** `core/tts_engine.py` (loading Qwen3-TTS with the LoRA adapter and `generate_voice_clone`) is written against the qwen-tts API but has **never run on a GPU**; everything around it (parsers, chunker, cache/resume,
   assembly, ffmpeg command lines, UI) is tested with a fake engine and a fake ffmpeg. Also untested: the real encoders in the pinned ffmpeg build (`libopus`, `libmp3lame`, `aac`, MP4 with Opus, Opus chapter markers, ID3 CHAP frames),
   preview playback (QtMultimedia) on Windows, how chapters show up in the listed players, and the Studio/Acrylic look on a real desktop.
+* **Text preparation on real books.** The rule steps are unit-tested on synthetic Russian/English samples only (not on real FB2/EPUB corpora); the AI clean-up (`SageEngine`, model download, speed on CPU/GPU, how many of its proposals the validator accepts) has never run for real.
 * Reuse against a **real** Alexandria/Pinokio install on Windows; a real ModelScope download after the certificate fix; the pinned LGPL ffmpeg download and swap on Windows (file locking).
 * Alignment quality/speed and the `align_long` and quality-filter thresholds on real (non-synthetic, non-English) recordings.
 * Training thresholds (loss 3.5, lr 1e-6...2e-6) for **Russian**; reading the adapter in Alexandria with its pinned `peft==0.18.1`; the optional `ctc-forced-aligner`.

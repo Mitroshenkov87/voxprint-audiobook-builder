@@ -38,6 +38,10 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 | `voice_info.py` | `voice.json` (schema 2): fields, voice types, **licences** (`LICENSES`, `license_allows_commercial`, derived `commercial_use`), migration of schema 1, read/write |
 | `voice_library.py` | the voice library under `voices/<id>/`: `VoiceLibrary`, `VoiceRecord`, register / import (folder, hardened zip) / update / delete / list |
 | `book_parsers.py` | TXT (heading detection), FB2 (+ `.fb2.zip`, entity guard, cover), EPUB (nav / NCX / spine) -> `Book` / `Chapter`; stdlib only |
+| `num_words.py` | own number-to-words for Russian (cardinals, ordinals with case / gender / number, decimals) and English (cardinals, ordinals, years); no `num2words` (LGPL-2.1, no declension by suffix). Cyrillic *data* |
+| `text_prep.py` | rule-based book preparation: steps `layout, noise, quotes, links, headings, numbers, abbrev` (`STEP_KEYS`), `PrepOptions`, `prepare_text_block`, `prepare_book` -> `(Book, PrepReport)`, `resolve_language`; ru + en fully, other languages only the neutral steps |
+| `text_cleanup.py` | optional neural clean-up: `CleanupEngine` protocol (`correct`), the **validator** (`validate`: only close spelling fixes, `е`->`ё`, inserted commas; everything else rejected), `BlockCache` (JSON per paragraph), `cleanup_book` (progress / cancel / resume), `SageEngine` (lazy transformers, **not run on real hardware**) |
+| `book_prep.py` | `PrepPlan` (rule options + neural step keys + `engine_factory`) and `run_preparation`: rules -> clean-up -> `.debug/prepared_text.txt` + `prep_report.json` |
 | `chunker.py` | chapter text -> sentence-sized chunks (reuses the clause splitter), pause lengths |
 | `narration.py` | `narrate_book`: `TTSEngine` protocol, `ChunkCache` (atomic per-chunk FLAC, key = sha256(engine tag + text)), `synthesize_chunks` (lazy engine, retry, ETA), `assemble_chapters`, `PauseToken`, `NarrationOptions` (formats, bitrates, `allow_aac`, `preprocessors`) |
 | `tts_engine.py` | the real engine `Qwen3AdapterEngine` (qwen-tts + PEFT adapter, voice-clone prompt from `ref_sample.wav`) - **not yet run on a GPU** |
@@ -48,6 +52,7 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 |---|---|
 | `paths.py` | application folders (`%LOCALAPPDATA%\Voxprint`, override `VOXPRINT_HOME`): `models/`, `packages/`, `voices/`, `state/`, `logs/`, `.staging/` |
 | `voice_repository.py` | online voice index (`index.json`, URL configurable, placeholder default) and verified downloads (HTTPS, size cap, SHA-256); never raises to the UI |
+| `text_models.py` | registry of the on-demand text models (`TextModel`, `REGISTRY`: SAGE integrated; RUPunct, en/de spelling, stress, translation, roles = placeholders), `state()` (ready / needs_download / planned), `ensure()` (pinned revision via `model_downloader`), `make_engine`, `build_plan(rule_steps, neural_steps)` |
 | `features.py` | feature flags; today `aac_enabled()` (env `VOXPRINT_ENABLE_AAC` > `state/features.json` > `AAC_DEFAULT`) |
 | `net.py` | HTTPS through the stdlib; retries with certifi roots on `CERTIFICATE_VERIFY_FAILED` |
 | `platform_win.py` | OS check, dark title bar, Acrylic backdrop (all guarded by `sys.platform`) |
@@ -91,12 +96,15 @@ result in the output folder.
 ## 3a. Data flow of narration
 ```
 book file --book_parsers.load_book--> Book(chapters) --chunker.chunk_book--> chunks (sentence-sized, per chapter)
+   book_prep.run_preparation (optional, `NarrationOptions.prep`): text_prep rules -> text_cleanup (SAGE + validator, cached in .cache/cleanup.json) -> prepared Book; debug copy in .debug/
    narration.synthesize_chunks: for each chunk  cache hit?  yes -> reuse   no -> TTSEngine.synthesize (Qwen3AdapterEngine: base model + voice adapter + reference clip) -> ChunkCache (atomic FLAC)
    narration.assemble_chapters: stream chunks into one WAV per chapter, pauses between sentences / paragraphs, a tail after each chapter
    audiobook_export.export_formats: ffmpeg  ->  .opus (chapters in ffmetadata)  /  per-chapter .mp3 + .m3u8  /  .m4b (AAC, only if allowed)  / ...
 ```
 The job folder is `<output>/<book>/` with `.cache/` (chunks) and `.work/` (temporary WAVs); both are removed after success unless `keep_cache` is set. Start after a cancel / crash simply finds the cached chunks again.
 Pause is a `PauseToken` polled between chunks; cancel uses the usual `CancelToken`. Before synthesis the needed ffmpeg encoders are checked so a missing `libopus` / `libmp3lame` / `aac` fails in seconds, not after hours.
+The preparation stage runs inside `narrate_book` before chunking (progress phase `prepare`); exported chapter titles, metadata and the cover come from the *original* book, and the engine-side normalizer is skipped when the "numbers" step already spelled the digits out.
+`.debug/` (prepared text and report) is kept after success, `.cache/` is not. The Narrate window builds the plan from its check boxes (`plan_builder`, injectable) and downloads the clean-up model through `TextModelDownloadWorker`.
 Extension points: `NarrationOptions.preprocessors` (functions applied to each chunk's text - clean-up / translation) and the engine protocol (a different TTS can be injected; the tests use a fake one).
 
 ## 4. Installation, environment and updates
@@ -153,5 +161,5 @@ claim more than its licence gives. Schema 1 (`voice_name`, `speech_seconds`) is 
 * `tests/conftest.py` isolates app-data folders and the language for every test.
 * `tests/test_i18n.py` guards the localization rules; `tests/test_credits.py` keeps `credits.json`, the notices and the installer in sync.
 * The narrator is tested with a fake `TTSEngine` and a fake ffmpeg runner (`tests/test_narration.py`): chunk cache and resume, cancel / pause, ETA, chapter assembly, ffmetadata / m3u8 content, command lines, the AAC flag.
-  Parsers and the chunker: `tests/test_books.py`; the library, licences and repository: `tests/test_voice_*.py`; the windows (navigation, language switch, cards, formats, disclaimer, run / pause / cancel): `tests/test_studio.py`.
+  Text preparation: `tests/test_text_prep.py` (every rule step, ru + en), `tests/test_text_cleanup.py` (validator, cache / resume / cancel, registry, fake download, narration wiring), `tests/test_narrate_prep_ui.py` (check boxes, presets, expanders, model states). Parsers and the chunker: `tests/test_books.py`; the library, licences and repository: `tests/test_voice_*.py`; the windows (navigation, language switch, cards, formats, disclaimer, run / pause / cancel): `tests/test_studio.py`.
 * Windows-only behaviour (Acrylic, real GPU training, the real Qwen3-TTS engine, the real ffmpeg encoders) is verified manually - see the "Tested on Windows" section of the README.
