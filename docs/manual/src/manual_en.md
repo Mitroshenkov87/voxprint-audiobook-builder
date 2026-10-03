@@ -118,9 +118,17 @@ Under the badge a reminder repeats the limit, for example *{{narr.voice_personal
 | {{prep.numbers}} | {{prep.numbers_d}} |
 | {{prep.abbrev}} | {{prep.abbrev_d}} |
 | {{prep.spellfix}} | {{prep.spellfix_d}} It needs a one-time download (a button **{{prep.model_download}}** appears; the model is about 365 MB) and is available for Russian books only. |
-| ▸ {{prep.more}} | Greyed-out ideas for later versions: pauses and punctuation by AI, Russian stress marks, translation before narrating, different voices for characters. They are marked "{{prep.later_tag}}" and do nothing yet. |
+| ▸ {{prep.more}} | Greyed-out ideas for later versions: pauses and punctuation by AI, Russian stress marks, different voices for characters. They are marked "{{prep.later_tag}}" and do nothing yet. |
 
 The rules cover Russian and English fully. For other languages (for example German books) only the language-neutral steps – layout, footnotes, quotes, links – are applied.
+
+### Optional – translate the book
+
+The card **{{narr.translate_title}}** has a check box (*{{narr.translate_check}}*) and a list of target languages. Voxprint detects the language of the book itself and translates it sentence by sentence **offline on your computer** with the open Opus-MT models (English ↔ Russian, English ↔ German; Russian ↔ German goes through English and is slower and less accurate). The models are about 300 MB per direction and are downloaded once, with a SHA-256 check, when you press **{{prep.model_download}}**. A graphics card is used if there is one, otherwise the processor. Chapters, chapter titles, paragraphs, verse lines, scene breaks and therefore the pauses stay as they are; then the usual text preparation runs for the new language and the book is narrated in it – choose a voice of the target language for the best result.
+
+* The translated text is saved next to the audiobook as `translation_xx.txt` (in the folder `Title (xx)`). Open it, read it and edit it; start the same narration again and **your edited text** is narrated. Delete the file to translate anew. Translated sentences are cached, so a stopped job never translates the same sentence twice.
+* *{{narr.translate_note}}*
+* Machine translation is not a human translation: expect wrong names, idioms, tenses and gender; short titles suffer most. Poems lose their rhyme.
 
 ## Step 4 – output format and quality
 
@@ -379,9 +387,10 @@ Out of the box, everything that can run automatically is **already selected** an
 
 * Text preparation (Narrate a book): the seven rule-based steps – layout, footnote marks and page numbers, quotes and dashes, links, chapter headings, numbers in words, abbreviations.
 * AI clean-up of typos (Russian books; one-time download of about 365 MB).
+* Translation of the book before narrating (English, Russian, German; Opus-MT models, about 300 MB per direction, downloaded once).
 * Training window: *{{check.checkbox}}* and *{{preview.compare}}* (both need the speech-recognition model, about 1.9 GB, downloaded once).
 * Always on, without a switch: alignment of the text onto the audio and its plausibility check, the audio quality filter, the recognition filters of the audio-only mode.
-* Not included, because they do not exist yet: punctuation model, stress marks, translation, speaker roles.
+* Not included, because they do not exist yet: punctuation model, stress marks, speaker roles.
 
 The training preset stays at *{{preset.balanced}}* on purpose: in our tests longer training with a higher learning rate made voices babble, so more is not better there. Instead, after **{{preview.compare}}** the better of the two variants is marked **{{auto.recommended}}** (verdict first, then fewer recognition errors, then the smaller pitch shift; with no clear difference variant A, which is cheaper). The choice is still yours: always listen.
 

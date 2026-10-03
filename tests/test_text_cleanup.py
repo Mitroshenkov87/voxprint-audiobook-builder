@@ -137,9 +137,14 @@ def test_registry_is_consistent_and_placeholders_are_marked():
     assert len(keys) == len(set(keys))
     sage = tm.get("sage-ru")
     assert sage.integrated and sage.license == "MIT" and len(sage.revision) == 40 and sage.repo.startswith("ai-forever/")
-    for step in (tm.STEP_STRESS, tm.STEP_TRANSLATE, tm.STEP_ROLES, tm.STEP_PUNCT):
+    for step in (tm.STEP_STRESS, tm.STEP_ROLES, tm.STEP_PUNCT):
         m = tm.for_step(step)
         assert m is not None and not m.integrated and tm.state(m) == tm.STATE_PLANNED
+    # translation: one integrated Opus-MT model per direction, a pinned commit and the SHA-256 of the weights
+    for key, pair in (("opus-ru-en", ("ru", "en")), ("opus-en-ru", ("en", "ru")), ("opus-de-en", ("de", "en")), ("opus-en-de", ("en", "de"))):
+        m = tm.get(key)
+        assert m.integrated and m.pair == pair and len(m.revision) == 40 and m.license in ("CC-BY-4.0", "Apache-2.0")
+        assert len(dict(m.sha256)["pytorch_model.bin"]) == 64 and "pytorch_model.bin" in m.files and tm.translate_model(*pair) is m
     assert tm.for_step(tm.STEP_SPELLFIX, "ru").key == "sage-ru" and tm.for_step(tm.STEP_SPELLFIX, "en").key == "spell-en"
 
 

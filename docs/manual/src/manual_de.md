@@ -118,9 +118,17 @@ Unter dem Badge wiederholt ein Hinweis die Einschränkung, zum Beispiel: „{{na
 | {{prep.numbers}} | {{prep.numbers_d}} |
 | {{prep.abbrev}} | {{prep.abbrev_d}} |
 | {{prep.spellfix}} | {{prep.spellfix_d}} Es braucht einen einmaligen Download (eine Schaltfläche **{{prep.model_download}}** erscheint; das Modell ist etwa 365 MB groß) und gilt nur für russische Bücher. |
-| ▸ {{prep.more}} | Ausgegraute Ideen für spätere Versionen: Pausen und Zeichensetzung per KI, russische Betonungszeichen, Übersetzung vor der Vertonung, verschiedene Stimmen für Figuren. Sie sind mit „{{prep.later_tag}}“ markiert und tun noch nichts. |
+| ▸ {{prep.more}} | Ausgegraute Ideen für spätere Versionen: Pausen und Zeichensetzung per KI, russische Betonungszeichen, verschiedene Stimmen für Figuren. Sie sind mit „{{prep.later_tag}}“ markiert und tun noch nichts. |
 
 Die Regeln decken Russisch und Englisch vollständig ab. Für andere Sprachen (zum Beispiel deutsche Bücher) werden nur die sprachneutralen Schritte angewendet – Layout, Fußnoten, Anführungszeichen, Links.
+
+### Optional – Buch übersetzen
+
+Die Karte **{{narr.translate_title}}** hat ein Kontrollkästchen (*{{narr.translate_check}}*) und eine Liste der Zielsprachen. Voxprint erkennt die Sprache des Buchs selbst und übersetzt es satzweise **offline auf Ihrem Computer** mit den offenen Opus-MT-Modellen (Englisch ↔ Russisch, Englisch ↔ Deutsch; Russisch ↔ Deutsch läuft über Englisch, langsamer und ungenauer). Die Modelle sind etwa 300 MB pro Richtung groß und werden einmal heruntergeladen, mit SHA-256-Prüfung, wenn Sie **{{prep.model_download}}** drücken. Eine Grafikkarte wird genutzt, falls vorhanden, sonst der Prozessor. Kapitel, Kapitelüberschriften, Absätze, Gedichtzeilen, Szenenwechsel und damit die Pausen bleiben erhalten; danach läuft die übliche Textvorbereitung für die neue Sprache und das Buch wird darin gesprochen – wählen Sie für das beste Ergebnis eine Stimme der Zielsprache.
+
+* Der übersetzte Text wird neben dem Hörbuch als `translation_xx.txt` gespeichert (im Ordner `Titel (xx)`). Öffnen, lesen und bearbeiten Sie ihn; starten Sie dieselbe Vertonung erneut, wird **Ihre bearbeitete Fassung** gesprochen. Löschen Sie die Datei, um neu zu übersetzen. Übersetzte Sätze werden zwischengespeichert, ein abgebrochener Auftrag übersetzt also keinen Satz doppelt.
+* *{{narr.translate_note}}*
+* Maschinelle Übersetzung ist keine menschliche Übersetzung: Namen, Redewendungen, Zeiten und Geschlecht können falsch sein; kurze Überschriften leiden am meisten. Gedichte verlieren den Reim.
 
 ## Schritt 4 – Ausgabeformat und Qualität
 
@@ -381,7 +389,7 @@ Ab Werk ist alles, was automatisch laufen kann, **bereits gewählt** und mit ein
 * KI-Korrektur von Tippfehlern (russische Bücher; einmaliger Download von etwa 365 MB).
 * Trainingsfenster: „{{check.checkbox}}“ und „{{preview.compare}}“ (beide brauchen das Spracherkennungsmodell, etwa 1,9 GB, einmal geladen).
 * Immer aktiv, ohne Schalter: Ausrichtung des Textes auf das Audio mit Plausibilitätsprüfung, Audio-Qualitätsfilter, Erkennungsfilter des Nur-Audio-Modus.
-* Nicht enthalten, weil es sie noch nicht gibt: Zeichensetzungsmodell, Betonungszeichen, Übersetzung, Sprecherrollen.
+* Nicht enthalten, weil es sie noch nicht gibt: Zeichensetzungsmodell, Betonungszeichen, Sprecherrollen.
 
 Die Trainingsvorgabe bleibt absichtlich bei „{{preset.balanced}}“: In unseren Tests ließ längeres Training mit höherer Lernrate die Stimme nuscheln, mehr ist dort also nicht besser. Stattdessen wird nach „{{preview.compare}}“ die bessere der beiden Varianten als „{{auto.recommended}}“ markiert (zuerst das Urteil, dann weniger Erkennungsfehler, dann die kleinere Tonhöhenabweichung; ohne klaren Unterschied Variante A, die günstiger ist). Die Entscheidung bleibt bei Ihnen: Hören Sie immer hin.
 

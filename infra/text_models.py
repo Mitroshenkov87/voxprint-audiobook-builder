@@ -11,11 +11,15 @@ file sizes.
 """
 from __future__ import annotations
 
+import hashlib
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
+from core.errors import ModelDownloadError
 from core.events import ProgressCallback, noop_progress
+from core.i18n import tr
 from infra import model_downloader as md
 
 KIND_CLEANUP, KIND_PUNCT, KIND_STRESS, KIND_TRANSLATE, KIND_ROLES = "cleanup", "punct", "stress", "translate", "roles"
@@ -38,12 +42,21 @@ class TextModel:
     size_mb: int
     license: str
     integrated: bool                # True = code exists (engine + validator + tests); False = placeholder
+    #: ``((file, sha256), ...)``: files whose SHA-256 is checked after the download (a mismatch deletes the model).
+    sha256: Tuple[Tuple[str, str], ...] = ()
+    #: Glob patterns of the files to download ("" = the whole repository).
+    files: Tuple[str, ...] = ()
+    pair: Tuple[str, str] = ("", "")   # translation models: (source, target) language
 
     @property
     def local_dir(self) -> Path:
         """Folder inside the models directory."""
         return md.local_dir_for(self.repo)
 
+
+#: Files of an Opus-MT repository that are needed (the repositories also hold TF / Rust / Flax copies of the weights).
+OPUS_FILES: Tuple[str, ...] = ("config.json", "generation_config.json", "tokenizer_config.json", "vocab.json", "source.spm",
+                               "target.spm", "pytorch_model.bin")
 
 REGISTRY: Tuple[TextModel, ...] = (
     TextModel("sage-ru", KIND_CLEANUP, STEP_SPELLFIX, "SAGE FRED-T5 distilled 95M", ("ru",),
@@ -54,8 +67,18 @@ REGISTRY: Tuple[TextModel, ...] = (
     TextModel("spell-de", KIND_CLEANUP, STEP_SPELLFIX, "German spelling correction", ("de",),
               "oliverguhr/spelling-correction-german-base", "", 950, "Apache-2.0", False),
     TextModel("stress-ru", KIND_STRESS, STEP_STRESS, "Russian stress marks and the letter yo", ("ru",), "", "", 0, "", False),
-    TextModel("translate-opus", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT (ru<->en, de<->en)", ("ru", "en", "de"),
-              "Helsinki-NLP/opus-mt-ru-en", "", 300, "CC-BY-4.0", False),
+    TextModel("opus-ru-en", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT ru -> en", ("ru", "en"), "Helsinki-NLP/opus-mt-ru-en",
+              "fbd6dc73284f95536648512cc21d57f19191961a", 300, "CC-BY-4.0", True,
+              (("pytorch_model.bin", "535450eb5613f3cc912f9ca3e54cfef6c14d201b319c24a88faf776a65538b5d"),), OPUS_FILES, ("ru", "en")),
+    TextModel("opus-en-ru", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT en -> ru", ("en", "ru"), "Helsinki-NLP/opus-mt-en-ru",
+              "bb09c99d180016eac6819df3dae68edb1690fdee", 300, "Apache-2.0", True,
+              (("pytorch_model.bin", "d15fa58c6bc3efd3629c1b6b86d9aa6d15d2751a4620aa4cdd7eed7b5cbe583b"),), OPUS_FILES, ("en", "ru")),
+    TextModel("opus-de-en", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT de -> en", ("de", "en"), "Helsinki-NLP/opus-mt-de-en",
+              "1a922f3b32a8e809e17a47d4b32142d8105924e5", 295, "Apache-2.0", True,
+              (("pytorch_model.bin", "e743c3070f61f477cb62fe95ef2c9be2e77f3e488cb6b8030ff8a19e8295c87d"),), OPUS_FILES, ("de", "en")),
+    TextModel("opus-en-de", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT en -> de", ("en", "de"), "Helsinki-NLP/opus-mt-en-de",
+              "6183067f769a302e3861815543b9f312c71b0ca4", 295, "CC-BY-4.0", True,
+              (("pytorch_model.bin", "da068344b1b0c20e6d4a8f77f48e06646b90d679029006b18579e68977206bdd"),), OPUS_FILES, ("en", "de")),
     TextModel("translate-madlad", KIND_TRANSLATE, STEP_TRANSLATE, "MADLAD-400 3B (CTranslate2 int8)", ("ru", "en", "de", "uk", "be"),
               "", "", 2950, "Apache-2.0", False),
     TextModel("roles", KIND_ROLES, STEP_ROLES, "Speaker / role markup", (), "", "", 0, "", False),
@@ -88,7 +111,25 @@ def ensure(model: TextModel, progress: ProgressCallback = noop_progress, **kw) -
     """Download the model if needed (pinned revision) and return its folder."""
     if not model.integrated or not model.repo:
         raise ValueError(f"{model.key} is a placeholder")
-    return md.ensure_model(model.repo, progress, revision=model.revision or None, reuse_external=False, **kw)
+    path = md.ensure_model(model.repo, progress, revision=model.revision or None, reuse_external=False,
+                           allow_patterns=list(model.files) or None, **kw)
+    for name, digest in model.sha256:
+        if sha256_of(path / name) != digest:
+            shutil.rmtree(path, ignore_errors=True)               # a corrupt or tampered download is never kept
+            raise ModelDownloadError(tr("err.model_hash", short=model.repo.split("/")[-1]), url=md.hf_url(model.repo))
+    return path
+
+
+def sha256_of(path: Path) -> str:
+    """SHA-256 of a file ("" if it cannot be read)."""
+    h = hashlib.sha256()
+    try:
+        with open(path, "rb") as f:
+            for block in iter(lambda: f.read(1 << 20), b""):
+                h.update(block)
+    except OSError:
+        return ""
+    return h.hexdigest()
 
 
 def make_engine(model: TextModel, device: str = ""):
@@ -115,3 +156,40 @@ def build_plan(rule_steps, neural_steps=frozenset()):
 
     neural = frozenset(neural_steps) & {STEP_SPELLFIX}                 # only integrated neural steps can run
     return PrepPlan(PrepOptions(frozenset(rule_steps)), neural, cleanup_engine_for if neural else None)
+
+
+# --------------------------------------------------------------------------- translation (Opus-MT)
+def translate_model(source: str, target: str) -> Optional[TextModel]:
+    """The integrated Opus-MT model of one direction, or ``None``."""
+    for m in REGISTRY:
+        if m.kind == KIND_TRANSLATE and m.integrated and m.pair == (source, target):
+            return m
+    return None
+
+
+def translate_models(source: str, target: str) -> List[TextModel]:
+    """Models of every hop from ``source`` to ``target`` (``[]`` for the same language; ``ValueError`` if unsupported)."""
+    from core import translate as tl
+
+    try:
+        hops = tl.route(source, target)
+    except tl.TranslateError as exc:
+        raise ValueError(str(exc)) from exc
+    return [m for m in (translate_model(s, t) for s, t in hops) if m is not None]
+
+
+def make_translator(source: str, target: str, device: str = ""):
+    """Translator of one direction if its model is downloaded, else ``None``."""
+    from core.translate import MarianEngine
+
+    m = translate_model(source, target)
+    if m is None or state(m) != STATE_READY:
+        return None
+    return MarianEngine(m.local_dir, m.revision, source, target, device)
+
+
+def build_translate_plan(target: str, source: str = ""):
+    """:class:`core.translate.TranslatePlan` for the UI selection (``None`` if no target language is chosen)."""
+    from core.translate import TranslatePlan
+
+    return TranslatePlan(target, source, make_translator) if target else None

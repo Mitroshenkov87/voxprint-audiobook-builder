@@ -72,6 +72,39 @@
    }
   },
   {
+   "id": "opus-mt",
+   "name": "Opus-MT translation models (Helsinki-NLP/opus-mt-ru-en, en-ru, de-en, en-de)",
+   "kind": "model",
+   "ship": "download",
+   "license": "CC-BY-4.0 / Apache-2.0",
+   "license_files": [
+    "CC-BY-4.0",
+    "Apache-2.0"
+   ],
+   "url": "https://huggingface.co/Helsinki-NLP",
+   "purpose": {
+    "en": "Optional offline machine translation of a book before narration (English, Russian, German; downloaded on request, about 300 MB per direction). Credit: OPUS-MT, University of Helsinki / Helsinki-NLP (Tiedemann and Thottingal, 2020). Machine translation quality varies.",
+    "de": "Optionale Offline-Maschinenübersetzung eines Buchs vor dem Vorlesen (Englisch, Russisch, Deutsch; auf Wunsch geladen, ca. 300 MB je Richtung). Quelle: OPUS-MT, Universität Helsinki / Helsinki-NLP (Tiedemann und Thottingal, 2020). Die Qualität maschineller Übersetzung schwankt.",
+    "ru": "Необязательный офлайн-машинный перевод книги перед озвучиванием (английский, русский, немецкий; загружается по запросу, около 300 МБ на направление). Авторы: OPUS-MT, Хельсинкский университет / Helsinki-NLP (Tiedemann и Thottingal, 2020). Качество машинного перевода бывает разным."
+   }
+  },
+  {
+   "id": "sentencepiece",
+   "name": "SentencePiece",
+   "kind": "library",
+   "ship": "bundled",
+   "license": "Apache-2.0",
+   "license_files": [
+    "sentencepiece"
+   ],
+   "url": "https://github.com/google/sentencepiece",
+   "purpose": {
+    "en": "Text tokenizer of the Opus-MT translation models",
+    "de": "Text-Tokenisierer der Opus-MT-Übersetzungsmodelle",
+    "ru": "Токенизатор текста для моделей перевода Opus-MT"
+   }
+  },
+  {
    "id": "qwen-tts",
    "name": "qwen-tts",
    "kind": "library",

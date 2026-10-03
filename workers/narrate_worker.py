@@ -151,3 +151,33 @@ class TextModelDownloadWorker(QThread):
             self.failed.emit(str(exc))
             return
         self.done.emit(self.model.key)
+
+
+class TextModelsDownloadWorker(QThread):
+    """Downloads several text models one after another (the hops of a translation).
+
+    Signals: ``progress(fraction of all)``, ``done(keys)``, ``failed(message)``."""
+
+    progress = Signal(float)
+    done = Signal(str)
+    failed = Signal(str)
+
+    def __init__(self, models: list, ensure: Callable[..., Any], parent=None) -> None:
+        """``ensure(model, progress)`` is :func:`infra.text_models.ensure` (injectable for tests)."""
+        super().__init__(parent)
+        self.models, self.ensure = list(models), ensure
+
+    def run(self) -> None:  # noqa: D401
+        """Thread body."""
+        n = max(1, len(self.models))
+        try:
+            for i, model in enumerate(self.models):
+                self.ensure(model, lambda stage, f, msg="", i=i: self.progress.emit((i + float(f)) / n))
+        except DatasetMakerError as exc:
+            self.failed.emit(exc.user_message)
+            return
+        except Exception as exc:  # noqa: BLE001 - network / disk errors of any kind
+            log.exception("translation model download failed")
+            self.failed.emit(str(exc))
+            return
+        self.done.emit(",".join(m.key for m in self.models))

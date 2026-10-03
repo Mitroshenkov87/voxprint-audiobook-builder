@@ -40,7 +40,23 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 * Status: downloaded on first start
 * Licence text: [`licenses/sage-fredt5.txt`](licenses/sage-fredt5.txt)
 
+### Opus-MT translation models (Helsinki-NLP/opus-mt-ru-en, en-ru, de-en, en-de)
+
+* Purpose: Optional offline machine translation of a book before narration (English, Russian, German; downloaded on request, about 300 MB per direction). Credit: OPUS-MT, University of Helsinki / Helsinki-NLP (Tiedemann and Thottingal, 2020). Machine translation quality varies.
+* Licence: CC-BY-4.0 / Apache-2.0
+* Project: <https://huggingface.co/Helsinki-NLP>
+* Status: downloaded on first start
+* Licence text: [`licenses/CC-BY-4.0.txt`](licenses/CC-BY-4.0.txt), [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt)
+
 ## Libraries and programs shipped with Voxprint
+
+### SentencePiece
+
+* Purpose: Text tokenizer of the Opus-MT translation models
+* Licence: Apache-2.0
+* Project: <https://github.com/google/sentencepiece>
+* Status: bundled
+* Licence text: [`licenses/sentencepiece.txt`](licenses/sentencepiece.txt)
 
 ### qwen-tts
 

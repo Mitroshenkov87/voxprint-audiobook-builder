@@ -104,6 +104,7 @@ result in the output folder.
 ## 3a. Data flow of narration
 ```
 book file --book_parsers.load_book--> Book(chapters) --chunker.chunk_book--> chunks (sentence-sized, per chapter)
+   translate.ensure_translation (optional, `NarrationOptions.translate`): Opus-MT per sentence (cache + translation_<lang>.txt in `<book> (<lang>)/`, `.translation/`) -> translated Book, target language narrated
    book_prep.run_preparation (optional, `NarrationOptions.prep`): text_prep rules -> text_cleanup (SAGE + validator, cached in .cache/cleanup.json) -> prepared Book; debug copy in .debug/
    narration.synthesize_chunks: for each chunk  cache hit?  yes -> reuse   no -> TTSEngine.synthesize_batch (or synthesize) (Qwen3AdapterEngine: base model + voice adapter + reference clip) -> ChunkCache (atomic FLAC)
    narration.assemble_chapters: stream chunks into one WAV per chapter, pauses between sentences / paragraphs, a tail after each chapter

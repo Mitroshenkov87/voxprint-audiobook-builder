@@ -1,5 +1,6 @@
 {
   "Apache-2.0": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/Apache-2.0.txt",
+  "CC-BY-4.0": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/CC-BY-4.0.txt",
   "CC-BY-NC-4.0": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/CC-BY-NC-4.0.txt",
   "CC0-1.0": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/CC0-1.0.txt",
   "MPL-2.0": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/MPL-2.0.txt",
@@ -38,6 +39,7 @@
   "safetensors": "https://raw.githubusercontent.com/huggingface/safetensors/main/LICENSE",
   "sage-fredt5": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/MIT.txt",
   "scipy": "https://raw.githubusercontent.com/scipy/scipy/main/LICENSE.txt",
+  "sentencepiece": "https://raw.githubusercontent.com/google/sentencepiece/master/LICENSE",
   "soundfile": "https://raw.githubusercontent.com/bastibe/python-soundfile/master/LICENSE",
   "sox": "https://raw.githubusercontent.com/rabitt/pysox/master/LICENSE",
   "tabler-icons": "https://raw.githubusercontent.com/tabler/tabler-icons/main/LICENSE",

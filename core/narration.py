@@ -16,8 +16,10 @@ is :mod:`core.tts_engine` and unit tests use a fake one.
 
 **Preparation** (``options.prep``, see :mod:`core.book_prep`): before chunking, the whole book goes through the automatic
 rule-based steps and the optional neural clean-up; the prepared text is saved to ``<job>/.debug/``.  Chapter titles in
-the exported files keep their original spelling.  Extension points (deliberately not implemented yet): the
-``preprocessors`` option (a per-chunk ``text -> text`` hook, e.g. translation) and ``Chunk``-level voice selection for
+the exported files keep their original spelling.  **Translation** (``options.translate``, :mod:`core.translate`) comes first:
+the book is translated sentence by sentence (cached; the readable result is ``<job>/translation_<lang>.txt``), the job
+folder gets the suffix `` (<lang>)`` and the target language is narrated.  Extension points (deliberately not implemented
+yet): the ``preprocessors`` option (a per-chunk ``text -> text`` hook) and ``Chunk``-level voice selection for
 multi-voice role markup (all chunks currently use the job's voice).
 """
 from __future__ import annotations
@@ -40,6 +42,7 @@ from core import audiobook_export as ex
 from core.audio_utils import resample
 from core.book_parsers import Book
 from core.book_prep import PrepPlan, run_preparation
+from core import translate as tl
 from core import pauses as pz
 from core.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_book
 from core.errors import CancelledByUser, DatasetMakerError, NarrationError
@@ -108,6 +111,8 @@ class NarrationOptions:
     #: Explicit silence between the pieces (comma, sentence, ellipsis, dash, paragraph, chapter ...), independent of the model's
     #: prosody (:mod:`core.pauses`).  ``None`` = the earlier packed chunks with fixed pauses.
     pauses: Optional[pz.PauseProfile] = field(default_factory=pz.PauseProfile)
+    #: Machine translation of the book before narration (:mod:`core.translate`); ``None`` = narrate the book as it is.
+    translate: Optional[tl.TranslatePlan] = None
 
 
 @dataclass
@@ -408,7 +413,13 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
     formats = [f for f in ex.ALL_FORMATS if f in options.formats] or list(ex.DEFAULT_FORMATS)
     if ex.FORMAT_M4B in formats and not options.allow_aac:
         raise NarrationError(tr("err.narration_aac_disabled"))
-    job_dir = Path(out_dir) / ex.safe_filename(book.title, 100, fallback="audiobook")
+    tplan = options.translate if (options.translate is not None and options.translate.enabled) else None
+    if tplan is not None and (tplan.source or tl.detect_book_language(book)) == tplan.target:
+        tplan = None                                          # the book is already in the chosen language
+    folder = ex.safe_filename(book.title, 100, fallback="audiobook")
+    if tplan is not None:
+        folder = ex.safe_filename(f"{book.title} ({tplan.target})", 100, fallback="audiobook")   # next to, not over, the original
+    job_dir = Path(out_dir) / folder
     job_dir.mkdir(parents=True, exist_ok=True)
     if ex.required_encoders(formats):
         if not ffmpeg:
@@ -417,7 +428,13 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
         if missing:
             raise NarrationError(tr("err.narration_encoder", encoder=", ".join(missing)))
 
-    source_book = book                                        # original titles go into the exported files
+    if tplan is not None:
+        progress(NarrationProgress(0, 1, None, tr("narr.translating", pct=0), "prepare"))
+        book, _src = tl.ensure_translation(
+            book, tplan, job_dir, cancel=cancel, only=set(chapters) if chapters else None,
+            progress=lambda f, m: progress(NarrationProgress(int(f * 100), 100, None, m, "prepare")))
+        language = tl.LANGUAGE_NAMES.get(tplan.target, language)      # narrate with the target language
+    source_book = book                                        # titles of the exported files (translated ones when translating)
     plan = options.prep
     if plan is not None and plan.enabled:
         progress(NarrationProgress(0, 1, None, tr("narr.preparing"), "prepare"))

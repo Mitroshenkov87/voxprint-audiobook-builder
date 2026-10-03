@@ -22,6 +22,7 @@ hf_xet                                  # fast model downloads from HF (on Windo
 # ==4.57.3 - they conflict with each other), and transformers 5.x breaks them -> stay on 4.x.
 transformers>=4.57.6,<5
 huggingface_hub>=0.34,<1.0              # transformers 4.57 requires huggingface-hub<1.0
+sentencepiece                           # tokenizer of the Opus-MT translation models (MarianTokenizer)
 accelerate>=1.12
 peft>=0.17                              # tested: 0.18.1 (as in Alexandria) and 0.21.2
 bitsandbytes>=0.46                      # 8-bit AdamW (wheels exist for Windows); without it plain AdamW is used

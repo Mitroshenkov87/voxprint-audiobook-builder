@@ -33,6 +33,8 @@ from core import pauses as pz
 from core import text_prep
 from core.book_parsers import SUPPORTED_EXTENSIONS, Book, load_book
 from core.errors import DatasetMakerError
+from core import num_words as nw
+from core import translate as tl
 from core import voice_info
 from core.i18n import tr
 from core.voice_library import VoiceLibrary
@@ -43,7 +45,7 @@ from ui.main_window import mark_recommended, open_folder, recommended_text
 from ui.mini_player import MiniPlayer
 from ui.voices_window import make_badge, make_scope_badge
 from ui.window_base import SubWindow, card_frame, fit_to_screen, hint_label
-from workers.narrate_worker import NarrateWorker, RepoDownloadWorker, RepoIndexWorker, TextModelDownloadWorker
+from workers.narrate_worker import NarrateWorker, RepoDownloadWorker, RepoIndexWorker, TextModelDownloadWorker, TextModelsDownloadWorker
 from workers.narration_runner import NarrationJob, default_output_dir, format_eta, run_narration
 
 log = logging.getLogger("voxprint.ui.narrate")
@@ -57,8 +59,7 @@ CHARS_PER_SECOND = 14.0         # rough speaking rate used for the "about N hour
 RULE_STEPS: Tuple[str, ...] = (text_prep.STEP_LAYOUT, text_prep.STEP_NOISE, text_prep.STEP_QUOTES, text_prep.STEP_LINKS,
                                text_prep.STEP_HEADINGS, text_prep.STEP_NUMBERS, text_prep.STEP_ABBREV)
 #: Steps that are only announced (no code yet): greyed out in the collapsed "coming later" list.
-LATER_STEPS: Tuple[str, ...] = (text_models.STEP_PUNCT, text_models.STEP_STRESS, text_models.STEP_TRANSLATE,
-                                text_models.STEP_ROLES)
+LATER_STEPS: Tuple[str, ...] = (text_models.STEP_PUNCT, text_models.STEP_STRESS, text_models.STEP_ROLES)
 SPELLFIX_MODEL = "sage-ru"      # registry key of the model behind the "fix typos" step
 SAMPLE_CHARS = 420              # length of the prepared-text sample
 
@@ -77,12 +78,16 @@ def prep_texts() -> Dict[str, Tuple[str, str]]:
     }
 
 
+def language_names() -> Dict[str, str]:
+    """``{code: name}`` of the translation languages in the UI language."""
+    return {"en": tr("narr.translate_lang_en"), "ru": tr("narr.translate_lang_ru"), "de": tr("narr.translate_lang_de")}
+
+
 def later_texts() -> Dict[str, str]:
     """``{step: name}`` of the announced (not yet available) steps."""
     return {
         text_models.STEP_PUNCT: tr("prep.later_punct"),
         text_models.STEP_STRESS: tr("prep.later_stress"),
-        text_models.STEP_TRANSLATE: tr("prep.later_translate"),
         text_models.STEP_ROLES: tr("prep.later_roles"),
     }
 
@@ -115,6 +120,7 @@ class NarrateWindow(SubWindow):
                  auto_open_folder: bool = True, model_state: Callable[[Any], str] = text_models.state,
                  model_ensure: Callable[..., Any] = text_models.ensure,
                  plan_builder: Callable[..., Any] = text_models.build_plan,
+                 translate_plan_builder: Callable[..., Any] = text_models.build_translate_plan,
                  fetch: Callable[..., Any] = repo.fetch_index, download: Callable[..., Any] = repo.download_voice,
                  auto_refresh: bool = True, player_backend: Any = None) -> None:
         """Build the window.  ``runner``, the file pickers and the text-model hooks (``model_state(model)``,
@@ -134,6 +140,10 @@ class NarrateWindow(SubWindow):
         self.aac_allowed = features.aac_enabled() if aac_allowed is None else aac_allowed
         self.auto_open_folder = auto_open_folder
         self.model_state, self.model_ensure, self.plan_builder = model_state, model_ensure, plan_builder
+        self.translate_plan_builder = translate_plan_builder
+        self.tr_worker: Optional[TextModelsDownloadWorker] = None
+        self._tr_msg = ""
+        self._tr_src_cache: Tuple[int, str] = (0, "")
         self.book: Optional[Book] = None
         self.book_path: Optional[Path] = None
         self.worker: Optional[NarrateWorker] = None
@@ -282,6 +292,45 @@ class NarrateWindow(SubWindow):
         self.more_prep_box.setVisible(False)
         v.addWidget(self.more_prep_box)
         self.btn_more_prep.toggled.connect(self._on_more_prep_toggled)
+        self.body.addWidget(c)
+
+        # --- translate the book (optional) ---
+        c = card_frame()
+        v = QVBoxLayout(c)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(6)
+        self.lbl_tr_title = QLabel()
+        self.lbl_tr_title.setObjectName("sectiontitle")
+        v.addWidget(self.lbl_tr_title)
+        trow = QHBoxLayout()
+        self.chk_translate = QCheckBox()
+        self.cmb_translate = QComboBox()
+        for code in tl.LANGUAGES:
+            self.cmb_translate.addItem(code, code)
+        trow.addWidget(self.chk_translate)
+        trow.addWidget(self.cmb_translate)
+        trow.addStretch(1)
+        v.addLayout(trow)
+        self.tr_box = QWidget()
+        tv = QVBoxLayout(self.tr_box)
+        tv.setContentsMargins(26, 0, 0, 0)
+        tv.setSpacing(4)
+        srow = QHBoxLayout()
+        self.lbl_tr_state = QLabel()
+        self.lbl_tr_state.setObjectName("cardnote")
+        self.lbl_tr_state.setWordWrap(True)
+        self.btn_tr_download = QPushButton()
+        srow.addWidget(self.lbl_tr_state, 1)
+        srow.addWidget(self.btn_tr_download)
+        tv.addLayout(srow)
+        self.lbl_tr_voice = hint_label()
+        tv.addWidget(self.lbl_tr_voice)
+        v.addWidget(self.tr_box)
+        self.lbl_tr_note = hint_label()
+        v.addWidget(self.lbl_tr_note)
+        self.chk_translate.toggled.connect(lambda _c: self._refresh_buttons())
+        self.cmb_translate.currentIndexChanged.connect(lambda _i: self._refresh_buttons())
+        self.btn_tr_download.clicked.connect(self.download_translate_models)
         self.body.addWidget(c)
 
         # --- output format and quality ---
@@ -495,6 +544,12 @@ class NarrateWindow(SubWindow):
         self.lbl_later_note.setText(tr("prep.later_note"))
         self._on_more_prep_toggled(self.btn_more_prep.isChecked())
         self._refresh_model_row()
+        self.lbl_tr_title.setText(tr("narr.translate_title"))
+        self.chk_translate.setText(tr("narr.translate_check"))
+        for i, code in enumerate(tl.LANGUAGES):
+            self.cmb_translate.setItemText(i, language_names()[code])
+        self.btn_tr_download.setText(tr("prep.model_download"))
+        self.lbl_tr_note.setText(tr("narr.translate_note"))
         self.lbl_format_title.setText(tr("narr.format"))
         self.lbl_quality.setText(tr("narr.quality"))
         self.preset_buttons["compact"].setText(tr("narr.preset_compact"))
@@ -690,6 +745,121 @@ class NarrateWindow(SubWindow):
         self._model_msg = tr("prep.model_failed", error=message)
         self._refresh_model_row()
 
+    # ------------------------------------------------------------------ translation
+    def translate_target(self) -> str:
+        """Language code chosen in the "Translate to" list."""
+        return str(self.cmb_translate.currentData() or "")
+
+    def book_source_language(self) -> str:
+        """Detected language of the loaded book (``""`` = unknown / not supported); cached per book."""
+        if self.book is None:
+            return ""
+        if self._tr_src_cache[0] != id(self.book):
+            self._tr_src_cache = (id(self.book), tl.detect_book_language(self.book))
+        return self._tr_src_cache[1]
+
+    def translate_models_needed(self) -> list:
+        """Registry models of the translation hops (``[]`` if not applicable or the pair is unsupported)."""
+        src, dst = self.book_source_language(), self.translate_target()
+        if not src or not dst or src == dst:
+            return []
+        try:
+            return text_models.translate_models(src, dst)
+        except ValueError:
+            return []
+
+    def _translate_status(self) -> str:
+        """``off`` | ``same`` | ``unsupported`` | ``needs_model`` | ``ready`` for the current selection."""
+        if not self.chk_translate.isChecked() or self.book is None:
+            return "off"
+        src, dst = self.book_source_language(), self.translate_target()
+        if src == dst:
+            return "same"
+        if not self.translate_models_needed():
+            return "unsupported"
+        if any(self.model_state(m) != text_models.STATE_READY for m in self.translate_models_needed()):
+            return "needs_model"
+        return "ready"
+
+    def _translate_ok(self) -> bool:
+        """False while translation is wanted but cannot run (unsupported source, model not downloaded yet)."""
+        return self._translate_status() in ("off", "same", "ready")
+
+    def translate_plan(self):
+        """The :class:`core.translate.TranslatePlan` for the job, or ``None`` (off, same language, not possible)."""
+        if self._translate_status() != "ready":
+            return None
+        return self.translate_plan_builder(self.translate_target(), self.book_source_language())
+
+    def _refresh_translate_row(self) -> None:
+        """Texts and the Download button of the translation card."""
+        on = self.chk_translate.isChecked()
+        self.tr_box.setVisible(on)
+        status = self._translate_status()
+        src, dst = self.book_source_language(), self.translate_target()
+        name = lambda code: language_names().get(code, code or "?")   # noqa: E731
+        models = self.translate_models_needed()
+        downloading = bool(self.tr_worker and self.tr_worker.isRunning())
+        if status == "same":
+            msg = tr("narr.translate_same")
+        elif status == "unsupported":
+            msg = tr("narr.translate_unsupported", source=name(src))
+        elif self._tr_msg:
+            msg = self._tr_msg
+        elif status == "needs_model":
+            missing = [m for m in models if self.model_state(m) != text_models.STATE_READY]
+            msg = tr("narr.translate_needs", size=sum(m.size_mb for m in missing))
+        elif status == "ready":
+            msg = tr("narr.translate_ready")
+        else:
+            msg = ""
+        if status in ("ready", "needs_model") and len(models) > 1:
+            msg += "  " + tr("narr.translate_pivot", source=name(src), target=name(dst))
+        if status in ("ready", "needs_model") and src:
+            msg = tr("narr.translate_detected", lang=name(src)) + "  " + msg
+        self.lbl_tr_state.setText(msg)
+        self.btn_tr_download.setVisible(status == "needs_model")
+        self.btn_tr_download.setEnabled(not downloading and not self.busy)
+        rec = self.library.get(self.selected_voice_id()) if self.selected_voice_id() else None
+        vlang = nw.lang_code(rec.language) if rec is not None and rec.language else ""
+        note = ""
+        if on and status in ("ready", "needs_model") and rec is not None and vlang and vlang != dst:
+            note = tr("narr.translate_voice", voice=name(vlang), target=name(dst))
+        self.lbl_tr_voice.setText(note)
+        self.lbl_tr_voice.setVisible(bool(note))
+
+    def download_translate_models(self) -> bool:
+        """Download the missing translation models one after another; returns False if nothing was started."""
+        if self.tr_worker and self.tr_worker.isRunning():
+            return False
+        missing = [m for m in self.translate_models_needed() if self.model_state(m) != text_models.STATE_READY]
+        if not missing:
+            return False
+        w = TextModelsDownloadWorker(missing, self.model_ensure, parent=self)
+        w.progress.connect(self._on_tr_progress)
+        w.done.connect(self._on_tr_done)
+        w.failed.connect(self._on_tr_failed)
+        self.tr_worker = w
+        self._tr_msg = tr("prep.model_downloading", pct=0)
+        w.start()
+        self._refresh_translate_row()
+        return True
+
+    def _on_tr_progress(self, fraction: float) -> None:
+        """Download progress of the translation models."""
+        self._tr_msg = tr("prep.model_downloading", pct=int(fraction * 100))
+        self.lbl_tr_state.setText(self._tr_msg)
+
+    def _on_tr_done(self, _keys: str) -> None:
+        """The models are on disk: the translation can be used."""
+        self._tr_msg = ""
+        self._refresh_buttons()
+
+    def _on_tr_failed(self, message: str) -> None:
+        """The download failed: the message is shown, the button stays for a retry."""
+        self._tr_msg = tr("prep.model_failed", error=message)
+        self._refresh_translate_row()
+
     def sample_text(self) -> str:
         """The prepared version of the first paragraph the rules change (else of the first paragraph)."""
         if not self.book:
@@ -859,7 +1029,8 @@ class NarrateWindow(SubWindow):
         return nr.NarrationOptions(
             formats=self.selected_formats(), bitrates=self.bitrates(),
             speak_titles=self.chk_titles.isChecked(), allow_aac=self.aac_allowed, pauses=self.pause_profile(),
-            prep=self.plan_builder(self.selected_rule_steps(), self.selected_neural_steps()))
+            prep=self.plan_builder(self.selected_rule_steps(), self.selected_neural_steps()),
+            translate=self.translate_plan())
 
     # ------------------------------------------------------------------ state
     @property
@@ -875,6 +1046,7 @@ class NarrateWindow(SubWindow):
         """Enable/disable controls from the current state."""
         busy = self.busy
         ready = bool(self.book and self.selected_voice_id() and self.selected_formats()) and not busy
+        ready = ready and self._translate_ok()
         self.btn_start.setEnabled(ready)
         self.btn_book.setEnabled(not busy)
         self.btn_out.setEnabled(not busy)
@@ -882,7 +1054,10 @@ class NarrateWindow(SubWindow):
             if chk is not self.prep_checks[text_models.STEP_SPELLFIX]:
                 chk.setEnabled(not busy)
         self._refresh_model_row()
+        self._refresh_translate_row()
         self._sync_preset()
+        self.chk_translate.setEnabled(not busy)
+        self.cmb_translate.setEnabled(not busy)
         self.cmb_voice.setEnabled(not busy)
         self.sld_pauses.setEnabled(not busy)
         self.btn_pause.setVisible(busy)
@@ -1041,6 +1216,8 @@ class NarrateWindow(SubWindow):
             self.worker.wait(8000)
         if self.model_worker and self.model_worker.isRunning():
             self.model_worker.wait(8000)
+        if self.tr_worker and self.tr_worker.isRunning():
+            self.tr_worker.wait(8000)
         for w in (self._dl_worker, self._index_worker):
             if w is not None and w.isRunning():
                 w.wait(3000)

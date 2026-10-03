@@ -85,7 +85,7 @@ pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --collect-all qwen_asr --collect-all qwen_tts --collect-all nagisa --collect-all imageio_ffmpeg ^
   --collect-all bitsandbytes --collect-data librosa --collect-all hf_xet --collect-all certifi ^
   --collect-all ru_normalizr --collect-all rutextnorm --collect-all pymorphy3 --collect-all pymorphy3_dicts_ru ^
-  --collect-all num2words --collect-all eng_to_ipa ^
+  --collect-all num2words --collect-all eng_to_ipa --collect-all sentencepiece ^
   --copy-metadata transformers --copy-metadata tokenizers --copy-metadata huggingface_hub --copy-metadata safetensors ^
   --copy-metadata accelerate --copy-metadata peft --copy-metadata torch --copy-metadata numpy --copy-metadata tqdm ^
   --copy-metadata regex --copy-metadata requests --copy-metadata packaging --copy-metadata filelock ^

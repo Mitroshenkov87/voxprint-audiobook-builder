@@ -63,6 +63,8 @@ SOURCES = {
     "gpl-3.0": ("spdx", "GPL-3.0-only"),
     "MPL-2.0": ("spdx", "MPL-2.0"),
     "CC-BY-NC-4.0": ("spdx", "CC-BY-NC-4.0"),
+    "CC-BY-4.0": ("spdx", "CC-BY-4.0"),                # Opus-MT translation models (two of the four are CC-BY-4.0)
+    "sentencepiece": ("repo", "google/sentencepiece"),
     "qt-lgpl-3.0": ("spdx", "LGPL-3.0-only"),
     "Apache-2.0": ("spdx", "Apache-2.0"),
 }

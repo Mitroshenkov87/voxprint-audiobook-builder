@@ -31,6 +31,10 @@ APPROX_SIZE_GB = {
     "Qwen/Qwen3-TTS-12Hz-1.7B-Base": 4.5,
     "Qwen/Qwen3-TTS-12Hz-0.6B-Base": 2.5,
     "ai-forever/sage-fredt5-distilled-95m": 0.5,         # optional text clean-up model (see infra/text_models.py)
+    "Helsinki-NLP/opus-mt-ru-en": 0.4,                    # optional translation models (Opus-MT, one per direction)
+    "Helsinki-NLP/opus-mt-en-ru": 0.4,
+    "Helsinki-NLP/opus-mt-de-en": 0.4,
+    "Helsinki-NLP/opus-mt-en-de": 0.4,
 }
 
 
@@ -230,6 +234,7 @@ def ensure_model(
     hf_probe: Optional[Callable[[str], bool]] = None,
     hf_mirror_fetch: Optional[Callable[..., Any]] = None,
     mirror_manifest: Optional[Path] = None,
+    allow_patterns: Optional[List[str]] = None,
 ) -> Path:
     """Return the path of the local model, downloading it on first use (automatically).
 
@@ -242,6 +247,9 @@ def ensure_model(
     Hugging Face -> ModelScope (reversed when Hugging Face is slow/unreachable); if both fail, the project's Hugging
     Face backup mirror (:mod:`infra.model_mirrors`, every file verified by SHA-256) is the last resort.  The result lands in ``<name>.partial``
     first and is renamed only after verification.
+
+    ``allow_patterns`` (glob list) restricts the Hugging Face download to some files (a repository that also holds TF / Rust /
+    Flax copies of the weights); the ModelScope and backup mirrors, which copy whole repositories, are not used then.
     """
     target = local_dir_for(repo_id, root)
     if verify_local_model(target):
@@ -300,6 +308,8 @@ def ensure_model(
         kwargs: Dict[str, Any] = {"repo_id": repo_id, "local_dir": str(partial)}
         if rev:
             kwargs["revision"] = rev
+        if allow_patterns:
+            kwargs["allow_patterns"] = list(allow_patterns)
         try:
             sd(tqdm_class=tracker.make_tqdm_class(), **kwargs)
         except TypeError:  # some huggingface_hub versions have no tqdm_class parameter
@@ -348,7 +358,7 @@ def ensure_model(
             entry, partial, lambda f: progress(stage, f, tr("progress.downloading", short=short, pct=int(f * 100))),
             hf_mirror_fetch)
 
-    mirror_ok = mirror_enabled() and root is None   # updates through the staging folder always go straight to Hugging Face
+    mirror_ok = mirror_enabled() and root is None and not allow_patterns   # updates through the staging folder always go straight to Hugging Face
     if mirror_ok:
         mirror_download = mirror_download or _default_mirror_download
         fast = (hf_probe or modelscope_mirror.hf_is_fast)(repo_id)
@@ -357,7 +367,7 @@ def ensure_model(
             log.warning("Hugging Face is slow or unreachable - trying ModelScope first for %s", repo_id)
     else:
         order = ["hf"]
-    if root is None and model_mirrors.entry_for(repo_id, mirror_manifest) is not None:
+    if root is None and not allow_patterns and model_mirrors.entry_for(repo_id, mirror_manifest) is not None:
         order.append("hfm")                     # the project's Hugging Face backup mirror, always last
     errors: List[str] = []
     ok_source = ""
