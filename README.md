@@ -14,9 +14,11 @@ The voice goes into your **voice library**; then pick a book (TXT, FB2, EPUB) an
 > Without an NVIDIA GPU the dataset is still created, but voice training falls back to the CPU (very slow, with a warning).
 > The code itself also runs on Linux (that is where the test-suite runs); a Linux/macOS GUI release is not a goal yet.
 
-> **Status: early (0.1.0).** The whole pipeline was exercised on a real RTX 4090 / Windows Server 2025 machine (see
-> [Tested on Windows](#tested-on-windows)), but there has been no public release yet and voice *quality* has not been
-> judged by ear. Expect rough edges.
+> ## Beta / experimental software (0.1.0)
+> Voxprint is **beta**: the whole pipeline (alignment, training, narration, installer) has been run end to end on a real RTX 4090 / Windows Server 2025 machine
+> (see [Tested on Windows](#tested-on-windows)), but there has been **no public release**, only one machine and one speaker were tested, voice *quality* is judged by ear of one person,
+> and many settings are defaults that may change. Expect rough edges; back up your recordings and voices ([Backup](#backup-restore-and-existing-models)); report problems as issues.
+> Voices are personal data - read [Voice owner's consent](#voice-owners-consent-and-usage-scope) and the licence notes before sharing anything.
 
 ## Contents
 [Concept](#concept-and-philosophy) · [Features](#features) · [Screenshots](#screenshots) · [Installation](#installation) ·
@@ -436,11 +438,25 @@ The 4090 has 22.5 GiB; the app was tested against a 16 GiB cap to emulate a 16 G
 | Input formats | mp3 passed; m4a passed after a fix; Russian text handling (UTF-8/cp1251, normalizer) passed |
 | GUI as a normal window | verified at 1920x1080 at 100/125/150% and 1366x768 at 125% |
 
-**Not verified (honest caveats):** voice *similarity/quality by ear* was not judged (the loss stays above 3.5 with few epochs; the ASR check proves
-intelligibility only); real **Russian** audio through alignment and training was not run (only English audio; Russian is verified for text handling);
-a long training run started from the GUI and the frozen exe's full pipeline were not exercised; loading the adapter in Alexandria with its own pinned
-peft was not tested; the ModelScope fallback and the pinned LGPL ffmpeg download were not re-tested after a certificate fix; the 8-bit optimizer was not used in training.
-Cosmetic: the `sox` package prints a "SoX could not be found" notice on import; the exe has no version info yet.
+**Second round (2026-10-03, same machine, after the Studio was built):**
+
+| Area | Result |
+|---|---|
+| Test-suite | 600+ tests pass on Linux (offscreen Qt); the Windows-only parts were exercised by the runs below |
+| Narration on the GPU (real Qwen3-TTS + adapter, Russian and English, technical text) | works: ~20 s samples are synthesised in about a minute, round-trip ASR error (WER) 3-20 % (Latin terms inside Russian text are the main source) |
+| Real Russian recording (10 min, phone) | 66-70 clips, 10 epochs at lr 1e-6 in about 4 min; the voice is recognisably the speaker, but the **pitch drifts up by about +2...+3 semitones** compared with the recording (a known LoRA effect; the automatic check warns above +4) |
+| Quick preview / compare, automatic voice check | single 57 s, compare 116 s wall; estimate within 10 %; peak VRAM 6.6 GiB |
+| Voice-owner consent (ASR) | scope read correctly in 9 of 9 synthesised statements (ru/en/de); a bug with dates written in words was found and fixed; **a real human recording of the statement was not tested** |
+| No-transcript mode | 609 s recording: 52 clips, 49 kept, 113 s, WER 15.7 % against the script |
+| Installer end to end (silent install, first start, self-tests, `--verify-install`, `--repair`, uninstall) | passed after fixes; models imported by hard link; `--selftest-narrate` produced an MP3 from the installed exe |
+| Backup / restore on NTFS | 9 GB backup in 18 s, restore in 29 s, trees identical |
+| ffmpeg | the pinned LGPL build downloads and works (`libopus`, `libmp3lame`, `aac`, FLAC) |
+
+**Not verified (honest caveats):** clicking through the GUI of the *installed* app (only process-level smoke tests were done), other GPUs (the training-time table for 4080 / 4070 ... is
+derived from specifications, only the 4090 was measured), other speakers and languages, a real human consent recording, the full `lzma2/max` installer compile (a fast-compression build was tested),
+loading the adapter in Alexandria with its own pinned peft, the 8-bit optimizer, the ModelScope fallback.
+Earlier (first round) caveats: real **Russian** audio through alignment and training was not run in round one (done in round two), voice similarity had not been judged by ear.
+Cosmetic: the `sox` package prints a "SoX could not be found" notice on import (hidden from the log); the exe has no version info yet.
 
 The Linux test-suite (`QT_QPA_PLATFORM=offscreen python -m pytest`) covers the pipeline with synthetic audio and a tiny randomly initialised model.
 
@@ -543,13 +559,9 @@ packages (`tools\gen_notices.py --with-installed`, called by `build.bat`). Voxpr
   Pinokio/Alexandria-style tree, ModelScope layout, pinned-revision mismatch, read-only guarantee, resumable ModelScope download (fake server), reuse/upgrade/install decisions,
   torch flavor mapping, completion manifest + reason codes, pinned-asset installer (sha256, staging, smoke test, rollback).
 
-## Still to verify (TODO-needs-GPU-test)
-* **The narrator on real hardware.** `core/tts_engine.py` (loading Qwen3-TTS with the LoRA adapter and `generate_voice_clone`) is written against the qwen-tts API but has **never run on a GPU**; everything around it (parsers, chunker, cache/resume,
-  assembly, ffmpeg command lines, UI) is tested with a fake engine and a fake ffmpeg. Also untested: the real encoders in the pinned ffmpeg build (`libopus`, `libmp3lame`, `aac`, MP4 with Opus, Opus chapter markers, ID3 CHAP frames),
-  preview playback (QtMultimedia) on Windows, how chapters show up in the listed players, and the Studio/Acrylic look on a real desktop.
-* **Backup / restore and the installer page on real hardware.** `infra/backup.py` / `infra/existing_models.py` are tested with temporary folders and fake disk usage only (cancel/resume, space check, hash mismatch, hard link vs copy). Untested: real USB/NAS targets, NTFS hard links, exFAT timestamps, multi-GB files. `installer/Voxprint.iss` (trilingual texts, the *Existing models* page, `SaveStringsToUTF8File`) was linted by tests but **never compiled with Inno Setup**.
-* **Text preparation on real books.** The rule steps are unit-tested on synthetic Russian/English samples only (not on real FB2/EPUB corpora); the AI clean-up (`SageEngine`, model download, speed on CPU/GPU, how many of its proposals the validator accepts) has never run for real.
-* Reuse against a **real** Alexandria/Pinokio install on Windows; a real ModelScope download after the certificate fix; the pinned LGPL ffmpeg download and swap on Windows (file locking).
-* Alignment quality/speed and the `align_long` and quality-filter thresholds on real (non-synthetic, non-English) recordings.
-* Training thresholds (loss 3.5, lr 1e-6...2e-6) for **Russian**; reading the adapter in Alexandria with its pinned `peft==0.18.1`; the optional `ctc-forced-aligner`.
-* The frozen exe's full pipeline, a long training run from the GUI, and the real-world behaviour of the Acrylic backdrop with the new darker theme.
+## Still to verify
+* Other GPUs (16 GB laptop cards, 3000/5000 series), other speakers, languages and microphones; a **female** voice (the pitch drift above was seen on a male voice).
+* A real human recording of the consent statement; real USB/NAS backup targets, exFAT timestamps.
+* Text preparation on real FB2/EPUB corpora and the optional AI clean-up (`SageEngine`) on real hardware; reuse against a real Alexandria/Pinokio install; the ModelScope fallback.
+* GUI click-through of the installed app on a clean machine, full `lzma2/max` installer compile and Windows SmartScreen / signing behaviour.
+* The optional `ctc-forced-aligner`; reading the adapter in Alexandria with its pinned `peft==0.18.1`.

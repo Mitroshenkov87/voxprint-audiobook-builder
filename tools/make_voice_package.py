@@ -81,7 +81,7 @@ def main(argv: Optional[list] = None) -> int:
     a = ap.parse_args(argv)
     spec = json.loads(a.spec.read_text(encoding="utf-8"))
     entry = build(a.adapter, spec, a.out, a.url.replace("VOICE", str(spec.get("id", "voice"))))
-    print(json.dumps(entry, ensure_ascii=False, indent=2))
+    print(json.dumps(entry, indent=2))      # ASCII-escaped: safe on any Windows console code page
     return 0
 
 
