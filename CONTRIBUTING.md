@@ -1,0 +1,71 @@
+# Contributing to Voxprint
+
+Thanks for your interest! Voxprint is a young project; small, focused contributions are the easiest to review.
+Please read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) first - it explains the module map and the data flow.
+
+## Ground rules
+* **Use only your own voice** (or someone's who explicitly agreed) in examples, issues, test data and screenshots. Never commit recordings of other people.
+* Be kind and constructive. Assume good intent.
+* Mind licences: do not add GPL/AGPL Python dependencies to the shipped program (e.g. `soynlp` is deliberately not installed - a test guards this); the README's
+  licence section explains the existing exceptions. Everything third-party must be listed in `credits.json` (see "Third-party components" below).
+* **No behaviour changes in pure refactor / documentation PRs.**
+
+## Development setup
+The test-suite runs on Linux, macOS or Windows **without a GPU and without network access**.
+
+```bash
+git clone <your fork>
+cd voxprint
+python -m venv .venv && . .venv/bin/activate            # Windows: .venv\Scripts\activate
+pip install torch --index-url https://download.pytorch.org/whl/cpu    # CPU torch is enough for the tests
+pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt
+pip install --no-deps -r requirements-nodeps.txt          # qwen-asr / qwen-tts: their transformers pins conflict
+QT_QPA_PLATFORM=offscreen python -m pytest                # ~250 tests; Windows: set QT_QPA_PLATFORM=offscreen
+```
+Running the GUI and the full pipeline needs Windows 11 and an NVIDIA GPU - see "Run from source" in the README.
+A dry run of the pipeline without any model: `python -m core.cli audio.wav text.txt --out dataset --fake-aligner`.
+
+On Windows, never run `uv run` without `--no-sync` (it replaces CUDA torch with the CPU build).
+
+## Tests
+* `pytest` must stay green before you open a PR. `pytest.ini` points at `tests/`.
+* `tests/conftest.py` isolates every test (own app-data folder, fixed language `ru` by default, no network, no foreign model caches) - do not undo this.
+  Tests that need another language set `VOXPRINT_LANG` themselves.
+* `tests/synth.py` generates synthetic readings with a known ground truth and a `TrueRateAligner`, so pipeline tests need no models.
+* Anything that talks to the network, subprocesses or other programs' folders is **injectable** (`opener`, `run`, `which`, `fetch_json`, `runner` ...). Follow that pattern in new code.
+* UI tests run under `QT_QPA_PLATFORM=offscreen`; blocking dialogs are skipped there.
+* Add a test with every behaviour change or bug fix.
+
+## Code style
+* Python 3.11+, type hints where they help, `from __future__ import annotations`.
+* **Documentation is part of the code.** Every module has a docstring explaining its purpose; every public function/class has a short docstring; add comments for
+  *why* something non-obvious is done (not for what the next line does). Code, comments and docstrings are **English**.
+* Keep `core/` free of Qt and of installer logic, and keep `ui/` free of heavy work (it belongs in `workers/` or `core/`).
+* Windows-only code lives in `infra/platform_win.py` (guarded by `sys.platform`); other modules must import cleanly on Linux.
+* Errors the user can see are `DatasetMakerError` subclasses with a localized message (`tr(...)`) - never show a raw traceback in the UI.
+* Never touch other programs' folders: model reuse is **read-only**, and only folders carrying Voxprint's ownership marker may be replaced or deleted.
+
+## Localization
+All user-visible text goes through `tr("some.key")` and lives in `locales/en.json`, `de.json`, `ru.json` (identical keys and `{placeholders}`, and every key used in code must exist - all enforced by `tests/test_i18n.py`, which also rejects Cyrillic string literals in code). New UI text therefore means three catalog entries. See "Adding a language" in the README.
+Russian *data* (abbreviation tables of the text normalizer, test fixtures) legitimately contains Cyrillic.
+
+## Third-party components
+`credits.json` is the single source for the About dialog, `THIRD_PARTY_NOTICES.md` and the `licenses/` folder. After adding a dependency: add its entry (en/de/ru purpose,
+licence, URL), run `python tools/fetch_licenses.py --only <id>` to fetch the licence text, then `python tools/gen_notices.py` (a test fails if the notices are out of date).
+Pin new runtime packages in `infra/verified_manifest.json` only after testing them (then regenerate the requirements files with
+`python -m infra.verified_manifest > requirements-verified.txt` and `python -m infra.verified_manifest --nodeps > requirements-nodeps.txt`).
+
+## Commits and pull requests
+* Small commits with a clear first line in the imperative ("Fix ...", "Add ..."). Explain *why* in the body when it is not obvious.
+* One topic per PR; describe what you changed, how you tested it and (for UI changes) attach an English screenshot - `docs/screenshots/` shows how they are made
+  (offscreen Qt `widget.grab()`).
+* Update `CHANGELOG.md` (the "Unreleased" section) for user-visible changes.
+* If you change the output formats (`dataset/`, adapter folder, `voice.json`), update the README and `docs/ARCHITECTURE.md`; `voice.json` carries a `schema` number for exactly this reason.
+
+## Reporting bugs
+Open an issue with: Windows build, GPU/driver, what you did, the message shown (it has a stable wording per error kind) and the relevant lines of
+`%LOCALAPPDATA%\Voxprint\logs\voxprint.log`. `main.py --verify-install` prints stable reason codes that help a lot. Do not attach recordings of other people.
+
+## Licence of contributions
+The project's own source-code licence is still to be chosen (see the README). By contributing you agree that your contribution may be distributed under the licence
+the project adopts; if you object, tell us in the PR.

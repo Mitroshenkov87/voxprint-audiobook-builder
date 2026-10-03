@@ -155,11 +155,11 @@ output\<voice name>\  adapter_model.safetensors, adapter_config.json, ref_sample
 ```
 `voice.json` (schema 1) example:
 ```json
-{"schema": 1, "voice_name": "my_voice", "language": "russian", "created": "2026-10-03T12:00:00+00:00",
+{"schema": 1, "voice_name": "my_voice", "language": "russian", "created": "2026-10-03T12:00:00Z",
  "speech_seconds": 412.7, "epochs": 15, "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
  "voice_type": "female", "description": "Warm narrator voice, calm pace"}
 ```
-`voice_type` (`male|female|child|other`) and `description` (≤ 500 characters) are optional and only present when you filled them in.
+`voice_type` (`male|female|child|other`) and `description` (whitespace collapsed, ≤ 500 characters) are optional: when you leave them empty they are written as empty strings. The other fields are filled in automatically.
 
 Using the merged model: `Qwen3TTSModel.from_pretrained(folder).generate_custom_voice(text, language="Russian", speaker="<voice name>")`.
 
