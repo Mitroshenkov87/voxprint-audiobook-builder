@@ -373,7 +373,7 @@ def test_cmd_single_opus_mp3_and_m4b_opus():
 def test_cmd_chapter_tags_and_cover():
     meta = ex.BookMeta("Book", "Auth", "Voice", "en", cover=Path("/w/cover.png"))
     ch = ex.ChapterAudio(1, "Second", Path("/w/chapter_0002.wav"), 5)
-    s = " ".join(ex.cmd_chapter("ff", ex.FORMAT_MP3_CHAPTERS, ch, 12, meta, Path("/o/02 - Second.mp3"), ex.Bitrates()))
+    s = " ".join(ex.cmd_chapter("ff", ex.FORMAT_MP3_CHAPTERS, ch, 12, meta, Path("/o/02 - Second.mp3"), ex.Bitrates())).replace("\\", "/")
     assert "-i /w/chapter_0002.wav -i /w/cover.png -map 0:a -map 1:v -c:v copy" in s
     assert "-c:a libmp3lame -b:a 96k -ac 1 -id3v2_version 3" in s
     for tag in ("title=Second", "album=Book", "artist=Auth", "track=2/12", "composer=Voice"):
