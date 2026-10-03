@@ -267,7 +267,10 @@ Start. A downloaded voice remembers its index id (`repo_id`) and is then shown o
 
 **Voice packages.** A voice package is a zip with the LoRA adapter and a `voice.json` (name, localized `names` / `descriptions`, licence, consent block). Packages are **not** part of this repository or the installer;
 they are hosted separately (a model host or a release asset) and listed in the voices index. Voices meant for testing carry the licence **`custom/test-use-only`** - *Test use only - no public release of generated audio, no commercial use*;
-their consent block has `method: "owner"` (the publisher owns the voice). **The open universal voice ("Open universal voice" / "Открытый универсальный голос" / "Offene Universalstimme").** A fully open English voice for anyone who has no recording of their own: trained with Voxprint's own pipeline
+their consent block has `method: "owner"` (the publisher owns the voice). **The voice "Alexander" (Александр).** A male Russian voice, the first one trained with Voxprint (10 minutes of the author's own recording). It is **not in this repository and not in the installer**; it is hosted separately
+(release asset / model host, see `tools/voice_specs/alexander.json`) and listed in the voices index. Licence: **personal use only - no public use of the output, no commercial projects** (`custom/personal-only`, scope *private only*, shown as a badge; voice type: male).
+
+**The open universal voice ("Open universal voice" / "Открытый универсальный голос" / "Offene Universalstimme").** A fully open English voice for anyone who has no recording of their own: trained with Voxprint's own pipeline
 (LoRA, learning rate 1e-6, 10 epochs, 66 clips = 7.5 min) **only** from the public-domain **LJ Speech 1.1** dataset (reader Linda Johnson, LibriVox recordings; compiled by Keith Ito, <https://keithito.com/LJ-Speech-Dataset/>;
 the dataset is dedicated to the public domain, the Hugging Face copy `keithito/lj_speech` is tagged `unlicense`) on top of `Qwen/Qwen3-TTS-12Hz-1.7B-Base`, which is **Apache-2.0** (commercial use of the model, its outputs and adapters is allowed).
 The voice package is licensed **CC0-1.0** (free for any use, also commercial; attribution to the LJ Speech dataset is appreciated). It is not stored in this repository: the spec is `tools/voice_specs/open-universal.json`, the zip is hosted separately and listed in the voices index.
@@ -526,6 +529,7 @@ packages (`tools\gen_notices.py --with-installed`, called by `build.bat`). Voxpr
 * **Models and voices have their own licences** - the Apache licence of the code does *not* cover them:
   * the models Voxprint downloads (Qwen3-TTS, Qwen3-ASR and the optional text models) keep the licences of their authors;
   * every **voice** carries its own licence in `voice.json` (see *My voices and licences*). Voices you train are `custom/personal-only` until you decide otherwise;
+  * the voice **Alexander / Александр** is published separately under *personal use only - no public use of the output, no commercial projects*;
   * voice packages are not part of this repository or the installer; a voice marked **"test use only"** (`custom/test-use-only`) may be used to try the program only: do not publish audio made with it and do not use it commercially.
 * Third-party components: `THIRD_PARTY_NOTICES.md` and `licenses\`.
 
