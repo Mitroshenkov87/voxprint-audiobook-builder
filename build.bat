@@ -62,7 +62,7 @@ echo === Build (%MODE%) ===
 pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --icon "assets\voxprint.ico" --add-data "assets\voxprint.ico;assets" --add-data "assets\check.png;assets" ^
   --paths . ^
-  --add-data "infra\verified_manifest.json;infra" --add-data "infra\assets_manifest.json;infra" ^
+  --add-data "infra\verified_manifest.json;infra" --add-data "infra\assets_manifest.json;infra" --add-data "infra\model_mirrors.json;infra" ^
   --add-data "locales;locales" --add-data "credits.json;." --add-data "licenses;licenses" ^
   --add-data "build\notices\THIRD_PARTY_NOTICES.md;." ^
   --hidden-import core.i18n --hidden-import core.appinfo --hidden-import core.model_export ^
