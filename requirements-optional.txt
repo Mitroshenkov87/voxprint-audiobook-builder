@@ -1,5 +1,5 @@
-# Необязательно. Запасной выравниватель (используется, только если Qwen3-ForcedAligner не сработал).
-# Ставить вручную и без зависимостей, чтобы он не подменил transformers/torch:
+# Optional. Backup aligner (used only if Qwen3-ForcedAligner fails).
+# Install it manually and without dependencies so that it does not replace transformers/torch:
 #   pip install --no-deps ctc-forced-aligner
-# затем его лёгкие зависимости (по списку в его README): nltk, uroman и т.п. - TODO-needs-GPU-test.
+# then its light dependencies (per its README): nltk, uroman etc. - TODO-needs-GPU-test.
 ctc-forced-aligner

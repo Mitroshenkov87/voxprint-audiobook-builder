@@ -2,7 +2,7 @@
   "schema": 1,
   "name": "Voxprint verified set",
   "date": "2026-10-02",
-  "note": "Версии, с которыми Voxprint проверен (юнит-тесты + tiny-модель на CPU, peft 0.18.1 и 0.21.2). Прогон на GPU/Windows - TODO. peft закреплён на версии Alexandria (0.18.1): формат адаптера должен читаться его PeftModel.from_pretrained.",
+  "note": "Versions Voxprint was verified with (unit tests + a tiny model on the CPU, peft 0.18.1 and 0.21.2; later also a full GPU run on Windows Server 2025 / RTX 4090). peft is pinned to Alexandria's version (0.18.1): the adapter format must be readable by its PeftModel.from_pretrained.",
   "packages": {
     "qwen-asr": "0.0.6",
     "qwen-tts": "0.1.1",

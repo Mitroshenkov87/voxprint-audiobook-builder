@@ -1,39 +1,39 @@
-# Voxprint - зависимости (без жёстких версий; указаны только нижние границы и необходимые верхние).
-# Порядок установки на Windows (делает build.bat):
-#   1) uv pip install torch torchaudio --torch-backend=auto    (PyTorch с CUDA; запасной путь - requirements-torch.txt)
-#   2) uv pip install -r requirements.txt -r requirements-verified.txt   (этот файл + проверенные версии)
-#   3) uv pip install --no-deps -r requirements-nodeps.txt     (qwen-asr, qwen-tts - см. комментарий ниже)
-# Не используйте "uv run" без --no-sync (заменит CUDA-torch на CPU-версию). flash-attn на Windows не нужен.
+# Voxprint - dependencies (no hard pins here; only lower bounds and the upper bounds that are needed).
+# Installation order on Windows (done by build.bat):
+#   1) uv pip install torch torchaudio --torch-backend=auto    (PyTorch with CUDA; fallback: requirements-torch.txt)
+#   2) uv pip install -r requirements.txt -r requirements-verified.txt   (this file + the verified versions)
+#   3) uv pip install --no-deps -r requirements-nodeps.txt     (qwen-asr, qwen-tts - see the comment below)
+# Do not use "uv run" without --no-sync (it replaces CUDA torch with the CPU build). flash-attn is not needed on Windows.
 
 PySide6>=6.7
 numpy
 scipy
 soundfile
 pydub
-audioop-lts; python_version >= "3.13"   # pydub использует audioop, удалённый в Python 3.13
-imageio-ffmpeg                          # ffmpeg для pydub (MP3/M4A и т.д.) без ручной установки
+audioop-lts; python_version >= "3.13"   # pydub uses audioop, which was removed in Python 3.13
+imageio-ffmpeg                          # ffmpeg for pydub (MP3/M4A etc.) without a manual install
 librosa
 packaging
 safetensors
-certifi                                 # запасные корневые сертификаты (свежая Windows/Server без нужных CA)
-hf_xet                                  # быстрая загрузка моделей с HF (на Windows маркер платформы AMD64 не срабатывает в зависимостях hub)
+certifi                                 # fallback root certificates (a fresh Windows/Server without the needed CAs)
+hf_xet                                  # fast model downloads from HF (on Windows the AMD64 platform marker does not fire in the hub's dependencies)
 
-# transformers: qwen-asr 0.0.6 и qwen-tts 0.1.1 написаны под transformers 4.57.x (в их METADATA стоит ==4.57.6 и
-# ==4.57.3 - они конфликтуют друг с другом), а transformers 5.x их ломает -> держим 4.x.
+# transformers: qwen-asr 0.0.6 and qwen-tts 0.1.1 are written for transformers 4.57.x (their METADATA says ==4.57.6 and
+# ==4.57.3 - they conflict with each other), and transformers 5.x breaks them -> stay on 4.x.
 transformers>=4.57.6,<5
-huggingface_hub>=0.34,<1.0              # transformers 4.57 требует huggingface-hub<1.0
+huggingface_hub>=0.34,<1.0              # transformers 4.57 requires huggingface-hub<1.0
 accelerate>=1.12
-peft>=0.17                              # проверено: 0.18.1 (как у Alexandria) и 0.21.2
-bitsandbytes>=0.46                      # 8-bit AdamW (на Windows есть колёса); без него - обычный AdamW
+peft>=0.17                              # tested: 0.18.1 (as in Alexandria) and 0.21.2
+bitsandbytes>=0.46                      # 8-bit AdamW (wheels exist for Windows); without it plain AdamW is used
 
-# нормализация русского текста (числа, сокращения) перед выравниванием; без них работает встроенный минимум
+# Russian text normalization (numbers, abbreviations) before alignment; without them a built-in minimum is used
 ru-normalizr
 rutextnorm
 
-# зависимости qwen-asr / qwen-tts (сами пакеты - в requirements-nodeps.txt)
+# dependencies of qwen-asr / qwen-tts (the packages themselves are in requirements-nodeps.txt)
 einops
 onnxruntime
-six               # нужен nagisa/qwen-asr (без него в сборке PyInstaller: No module named six)
-nagisa            # soynlp (GPLv3) намеренно НЕ ставим: qwen-asr импортирует его лениво, только для корейского языка
+six               # needed by nagisa/qwen-asr (without it the PyInstaller build fails: No module named six)
+nagisa            # soynlp (GPLv3) is deliberately NOT installed: qwen-asr imports it lazily, for Korean only
 sox
 qwen-omni-utils

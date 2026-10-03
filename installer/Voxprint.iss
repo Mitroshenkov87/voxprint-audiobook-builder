@@ -1,7 +1,7 @@
-﻿; Установщик Voxprint (Inno Setup 6.x). Сборка:  ISCC installer\Voxprint.iss   (или через build.bat)
-; Для варианта --onedir:  ISCC /DONEDIR installer\Voxprint.iss
-; Только Windows 11 x64. Модели не входят в установщик: приложение само скачивает их при первом запуске
-; (после установки предлагается сразу запустить Voxprint с флагом --prefetch).
+﻿; Voxprint installer (Inno Setup 6.x). Build with:  ISCC installer\Voxprint.iss   (or through build.bat)
+; For the --onedir variant:  ISCC /DONEDIR installer\Voxprint.iss
+; Windows 11 x64 only. The models are not part of the installer: the app downloads them itself on first start
+; (after the installation, Voxprint can be started right away with the --prefetch flag).
 
 #define AppName "Voxprint"
 #define AppVersion "0.1.0"
@@ -25,7 +25,8 @@ WizardStyle=modern
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-; Windows 11 24H2+ (сборка 26100). Более старые версии не блокируем жёстко - см. [Code]: только мягкое предупреждение.
+; Windows 11 24H2+ (build 26100). Older versions are not blocked hard - see [Code]: only a soft warning.
+; NOTE: the installer wizard texts below are Russian (single-language installer for now; English/German wizard texts are on the roadmap).
 MinVersion=10.0.22000
 CloseApplications=yes
 
@@ -41,11 +42,11 @@ Source: "..\dist\Voxprint\*"; DestDir: "{app}"; Flags: ignoreversion recursesubd
 #else
 Source: "..\dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 #endif
-; Лицензии третьих сторон (LGPL/GPL/Apache и др.): список компонентов и полные тексты лицензий.
+; Third-party licences (LGPL/GPL/Apache etc.): the component list and the full licence texts.
 Source: "..\build\notices\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\credits.json"; DestDir: "{app}"; Flags: ignoreversion
-; Необязательно: положите vc_redist.x64.exe в installer\redist, и он будет установлен тихо (нужен PyTorch).
+; Optional: put vc_redist.x64.exe into installer\redist and it will be installed silently (PyTorch needs it).
 #ifexist "redist\vc_redist.x64.exe"
 Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 #endif
