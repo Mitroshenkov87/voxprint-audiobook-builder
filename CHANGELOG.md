@@ -20,6 +20,10 @@ The project is not released yet; everything below is the history of the 0.1.0 de
 - **Registry of text models** (`infra/text_models.py`) with placeholders (greyed out under *More preparation (coming later)*): RUPunct punctuation, stress / `ё`, en / de spelling, translation, speaker roles.
 - **Quality presets** *Compact / Standard / High* with a size-per-hour hint; exact bitrates moved to a collapsed *Advanced* section (also: output folder, chapter titles, sample of the prepared text); *Other formats* holds only formats.
 - Extension point `NarrationOptions.preprocessors` (translation / roles will plug in there).
+- **Backup and restore of models and voices** (Settings -> *Models and voices*): copy models (own folder + complete copies from other programs' caches), the ffmpeg tool and optionally the voice library to any folder or drive
+  (`infra/backup.py`): progress and cancel, resumable (`.part` files, manifest `voxprint-backup.json` with SHA-256), identical files skipped, free-space check before writing, hash-verified restore through staging folders, voices never overwritten.
+- **Existing models folder** (`infra/existing_models.py`): models from a previous install / backup are imported (hard link on the same drive, else copy; verified by hash) before any download; set in Settings or by the installer.
+- **Installer**: new optional wizard page *Existing models* (writes `state\existing_models_dir.txt`, copies nothing; silent `/ModelsDir=`); wizard texts are now English / Russian / German via `[CustomMessages]`.
 - New docs screenshots: Studio, My voices, Narrate (incl. Russian and German renders).
 - **Settings dialog** behind a gear button: language, *Check for updates*, open models folder, open data & log folder, *Repair the installation*, *About*.
   The main screen keeps only the core workflow.

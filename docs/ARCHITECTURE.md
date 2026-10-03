@@ -53,6 +53,8 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 | `paths.py` | application folders (`%LOCALAPPDATA%\Voxprint`, override `VOXPRINT_HOME`): `models/`, `packages/`, `voices/`, `state/`, `logs/`, `.staging/` |
 | `voice_repository.py` | online voice index (`index.json`, URL configurable, placeholder default) and verified downloads (HTTPS, size cap, SHA-256); never raises to the UI |
 | `text_models.py` | registry of the on-demand text models (`TextModel`, `REGISTRY`: SAGE integrated; RUPunct, en/de spelling, stress, translation, roles = placeholders), `state()` (ready / needs_download / planned), `ensure()` (pinned revision via `model_downloader`), `make_engine`, `build_plan(rule_steps, neural_steps)` |
+| `backup.py` | backup / restore of models, the ffmpeg tool and voices: `collect_items`, `plan_backup` / `run_backup` (resumable `.part` files, manifest `voxprint-backup.json` with SHA-256, skip identical, `check_space`), `plan_restore` / `run_restore` (staging `.restoring`, hash verification, voices never overwritten); disk usage is injectable |
+| `existing_models.py` | the "existing models folder" (`state/existing_models_dir.txt`, env `VOXPRINT_EXISTING_MODELS`): `find` (model locator roots with `ignore_disabled`), `import_model` (hard link on the same drive, else verified copy through `<name>.importing`), `import_available`, `pending` (start-up) |
 | `features.py` | feature flags; today `aac_enabled()` (env `VOXPRINT_ENABLE_AAC` > `state/features.json` > `AAC_DEFAULT`) |
 | `net.py` | HTTPS through the stdlib; retries with certifi roots on `CERTIFICATE_VERIFY_FAILED` |
 | `platform_win.py` | OS check, dark title bar, Acrylic backdrop (all guarded by `sys.platform`) |
@@ -67,7 +69,7 @@ Dependencies point downwards: `ui -> workers -> core / infra`; `core` never impo
 ### `workers/`
 `pipeline_runner.py` holds the Qt-free scenarios ("dataset", "voice (LoRA)", "universal model", first-run prefetch) with injectable collaborators;
 `process_worker.py` wraps them in `QThread` workers whose only interface to the UI is signals (`progress`, `finished`, `failed`, `cancelled`).
-`narration_runner.py` (`NarrationJob`, `run_narration`, `format_eta`) is the Qt-free narrator scenario; `narrate_worker.py` has `NarrateWorker` (narration with pause / cancel) and the repository workers
+`narration_runner.py` (`NarrationJob`, `run_narration`, `format_eta`) is the Qt-free narrator scenario; `backup_runner.py` (which repositories belong to a backup, run functions) and `backup_worker.py` (`BackupWorker`, a generic thread for backup / restore / import) serve the Settings dialog. `narrate_worker.py` has `NarrateWorker` (narration with pause / cancel) and the repository workers
 (`RepoIndexWorker`, `RepoDownloadWorker`). Training registers the finished voice in the library (`pipeline_runner._register_voice`, `TaskResult.voice_id`).
 
 ### `ui/`
@@ -106,6 +108,8 @@ Pause is a `PauseToken` polled between chunks; cancel uses the usual `CancelToke
 The preparation stage runs inside `narrate_book` before chunking (progress phase `prepare`); exported chapter titles, metadata and the cover come from the *original* book, and the engine-side normalizer is skipped when the "numbers" step already spelled the digits out.
 `.debug/` (prepared text and report) is kept after success, `.cache/` is not. The Narrate window builds the plan from its check boxes (`plan_builder`, injectable) and downloads the clean-up model through `TextModelDownloadWorker`.
 Extension points: `NarrationOptions.preprocessors` (functions applied to each chunk's text - clean-up / translation) and the engine protocol (a different TTS can be injected; the tests use a fake one).
+
+`model_downloader.ensure_model` now tries, in order: own folder -> **import from the existing models folder** (`existing_models.find/import_model`) -> read-only reuse of other programs' copies (`model_locator`) -> download. `model_locator.candidate_roots()` lists the existing folder first (kind `existing`). `main.py` runs the first-run model step also when `existing_models.pending(...)` is true, so the installer-chosen folder is imported on the first start.
 
 ## 4. Installation, environment and updates
 * **Installer** (Inno Setup, per user) installs the PyInstaller `onedir` build and runs the first-start setup: environment probe, optional Python venv with the right torch build
@@ -161,5 +165,5 @@ claim more than its licence gives. Schema 1 (`voice_name`, `speech_seconds`) is 
 * `tests/conftest.py` isolates app-data folders and the language for every test.
 * `tests/test_i18n.py` guards the localization rules; `tests/test_credits.py` keeps `credits.json`, the notices and the installer in sync.
 * The narrator is tested with a fake `TTSEngine` and a fake ffmpeg runner (`tests/test_narration.py`): chunk cache and resume, cancel / pause, ETA, chapter assembly, ffmetadata / m3u8 content, command lines, the AAC flag.
-  Text preparation: `tests/test_text_prep.py` (every rule step, ru + en), `tests/test_text_cleanup.py` (validator, cache / resume / cancel, registry, fake download, narration wiring), `tests/test_narrate_prep_ui.py` (check boxes, presets, expanders, model states). Parsers and the chunker: `tests/test_books.py`; the library, licences and repository: `tests/test_voice_*.py`; the windows (navigation, language switch, cards, formats, disclaimer, run / pause / cancel): `tests/test_studio.py`.
+  Backup / restore / import: `tests/test_backup.py` (temporary folders, fake disk usage; cancel, resume, space, hash mismatch, hard link vs copy), `tests/test_backup_ui.py` (Settings section), `tests/test_installer_models_page.py` (lints `installer/Voxprint.iss`: encoding, message tables for en/ru/de, Pascal structure, the contract with the app; the script is never compiled on Linux). Text preparation: `tests/test_text_prep.py` (every rule step, ru + en), `tests/test_text_cleanup.py` (validator, cache / resume / cancel, registry, fake download, narration wiring), `tests/test_narrate_prep_ui.py` (check boxes, presets, expanders, model states). Parsers and the chunker: `tests/test_books.py`; the library, licences and repository: `tests/test_voice_*.py`; the windows (navigation, language switch, cards, formats, disclaimer, run / pause / cancel): `tests/test_studio.py`.
 * Windows-only behaviour (Acrylic, real GPU training, the real Qwen3-TTS engine, the real ffmpeg encoders) is verified manually - see the "Tested on Windows" section of the README.

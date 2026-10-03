@@ -22,7 +22,7 @@ The voice goes into your **voice library**; then pick a book (TXT, FB2, EPUB) an
 [Concept](#concept-and-philosophy) · [Features](#features) · [Screenshots](#screenshots) · [Installation](#installation) ·
 [Using Voxprint](#using-voxprint) · [Narrate a book](#narrate-a-book) · [My voices](#my-voices-and-licences) · [AAC / M4B notice](#aac--m4b-patents-please-read) ·
 [How it works](#how-it-works) · [Output format](#output-format) ·
-[Hardware requirements](#hardware-requirements) · [Model reuse](#reusing-what-is-already-on-your-computer) ·
+[Hardware requirements](#hardware-requirements) · [Model reuse](#reusing-what-is-already-on-your-computer) · [Backup and restore](#backup-restore-and-existing-models) ·
 [Tested on Windows](#tested-on-windows) · [Privacy](#privacy) · [Roadmap](#roadmap) · [Contributing](#contributing) ·
 [Licences](#licences-and-third-party-components)
 
@@ -47,6 +47,7 @@ voice recording and a text file to ready output files you can load into a neural
 * **Audiobook formats** - default: **one `.opus` file with chapter markers**; **MP3 per chapter** (most compatible, ID3 tags + `.m3u8`); opt-in **M4B (AAC)** for Apple Books
   (patent notice below); more under *Other formats* (M4B with Opus, Opus/FLAC/WAV per chapter, one MP3 with chapter marks). Quality is three buttons (*Compact / Standard / High*); exact bitrates sit under *Advanced*.
 * **Book preparation** - fully automatic text clean-up before synthesis (no editor, nothing to review): rule-based steps for Russian and English (layout, footnotes/page numbers, quotes and dashes, links, chapter headings, **numbers in words** with Russian case/gender agreement, abbreviations) and an optional on-demand AI typo/comma fixer for Russian that is checked by a strict validator ([details](#prepare-the-text)).
+* **Backup and restore** of models and voices to any folder or drive (resumable, skips identical files, free-space check, SHA-256 verified), an *existing models folder* that is imported before any download, and an optional installer page for it ([details](#backup-restore-and-existing-models)).
 * **Voice library** (`%LOCALAPPDATA%\Voxprint\voices\`) - every trained voice is registered automatically; preview, licence badge, delete, **import** from a folder or a zip,
   and **download voices from a repository** (index URL is configurable; SHA-256 checked).
 * **Voice licences** - each voice carries a licence (CC0, CC-BY, CC-BY-SA, CC-BY-NC, CC-BY-NC-SA or custom/personal-only) and the UI shows whether *commercial use* is allowed.
@@ -75,7 +76,7 @@ All screenshots are English-UI renders of the current theme (offscreen Qt; see `
 |---|---|---|
 | <img src="docs/screenshots/narrate.png" width="300"> | <img src="docs/screenshots/narrate_aac.png" width="300"> | <img src="docs/screenshots/narrate_running.png" width="300"> |
 
-Same windows in Russian and German: [`ru/studio_home`](docs/screenshots/ru/studio_home.png), [`ru/voices`](docs/screenshots/ru/voices.png), [`ru/narrate`](docs/screenshots/ru/narrate.png), [`ru/narrate_aac`](docs/screenshots/ru/narrate_aac.png),
+Same windows in Russian and German: [`ru/studio_home`](docs/screenshots/ru/studio_home.png), [`ru/voices`](docs/screenshots/ru/voices.png), [`ru/settings`](docs/screenshots/ru/settings.png), [`de/settings`](docs/screenshots/de/settings.png), [`ru/narrate`](docs/screenshots/ru/narrate.png), [`ru/narrate_aac`](docs/screenshots/ru/narrate_aac.png),
 [`de/studio_home`](docs/screenshots/de/studio_home.png), [`de/voices`](docs/screenshots/de/voices.png), [`de/narrate`](docs/screenshots/de/narrate.png), [`de/narrate_aac`](docs/screenshots/de/narrate_aac.png).
 
 Training window ("Train your voice"):
@@ -104,6 +105,10 @@ There is no public release yet. Planned installer channels are listed in the [Ro
 ### Option 1: the installer (built locally)
 `build.bat` produces `installer\Output\Voxprint-Setup.exe` (Inno Setup 6, per-machine install, Windows 11 x64; about 1.8 GB because PyTorch is inside).
 The installer does not contain the models: on first start Voxprint downloads about 7 GB once (internet needed).
+The wizard is available in **English, Russian and German** and has an optional page **"Existing models"** (right after the install folder): *Do you already have downloaded models from a previous install?* - choose the
+folder or leave the field empty to skip. The installer **copies nothing**; it only writes the chosen path to `%LOCALAPPDATA%\Voxprint\state\existing_models_dir.txt` (UTF-8), and on the first start the program imports the
+models from there instead of downloading them (see [Backup, restore and existing models](#backup-restore-and-existing-models)). Silent install: `Voxprint-Setup.exe /VERYSILENT /ModelsDir="D:\old\models"`.
+Caveat: the installer runs elevated (per-machine); if the administrator account differs from the account that uses the program, `%LOCALAPPDATA%` is the administrator's - then set the folder in *Settings* instead.
 
 ### Option 2: run from source (Windows)
 ```bat
@@ -335,6 +340,21 @@ ffmpeg: a system one is used only if `ffmpeg -version` works, otherwise a pinned
 **Unsloth is deliberately not used**: as of 2026-10-03 it has no Qwen3-TTS fine-tuning support and its dependency pins conflict with the verified set;
 Voxprint trains with its own LoRA loop.
 
+## Backup, restore and existing models
+**Settings (gear) -> Models and voices.**
+* **Back up models and voices...** - pick any folder or drive (external disk, NAS share). Voxprint copies to `<folder>\Voxprint-backup\`: every complete model it uses (its own models folder plus complete copies from the Hugging Face cache of other
+  programs: TTS bases, forced aligner, clean-up models), the pinned ffmpeg build if it was downloaded, and - with *Include my voices* ticked (default) - the voice library. Before anything is written you see the size and the free space of the target;
+  if it will not fit, you get a clear message ("needs X, Y free") and **nothing** is copied. Progress and Cancel are shown in the dialog.
+* **Resumable, skips identical files.** Each file is written as `name.part` and renamed when complete; a cancelled / crashed run loses at most that file and the next run continues. A file is skipped when the size and modification time match
+  (or, if the time differs, the SHA-256 matches). `voxprint-backup.json` (the manifest) lists every file with size, SHA-256 and time; an interrupted run never removes items the manifest already vouched for. The backup is plain files: browse it, zip it, copy it by hand.
+* **Restore from backup...** - pick the folder that contains `Voxprint-backup` (or that folder itself). Every file is verified against the manifest hash (the copy is read back); models are staged in `<name>.restoring` and swapped in only when complete, so a half-restored model is
+  never used. A model that differs from the backup is replaced after the new copy is verified; a **voice that exists with different content is never overwritten** (it is reported). Files already identical are skipped.
+* **Existing models folder** - name a folder with models from a previous install (an old `...\Voxprint\models` folder, a Voxprint backup, a Hugging Face cache). Before downloading anything, Voxprint **imports** a complete copy from there
+  (`infra/existing_models.py`, ahead of the read-only reuse above): a **hard link** if the folder is on the same drive (instant, no extra space), otherwise a **copy**; verified by SHA-256 (against the backup manifest when there is one, else by reading the copy back);
+  the same completeness and revision rules as for any foreign copy apply, and a failed or corrupt import falls back to the normal download. The source folder is never modified. Storage: `state\existing_models_dir.txt` (override: `VOXPRINT_EXISTING_MODELS`);
+  `VOXPRINT_NO_EXTERNAL_MODELS` does not switch off this explicitly chosen folder. Choosing a folder in Settings offers to import right away (nothing is downloaded); the installer page sets the same file and the first start imports.
+Limits: resume works per file (a half-copied multi-GB file starts over); not verified on real removable media / NTFS hard links / a NAS (tests use temporary folders and fake disk usage).
+
 ## Tested on Windows
 Real run on **Windows Server 2025 + NVIDIA RTX 4090** (driver 610.88 / CUDA 13.3, Python 3.11.9, torch 2.14.1+cu130), 2026-10-03.
 The 4090 has 22.5 GiB; the app was tested against a 16 GiB cap to emulate a 16 GB laptop GPU.
@@ -377,7 +397,7 @@ Ideas, not promises:
 * A real **voices repository** (the index URL in the program is a placeholder today).
 * **Android** - later: convert the merged model for phones (GGUF / LiteRT; today the merged folder is a plain Hugging Face directory a converter can start from).
 * **Installer channels** - *online* (small installer, downloads components), *offline* (everything included), and *beta* (pre-releases).
-* English and German installer wizard texts (the current Inno Setup wizard is Russian-only), a public repository URL and a published licence for the Voxprint source code.
+* A public repository URL and a published licence for the Voxprint source code.
 * More languages in the UI (see "Adding a language" below) and Linux/macOS builds.
 
 ## Contributing
@@ -456,6 +476,7 @@ before the first public release. Important points:
 * **The narrator on real hardware.** `core/tts_engine.py` (loading Qwen3-TTS with the LoRA adapter and `generate_voice_clone`) is written against the qwen-tts API but has **never run on a GPU**; everything around it (parsers, chunker, cache/resume,
   assembly, ffmpeg command lines, UI) is tested with a fake engine and a fake ffmpeg. Also untested: the real encoders in the pinned ffmpeg build (`libopus`, `libmp3lame`, `aac`, MP4 with Opus, Opus chapter markers, ID3 CHAP frames),
   preview playback (QtMultimedia) on Windows, how chapters show up in the listed players, and the Studio/Acrylic look on a real desktop.
+* **Backup / restore and the installer page on real hardware.** `infra/backup.py` / `infra/existing_models.py` are tested with temporary folders and fake disk usage only (cancel/resume, space check, hash mismatch, hard link vs copy). Untested: real USB/NAS targets, NTFS hard links, exFAT timestamps, multi-GB files. `installer/Voxprint.iss` (trilingual texts, the *Existing models* page, `SaveStringsToUTF8File`) was linted by tests but **never compiled with Inno Setup**.
 * **Text preparation on real books.** The rule steps are unit-tested on synthetic Russian/English samples only (not on real FB2/EPUB corpora); the AI clean-up (`SageEngine`, model download, speed on CPU/GPU, how many of its proposals the validator accepts) has never run for real.
 * Reuse against a **real** Alexandria/Pinokio install on Windows; a real ModelScope download after the certificate fix; the pinned LGPL ffmpeg download and swap on Windows (file locking).
 * Alignment quality/speed and the `align_long` and quality-filter thresholds on real (non-synthetic, non-English) recordings.
