@@ -27,7 +27,8 @@ call ".venv\Scripts\activate.bat"
 python -m pip install -U pip wheel uv || exit /b 1
 
 echo === PyTorch (CUDA, automatic selection) ===
-uv pip install torch torchaudio --torch-backend=auto
+if not defined VOX_TORCH_BACKEND set VOX_TORCH_BACKEND=auto
+uv pip install torch torchaudio --torch-backend=%VOX_TORCH_BACKEND%
 if errorlevel 1 (
     echo [i] uv could not select wheels - trying the cu128 index
     python -m pip install -r requirements-torch.txt || exit /b 1
