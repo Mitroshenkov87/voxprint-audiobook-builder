@@ -245,10 +245,10 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
     spk = speaker_embedding_from_ref(hf_model, data["ref_audio"], device, dtype)
     samples = prepare_samples(data["rows"], tokenize, encode_audio, spk, device, plan.max_seconds_per_item,
                               progress, cancel, warnings)
-    # peft goes on the talker (like train_lora.py): the adapter keys are relative to the talker
+
     for p in hf_model.parameters():
         p.requires_grad_(False)
-    # peft - на talker (как train_lora.py): ключи адаптера относительны к talker
+    # peft goes on the talker (like train_lora.py): the adapter keys are relative to the talker
     peft_talker = get_peft_model(hf_model.talker, build_lora_config(plan.lora_r, plan.lora_alpha))
     hf_model.talker = peft_talker
     base_talker = peft_talker.base_model.model
@@ -256,12 +256,12 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
         peft_talker.enable_input_require_grads()
         if plan.gradient_checkpointing:
             base_talker.model.gradient_checkpointing_enable()
-    except Exception as exc:  # noqa: BLE001 - без checkpointing просто больше памяти
+    except Exception as exc:  # noqa: BLE001 - without checkpointing it just uses more memory
         log.warning("gradient checkpointing unavailable: %s", exc)
     params = [p for p in peft_talker.parameters() if p.requires_grad]
-    for p in params:  # LoRA weights in fp32 for stability (peft usually does this itself)
+    if not params:
         raise TrainingError(tr("err.no_lora_layers"))
-    for p in params:  # LoRA-веса в fp32 для устойчивости (peft обычно делает это сам)
+    for p in params:  # LoRA weights in fp32 for stability (peft usually does this itself)
         p.data = p.data.float()
     log.info("LoRA trainable params: %d (r=%d alpha=%d lr=%g epochs=%d accum=%d, %d samples)",
              sum(p.numel() for p in params), plan.lora_r, plan.lora_alpha, plan.lr, plan.epochs,

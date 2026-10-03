@@ -205,7 +205,7 @@ class FallbackAligner(BaseAligner):
         """Load the primary aligner; on failure (other than OOM) try the backup."""
         try:
             self.primary.load()
-        except Exception as fb_exc:  # noqa: BLE001 - backup unavailable: report the original cause
+        except OutOfMemoryError_:
             raise
         except Exception as exc:  # noqa: BLE001
             log.warning("primary aligner failed to load (%s) - switching to fallback", exc)
@@ -257,7 +257,7 @@ class FakeAligner(BaseAligner):
 
     def align(self, audio: np.ndarray, sr: int, text: str, language: str) -> List[WordTiming]:
         """Distribute the words evenly (by letter count) across the voiced interval of ``audio``."""
-# --------------------------------------------------------------------------- long audio
+        self.calls += 1
         tokens = [clean_token(t) for t in text.split()]
         tokens = [t for t in tokens if t]
         if not tokens:
@@ -348,10 +348,10 @@ def align_long(
 
     while True:
         cancel_check()
-        # index of the clause where the accumulated letter count is closest to the estimate
+        remaining = total - t0
         frac_done = min(0.99, t0 / total)
         on_progress(frac_done, tr("progress.aligning_chunk", done=int(t0 // 60), total=int(total // 60) + 1))
-        for k in range(1, n_units - ui):  # always leave at least one clause for the remainder
+        if remaining <= max_chunk_sec * 1.1 or ui >= n_units - 1:
             chunk = audio[int(t0 * sr):]
             chunk_text = " ".join(units[ui:])
             ws = aligner.align(chunk, sr, chunk_text, language)
