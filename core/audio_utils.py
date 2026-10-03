@@ -84,6 +84,25 @@ def resample(x: np.ndarray, sr_from: int, sr_to: int) -> np.ndarray:
     return np.clip(y, -1.0, 1.0).astype(np.float32)
 
 
+def _read_with_ffmpeg(path: Path) -> Tuple[np.ndarray, int]:
+    """Декодирует через ffmpeg напрямую во временный WAV. Не требует ffprobe (его нет в колесе imageio-ffmpeg, а pydub
+    для m4a/aac/mp4 его вызывает - иначе [WinError 2])."""
+    import subprocess
+    import tempfile
+
+    exe = ensure_ffmpeg()
+    if not exe:
+        raise FileNotFoundError("ffmpeg not found")
+    with tempfile.TemporaryDirectory(prefix="voxprint_") as tmp:
+        out = Path(tmp) / "decoded.wav"
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        proc = subprocess.run([exe, "-v", "error", "-nostdin", "-y", "-i", str(path), "-vn", "-acodec", "pcm_f32le",
+                               str(out)], capture_output=True, creationflags=flags)
+        if proc.returncode != 0 or not out.exists():
+            raise RuntimeError(proc.stderr.decode("utf-8", "replace").strip()[-300:] or f"ffmpeg rc={proc.returncode}")
+        return _read_with_soundfile(out)
+
+
 def _read_with_pydub(path: Path) -> Tuple[np.ndarray, int]:
     ensure_ffmpeg()
     from pydub import AudioSegment
@@ -112,7 +131,7 @@ def load_audio(path, target_sr: int = 16000) -> Tuple[np.ndarray, int]:
         raise AudioReadError(tr("err.audio_missing", path=p))
     errors: List[str] = []
     order = [_read_with_soundfile, _read_with_pydub] if p.suffix.lower() in (".wav", ".flac", ".ogg") else [
-        _read_with_pydub, _read_with_soundfile]
+        _read_with_ffmpeg, _read_with_pydub, _read_with_soundfile]
     for reader in order:
         try:
             x, sr = reader(p)
@@ -135,7 +154,7 @@ def load_audio_multi(path, rates: Tuple[int, ...]) -> dict:
     x, sr = None, 0
     errors: List[str] = []
     order = [_read_with_soundfile, _read_with_pydub] if p.suffix.lower() in (".wav", ".flac", ".ogg") else [
-        _read_with_pydub, _read_with_soundfile]
+        _read_with_ffmpeg, _read_with_pydub, _read_with_soundfile]
     for reader in order:
         try:
             x, sr = reader(p)
