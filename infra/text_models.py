@@ -53,7 +53,7 @@ REGISTRY: Tuple[TextModel, ...] = (
               "oliverguhr/spelling-correction-english-base", "", 535, "MIT", False),
     TextModel("spell-de", KIND_CLEANUP, STEP_SPELLFIX, "German spelling correction", ("de",),
               "oliverguhr/spelling-correction-german-base", "", 950, "Apache-2.0", False),
-    TextModel("stress-ru", KIND_STRESS, STEP_STRESS, "Russian stress and ё", ("ru",), "", "", 0, "", False),
+    TextModel("stress-ru", KIND_STRESS, STEP_STRESS, "Russian stress marks and the letter yo", ("ru",), "", "", 0, "", False),
     TextModel("translate-opus", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT (ru<->en, de<->en)", ("ru", "en", "de"),
               "Helsinki-NLP/opus-mt-ru-en", "", 300, "CC-BY-4.0", False),
     TextModel("translate-madlad", KIND_TRANSLATE, STEP_TRANSLATE, "MADLAD-400 3B (CTranslate2 int8)", ("ru", "en", "de", "uk", "be"),

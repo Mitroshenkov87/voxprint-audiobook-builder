@@ -32,6 +32,14 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 * Status: optional, not bundled
 * Licence text: [`licenses/CC-BY-NC-4.0.txt`](licenses/CC-BY-NC-4.0.txt)
 
+### SAGE FRED-T5 distilled 95M (ai-forever/sage-fredt5-distilled-95m)
+
+* Purpose: Optional Russian spelling and punctuation proposer for book preparation (downloaded on request, about 365 MB; every proposal is checked by a validator)
+* Licence: MIT
+* Project: <https://huggingface.co/ai-forever/sage-fredt5-distilled-95m>
+* Status: downloaded on first start
+* Licence text: [`licenses/sage-fredt5.txt`](licenses/sage-fredt5.txt)
+
 ## Libraries and programs shipped with Voxprint
 
 ### qwen-tts

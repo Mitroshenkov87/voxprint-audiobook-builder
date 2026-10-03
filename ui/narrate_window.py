@@ -7,10 +7,14 @@ stopped.
 
 Output formats (see :mod:`core.audiobook_export`): the default is one Ogg Opus file with chapter markers; per-chapter MP3
 is the most compatible alternative; M4B (AAC, for Apple Books) is a separate, clearly marked opt-in with a legal note and
-can be hidden completely (:mod:`infra.features`); more formats and the bitrates sit under "Other formats and quality".
+can be hidden completely (:mod:`infra.features`).  The quality is chosen with three preset buttons (Compact / Standard /
+High, see :data:`core.audiobook_export.QUALITY_PRESETS`); exact bitrates, the output folder, the chapter-title option and a
+sample of the prepared text sit in the collapsed "Advanced" section, the rarely needed formats in "Other formats".
 
-Extension points that are deliberately *not* implemented yet are only mentioned in one line of text ("coming later"):
-text clean-up, translation and multi-voice role markup.
+"Prepare the text" is fully automatic (no editor, no review): the rule-based steps of :mod:`core.text_prep` are check
+boxes (all on by default), the optional AI clean-up of :mod:`core.text_cleanup` needs a one-time model download (button in
+the row, :class:`workers.narrate_worker.TextModelDownloadWorker`) and works for Russian books only.  Steps that do not exist
+yet (punctuation model, stress marks, translation, speaker roles) are shown greyed out in a collapsed "coming later" list.
 """
 from __future__ import annotations
 
@@ -25,15 +29,16 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxL
 
 from core import audiobook_export as ex
 from core import narration as nr
+from core import text_prep
 from core.book_parsers import SUPPORTED_EXTENSIONS, Book, load_book
 from core.errors import DatasetMakerError
 from core.i18n import tr
 from core.voice_library import VoiceLibrary
-from infra import features
+from infra import features, text_models
 from ui.main_window import open_folder
 from ui.voices_window import make_badge
 from ui.window_base import SubWindow, card_frame, fit_to_screen, hint_label
-from workers.narrate_worker import NarrateWorker
+from workers.narrate_worker import NarrateWorker, TextModelDownloadWorker
 from workers.narration_runner import NarrationJob, default_output_dir, format_eta, run_narration
 
 log = logging.getLogger("voxprint.ui.narrate")
@@ -43,6 +48,38 @@ MAIN_FORMATS: Tuple[str, ...] = (ex.FORMAT_OPUS_SINGLE, ex.FORMAT_MP3_CHAPTERS)
 OTHER_FORMATS: Tuple[str, ...] = (ex.FORMAT_M4B_OPUS, ex.FORMAT_OPUS_CHAPTERS, ex.FORMAT_MP3_SINGLE,
                                   ex.FORMAT_FLAC_CHAPTERS, ex.FORMAT_WAV_CHAPTERS)
 CHARS_PER_SECOND = 14.0         # rough speaking rate used for the "about N hours" estimate
+#: Rule-based preparation steps shown as check boxes (all on by default), in display order.
+RULE_STEPS: Tuple[str, ...] = (text_prep.STEP_LAYOUT, text_prep.STEP_NOISE, text_prep.STEP_QUOTES, text_prep.STEP_LINKS,
+                               text_prep.STEP_HEADINGS, text_prep.STEP_NUMBERS, text_prep.STEP_ABBREV)
+#: Steps that are only announced (no code yet): greyed out in the collapsed "coming later" list.
+LATER_STEPS: Tuple[str, ...] = (text_models.STEP_PUNCT, text_models.STEP_STRESS, text_models.STEP_TRANSLATE,
+                                text_models.STEP_ROLES)
+SPELLFIX_MODEL = "sage-ru"      # registry key of the model behind the "fix typos" step
+SAMPLE_CHARS = 420              # length of the prepared-text sample
+
+
+def prep_texts() -> Dict[str, Tuple[str, str]]:
+    """``{step: (name, one-line description)}`` of the preparation steps in the current language."""
+    return {
+        text_prep.STEP_LAYOUT: (tr("prep.layout"), tr("prep.layout_d")),
+        text_prep.STEP_NOISE: (tr("prep.noise"), tr("prep.noise_d")),
+        text_prep.STEP_QUOTES: (tr("prep.quotes"), tr("prep.quotes_d")),
+        text_prep.STEP_LINKS: (tr("prep.links"), tr("prep.links_d")),
+        text_prep.STEP_HEADINGS: (tr("prep.headings"), tr("prep.headings_d")),
+        text_prep.STEP_NUMBERS: (tr("prep.numbers"), tr("prep.numbers_d")),
+        text_prep.STEP_ABBREV: (tr("prep.abbrev"), tr("prep.abbrev_d")),
+        text_models.STEP_SPELLFIX: (tr("prep.spellfix"), tr("prep.spellfix_d")),
+    }
+
+
+def later_texts() -> Dict[str, str]:
+    """``{step: name}`` of the announced (not yet available) steps."""
+    return {
+        text_models.STEP_PUNCT: tr("prep.later_punct"),
+        text_models.STEP_STRESS: tr("prep.later_stress"),
+        text_models.STEP_TRANSLATE: tr("prep.later_translate"),
+        text_models.STEP_ROLES: tr("prep.later_roles"),
+    }
 
 
 def format_texts() -> Dict[str, Tuple[str, str]]:
@@ -70,8 +107,12 @@ class NarrateWindow(SubWindow):
     def __init__(self, library: Optional[VoiceLibrary] = None, runner: Callable[..., Any] = run_narration,
                  pick_book: Optional[Callable[[], str]] = None, pick_folder: Optional[Callable[[], str]] = None,
                  out_dir: Optional[Path] = None, aac_allowed: Optional[bool] = None,
-                 auto_open_folder: bool = True) -> None:
-        """Build the window.  ``runner`` and the file pickers are injectable (tests); ``aac_allowed`` overrides the feature flag."""
+                 auto_open_folder: bool = True, model_state: Callable[[Any], str] = text_models.state,
+                 model_ensure: Callable[..., Any] = text_models.ensure,
+                 plan_builder: Callable[..., Any] = text_models.build_plan) -> None:
+        """Build the window.  ``runner``, the file pickers and the text-model hooks (``model_state(model)``,
+        ``model_ensure(model, progress)``, ``plan_builder(rule_steps, neural_steps)``) are injectable (tests);
+        ``aac_allowed`` overrides the feature flag."""
         super().__init__(with_back=True)
         self.library = library or VoiceLibrary()
         self.runner = runner
@@ -79,6 +120,7 @@ class NarrateWindow(SubWindow):
         self.out_dir: Path = Path(out_dir) if out_dir else default_output_dir()
         self.aac_allowed = features.aac_enabled() if aac_allowed is None else aac_allowed
         self.auto_open_folder = auto_open_folder
+        self.model_state, self.model_ensure, self.plan_builder = model_state, model_ensure, plan_builder
         self.book: Optional[Book] = None
         self.book_path: Optional[Path] = None
         self.worker: Optional[NarrateWorker] = None
@@ -86,8 +128,16 @@ class NarrateWindow(SubWindow):
         self.format_checks: Dict[str, QCheckBox] = {}
         self.format_desc: Dict[str, QLabel] = {}
         self.format_names: Dict[str, QLabel] = {}
+        self.prep_checks: Dict[str, QCheckBox] = {}
+        self.prep_desc: Dict[str, QLabel] = {}
+        self.later_checks: Dict[str, QCheckBox] = {}
+        self.preset_buttons: Dict[str, QPushButton] = {}
+        self.model_worker: Optional[TextModelDownloadWorker] = None
+        self._model_msg = ""                    # last download message ("" = show the state text)
+        self._spell_wanted = True               # the user's wish for the AI step (default on once it is available)
         self._build()
         self.retranslate()
+        self._sync_preset()
         self.refresh_voices()
         fit_to_screen(self, self.content, 820, 600)
 
@@ -102,6 +152,18 @@ class NarrateWindow(SubWindow):
         parent_layout.addWidget(desc)
         self.format_checks[fmt], self.format_desc[fmt] = chk, desc
         chk.toggled.connect(lambda _c: self._refresh_buttons())
+        return chk
+
+    def _prep_row(self, key: str, parent_layout: QVBoxLayout, checked: bool) -> QCheckBox:
+        """A preparation check box with its one-line description below."""
+        chk = QCheckBox()
+        chk.setChecked(checked)
+        desc = hint_label()
+        desc.setContentsMargins(26, 0, 0, 0)
+        parent_layout.addWidget(chk)
+        parent_layout.addWidget(desc)
+        self.prep_checks[key], self.prep_desc[key] = chk, desc
+        chk.toggled.connect(lambda c, k=key: self._on_prep_toggled(k, c))
         return chk
 
     def _build(self) -> None:
@@ -167,7 +229,48 @@ class NarrateWindow(SubWindow):
         v.addWidget(self.no_voice)
         self.body.addWidget(c)
 
-        # --- output ---
+        # --- prepare the text (automatic: rules, then the optional AI clean-up) ---
+        c = card_frame()
+        v = QVBoxLayout(c)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(6)
+        self.lbl_prep_title = QLabel()
+        self.lbl_prep_title.setObjectName("sectiontitle")
+        v.addWidget(self.lbl_prep_title)
+        self.lbl_prep_hint = hint_label()
+        v.addWidget(self.lbl_prep_hint)
+        for key in RULE_STEPS:
+            self._prep_row(key, v, checked=True)
+        self._prep_row(text_models.STEP_SPELLFIX, v, checked=False)
+        mrow = QHBoxLayout()
+        mrow.setContentsMargins(26, 0, 0, 0)
+        self.lbl_model_state = QLabel()
+        self.lbl_model_state.setObjectName("cardnote")
+        self.btn_model_download = QPushButton()
+        mrow.addWidget(self.lbl_model_state, 1)
+        mrow.addWidget(self.btn_model_download)
+        v.addLayout(mrow)
+        self.btn_more_prep = QToolButton()
+        self.btn_more_prep.setObjectName("expander")
+        self.btn_more_prep.setCheckable(True)
+        v.addWidget(self.btn_more_prep)
+        self.more_prep_box = QWidget()
+        mv = QVBoxLayout(self.more_prep_box)
+        mv.setContentsMargins(0, 0, 0, 0)
+        mv.setSpacing(4)
+        for key in LATER_STEPS:
+            chk = QCheckBox()
+            chk.setEnabled(False)
+            mv.addWidget(chk)
+            self.later_checks[key] = chk
+        self.lbl_later_note = hint_label()
+        mv.addWidget(self.lbl_later_note)
+        self.more_prep_box.setVisible(False)
+        v.addWidget(self.more_prep_box)
+        self.btn_more_prep.toggled.connect(self._on_more_prep_toggled)
+        self.body.addWidget(c)
+
+        # --- output format and quality ---
         c = card_frame()
         v = QVBoxLayout(c)
         v.setContentsMargins(16, 14, 16, 14)
@@ -203,7 +306,23 @@ class NarrateWindow(SubWindow):
         self.aac_box.setVisible(self.aac_allowed)
         self.lbl_aac_disclaimer.setVisible(False)
         self.format_checks[ex.FORMAT_M4B].toggled.connect(self._on_aac_toggled)
-        # other formats + bitrates
+        # quality presets
+        self.lbl_quality = QLabel()
+        self.lbl_quality.setObjectName("sectiontitle")
+        v.addWidget(self.lbl_quality)
+        prow = QHBoxLayout()
+        for name in ex.QUALITY_PRESETS:
+            btn = QPushButton()
+            btn.setCheckable(True)
+            btn.setObjectName("preset")
+            btn.clicked.connect(lambda _c=False, n=name: self.apply_preset(n))
+            prow.addWidget(btn)
+            self.preset_buttons[name] = btn
+        prow.addStretch(1)
+        v.addLayout(prow)
+        self.lbl_preset_info = hint_label()
+        v.addWidget(self.lbl_preset_info)
+        # other formats (collapsed)
         self.btn_other = QToolButton()
         self.btn_other.setObjectName("expander")
         self.btn_other.setCheckable(True)
@@ -214,12 +333,27 @@ class NarrateWindow(SubWindow):
         ov.setSpacing(6)
         for fmt in OTHER_FORMATS:
             self._format_row(fmt, ov)
+        self.other_box.setVisible(False)
+        v.addWidget(self.other_box)
+        self.btn_other.toggled.connect(self._on_other_toggled)
+        # advanced (collapsed): exact bitrates, output folder, chapter titles, text sample
+        self.btn_advanced = QToolButton()
+        self.btn_advanced.setObjectName("expander")
+        self.btn_advanced.setCheckable(True)
+        v.addWidget(self.btn_advanced)
+        self.advanced_box = QWidget()
+        dv = QVBoxLayout(self.advanced_box)
+        dv.setContentsMargins(0, 0, 0, 0)
+        dv.setSpacing(6)
         brow = QHBoxLayout()
         self.spn_opus, self.spn_mp3, self.spn_aac = QSpinBox(), QSpinBox(), QSpinBox()
-        for spn, lo, hi, val in ((self.spn_opus, 12, 128, 32), (self.spn_mp3, 32, 320, 96), (self.spn_aac, 24, 256, 64)):
+        std = ex.QUALITY_PRESETS[ex.DEFAULT_PRESET]
+        for spn, lo, hi, val in ((self.spn_opus, 12, 128, std.opus_kbps), (self.spn_mp3, 32, 320, std.mp3_kbps),
+                                 (self.spn_aac, 24, 256, std.aac_kbps)):
             spn.setRange(lo, hi)
             spn.setValue(val)
             spn.setSuffix(" kbit/s")
+            spn.valueChanged.connect(self._on_rate_changed)
         self.lbl_rate_opus, self.lbl_rate_mp3, self.lbl_rate_aac = QLabel(), QLabel(), QLabel()
         for lbl, spn in ((self.lbl_rate_opus, self.spn_opus), (self.lbl_rate_mp3, self.spn_mp3),
                          (self.lbl_rate_aac, self.spn_aac)):
@@ -227,27 +361,29 @@ class NarrateWindow(SubWindow):
             brow.addWidget(spn)
         brow.addStretch(1)
         self.rates_row = brow
-        ov.addLayout(brow)
+        dv.addLayout(brow)
         self.lbl_rates_hint = hint_label()
-        ov.addWidget(self.lbl_rates_hint)
-        self.other_box.setVisible(False)
-        v.addWidget(self.other_box)
-        self.btn_other.toggled.connect(self._on_other_toggled)
-        # output folder + options
+        dv.addWidget(self.lbl_rates_hint)
         frow = QHBoxLayout()
         self.btn_out = QPushButton()
         self.lbl_out = QLabel()
         self.lbl_out.setObjectName("fileLabel")
         frow.addWidget(self.btn_out)
         frow.addWidget(self.lbl_out, 1)
-        v.addLayout(frow)
+        dv.addLayout(frow)
         self.chk_titles = QCheckBox()
         self.chk_titles.setChecked(True)
-        v.addWidget(self.chk_titles)
+        dv.addWidget(self.chk_titles)
+        self.lbl_sample_title = QLabel()
+        self.lbl_sample_title.setObjectName("sectiontitle")
+        self.lbl_sample = hint_label()
+        self.lbl_sample.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        dv.addWidget(self.lbl_sample_title)
+        dv.addWidget(self.lbl_sample)
+        self.advanced_box.setVisible(False)
+        v.addWidget(self.advanced_box)
+        self.btn_advanced.toggled.connect(self._on_advanced_toggled)
         self.body.addWidget(c)
-
-        self.lbl_later = hint_label()
-        self.body.addWidget(self.lbl_later)
 
         # --- run ---
         self.btn_start = QPushButton()
@@ -282,6 +418,7 @@ class NarrateWindow(SubWindow):
 
         self.btn_book.clicked.connect(self.choose_book)
         self.btn_out.clicked.connect(self.choose_folder)
+        self.btn_model_download.clicked.connect(self.download_model)
         self.btn_start.clicked.connect(self.start)
         self.btn_pause.clicked.connect(self.toggle_pause)
         self.btn_cancel.clicked.connect(self.cancel)
@@ -307,7 +444,27 @@ class NarrateWindow(SubWindow):
         self.lbl_no_voice.setText(tr("narr.no_voice"))
         self.btn_to_train.setText(tr("studio.train_title"))
         self.btn_to_voices.setText(tr("studio.voices_title"))
+        self.lbl_prep_title.setText(tr("narr.prep_title"))
+        self.lbl_prep_hint.setText(tr("narr.prep_hint"))
+        for key, (name, desc) in prep_texts().items():
+            self.prep_checks[key].setText(name)
+            self.prep_desc[key].setText(desc)
+        self.btn_model_download.setText(tr("prep.model_download"))
+        later = later_texts()
+        for key, chk in self.later_checks.items():
+            chk.setText(f"{later[key]}  \u00b7  {tr('prep.later_tag')}")
+        self.lbl_later_note.setText(tr("prep.later_note"))
+        self._on_more_prep_toggled(self.btn_more_prep.isChecked())
+        self._refresh_model_row()
         self.lbl_format_title.setText(tr("narr.format"))
+        self.lbl_quality.setText(tr("narr.quality"))
+        self.preset_buttons["compact"].setText(tr("narr.preset_compact"))
+        self.preset_buttons["standard"].setText(tr("narr.preset_standard"))
+        self.preset_buttons["high"].setText(tr("narr.preset_high"))
+        self._sync_preset()
+        self._on_advanced_toggled(self.btn_advanced.isChecked())
+        self.lbl_sample_title.setText(tr("narr.sample"))
+        self._update_sample()
         names = format_texts()
         for fmt, chk in self.format_checks.items():
             chk.setText(names[fmt][0])
@@ -323,7 +480,6 @@ class NarrateWindow(SubWindow):
         self.btn_out.setText(tr("narr.choose_folder"))
         self.lbl_out.setText(str(self.out_dir))
         self.chk_titles.setText(tr("narr.speak_titles"))
-        self.lbl_later.setText(tr("narr.coming_later"))
         self.btn_start.setText(tr("narr.start"))
         self.btn_pause.setText(tr("narr.resume") if self._paused() else tr("narr.pause"))
         self.btn_cancel.setText(tr("ui.cancel"))
@@ -336,9 +492,166 @@ class NarrateWindow(SubWindow):
         self._refresh_buttons()
 
     def _on_other_toggled(self, open_: bool) -> None:
-        """Expand / collapse "Other formats and quality"."""
+        """Expand / collapse "Other formats"."""
         self.other_box.setVisible(open_)
         self.btn_other.setText(("\u25be " if open_ else "\u25b8 ") + tr("narr.other_formats"))
+
+    def _on_advanced_toggled(self, open_: bool) -> None:
+        """Expand / collapse "Advanced" (bitrates, output folder, chapter titles, text sample)."""
+        self.advanced_box.setVisible(open_)
+        self.btn_advanced.setText(("\u25be " if open_ else "\u25b8 ") + tr("narr.advanced"))
+        if open_:
+            self._update_sample()
+
+    def _on_more_prep_toggled(self, open_: bool) -> None:
+        """Expand / collapse the greyed-out "coming later" steps."""
+        self.more_prep_box.setVisible(open_)
+        self.btn_more_prep.setText(("\u25be " if open_ else "\u25b8 ") + tr("prep.more"))
+
+    # ------------------------------------------------------------------ quality presets
+    def apply_preset(self, name: str) -> None:
+        """Set the three bitrates from a preset (Compact / Standard / High)."""
+        b = ex.QUALITY_PRESETS[name]
+        for spn, val in ((self.spn_opus, b.opus_kbps), (self.spn_mp3, b.mp3_kbps), (self.spn_aac, b.aac_kbps)):
+            spn.blockSignals(True)
+            spn.setValue(val)
+            spn.blockSignals(False)
+        self._sync_preset()
+
+    def current_preset(self) -> str:
+        """Name of the preset equal to the spin boxes, ``""`` for custom values."""
+        return ex.preset_for(self.bitrates())
+
+    def bitrates(self) -> ex.Bitrates:
+        """Bitrates of the spin boxes in the Advanced section."""
+        return ex.Bitrates(self.spn_aac.value(), self.spn_mp3.value(), self.spn_opus.value())
+
+    def _on_rate_changed(self, _v: int = 0) -> None:
+        """A bitrate was edited by hand: the matching preset (if any) is highlighted, otherwise none."""
+        self._sync_preset()
+
+    def _sync_preset(self) -> None:
+        """Highlight the matching preset button, update the one-line description and the size estimate."""
+        name = self.current_preset()
+        for key, btn in self.preset_buttons.items():
+            btn.setChecked(key == name)
+        text = {"compact": tr("narr.preset_compact_d"), "standard": tr("narr.preset_standard_d"),
+                "high": tr("narr.preset_high_d"), "": tr("narr.preset_custom_d")}[name]
+        b = self.bitrates()
+        chosen = self.selected_formats()
+        parts = []
+        if chosen & {ex.FORMAT_OPUS_SINGLE, ex.FORMAT_OPUS_CHAPTERS, ex.FORMAT_M4B_OPUS} or not chosen:
+            parts.append("Opus " + tr("narr.mb", n=round(ex.megabytes_per_hour(b.opus_kbps))))
+        if chosen & {ex.FORMAT_MP3_CHAPTERS, ex.FORMAT_MP3_SINGLE}:
+            parts.append("MP3 " + tr("narr.mb", n=round(ex.megabytes_per_hour(b.mp3_kbps))))
+        if ex.FORMAT_M4B in chosen:
+            parts.append("AAC " + tr("narr.mb", n=round(ex.megabytes_per_hour(b.aac_kbps))))
+        self.lbl_preset_info.setText(text + " " + tr("narr.size_hint", sizes=" \u00b7 ".join(parts)))
+
+    # ------------------------------------------------------------------ text preparation
+    def selected_rule_steps(self) -> Set[str]:
+        """Rule-based preparation steps that are checked."""
+        return {k for k in RULE_STEPS if self.prep_checks[k].isChecked()}
+
+    def selected_neural_steps(self) -> Set[str]:
+        """Neural steps that are checked and usable (the clean-up model must be downloaded)."""
+        chk = self.prep_checks[text_models.STEP_SPELLFIX]
+        return {text_models.STEP_SPELLFIX} if chk.isChecked() and chk.isEnabled() else set()
+
+    def book_language(self) -> str:
+        """Language code of the loaded book (``""`` = unknown / no book)."""
+        return text_prep.resolve_language(self.book) if self.book else ""
+
+    def _on_prep_toggled(self, key: str, checked: bool) -> None:
+        """A preparation check box was clicked."""
+        if key == text_models.STEP_SPELLFIX and self.prep_checks[key].isEnabled():
+            self._spell_wanted = checked
+        self._update_sample()
+        self._refresh_buttons()
+
+    def _refresh_model_row(self) -> None:
+        """State of the AI clean-up row: ready / needs a download / downloading / wrong language."""
+        model = text_models.get(SPELLFIX_MODEL)
+        lang = self.book_language()
+        lang_ok = not lang or lang in model.languages
+        ready = self.model_state(model) == text_models.STATE_READY
+        downloading = bool(self.model_worker and self.model_worker.isRunning())
+        chk = self.prep_checks[text_models.STEP_SPELLFIX]
+        usable = ready and lang_ok and not self.busy
+        chk.blockSignals(True)
+        chk.setEnabled(usable)
+        chk.setChecked(usable and self._spell_wanted)
+        chk.blockSignals(False)
+        if not lang_ok:
+            msg = tr("prep.model_lang")
+        elif self._model_msg:
+            msg = self._model_msg
+        elif ready:
+            msg = tr("prep.model_ready")
+        else:
+            msg = tr("prep.model_needs", size=model.size_mb)
+        self.lbl_model_state.setText(msg)
+        self.btn_model_download.setVisible(not ready and lang_ok)
+        self.btn_model_download.setEnabled(not downloading and not self.busy)
+
+    def download_model(self) -> bool:
+        """Download the clean-up model in the background; returns False if nothing was started."""
+        if self.model_worker and self.model_worker.isRunning():
+            return False
+        model = text_models.get(SPELLFIX_MODEL)
+        w = TextModelDownloadWorker(model, self.model_ensure, parent=self)
+        w.progress.connect(self._on_model_progress)
+        w.done.connect(self._on_model_done)
+        w.failed.connect(self._on_model_failed)
+        self.model_worker = w
+        self._model_msg = tr("prep.model_downloading", pct=0)
+        self._refresh_model_row()
+        w.start()
+        self._refresh_model_row()
+        return True
+
+    def _on_model_progress(self, fraction: float) -> None:
+        """Download progress of the clean-up model."""
+        self._model_msg = tr("prep.model_downloading", pct=int(fraction * 100))
+        self.lbl_model_state.setText(self._model_msg)
+
+    def _on_model_done(self, _key: str) -> None:
+        """The model is on disk: the step becomes available (and is switched on by default)."""
+        self._model_msg = ""
+        self._spell_wanted = True
+        self._refresh_model_row()
+        self._refresh_buttons()
+
+    def _on_model_failed(self, message: str) -> None:
+        """The download failed: the message is shown, the button stays for a retry."""
+        self._model_msg = tr("prep.model_failed", error=message)
+        self._refresh_model_row()
+
+    def sample_text(self) -> str:
+        """The prepared version of the first paragraph the rules change (else of the first paragraph)."""
+        if not self.book:
+            return ""
+        lang = self.book_language()
+        opts = text_prep.PrepOptions(frozenset(self.selected_rule_steps()))
+        paras = [p.strip() for ch in self.book.chapters[:3] for p in ch.text.split("\n\n") if len(p.strip()) >= 30][:60]
+        if not paras:
+            return ""
+        first = ""
+        for para in paras:
+            out = text_prep.prepare_text_block(para, lang, opts) if opts.steps else para
+            if out != para:
+                first = out
+                break
+        if not first:
+            first = (text_prep.prepare_text_block(paras[0], lang, opts) if opts.steps else paras[0]) + "  " + tr("narr.sample_same")
+        return first if len(first) <= SAMPLE_CHARS else first[:SAMPLE_CHARS].rsplit(" ", 1)[0] + "\u2026"
+
+    def _update_sample(self) -> None:
+        """Refresh the read-only sample in the Advanced section (only while it is visible, it is cheap but pointless otherwise)."""
+        if not self.book:
+            self.lbl_sample.setText(tr("narr.sample_none"))
+        elif self.advanced_box.isVisible() or self.btn_advanced.isChecked():
+            self.lbl_sample.setText(self.sample_text())
 
     def _on_aac_toggled(self, checked: bool) -> None:
         """The full AAC disclaimer is shown while M4B is selected."""
@@ -370,6 +683,8 @@ class NarrateWindow(SubWindow):
         self.lbl_ready.hide()
         self.btn_open.hide()
         self._render_book_info()
+        self._refresh_model_row()
+        self._update_sample()
         self._refresh_buttons()
         return True
 
@@ -448,9 +763,9 @@ class NarrateWindow(SubWindow):
     def options(self) -> nr.NarrationOptions:
         """Build the narration options from the controls."""
         return nr.NarrationOptions(
-            formats=self.selected_formats(),
-            bitrates=ex.Bitrates(self.spn_aac.value(), self.spn_mp3.value(), self.spn_opus.value()),
-            speak_titles=self.chk_titles.isChecked(), allow_aac=self.aac_allowed)
+            formats=self.selected_formats(), bitrates=self.bitrates(),
+            speak_titles=self.chk_titles.isChecked(), allow_aac=self.aac_allowed,
+            prep=self.plan_builder(self.selected_rule_steps(), self.selected_neural_steps()))
 
     # ------------------------------------------------------------------ state
     @property
@@ -469,6 +784,11 @@ class NarrateWindow(SubWindow):
         self.btn_start.setEnabled(ready)
         self.btn_book.setEnabled(not busy)
         self.btn_out.setEnabled(not busy)
+        for chk in self.prep_checks.values():
+            if chk is not self.prep_checks[text_models.STEP_SPELLFIX]:
+                chk.setEnabled(not busy)
+        self._refresh_model_row()
+        self._sync_preset()
         self.cmb_voice.setEnabled(not busy)
         self.btn_pause.setVisible(busy)
         self.btn_cancel.setVisible(busy)
@@ -554,6 +874,8 @@ class NarrateWindow(SubWindow):
         if self.worker and self.worker.isRunning():
             self.worker.cancel()
             self.worker.wait(8000)
+        if self.model_worker and self.model_worker.isRunning():
+            self.model_worker.wait(8000)
 
     def closeEvent(self, e) -> None:  # noqa: N802
         """Stop the worker before closing."""

@@ -17,6 +17,7 @@ from core import audiobook_export as ex
 from core import i18n, voice_info
 from core import narration as nr
 from core.voice_library import VoiceLibrary
+from infra import text_models
 from infra import voice_repository as repo
 from tests.test_voice_library import make_adapter
 
@@ -89,7 +90,10 @@ def make_studio(lib, **kw):
                           repo_dialog_factory=kw.pop("repo_dialog_factory", None))
     narrate = NarrateWindow(lib, runner=runner, pick_book=kw.pop("pick_book", None),
                             pick_folder=kw.pop("pick_folder2", None), out_dir=kw.pop("out_dir", None),
-                            aac_allowed=kw.pop("aac_allowed", True), auto_open_folder=False)
+                            aac_allowed=kw.pop("aac_allowed", True), auto_open_folder=False,
+                            model_state=kw.pop("model_state", lambda m: "needs_download"),
+                            model_ensure=kw.pop("model_ensure", lambda m, progress: None),
+                            plan_builder=kw.pop("plan_builder", text_models.build_plan))
     return StudioWindow(library=lib, trainer=trainer, voices=voices, narrate=narrate)
 
 
@@ -423,12 +427,13 @@ def test_format_defaults_groups_and_descriptions(app, lib):
         texts = format_texts()
         assert set(texts) == set(ex.ALL_FORMATS) and all(a and b and a != b for a, b in texts.values())
     i18n.set_language("en")
-    # other formats are behind the expander
-    assert not n.other_box.isVisibleTo(n)
+    # other formats are behind the expander (it holds formats only: bitrates live under "Advanced")
+    assert not n.other_box.isVisibleTo(n) and n.btn_other.text().endswith("Other formats")
     n.btn_other.setChecked(True)
     assert n.other_box.isVisibleTo(n) and n.btn_other.text().startswith("\u25be")
     for f in (ex.FORMAT_M4B_OPUS, ex.FORMAT_OPUS_CHAPTERS, ex.FORMAT_MP3_SINGLE, ex.FORMAT_FLAC_CHAPTERS, ex.FORMAT_WAV_CHAPTERS):
         assert n.format_checks[f].isVisibleTo(n) and n.format_desc[f].text()
+    assert not n.other_box.isAncestorOf(n.spn_opus) and not n.other_box.isAncestorOf(n.btn_out)
     assert (n.spn_opus.value(), n.spn_mp3.value(), n.spn_aac.value()) == (32, 96, 64)
     s.shutdown()
 
@@ -501,7 +506,8 @@ def test_full_narration_run_with_progress_eta_and_result(app, lib, tmp_path):
     n.refresh_voices()
     n.load_book_file(write_book(tmp_path))
     n.format_checks[ex.FORMAT_MP3_CHAPTERS].setChecked(True)
-    n.spn_opus.setValue(40)
+    n.spn_opus.setValue(40)                                             # Advanced: exact bitrate -> custom quality
+    assert n.current_preset() == "" and not any(b.isChecked() for b in n.preset_buttons.values())
     n.chk_titles.setChecked(False)
     assert n.start()
     assert n.busy and n.btn_pause.isVisibleTo(n) and n.btn_cancel.isVisibleTo(n) and not n.btn_start.isEnabled()
@@ -561,12 +567,4 @@ def test_non_commercial_voice_shows_a_note_and_badge(app, lib, tmp_path):
     assert n.badge_box.count() == 1 and n.badge_box.itemAt(0).widget().property("commercial") == "false"
     add_voice(lib, tmp_path, "Zed", "CC0-1.0")
     n.refresh_voices(select=lib.list_voices()[0].id)
-    s.shutdown()
-
-
-def test_coming_later_line_is_text_only(app, lib):
-    i18n.set_language("en")
-    s = make_studio(lib)
-    n = s.narrate_window
-    assert "text clean-up, translation and multi-voice roles" in n.lbl_later.text()
     s.shutdown()

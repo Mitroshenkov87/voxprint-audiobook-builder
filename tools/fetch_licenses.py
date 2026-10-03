@@ -22,6 +22,7 @@ SPDX = "https://raw.githubusercontent.com/spdx/license-list-data/main/text/{}.tx
 # file id -> ("repo", "owner/name") | ("url", direct URL) | ("spdx", SPDX identifier)
 SOURCES = {
     "qwen-tts": ("repo", "QwenLM/Qwen3-TTS"),
+    "sage-fredt5": ("spdx", "MIT"),            # the model repository has no LICENSE file; licenses/sage-fredt5.txt carries an explanatory header
     "qwen-asr": ("repo", "QwenLM/Qwen3-ASR"),
     "qwen-omni-utils": ("repo", "QwenLM/Qwen2-VL"),
     "pytorch": ("repo", "pytorch/pytorch"),

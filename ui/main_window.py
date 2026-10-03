@@ -143,6 +143,8 @@ QCheckBox:disabled {{{{ color: {disabled}; }}}}
 QCheckBox::indicator {{{{ width: 16px; height: 16px; border: 1px solid {accent}; border-radius: 4px; background: {control}; }}}}
 QCheckBox::indicator:checked {{{{ background: {strong}; border-color: {soft}; {check_image} }}}}
 QToolButton#expander {{{{ background: transparent; border: none; color: {soft}; font-weight: 600; padding: 4px 2px; }}}}
+QPushButton#preset {{{{ padding: 6px 16px; }}}}
+QPushButton#preset:checked {{{{ background: {strong}; border-color: {soft}; color: #ffffff; font-weight: 600; }}}}
 QSpinBox {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px; padding: 5px 8px; }}}}
 QListWidget {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px; padding: 4px; }}}}
 QListWidget::item {{{{ padding: 6px; }}}}

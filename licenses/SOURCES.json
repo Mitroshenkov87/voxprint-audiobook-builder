@@ -35,6 +35,7 @@
   "ru-normalizr": "https://raw.githubusercontent.com/NickZaitsev/ru-normalizr/main/LICENSE",
   "rutextnorm": "https://raw.githubusercontent.com/shigabeev/russian_tts_normalization/main/LICENSE",
   "safetensors": "https://raw.githubusercontent.com/huggingface/safetensors/main/LICENSE",
+  "sage-fredt5": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/MIT.txt",
   "scipy": "https://raw.githubusercontent.com/scipy/scipy/main/LICENSE.txt",
   "soundfile": "https://raw.githubusercontent.com/bastibe/python-soundfile/master/LICENSE",
   "sox": "https://raw.githubusercontent.com/rabitt/pysox/master/LICENSE",

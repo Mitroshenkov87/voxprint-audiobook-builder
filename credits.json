@@ -56,6 +56,22 @@
    }
   },
   {
+   "id": "sage-fredt5",
+   "name": "SAGE FRED-T5 distilled 95M (ai-forever/sage-fredt5-distilled-95m)",
+   "kind": "model",
+   "ship": "download",
+   "license": "MIT",
+   "license_files": [
+    "sage-fredt5"
+   ],
+   "url": "https://huggingface.co/ai-forever/sage-fredt5-distilled-95m",
+   "purpose": {
+    "en": "Optional Russian spelling and punctuation proposer for book preparation (downloaded on request, about 365 MB; every proposal is checked by a validator)",
+    "de": "Optionaler russischer Rechtschreib- und Zeichensetzungs-Vorschlagsgeber für die Buchvorbereitung (auf Wunsch geladen, ca. 365 MB; jeder Vorschlag wird von einem Prüfer kontrolliert)",
+    "ru": "Необязательная модель для исправления опечаток и пунктуации в русских книгах (загружается по запросу, около 365 МБ; каждое предложение проверяется валидатором)"
+   }
+  },
+  {
    "id": "qwen-tts",
    "name": "qwen-tts",
    "kind": "library",

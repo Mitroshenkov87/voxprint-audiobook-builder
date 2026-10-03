@@ -120,3 +120,31 @@ class RepoDownloadWorker(QThread):
             ids.append(rec.id)
             self.voice_done.emit(rec.id)
         self.finished_all.emit(ids)
+
+
+class TextModelDownloadWorker(QThread):
+    """Downloads an optional text model (e.g. the clean-up model) in the background.
+
+    Signals: ``progress(fraction)``, ``done(key)``, ``failed(message)``."""
+
+    progress = Signal(float)
+    done = Signal(str)
+    failed = Signal(str)
+
+    def __init__(self, model, ensure: Callable[..., Any], parent=None) -> None:
+        """``ensure(model, progress)`` is :func:`infra.text_models.ensure` (injectable for tests)."""
+        super().__init__(parent)
+        self.model, self.ensure = model, ensure
+
+    def run(self) -> None:  # noqa: D401
+        """Thread body."""
+        try:
+            self.ensure(self.model, lambda stage, f, msg="": self.progress.emit(float(f)))
+        except DatasetMakerError as exc:
+            self.failed.emit(exc.user_message)
+            return
+        except Exception as exc:  # noqa: BLE001 - network / disk errors of any kind
+            log.exception("text model download failed")
+            self.failed.emit(str(exc))
+            return
+        self.done.emit(self.model.key)
