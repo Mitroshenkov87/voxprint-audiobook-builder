@@ -17,8 +17,11 @@ def _cat(lang):
     return json.loads((LOC / f"{lang}.json").read_text(encoding="utf-8"))
 
 
-def test_five_languages_and_identical_keys_and_placeholders():
-    assert LANGS == ("en", "de", "ru", "uk", "be")
+def test_three_languages_and_identical_keys_and_placeholders():
+    assert LANGS == ("en", "de", "ru")
+    assert set(i18n.LANG_NAMES) == set(LANGS)
+    # no stray catalogs of dropped/unsupported languages
+    assert sorted(p.stem for p in (ROOT / "locales").glob("*.json")) == sorted(LANGS)
     cats = {l: _cat(l) for l in LANGS}
     base = cats["en"]
     assert len(base) > 150
@@ -33,11 +36,9 @@ def test_scripts_match_languages():
     en, de = _cat("en"), _cat("de")
     assert not [k for k, v in {**{("en", k): v for k, v in en.items()}, **{("de", k): v for k, v in de.items()}}.items()
                 if CYR.search(v)]
-    for l in ("ru", "uk", "be"):
-        c = _cat(l)
-        assert CYR.search(c["ui.btn_lora"]) and CYR.search(c["about.what"])
-    assert _cat("uk")["ui.language"] == "Мова" and _cat("be")["ui.language"] == "Мова"
-    assert _cat("uk")["ui.ready"] != _cat("be")["ui.ready"] or True
+    c = _cat("ru")
+    assert CYR.search(c["ui.btn_lora"]) and CYR.search(c["about.what"])
+    assert c["ui.language"] == "Язык"
 
 
 def test_every_key_used_in_code_exists():
@@ -87,16 +88,17 @@ def test_tr_fallbacks(monkeypatch):
     assert tr("progress.pieces") == _cat("de")["progress.pieces"]            # нет параметра - без исключения
     assert tr("progress.pieces", n=3) == "Erhaltene Fragmente: 3"
     # нет перевода в языке -> английский
-    monkeypatch.setitem(i18n.load_catalog("uk"), "ui.cancel", "")
-    del i18n.load_catalog("uk")["ui.cancel"]
-    i18n.set_language("uk")
+    monkeypatch.setitem(i18n.load_catalog("de"), "ui.cancel", "")
+    del i18n.load_catalog("de")["ui.cancel"]
+    i18n.set_language("de")
     assert tr("ui.cancel") == _cat("en")["ui.cancel"]
-    assert i18n.tr_lang("ui.ready", "be") == _cat("be")["ui.ready"]
+    assert i18n.tr_lang("ui.ready", "ru") == _cat("ru")["ui.ready"]
 
 
 def test_normalize_code():
     n = i18n.normalize_code
-    assert n("ru-RU") == "ru" and n("uk_UA.UTF-8") == "uk" and n("BE") == "be" and n("de-AT") == "de"
+    assert n("ru-RU") == "ru" and n("de_AT.UTF-8") == "de" and n("EN") == "en" and n("de-AT") == "de"
+    assert n("uk_UA.UTF-8") is None and n("be-BY") is None             # Ukrainian/Belarusian are no longer offered
     assert n("fr-FR") is None and n("") is None and n(None) is None and n("C") is None
 
 
@@ -108,13 +110,15 @@ def test_detection_order(monkeypatch, tmp_path):
     i18n.reset()
     assert tr("ui.btn_lora") == "Create voice (LoRA)"
     monkeypatch.setenv("LANG", "uk_UA.UTF-8")
-    assert i18n.detect_language() == "uk"                       # язык системы
-    i18n.set_language("be", persist=True)
-    assert i18n.saved_language() == "be" and i18n.detect_language() == "be"   # сохранённый выбор важнее системы
+    assert i18n.detect_language() == "en"                       # unsupported system language -> English
+    monkeypatch.setenv("LANG", "ru_RU.UTF-8")
+    assert i18n.detect_language() == "ru"                       # язык системы
+    i18n.set_language("de", persist=True)
+    assert i18n.saved_language() == "de" and i18n.detect_language() == "de"   # сохранённый выбор важнее системы
     monkeypatch.setenv("VOXPRINT_LANG", "de")
     assert i18n.detect_language() == "de"                       # переменная окружения важнее всего
     monkeypatch.setenv("VOXPRINT_LANG", "xx")
-    assert i18n.detect_language() == "be"                       # неизвестный код игнорируется
+    assert i18n.detect_language() == "de"                       # неизвестный код игнорируется
 
 
 def test_windows_locale_name(monkeypatch):
@@ -124,7 +128,7 @@ def test_windows_locale_name(monkeypatch):
     class K32:
         @staticmethod
         def GetUserDefaultLocaleName(buf, n):
-            buf.value = "be-BY"
+            buf.value = "de-DE"
             return 5
 
     class Win:
@@ -132,7 +136,7 @@ def test_windows_locale_name(monkeypatch):
 
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr(ctypes, "windll", Win(), raising=False)
-    assert i18n.system_language() == "be"
+    assert i18n.system_language() == "de"
 
 
 def test_stage_labels_follow_language():
@@ -165,8 +169,8 @@ def test_ui_language_switcher_retranslates_and_persists(app):
     from ui.main_window import MainWindow
     w = MainWindow(runner=lambda *a: None, autocheck=False, auto_open_folder=False)
     w.show()
-    assert w.cmb_lang.count() == 5 and w.cmb_lang.currentData() == "ru"
-    assert [w.cmb_lang.itemText(i) for i in range(5)] == ["English", "Deutsch", "Русский", "Українська", "Беларуская"]
+    assert w.cmb_lang.count() == 3 and w.cmb_lang.currentData() == "ru"
+    assert [w.cmb_lang.itemText(i) for i in range(3)] == ["English", "Deutsch", "Русский"]
     w.set_language("en")
     assert w.btn_lora.text() == "Create voice (LoRA)" and w.btn_merge.text() == "Build universal model (~4 GB)"
     assert w.lbl_status.text() == "Choose the audio and the text - I will do the rest."
@@ -175,10 +179,10 @@ def test_ui_language_switcher_retranslates_and_persists(app):
     assert i18n.saved_language() == "en"
     w.set_language("de")
     assert w.btn_dataset.text() == "Datensatz erstellen"
-    w.set_language("uk")
-    assert w.btn_open.text() == "Відкрити теку з результатом"
-    w.set_language("be")
-    assert w.btn_update.text() == "Праверыць абнаўленні"
+    w.set_language("ru")
+    assert w.btn_update.text() == _cat("ru")["ui.btn_update"]
+    w.set_language("uk")                                         # not offered any more: ignored
+    assert w.cmb_lang.currentData() == "ru"
     # выбранный файл не сбрасывается при смене языка
     w.set_audio(Path("/tmp/voice.wav"))
     w.set_language("en")

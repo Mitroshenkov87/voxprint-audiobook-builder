@@ -1,6 +1,6 @@
 """Локализация: простые JSON-каталоги locales/<код>.json (плоские ключи вида "ui.start", параметры {name}).
 
-Языки: en (по умолчанию), de, ru, uk, be. Порядок выбора языка:
+Языки: en (по умолчанию), de, ru. Как добавить язык - README, раздел «Adding a language». Порядок выбора языка:
   1. переменная окружения VOXPRINT_LANG;  2. сохранённый выбор (state/language);
   3. язык системы (Windows: GetUserDefaultLocaleName, иначе LC_ALL/LC_MESSAGES/LANG);  4. английский.
 `tr(key, **params)` никогда не бросает исключений: нет перевода -> английский текст -> сам ключ.
@@ -17,10 +17,10 @@ from typing import Dict, Optional
 
 log = logging.getLogger("voxprint.i18n")
 
-LANGS = ("en", "de", "ru", "uk", "be")
+LANGS = ("en", "de", "ru")
 DEFAULT_LANG = "en"
 #: Названия языков показываются на их собственном языке (в переключателе).
-LANG_NAMES = {"en": "English", "de": "Deutsch", "ru": "Русский", "uk": "Українська", "be": "Беларуская"}
+LANG_NAMES = {"en": "English", "de": "Deutsch", "ru": "Русский"}
 
 _catalogs: Dict[str, Dict[str, str]] = {}
 _current: Optional[str] = None
@@ -45,7 +45,7 @@ def load_catalog(lang: str) -> Dict[str, str]:
 
 
 def normalize_code(value: Optional[str]) -> Optional[str]:
-    """'ru-RU' / 'uk_UA.UTF-8' / 'BE' -> 'ru' / 'uk' / 'be'; неподдерживаемый -> None."""
+    """'ru-RU' / 'de_AT.UTF-8' / 'EN' -> 'ru' / 'de' / 'en'; неподдерживаемый (в т.ч. uk, be) -> None."""
     if not value:
         return None
     code = value.strip().lower().replace("_", "-").split(".")[0].split("@")[0].split("-")[0]

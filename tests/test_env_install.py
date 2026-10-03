@@ -164,7 +164,7 @@ def test_user_messages_in_all_languages():
         msgs = ep.user_messages(rep)
         assert len(msgs) >= 4 and all("{" not in m for m in msgs)
         seen.add(msgs[0])
-    assert len(seen) == 5
+    assert len(seen) == len(i18n.LANGS) == 3
 
 
 def test_updater_reports_environment_and_upgrades_only_own_overlay(tmp_path, monkeypatch):
@@ -274,7 +274,7 @@ def test_health_text_in_all_languages_for_every_code():
         lines = ist.describe_reasons(rep)
         assert len(lines) == len(ist.ALL_CODES) and all("health." not in l and "{" not in l for l in lines)
         seen.add(lines[0])
-    assert len(seen) == 5
+    assert len(seen) == len(i18n.LANGS) == 3
 
 
 def test_cli_verify_and_repair_messages():

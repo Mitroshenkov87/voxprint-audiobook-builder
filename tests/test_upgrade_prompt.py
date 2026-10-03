@@ -19,7 +19,7 @@ from ui.main_window import MainWindow
 from ui.upgrade_dialog import UpgradeOfferDialog
 from workers.process_worker import UpdateWorker
 
-LANGS = ["en", "de", "ru", "uk", "be"]
+LANGS = list(i18n.LANGS)
 
 
 @pytest.fixture(scope="module")

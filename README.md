@@ -36,7 +36,7 @@ A copy is accepted only if it is **complete**: valid `config.json`, every file o
 exist, symlinks resolve, no `*.incomplete` leftovers. It must also match the **verified revision** from `infra/verified_manifest.json`:
 the HF snapshot folder name is the commit sha; folders without a sha (ModelScope, plain folders) are accepted only when the sizes of the
 weight files equal the verified commit. On a mismatch the verified revision is downloaded and the log says so. The updater never touches
-reused copies (it only refreshes Voxprint's own). The message "Found the model ... from another app" is shown in all five languages.
+reused copies (it only refreshes Voxprint's own). The message "Found the model ... from another app" is shown in all three languages (English, German, Russian).
 
 **Download mirror.** If Hugging Face is slow or unreachable (a 6 s probe; skipped when you set your own `HF_ENDPOINT`) or fails, Voxprint
 downloads from **ModelScope** (modelscope.cn, org `Qwen`; the same repository ids, byte-identical file sizes - verified 2026-10-03) and
@@ -45,7 +45,7 @@ confirms the revision by file sizes. Downloads resume after an interruption (`<m
 **Components.** The same idea for Python packages and tools (`infra/env_probe.py`, read-only): *installed and current or proven compatible* -> reused;
 *missing* -> the newest stable verified version is installed into **Voxprint's own environment**
 (its venv / `packages/` overlay), whose components are auto-updated. An *outdated component in your system or another environment* (system Python, Pinokio, conda) is
-**never touched silently**: Voxprint shows a one-click prompt (all 5 languages) offering to upgrade it to the newest stable version and says what changes (which packages, in which
+**never touched silently**: Voxprint shows a one-click prompt (English, German, Russian) offering to upgrade it to the newest stable version and says what changes (which packages, in which
 environment). **Upgrade** -> pip upgrades it there (smoke-tested, the old version is restored on failure); **Not now** and still compatible -> it is used as it is; **Not now** and too old
 -> Voxprint uses its own copy and your environment stays untouched. A declined offer is not repeated for the same version. Versions are read with `importlib.metadata` (nothing imported or written).
 torch: any
@@ -67,7 +67,7 @@ fine-tuning support (issue #3951 open, depends on the unmerged transformers PR #
    The small adapter works only in a few apps (e.g. Alexandria); the ~4 GB model is universal - it works in any app that runs
    Qwen3-TTS. Before starting, Voxprint checks the free disk space and asks for confirmation; the big model is never built
    automatically. The button is enabled once a trained adapter exists.
-5. Language: English, Deutsch, Русский, Українська, Беларуская - the list in the top right corner (default: your system
+5. Language: English, Deutsch, Русский - the list in the top right corner (default: your system
    language, otherwise English; disabled while a task runs). **About** shows the help, the authors and the open-source
    components with their licences, the GitHub link (shown only after the repository URL is set) and the third-party notices.
 
@@ -117,13 +117,26 @@ python tools\gen_notices.py            :: THIRD_PARTY_NOTICES.md (a test checks 
 **Never run `uv run` without `--no-sync`** (it re-syncs the environment and replaces CUDA torch with CPU torch). No flash-attn on Windows.
 Versions: `infra/verified_manifest.json` pins the package versions and model revisions Voxprint was tested with; the updater installs
 those by default (`VOXPRINT_CHANNEL=latest` for newest). `requirements-verified.txt` / `requirements-nodeps.txt` are generated from it.
-App data: `%LOCALAPPDATA%\Voxprint` (`models\`, `logs\`, `state\`, ...; override with `VOXPRINT_HOME`). Interface language override: `VOXPRINT_LANG=en|de|ru|uk|be`.
+App data: `%LOCALAPPDATA%\Voxprint` (`models\`, `logs\`, `state\`, ...; override with `VOXPRINT_HOME`). Interface language override: `VOXPRINT_LANG=en|de|ru`.
 
 ### Localization
-Catalogs are flat JSON files `locales/{en,de,ru,uk,be}.json` (`"ui.start": "...{name}..."`); `core/i18n.py` provides `tr(key, **params)`.
+Supported UI languages: **English (default), German, Russian**. Catalogs are flat JSON files `locales/{en,de,ru}.json` (`"ui.start": "...{name}..."`);
+`core/i18n.py` provides `tr(key, **params)`. A system language that is not supported (e.g. Ukrainian, Belarusian) falls back to English.
 Order: `VOXPRINT_LANG`, saved choice (`state\language`), Windows user locale (`GetUserDefaultLocaleName`), English. A test checks that all
-five files have identical keys and placeholders and that no user-facing literals are left in the code. The component descriptions
+catalogs have identical keys and placeholders and that no user-facing literals are left in the code. The component descriptions
 are localized inside `credits.json`.
+
+#### Adding a language (dev notes)
+Ukrainian and Belarusian were dropped on purpose (fewer languages to keep in sync); their last complete catalogs are in git history
+(`git show cdea827:locales/uk.json`, `...be.json`; component texts in `git show cdea827:credits.json`). To add a language `xx`:
+1. `core/i18n.py`: append `"xx"` to `LANGS` and its own-language name to `LANG_NAMES` (the language switcher and the system-locale
+   mapping `normalize_code` are driven by these two; nothing else is hard-coded).
+2. `locales/xx.json`: copy `en.json` and translate all values; keep every key and every `{placeholder}` (a test enforces both).
+3. `credits.json`: add an `"xx"` text to every `purpose` (and `note`) entry - the credits test requires all `LANGS`.
+4. Run `python -m pytest` - the parity tests (`tests/test_i18n.py`, `tests/test_credits.py`) and the per-language UI/dialog/message tests
+   iterate over `i18n.LANGS`, so they cover the new language automatically; update the two counts that say `3` (the switcher test in
+   `tests/test_i18n.py` and the `len(seen) == 3` checks in `tests/test_env_install.py` / `tests/test_model_locator.py`).
+5. Mention it in the README language list.
 
 ### Repository link
 The GitHub URL lives in one place: `"repo_url"` in `credits.json` (read as `core.appinfo.REPO_URL`). While it still contains the
@@ -209,14 +222,14 @@ Alexandria через **Pinokio** - `<pinokio>\api\alexandria-audiobook.git\cach
 Копия принимается, только если **полная** (валидный `config.json`, все файлы репозитория, включая `speech_tokenizer/`; заголовки и размеры `*.safetensors` согласованы,
 все шарды на месте, симлинки ведут к существующим файлам, нет `*.incomplete`) и совпадает с **проверенной ревизией** из манифеста (у кэша HF - имя папки снимка = sha коммита;
 у папок без sha - совпадение размеров весов с проверенным коммитом). При несовпадении скачивается проверенная ревизия, в журнале пишется причина. Сообщение
-«Найдена модель ... из другой программы» показывается на пяти языках; обновление чужие копии не трогает.
+«Найдена модель ... из другой программы» показывается на трёх языках (English, Deutsch, Русский); обновление чужие копии не трогает.
 
 **Зеркало ModelScope.** Если Hugging Face медленный/недоступен (проба 6 с; при вашем `HF_ENDPOINT` не вмешиваемся) или загрузка не удалась, модели скачиваются с **ModelScope**
 (modelscope.cn, организация `Qwen`; те же идентификаторы репозиториев и те же размеры файлов - проверено 2026-10-03), ревизия подтверждается по размерам. Загрузки
 докачиваются после обрыва. `VOXPRINT_NO_MIRROR=1` отключает зеркало.
 
 **Компоненты.** Тот же принцип для пакетов и программ (`infra/env_probe.py`, только чтение): установлено и актуально/проверенно совместимо → используется; нет → новейшая стабильная проверенная версия ставится в **собственное окружение Voxprint** (его venv / каталог `packages/`), компоненты которого обновляются автоматически.
-**Устаревший компонент в вашей системе или другом окружении** (системный Python, Pinokio, conda) **молча не трогается**: Voxprint показывает простое окно в один клик (на 5 языках) с предложением
+**Устаревший компонент в вашей системе или другом окружении** (системный Python, Pinokio, conda) **молча не трогается**: Voxprint показывает простое окно в один клик (English, Deutsch, Русский) с предложением
 обновить его до новейшей стабильной версии и сообщает, что изменится (какие пакеты и в каком окружении). **Обновить** → pip обновляет компонент там (с проверочным импортом, при сбое возвращается прежняя версия);
 **Не сейчас** и компонент ещё совместим → используется как есть; **Не сейчас** и он слишком старый → Voxprint использует собственную копию, ваше окружение остаётся нетронутым. Отказ для той же версии не повторяется.
 Версии читаются через `importlib.metadata` (ничего не импортируется и не пишется). torch: подходит любая сборка, но вариант CUDA должен соответствовать драйверу NVIDIA
@@ -237,7 +250,7 @@ Voxprint обучает собственным циклом LoRA.
    Маленький адаптер работает лишь в нескольких приложениях (например, Alexandria), большая модель универсальна:
    подходит любому приложению, которое запускает Qwen3-TTS. Перед запуском программа проверяет свободное место и просит подтверждение;
    автоматически модель никогда не собирается. Кнопка активна, когда есть обученный адаптер.
-5. Язык интерфейса (English, Deutsch, Русский, Українська, Беларуская) выбирается списком в правом верхнем углу
+5. Язык интерфейса (English, Deutsch, Русский) выбирается списком в правом верхнем углу
    (по умолчанию — язык системы, иначе английский). Кнопка «О программе» — справка, авторы и список компонентов с лицензиями.
 Плохие фрагменты записи (искажения, тишина, шум) отбрасываются автоматически, числа и сокращения в русском тексте
 раскрываются сами. Обновления проверяются раз в неделю (кнопка «Проверить обновления» — вручную; лог `logs\updater.log`).

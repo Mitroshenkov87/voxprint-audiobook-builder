@@ -8,7 +8,7 @@ from core import appinfo, i18n
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = json.loads((ROOT / "credits.json").read_text(encoding="utf-8"))
-LANGS = ("en", "de", "ru", "uk", "be")
+LANGS = i18n.LANGS
 
 
 def test_credits_json_well_formed():

@@ -19,9 +19,7 @@
    "purpose": {
     "en": "Base text-to-speech models that your voice is trained on",
     "de": "Basis-Sprachsynthesemodelle, auf denen Ihre Stimme trainiert wird",
-    "ru": "Базовые модели синтеза речи, на которых обучается ваш голос",
-    "uk": "Базові моделі синтезу мовлення, на яких навчається ваш голос",
-    "be": "Базавыя мадэлі сінтэзу маўлення, на якіх навучаецца ваш голас"
+    "ru": "Базовые модели синтеза речи, на которых обучается ваш голос"
    }
   },
   {
@@ -37,9 +35,7 @@
    "purpose": {
     "en": "Neural forced aligner: matches every word of the text to a moment in the recording",
     "de": "Neuronaler Forced Aligner: ordnet jedes Wort des Textes einem Zeitpunkt der Aufnahme zu",
-    "ru": "Нейросетевой выравниватель: сопоставляет каждое слово текста с моментом записи",
-    "uk": "Нейромережевий вирівнювач: зіставляє кожне слово тексту з моментом запису",
-    "be": "Нейрасеткавы выраўноўвальнік: супастаўляе кожнае слова тэксту з момантам запісу"
+    "ru": "Нейросетевой выравниватель: сопоставляет каждое слово текста с моментом записи"
    }
   },
   {
@@ -55,9 +51,7 @@
    "purpose": {
     "en": "Optional backup aligner model (only if the optional ctc-forced-aligner package is installed). NON-COMMERCIAL licence!",
     "de": "Optionales Ersatz-Ausrichtungsmodell (nur mit dem optionalen Paket ctc-forced-aligner). NICHT-KOMMERZIELLE Lizenz!",
-    "ru": "Необязательная запасная модель выравнивания (только при установленном пакете ctc-forced-aligner). Лицензия НЕКОММЕРЧЕСКАЯ!",
-    "uk": "Необов'язкова запасна модель вирівнювання (лише за встановленого пакета ctc-forced-aligner). Ліцензія НЕКОМЕРЦІЙНА!",
-    "be": "Неабавязковая запасная мадэль выраўноўвання (толькі пры ўсталяваным пакеце ctc-forced-aligner). Ліцэнзія НЕКАМЕРЦЫЙНАЯ!"
+    "ru": "Необязательная запасная модель выравнивания (только при установленном пакете ctc-forced-aligner). Лицензия НЕКОММЕРЧЕСКАЯ!"
    }
   },
   {
@@ -73,9 +67,7 @@
    "purpose": {
     "en": "Qwen3-TTS model code (speech synthesis and the audio tokenizer)",
     "de": "Qwen3-TTS-Modellcode (Sprachsynthese und Audio-Tokenizer)",
-    "ru": "Код моделей Qwen3-TTS (синтез речи и аудио-токенизатор)",
-    "uk": "Код моделей Qwen3-TTS (синтез мовлення й аудіотокенізатор)",
-    "be": "Код мадэляў Qwen3-TTS (сінтэз маўлення і аўдыятокенізатар)"
+    "ru": "Код моделей Qwen3-TTS (синтез речи и аудио-токенизатор)"
    }
   },
   {
@@ -91,9 +83,7 @@
    "purpose": {
     "en": "Runs the Qwen3 forced aligner",
     "de": "Führt den Qwen3-Forced-Aligner aus",
-    "ru": "Запуск выравнивателя Qwen3",
-    "uk": "Запуск вирівнювача Qwen3",
-    "be": "Запуск выраўноўвальніка Qwen3"
+    "ru": "Запуск выравнивателя Qwen3"
    }
   },
   {
@@ -109,9 +99,7 @@
    "purpose": {
     "en": "Audio/media helpers required by qwen-asr",
     "de": "Audio-/Medien-Hilfsfunktionen für qwen-asr",
-    "ru": "Вспомогательные функции аудио/медиа для qwen-asr",
-    "uk": "Допоміжні функції аудіо/медіа для qwen-asr",
-    "be": "Дапаможныя функцыі аўдыё/медыя для qwen-asr"
+    "ru": "Вспомогательные функции аудио/медиа для qwen-asr"
    }
   },
   {
@@ -127,9 +115,7 @@
    "purpose": {
     "en": "Neural-network engine",
     "de": "Engine für neuronale Netze",
-    "ru": "Движок нейросетей",
-    "uk": "Рушій нейромереж",
-    "be": "Рухавік нейрасетак"
+    "ru": "Движок нейросетей"
    }
   },
   {
@@ -145,9 +131,7 @@
    "purpose": {
     "en": "Audio processing for PyTorch",
     "de": "Audioverarbeitung für PyTorch",
-    "ru": "Обработка звука для PyTorch",
-    "uk": "Обробка звуку для PyTorch",
-    "be": "Апрацоўка гуку для PyTorch"
+    "ru": "Обработка звука для PyTorch"
    }
   },
   {
@@ -163,9 +147,7 @@
    "purpose": {
     "en": "Loads and runs the models",
     "de": "Lädt und führt die Modelle aus",
-    "ru": "Загрузка и запуск моделей",
-    "uk": "Завантаження й запуск моделей",
-    "be": "Загрузка і запуск мадэляў"
+    "ru": "Загрузка и запуск моделей"
    }
   },
   {
@@ -181,9 +163,7 @@
    "purpose": {
     "en": "LoRA voice adapters: training, saving and merging",
     "de": "LoRA-Stimmadapter: Training, Speichern und Zusammenführen",
-    "ru": "Голосовые адаптеры LoRA: обучение, сохранение и слияние",
-    "uk": "Голосові адаптери LoRA: навчання, збереження й злиття",
-    "be": "Галасавыя адаптары LoRA: навучанне, захаванне і зліццё"
+    "ru": "Голосовые адаптеры LoRA: обучение, сохранение и слияние"
    }
   },
   {
@@ -199,9 +179,7 @@
    "purpose": {
     "en": "Device and memory management",
     "de": "Geräte- und Speicherverwaltung",
-    "ru": "Управление устройствами и памятью",
-    "uk": "Керування пристроями й пам'яттю",
-    "be": "Кіраванне прыладамі і памяццю"
+    "ru": "Управление устройствами и памятью"
    }
   },
   {
@@ -217,9 +195,7 @@
    "purpose": {
     "en": "Downloads the models",
     "de": "Lädt die Modelle herunter",
-    "ru": "Скачивание моделей",
-    "uk": "Завантаження моделей",
-    "be": "Спампоўванне мадэляў"
+    "ru": "Скачивание моделей"
    }
   },
   {
@@ -235,9 +211,7 @@
    "purpose": {
     "en": "Safe model weight files",
     "de": "Sichere Modellgewichts-Dateien",
-    "ru": "Безопасные файлы весов моделей",
-    "uk": "Безпечні файли ваг моделей",
-    "be": "Бяспечныя файлы вагаў мадэляў"
+    "ru": "Безопасные файлы весов моделей"
    }
   },
   {
@@ -253,9 +227,7 @@
    "purpose": {
     "en": "8-bit optimizer that saves video memory",
     "de": "8-Bit-Optimierer, der Grafikspeicher spart",
-    "ru": "8-битный оптимизатор, экономящий видеопамять",
-    "uk": "8-бітний оптимізатор, що заощаджує відеопам'ять",
-    "be": "8-бітны аптымізатар, што эканоміць відэапамяць"
+    "ru": "8-битный оптимизатор, экономящий видеопамять"
    }
   },
   {
@@ -272,16 +244,12 @@
    "purpose": {
     "en": "The window and all interface elements",
     "de": "Das Fenster und alle Oberflächenelemente",
-    "ru": "Окно и все элементы интерфейса",
-    "uk": "Вікно й усі елементи інтерфейсу",
-    "be": "Акно і ўсе элементы інтэрфейсу"
+    "ru": "Окно и все элементы интерфейса"
    },
    "note": {
     "en": "Used unmodified and dynamically linked. Prefer the folder-type build (build.bat onedir) so the Qt/PySide6 libraries can be replaced. Source: https://code.qt.io and https://pyside.org.",
     "de": "Unverändert und dynamisch gelinkt verwendet. Bevorzugen Sie den Ordner-Build (build.bat onedir), damit die Qt/PySide6-Bibliotheken ersetzt werden können. Quellcode: https://code.qt.io und https://pyside.org.",
-    "ru": "Используется без изменений, с динамической компоновкой. Лучше собирать «папкой» (build.bat onedir), чтобы библиотеки Qt/PySide6 можно было заменить. Исходный код: https://code.qt.io и https://pyside.org.",
-    "uk": "Використовується без змін, з динамічним компонуванням. Краще збирати «текою» (build.bat onedir), щоб бібліотеки Qt/PySide6 можна було замінити. Вихідний код: https://code.qt.io та https://pyside.org.",
-    "be": "Выкарыстоўваецца без змен, з дынамічнай кампаноўкай. Лепш збіраць «папкай» (build.bat onedir), каб бібліятэкі Qt/PySide6 можна было замяніць. Зыходны код: https://code.qt.io і https://pyside.org."
+    "ru": "Используется без изменений, с динамической компоновкой. Лучше собирать «папкой» (build.bat onedir), чтобы библиотеки Qt/PySide6 можно было заменить. Исходный код: https://code.qt.io и https://pyside.org."
    }
   },
   {
@@ -297,9 +265,7 @@
    "purpose": {
     "en": "Numerical arrays",
     "de": "Numerische Arrays",
-    "ru": "Числовые массивы",
-    "uk": "Числові масиви",
-    "be": "Лікавыя масівы"
+    "ru": "Числовые массивы"
    }
   },
   {
@@ -315,9 +281,7 @@
    "purpose": {
     "en": "Signal processing (filtering, resampling)",
     "de": "Signalverarbeitung (Filter, Resampling)",
-    "ru": "Обработка сигналов (фильтры, ресемплинг)",
-    "uk": "Обробка сигналів (фільтри, ресемплінг)",
-    "be": "Апрацоўка сігналаў (фільтры, рэсэмплінг)"
+    "ru": "Обработка сигналов (фильтры, ресемплинг)"
    }
   },
   {
@@ -333,9 +297,7 @@
    "purpose": {
     "en": "Audio analysis",
     "de": "Audioanalyse",
-    "ru": "Анализ звука",
-    "uk": "Аналіз звуку",
-    "be": "Аналіз гуку"
+    "ru": "Анализ звука"
    }
   },
   {
@@ -351,9 +313,7 @@
    "purpose": {
     "en": "Reading and writing WAV/FLAC files (uses libsndfile, LGPL, shipped in the wheel)",
     "de": "Lesen und Schreiben von WAV/FLAC-Dateien (nutzt libsndfile, LGPL, im Wheel enthalten)",
-    "ru": "Чтение и запись WAV/FLAC (использует libsndfile, LGPL, входит в пакет)",
-    "uk": "Читання й запис WAV/FLAC (використовує libsndfile, LGPL, входить до пакета)",
-    "be": "Чытанне і запіс WAV/FLAC (выкарыстоўвае libsndfile, LGPL, уваходзіць у пакет)"
+    "ru": "Чтение и запись WAV/FLAC (использует libsndfile, LGPL, входит в пакет)"
    }
   },
   {
@@ -369,9 +329,7 @@
    "purpose": {
     "en": "Opening MP3 and other audio formats",
     "de": "Öffnen von MP3 und anderen Audioformaten",
-    "ru": "Открытие MP3 и других аудиоформатов",
-    "uk": "Відкриття MP3 та інших аудіоформатів",
-    "be": "Адкрыццё MP3 і іншых аўдыяфарматаў"
+    "ru": "Открытие MP3 и других аудиоформатов"
    }
   },
   {
@@ -387,9 +345,7 @@
    "purpose": {
     "en": "Provides the ffmpeg program used to decode audio formats",
     "de": "Stellt das Programm ffmpeg zum Dekodieren von Audioformaten bereit",
-    "ru": "Поставляет программу ffmpeg для декодирования аудиоформатов",
-    "uk": "Постачає програму ffmpeg для декодування аудіоформатів",
-    "be": "Пастаўляе праграму ffmpeg для дэкадавання аўдыяфарматаў"
+    "ru": "Поставляет программу ffmpeg для декодирования аудиоформатов"
    }
   },
   {
@@ -405,16 +361,12 @@
    "purpose": {
     "en": "Audio decoding (separate program, run as a subprocess)",
     "de": "Audio-Dekodierung (eigenständiges Programm, als Unterprozess gestartet)",
-    "ru": "Декодирование звука (отдельная программа, запускается как подпроцесс)",
-    "uk": "Декодування звуку (окрема програма, запускається як підпроцес)",
-    "be": "Дэкадаванне гуку (асобная праграма, запускаецца як падпрацэс)"
+    "ru": "Декодирование звука (отдельная программа, запускается как подпроцесс)"
    },
    "note": {
     "en": "Separate executable, not linked into Voxprint. Source code: https://ffmpeg.org/download.html#get-sources (build scripts of the binary: https://github.com/imageio/imageio-binaries). The GPL text is in licenses/gpl-3.0.txt.",
     "de": "Eigenständige ausführbare Datei, nicht in Voxprint eingebunden. Quellcode: https://ffmpeg.org/download.html#get-sources (Build-Skripte der Binärdatei: https://github.com/imageio/imageio-binaries). Der GPL-Text steht in licenses/gpl-3.0.txt.",
-    "ru": "Отдельный исполняемый файл, не скомпонован с Voxprint. Исходный код: https://ffmpeg.org/download.html#get-sources (скрипты сборки бинарника: https://github.com/imageio/imageio-binaries). Текст GPL: licenses/gpl-3.0.txt.",
-    "uk": "Окремий виконуваний файл, не скомпонований із Voxprint. Вихідний код: https://ffmpeg.org/download.html#get-sources (скрипти збирання бінарника: https://github.com/imageio/imageio-binaries). Текст GPL: licenses/gpl-3.0.txt.",
-    "be": "Асобны выканальны файл, не скампанаваны з Voxprint. Зыходны код: https://ffmpeg.org/download.html#get-sources (скрыпты зборкі бінарніка: https://github.com/imageio/imageio-binaries). Тэкст GPL: licenses/gpl-3.0.txt."
+    "ru": "Отдельный исполняемый файл, не скомпонован с Voxprint. Исходный код: https://ffmpeg.org/download.html#get-sources (скрипты сборки бинарника: https://github.com/imageio/imageio-binaries). Текст GPL: licenses/gpl-3.0.txt."
    }
   },
   {
@@ -430,9 +382,7 @@
    "purpose": {
     "en": "Tensor reshaping used by the models",
     "de": "Tensor-Umformung, die von den Modellen genutzt wird",
-    "ru": "Преобразование тензоров в моделях",
-    "uk": "Перетворення тензорів у моделях",
-    "be": "Пераўтварэнне тэнзараў у мадэлях"
+    "ru": "Преобразование тензоров в моделях"
    }
   },
   {
@@ -448,9 +398,7 @@
    "purpose": {
     "en": "Neural-network runtime required by qwen-tts",
     "de": "Laufzeit für neuronale Netze, von qwen-tts benötigt",
-    "ru": "Среда выполнения нейросетей, нужная qwen-tts",
-    "uk": "Середовище виконання нейромереж, потрібне qwen-tts",
-    "be": "Асяроддзе выканання нейрасетак, патрэбнае qwen-tts"
+    "ru": "Среда выполнения нейросетей, нужная qwen-tts"
    }
   },
   {
@@ -466,9 +414,7 @@
    "purpose": {
     "en": "Japanese word segmentation required by qwen-asr",
     "de": "Japanische Wortsegmentierung, von qwen-asr benötigt",
-    "ru": "Разбиение японского текста на слова (нужно qwen-asr)",
-    "uk": "Розбиття японського тексту на слова (потрібне qwen-asr)",
-    "be": "Падзел японскага тэксту на словы (патрэбны qwen-asr)"
+    "ru": "Разбиение японского текста на слова (нужно qwen-asr)"
    }
   },
   {
@@ -484,9 +430,7 @@
    "purpose": {
     "en": "Python wrapper required by qwen-tts (the SoX program itself is not shipped)",
     "de": "Python-Wrapper, von qwen-tts benötigt (das Programm SoX selbst wird nicht mitgeliefert)",
-    "ru": "Python-обёртка, нужная qwen-tts (сама программа SoX не поставляется)",
-    "uk": "Python-обгортка, потрібна qwen-tts (сама програма SoX не постачається)",
-    "be": "Python-абгортка, патрэбная qwen-tts (сама праграма SoX не пастаўляецца)"
+    "ru": "Python-обёртка, нужная qwen-tts (сама программа SoX не поставляется)"
    }
   },
   {
@@ -502,9 +446,7 @@
    "purpose": {
     "en": "Spelling out Russian numbers and abbreviations",
     "de": "Ausschreiben russischer Zahlen und Abkürzungen",
-    "ru": "Раскрытие русских чисел и сокращений",
-    "uk": "Розкриття російських чисел і скорочень",
-    "be": "Раскрыццё рускіх лікаў і скарачэнняў"
+    "ru": "Раскрытие русских чисел и сокращений"
    }
   },
   {
@@ -520,9 +462,7 @@
    "purpose": {
     "en": "Backup Russian text normalization",
     "de": "Russische Ersatz-Textnormalisierung",
-    "ru": "Запасная нормализация русского текста",
-    "uk": "Запасна нормалізація російського тексту",
-    "be": "Запасная нармалізацыя рускага тэксту"
+    "ru": "Запасная нормализация русского текста"
    }
   },
   {
@@ -539,9 +479,7 @@
    "purpose": {
     "en": "Russian morphology (word forms)",
     "de": "Russische Morphologie (Wortformen)",
-    "ru": "Русская морфология (формы слов)",
-    "uk": "Російська морфологія (форми слів)",
-    "be": "Руская марфалогія (формы слоў)"
+    "ru": "Русская морфология (формы слов)"
    }
   },
   {
@@ -557,16 +495,12 @@
    "purpose": {
     "en": "Numbers to words",
     "de": "Zahlen in Worte",
-    "ru": "Числа словами",
-    "uk": "Числа словами",
-    "be": "Лікі словамі"
+    "ru": "Числа словами"
    },
    "note": {
     "en": "Pure-Python library used unmodified; the LGPL allows replacing it with another version (it is a normal Python package).",
     "de": "Reine Python-Bibliothek, unverändert verwendet; die LGPL erlaubt den Austausch gegen eine andere Version (normales Python-Paket).",
-    "ru": "Чисто питоновская библиотека, используется без изменений; LGPL позволяет заменить её другой версией (обычный Python-пакет).",
-    "uk": "Суто питонівська бібліотека, використовується без змін; LGPL дозволяє замінити її іншою версією (звичайний Python-пакет).",
-    "be": "Чыста пітонаўская бібліятэка, выкарыстоўваецца без змен; LGPL дазваляе замяніць яе іншай версіяй (звычайны Python-пакет)."
+    "ru": "Чисто питоновская библиотека, используется без изменений; LGPL позволяет заменить её другой версией (обычный Python-пакет)."
    }
   },
   {
@@ -582,9 +516,7 @@
    "purpose": {
     "en": "Roman numerals",
     "de": "Römische Zahlen",
-    "ru": "Римские цифры",
-    "uk": "Римські цифри",
-    "be": "Рымскія лічбы"
+    "ru": "Римские цифры"
    }
   },
   {
@@ -600,9 +532,7 @@
    "purpose": {
     "en": "English words in Russian text",
     "de": "Englische Wörter im russischen Text",
-    "ru": "Английские слова в русском тексте",
-    "uk": "Англійські слова в російському тексті",
-    "be": "Англійскія словы ў рускім тэксце"
+    "ru": "Английские слова в русском тексте"
    }
   },
   {
@@ -619,9 +549,7 @@
    "purpose": {
     "en": "Version comparison for updates",
     "de": "Versionsvergleich für Updates",
-    "ru": "Сравнение версий для обновлений",
-    "uk": "Порівняння версій для оновлень",
-    "be": "Параўнанне версій для абнаўленняў"
+    "ru": "Сравнение версий для обновлений"
    }
   },
   {
@@ -638,9 +566,7 @@
    "purpose": {
     "en": "Progress bars",
     "de": "Fortschrittsbalken",
-    "ru": "Индикаторы прогресса",
-    "uk": "Індикатори прогресу",
-    "be": "Індыкатары прагрэсу"
+    "ru": "Индикаторы прогресса"
    }
   },
   {
@@ -656,16 +582,12 @@
    "purpose": {
     "en": "Optional backup aligner; not bundled, installed by the user on request",
     "de": "Optionaler Ersatz-Aligner; nicht enthalten, auf Wunsch vom Benutzer installiert",
-    "ru": "Необязательный запасной выравниватель; не входит в поставку, ставится пользователем по желанию",
-    "uk": "Необов'язковий запасний вирівнювач; не входить до поставки, встановлюється користувачем за бажанням",
-    "be": "Неабавязковы запасны выраўноўвальнік; не ўваходзіць у пастаўку, усталёўваецца карыстальнікам па жаданні"
+    "ru": "Необязательный запасной выравниватель; не входит в поставку, ставится пользователем по желанию"
    },
    "note": {
     "en": "The PyPI package of this name is published from a fork whose licence metadata is empty; check it before installing.",
     "de": "Das PyPI-Paket dieses Namens stammt aus einem Fork ohne Lizenzangabe; prüfen Sie dies vor der Installation.",
-    "ru": "Пакет с таким именем на PyPI опубликован из форка без сведений о лицензии; проверьте это перед установкой.",
-    "uk": "Пакет із такою назвою на PyPI опубліковано з форку без відомостей про ліцензію; перевірте це перед встановленням.",
-    "be": "Пакет з такой назвай на PyPI апублікаваны з форка без звестак пра ліцэнзію; праверце гэта перад усталяваннем."
+    "ru": "Пакет с таким именем на PyPI опубликован из форка без сведений о лицензии; проверьте это перед установкой."
    }
   },
   {
@@ -681,16 +603,12 @@
    "purpose": {
     "en": "Audio decoding. Used only if no working ffmpeg is installed on the computer; downloaded once and checked by a pinned checksum",
     "de": "Audio-Dekodierung. Nur genutzt, wenn auf dem Computer kein funktionierendes ffmpeg installiert ist; einmalig geladen und per fester Prüfsumme geprüft",
-    "ru": "Декодирование звука. Используется, только если на компьютере нет рабочего ffmpeg; скачивается один раз и проверяется по закреплённой контрольной сумме",
-    "uk": "Декодування звуку. Використовується, лише якщо на комп'ютері немає робочого ffmpeg; завантажується один раз і перевіряється за закріпленою контрольною сумою",
-    "be": "Дэкадаванне гуку. Выкарыстоўваецца, толькі калі на камп'ютары няма працоўнага ffmpeg; спампоўваецца адзін раз і правяраецца па замацаванай кантрольнай суме"
+    "ru": "Декодирование звука. Используется, только если на компьютере нет рабочего ffmpeg; скачивается один раз и проверяется по закреплённой контрольной сумме"
    },
    "note": {
     "en": "Separate executable, not linked into Voxprint. Source code: https://ffmpeg.org/download.html#get-sources (build scripts: https://github.com/BtbN/FFmpeg-Builds).",
     "de": "Eigenständige ausführbare Datei, nicht in Voxprint eingebunden. Quellcode: https://ffmpeg.org/download.html#get-sources (Build-Skripte: https://github.com/BtbN/FFmpeg-Builds).",
-    "ru": "Отдельный исполняемый файл, не скомпонован с Voxprint. Исходный код: https://ffmpeg.org/download.html#get-sources (скрипты сборки: https://github.com/BtbN/FFmpeg-Builds).",
-    "uk": "Окремий виконуваний файл, не скомпонований із Voxprint. Вихідний код: https://ffmpeg.org/download.html#get-sources (скрипти збирання: https://github.com/BtbN/FFmpeg-Builds).",
-    "be": "Асобны выканальны файл, не скампанаваны з Voxprint. Зыходны код: https://ffmpeg.org/download.html#get-sources (скрыпты зборкі: https://github.com/BtbN/FFmpeg-Builds)."
+    "ru": "Отдельный исполняемый файл, не скомпонован с Voxprint. Исходный код: https://ffmpeg.org/download.html#get-sources (скрипты сборки: https://github.com/BtbN/FFmpeg-Builds)."
    }
   },
   {
@@ -707,9 +625,7 @@
    "purpose": {
     "en": "Installs packages when building (not shipped)",
     "de": "Installiert Pakete beim Erstellen (nicht enthalten)",
-    "ru": "Устанавливает пакеты при сборке (не поставляется)",
-    "uk": "Встановлює пакети під час збирання (не постачається)",
-    "be": "Усталёўвае пакеты пры зборцы (не пастаўляецца)"
+    "ru": "Устанавливает пакеты при сборке (не поставляется)"
    }
   },
   {
@@ -725,9 +641,7 @@
    "purpose": {
     "en": "Packs the program into an application (its bootloader is embedded; the exception allows distribution under any licence)",
     "de": "Verpackt das Programm zu einer Anwendung (der Bootloader ist eingebettet; die Ausnahme erlaubt die Verbreitung unter beliebiger Lizenz)",
-    "ru": "Упаковывает программу в приложение (загрузчик встроен; исключение разрешает распространение под любой лицензией)",
-    "uk": "Пакує програму в застосунок (завантажувач вбудовано; виняток дозволяє розповсюдження під будь-якою ліцензією)",
-    "be": "Пакуе праграму ў праграмны пакет (загрузчык убудаваны; выключэнне дазваляе распаўсюд пад любой ліцэнзіяй)"
+    "ru": "Упаковывает программу в приложение (загрузчик встроен; исключение разрешает распространение под любой лицензией)"
    }
   },
   {
@@ -743,9 +657,7 @@
    "purpose": {
     "en": "Creates the installer",
     "de": "Erstellt das Installationsprogramm",
-    "ru": "Создаёт установщик",
-    "uk": "Створює інсталятор",
-    "be": "Стварае ўсталёўшчык"
+    "ru": "Создаёт установщик"
    }
   },
   {
@@ -761,9 +673,7 @@
    "purpose": {
     "en": "The fingerprint icon of the application (modified)",
     "de": "Das Fingerabdruck-Symbol der Anwendung (angepasst)",
-    "ru": "Значок-отпечаток приложения (изменён)",
-    "uk": "Значок-відбиток застосунку (змінено)",
-    "be": "Значок-адбітак праграмы (зменены)"
+    "ru": "Значок-отпечаток приложения (изменён)"
    }
   }
  ]

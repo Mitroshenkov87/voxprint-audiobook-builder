@@ -379,7 +379,7 @@ def test_updater_ignores_external_models(env):
 
 
 # ------------------------------------------------------------------------------------- locale message
-def test_reuse_message_in_all_five_locales():
+def test_reuse_message_in_all_locales():
     texts = set()
     for lang in i18n.LANGS:
         i18n.set_language(lang)
@@ -387,7 +387,7 @@ def test_reuse_message_in_all_five_locales():
             t = i18n.tr(key, short="Qwen3-TTS-12Hz-1.7B-Base", where="C:\\x")
             assert t != key and "{" not in t and "Qwen3-TTS-12Hz-1.7B-Base" in t
         texts.add(i18n.tr("progress.model_reused", short="S", where="W"))
-    assert len(texts) == 5
+    assert len(texts) == len(i18n.LANGS) == 3
 
 
 # ------------------------------------------------------------------------------------- ModelScope mirror
