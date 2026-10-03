@@ -331,7 +331,7 @@ When the library is empty the window says *{{voices.empty}}* and offers **{{voic
 
 **{{voices.import}}** offers two ways: **{{voices.import_folder}}** (an adapter folder) and **{{voices.import_zip}}** (a voice package). Archives are checked for unsafe paths and size limits. A voice that arrives without a declared licence is treated as *personal use only*.
 
-## Licences and the two voices that Voxprint offers
+## Licences and the voice that Voxprint offers
 
 | Licence | Commercial use |
 |---|---|
@@ -341,11 +341,10 @@ When the library is empty the window says *{{voices.empty}}* and offers **{{voic
 | custom/test-use-only | not allowed; for testing only, no public release |
 
 * **Open universal voice** (German UI: *Offene Universalstimme*, Russian UI: *Открытый универсальный голос*) – an English voice for people who have no recording of their own. Trained only from the public-domain LJ Speech dataset (reader Linda Johnson, LibriVox); licence **CC0-1.0** – free for any use, also commercial; attribution to the LJ Speech dataset (Keith Ito) is appreciated.
-* **Александр (Alexander)** – a male Russian voice, the first one trained with Voxprint. Licence: **personal use only** – no public use of the output, no commercial projects (scope *{{consent.badge_private_only}}*).
 
-Both are downloaded separately (not inside the installer) from the voice repository.
+It is downloaded separately (not inside the installer) from the voice repository.
 
-> The pictures here and in chapter 5 use demonstration voices; in the screenshots the voice "Alexander" still carries an earlier test-licence label. In the released voice list its badge reads "Personal use only" as described here.
+> The pictures here and in chapter 5 use demonstration voices. Voices you train yourself are *personal use only* by default (scope *{{consent.badge_private_only}}*): no public use of the output, no commercial projects.
 
 The badge is information, not legal advice. The licence covers the voice model only.
 

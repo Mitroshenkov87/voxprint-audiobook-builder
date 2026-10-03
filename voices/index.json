@@ -2,29 +2,6 @@
   "schema": 1,
   "voices": [
     {
-      "id": "alexander",
-      "name": "Александр",
-      "language": "Russian",
-      "author": "Aleksandr Mitroshenkov",
-      "license": "custom/personal-only",
-      "voice_type": "male",
-      "description": "Male Russian voice, the first voice trained with Voxprint. Personal use only: no public use of the output, no commercial projects.",
-      "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-      "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/alexander.zip",
-      "sha256": "b58664ba28b578a3b8a4d45c5d3044f73e21ec83ba8ec7a1dabdb1a37c5698e7",
-      "size_bytes": 53635659,
-      "names": {
-        "ru": "Александр",
-        "en": "Alexander",
-        "de": "Alexander"
-      },
-      "descriptions": {
-        "ru": "Мужской русский голос, первый голос, обученный в Voxprint. Только для личного использования: без публикации результатов и без коммерческих проектов.",
-        "en": "Male Russian voice, the first voice trained with Voxprint. Personal use only: no public use of the output, no commercial projects.",
-        "de": "Männliche russische Stimme, die erste mit Voxprint trainierte Stimme. Nur für den persönlichen Gebrauch: keine öffentliche Nutzung der Ausgabe, keine kommerziellen Projekte."
-      }
-    },
-    {
       "id": "open-universal",
       "name": "Open universal voice",
       "language": "English",

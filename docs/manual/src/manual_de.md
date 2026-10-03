@@ -331,7 +331,7 @@ Ist die Bibliothek leer, sagt das Fenster „{{voices.empty}}“ und bietet **{{
 
 **{{voices.import}}** bietet zwei Wege: **{{voices.import_folder}}** (ein Adapterordner) und **{{voices.import_zip}}** (ein Stimmpaket). Archive werden auf unsichere Pfade und Größenlimits geprüft. Eine Stimme ohne angegebene Lizenz gilt als „nur persönliche Nutzung“.
 
-## Lizenzen und die zwei Stimmen, die Voxprint anbietet
+## Lizenzen und die Stimme, die Voxprint anbietet
 
 | Lizenz | Kommerzielle Nutzung |
 |---|---|
@@ -341,11 +341,10 @@ Ist die Bibliothek leer, sagt das Fenster „{{voices.empty}}“ und bietet **{{
 | custom/test-use-only | nicht erlaubt; nur zum Testen, keine Veröffentlichung |
 
 * **Offene Universalstimme** (englisch: *Open universal voice*, russisch: *Открытый универсальный голос*) – eine englische Stimme für alle, die keine eigene Aufnahme haben. Nur mit dem gemeinfreien LJ-Speech-Datensatz trainiert (Sprecherin Linda Johnson, LibriVox); Lizenz **CC0-1.0** – für jede Nutzung frei, auch kommerziell; die Nennung des LJ-Speech-Datensatzes (Keith Ito) ist erwünscht.
-* **Александр (Alexander)** – eine männliche russische Stimme, die erste mit Voxprint trainierte. Lizenz: **nur persönliche Nutzung** – keine öffentliche Nutzung der Ausgabe, keine kommerziellen Projekte (Umfang „{{consent.badge_private_only}}“).
 
-Beide werden getrennt (nicht im Installationsprogramm enthalten) aus dem Stimmen-Repository geladen.
+Sie wird getrennt (nicht im Installationsprogramm enthalten) aus dem Stimmen-Repository geladen.
 
-> Die Bilder hier und in Kapitel 5 verwenden Demonstrationsstimmen; auf den Screenshots trägt die Stimme „Alexander“ noch eine frühere Test-Lizenzbezeichnung. In der veröffentlichten Stimmenliste lautet ihr Badge „Nur persönliche Nutzung“, wie hier beschrieben.
+> Die Bilder hier und in Kapitel 5 verwenden Demonstrationsstimmen. Stimmen, die Sie selbst trainieren, sind standardmäßig **nur für den persönlichen Gebrauch** (Umfang „{{consent.badge_private_only}}“): keine öffentliche Nutzung der Ausgabe, keine kommerziellen Projekte.
 
 Das Badge ist eine Information, keine Rechtsberatung. Die Lizenz gilt nur für das Stimmenmodell.
 
