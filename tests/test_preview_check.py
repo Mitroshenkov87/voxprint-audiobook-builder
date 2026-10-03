@@ -211,3 +211,31 @@ def test_preview_and_check_texts_in_every_language():
         i18n.set_language(lang, persist=False)
         for k in ("preview.button", "preview.estimate", "preview.row", "check.checkbox", "check.sugg_no_stop", "check.verdict_bad"):
             assert tr(k) != k
+
+
+def test_estimate_matches_the_measured_rtx4090_previews():
+    """Measured on the real GPU (RTX 4090, 1.7B, 12 clips): A (4 epochs, r32) 22.0-26.7 s, B (6 epochs, r64) 31.8 s of training."""
+    from core import train_presets
+    from infra.vram_optimizer import GpuInfo, plan_training
+    from workers import preview_runner as pr
+
+    gpu = GpuInfo(True, "NVIDIA GeForce RTX 4090", 22.5, 21.0)
+    plan = plan_training(gpu, 70)
+    a, b = pr.make_variants(plan, True)
+    ea = train_presets.estimate_seconds(a.plan, 12, gpu)
+    eb = train_presets.estimate_seconds(b.plan, 12, gpu)
+    assert 22.0 * 0.95 <= ea <= 26.7 * 1.25 and 31.8 * 0.95 <= eb <= 31.8 * 1.25
+    assert ea < eb                                     # the bigger variant is estimated slower
+    total = ea + eb + 2 * pr.SYNTH_CHECK_SEC + pr.ASR_LOAD_SEC   # measured whole compare run: ~125 s incl. ASR load
+    assert 105 <= total <= 150
+
+
+def test_gpu_factor_table_is_ordered_by_speed():
+    """Sanity of the scaling table: a faster card never gets a bigger factor (spec-derived, only the 4090 is measured)."""
+    from core import train_presets as tp
+
+    order = ["5090", "4090", "4080", "3090", "4070 ti", "3080", "4070", "4060 ti", "3070", "4060", "2080", "3060", "2070", "2060", "1080", "1070", "1060"]
+    f = dict(tp.GPU_FACTORS)
+    assert f["4090"] == 1.0
+    vals = [f[k] for k in order]
+    assert vals == sorted(vals)
