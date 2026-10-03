@@ -52,7 +52,7 @@ if not exist "build\notices" mkdir "build\notices"
 python tools\gen_notices.py --with-installed --out "build\notices\THIRD_PARTY_NOTICES.md" || (echo [ОШИБКА] Не создан THIRD_PARTY_NOTICES.md. & exit /b 1)
 
 echo === Тесты ===
-python -m pytest || (echo [ОШИБКА] Тесты не прошли. & exit /b 1)
+if not defined VOX_SKIP_TESTS ( python -m pytest || (echo [ОШИБКА] Тесты не прошли. & exit /b 1) )
 
 set MODE=--onefile
 if /I "%~1"=="onedir" set MODE=--onedir
@@ -79,7 +79,7 @@ pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --hidden-import qwen_tts.inference.qwen3_tts_tokenizer ^
   --hidden-import peft --hidden-import bitsandbytes --hidden-import accelerate --hidden-import safetensors.torch ^
   --hidden-import scipy.signal --hidden-import soundfile --hidden-import pydub --hidden-import imageio_ffmpeg ^
-  --hidden-import onnxruntime --hidden-import sox --hidden-import nagisa ^
+  --hidden-import onnxruntime --hidden-import sox --hidden-import nagisa --hidden-import six ^
   --hidden-import huggingface_hub --hidden-import librosa ^
   --collect-all qwen_asr --collect-all qwen_tts --collect-all nagisa --collect-all imageio_ffmpeg ^
   --collect-all bitsandbytes --collect-data librosa --collect-all hf_xet --collect-all certifi ^
@@ -93,7 +93,8 @@ pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   main.py
 if errorlevel 1 (echo [ОШИБКА] PyInstaller завершился с ошибкой. & exit /b 1)
 
-rem --- установщик (если установлен Inno Setup 6)
+rem --- установщик (если установлен Inno Setup 6); VOX_SKIP_INSTALLER=1 - только exe (быстрая пересборка), VOX_SKIP_TESTS=1 - без тестов
+if defined VOX_SKIP_INSTALLER goto :finish
 set ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe
 if not exist "%ISCC%" set ISCC=%ProgramFiles%\Inno Setup 6\ISCC.exe
 if exist "%ISCC%" (
@@ -102,4 +103,5 @@ if exist "%ISCC%" (
 ) else (
     echo [i] Inno Setup 6 не найден - установщик не собран. Exe: dist\Voxprint.exe
 )
+:finish
 endlocal
