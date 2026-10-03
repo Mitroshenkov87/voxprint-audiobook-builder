@@ -68,38 +68,24 @@ voice recording and a text file to ready output files you can load into a neural
 * Acrylic (glass) look on Windows 11 with a dark, high-contrast (WCAG AA) theme and a plain fallback.
 
 ## Screenshots
-All screenshots are English-UI renders of the current theme (offscreen Qt; see `docs/screenshots/`; Russian and German renders are in `docs/screenshots/ru/` and `docs/screenshots/de/`).
+Real screenshots of the current build on **Windows (RTX 4090 server, dark theme, English UI)**; Russian and German versions of the main windows are in [`docs/screenshots/ru/`](docs/screenshots/ru/) and [`docs/screenshots/de/`](docs/screenshots/de/).
 
-| Studio (no voices yet) | Studio | My voices |
+<p align="center"><img src="docs/screenshots/desktop_acrylic.png" alt="Voxprint Studio over a dark desktop (Acrylic)" width="720"></p>
+
+| Studio | My voices (installed voices, licence and scope badges) | My voices (an online voice, not downloaded yet) |
 |---|---|---|
-| <img src="docs/screenshots/studio_empty.png" width="300"> | <img src="docs/screenshots/studio_home.png" width="300"> | <img src="docs/screenshots/voices.png" width="300"> |
+| <img src="docs/screenshots/studio_home.png" width="300"> | <img src="docs/screenshots/voices.png" width="300"> | <img src="docs/screenshots/voices_online.png" width="300"> |
 
-| Narrate a book (sections collapsed) | Everything expanded, AAC notice | Narration running |
-|---|---|---|
-| <img src="docs/screenshots/narrate.png" width="300"> | <img src="docs/screenshots/narrate_aac.png" width="300"> | <img src="docs/screenshots/narrate_running.png" width="300"> |
-
-Same windows in Russian and German: [`ru/studio_home`](docs/screenshots/ru/studio_home.png), [`ru/voices`](docs/screenshots/ru/voices.png), [`ru/settings`](docs/screenshots/ru/settings.png), [`de/settings`](docs/screenshots/de/settings.png), [`ru/narrate`](docs/screenshots/ru/narrate.png), [`ru/narrate_aac`](docs/screenshots/ru/narrate_aac.png),
-[`de/studio_home`](docs/screenshots/de/studio_home.png), [`de/voices`](docs/screenshots/de/voices.png), [`de/narrate`](docs/screenshots/de/narrate.png), [`de/narrate_aac`](docs/screenshots/de/narrate_aac.png).
-
-Training window ("Train your voice"):
-
-| Choose files | Running | Done |
-|---|---|---|
-| <img src="docs/screenshots/main_files_chosen.png" width="300"> | <img src="docs/screenshots/main_running.png" width="300"> | <img src="docs/screenshots/main_done.png" width="300"> |
-
-| Idle | Settings (gear) | About |
-|---|---|---|
-| <img src="docs/screenshots/main_idle.png" width="300"> | <img src="docs/screenshots/settings.png" width="300"> | <img src="docs/screenshots/about.png" width="300"> |
-
-Acrylic preview - the translucent window with its strong dark tint, composited over a deliberately bright desktop (the worst case for contrast):
-
-<p align="center"><img src="docs/screenshots/main_acrylic_preview.png" alt="Acrylic preview" width="520"></p>
-
-Real desktop screenshots from the Windows test run (Windows Server 2025, taken *before* the darker, more opaque theme - the current look is the one above):
-
-| 1920x1080 at 125% | 1366x768 at 125% |
+| Narrate a book, with the mini player (listen while it is being made) | Train: presets and the no-transcript mode |
 |---|---|
-| <img src="docs/screenshots/windows_desktop_1920x1080_125.png" width="420"> | <img src="docs/screenshots/windows_desktop_1366x768_125.png" width="420"> |
+| <img src="docs/screenshots/narrate.png" width="330"> | <img src="docs/screenshots/train_notranscript.png" width="330"> |
+
+| Train: quick preview, compare two variants | Train: voice-owner consent after training | Settings |
+|---|---|---|
+| <img src="docs/screenshots/train_preview.png" width="300"> | <img src="docs/screenshots/train_consent.png" width="300"> | <img src="docs/screenshots/settings.png" width="240"> |
+
+Russian: [`studio_home`](docs/screenshots/ru/studio_home.png), [`voices`](docs/screenshots/ru/voices.png), [`narrate`](docs/screenshots/ru/narrate.png) · German: [`studio_home`](docs/screenshots/de/studio_home.png), [`voices`](docs/screenshots/de/voices.png), [`narrate`](docs/screenshots/de/narrate.png).
+The voices in the screenshots are demo entries; "Alexander" is the real metadata of the original voice package.
 
 ## Installation
 There is no public release yet. Planned installer channels are listed in the [Roadmap](#roadmap). Today you have two options.
