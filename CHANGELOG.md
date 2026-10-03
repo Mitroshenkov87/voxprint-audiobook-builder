@@ -5,7 +5,11 @@ The project is not released yet; everything below is the history of the 0.1.0 de
 
 ## [Unreleased]
 
+### Fixed
+- Consent statement: the name and the date written in words by the recogniser ("третьего октября две тысячи двадцать шестого года", no commas) are now read (`core/spoken_date.py`, ru/en/de) - found with real Qwen3-ASR output on an RTX 4090.
+
 ### Added
+- `--selftest-narrate [voice]` flag: headless end-to-end check of an installed build (first voice narrates two sentences -> MP3, `logs/selftest_narrate.txt`). `workers/selftest_narrate.py`.
 - **Quick preview** in the Train window: short training on a small subset (<=12 clips, <=4 epochs, ~3 min cap) and a ~10 s sample with pitch/WER metrics; *Compare 2 variants* with *Use these settings*; cancel, time/VRAM caps, en/ru/de. **Automatic voice check** after training (pitch, WER, babbling) with warnings. `core/voice_check.py`, `workers/preview_runner.py`.
 - **Voice-owner consent**: spoken consent statement at the end of the recording (script block 18, ru/en/de templates) is read automatically into a usage scope (commercial / public non-commercial / private only), confirmed with one click, stored in `voice.json` (`consent` block, optional clip), mapped to the licence fields and shown as badges and reminders in My voices and Narrate. `core/consent.py`, `workers/consent_runner.py`.
 - **Training presets** (Fast / Balanced / Maximum / Manual) in the Train window with a GPU-calibrated time estimate and a collapsed Advanced panel (`core/train_presets.py`); Balanced = the automatic plan, the learning rate is never raised by a preset.

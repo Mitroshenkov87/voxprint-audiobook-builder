@@ -2,6 +2,7 @@
 
 Flags: ``--prefetch`` (force-download the models; used by the installer), ``--selftest`` (start and quit),
 ``--selftest-imports`` (import every heavy library - checks that a PyInstaller build is complete),
+``--selftest-narrate [voice]`` (narrate two sentences headless; writes logs/selftest_narrate.txt),
 ``--verify-install`` (install check with reason codes), ``--repair`` (rebuild only Voxprint's own environment).
 """
 from __future__ import annotations
@@ -101,6 +102,11 @@ def main(argv=None) -> int:
         return install_state.cli_verify()
     if "--selftest-imports" in argv:
         return _selftest_imports()
+    if "--selftest-narrate" in argv:   # headless: narrate two sentences with the first voice (argument after the flag = voice id)
+        from workers import selftest_narrate
+
+        i = argv.index("--selftest-narrate")
+        return selftest_narrate.run(argv[i + 1] if i + 1 < len(argv) and not argv[i + 1].startswith("--") else "")
     selftest = "--selftest" in argv  # start and quit automatically (used for the offscreen smoke check)
 
     from PySide6.QtCore import QTimer

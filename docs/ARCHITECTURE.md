@@ -6,7 +6,7 @@ is wired. Read it together with the module docstrings (every module starts with 
 ## 1. Layers
 
 ```
-main.py                 entry point: CLI switches (--selftest, --selftest-imports, --verify-install, --repair), logging, start of the UI
+main.py                 entry point: CLI switches (--selftest, --selftest-imports, --selftest-narrate, --verify-install, --repair), logging, start of the UI
 ui/                     PySide6 windows and dialogs - no heavy work, only signals/slots
 workers/                glue between UI and core: Qt threads (QThread) and Qt-free scenario runners
 core/                   the pipeline itself: audio/text processing, alignment, dataset, LoRA training, export. No Qt, no installer logic
