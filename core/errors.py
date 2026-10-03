@@ -109,3 +109,15 @@ class NarrationError(DatasetMakerError):
     """Synthesis or export of an audiobook failed (engine problem, ffmpeg problem, no disk space ...)."""
 
     kind = "narration"
+
+
+class BackupError(DatasetMakerError):
+    """Backing up, restoring or importing models / voices failed (no space, unreadable backup, hash mismatch ...).
+
+    ``code`` is a stable short string (``space``, ``no_manifest``, ``hash``, ``io``, ``busy``) for the UI and the tests."""
+
+    kind = "backup"
+
+    def __init__(self, user_message: str, *, code: str = "io", details: str = "") -> None:
+        super().__init__(user_message, details=details)
+        self.code = code

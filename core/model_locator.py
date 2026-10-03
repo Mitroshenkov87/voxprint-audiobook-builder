@@ -166,6 +166,12 @@ def _is_dir(p: Path) -> bool:
 def candidate_roots() -> List[Tuple[str, Path]]:
     """(kind, folder) pairs to search, most specific first, existing and de-duplicated."""
     raw: List[Tuple[str, Path]] = []
+    try:                       # the folder the user (or the installer) named explicitly goes first
+        from infra import existing_models
+
+        raw.extend(existing_models.roots())
+    except Exception:  # noqa: BLE001 - optional
+        pass
     for part in os.environ.get(ENV_EXTRA_DIRS, "").split(os.pathsep):
         part = part.strip().strip('"')
         if part:
@@ -431,11 +437,12 @@ def _iter_candidates(root: Path, repo_id: str, pinned: Optional[str]) -> Iterato
 
 
 def find_model(repo_id: str, pinned_revision: Optional[str] = None,
-               roots: Optional[Iterable[Tuple[str, Path]]] = None) -> Optional[FoundModel]:
+               roots: Optional[Iterable[Tuple[str, Path]]] = None, ignore_disabled: bool = False) -> Optional[FoundModel]:
     """Best complete copy of ``repo_id`` made by another app, or None (=> download as usual).
 
-    ``pinned_revision`` is the verified commit from the manifest (None = no pin)."""
-    if disabled():
+    ``pinned_revision`` is the verified commit from the manifest (None = no pin).  ``ignore_disabled`` is for roots the
+    user chose explicitly (the "existing models folder"): ``VOXPRINT_NO_EXTERNAL_MODELS`` only switches off the guessing."""
+    if disabled() and not ignore_disabled:
         return None
     roots = list(roots) if roots is not None else candidate_roots()
     rejected_other_rev: List[Tuple[Path, str]] = []

@@ -89,6 +89,29 @@ def external_model(repo_id: str, revision: Optional[str] = None):
         return None
 
 
+def _import_existing(repo_id: str, revision: Optional[str], progress: ProgressCallback, stage: Stage, short: str) -> Optional[Path]:
+    """Import the model from the user's "existing models folder" (:mod:`infra.existing_models`) into the own models folder.
+
+    Link or copy, verified by hash, before anything is downloaded.  Returns the new folder, or None if no such folder is
+    configured, it holds no usable copy or the import failed (the normal path - in-place reuse, then download - follows)."""
+    from core.errors import CancelledByUser
+    from infra import existing_models
+
+    try:
+        found = existing_models.find(repo_id, revision if revision else pinned_revision(repo_id))
+        if found is None:
+            return None
+        progress(stage, 0.0, tr("progress.model_importing", short=short, where=str(found.location)))
+        path = existing_models.import_model(found, lambda f, m="": progress(stage, f, m))
+        progress(stage, 1.0, tr("progress.model_imported", short=short))
+        return path
+    except CancelledByUser:
+        raise
+    except Exception as exc:  # noqa: BLE001 - a failed import must never block the download path
+        log.warning("importing %s from the existing models folder failed: %s", repo_id, exc)
+        return None
+
+
 #: Model states reported to the UI (see :func:`model_state`).
 STATE_MISSING, STATE_PARTIAL, STATE_READY = "missing", "partial", "ready"
 
@@ -108,6 +131,13 @@ def model_state(repo_id: str) -> str:
     be resumed (ours, or an unfinished one in another app's cache - which we never touch); missing: nothing yet."""
     if verify_local_model(local_dir_for(repo_id)) or external_model(repo_id) is not None:
         return STATE_READY
+    try:
+        from infra import existing_models
+
+        if existing_models.find(repo_id, pinned_revision(repo_id)) is not None:
+            return STATE_READY
+    except Exception:  # noqa: BLE001
+        pass
     if partial_dir_has_data(repo_id):
         return STATE_PARTIAL
     try:
@@ -213,6 +243,10 @@ def ensure_model(
         return target
 
     short = repo_id.split("/")[-1]
+    if root is None:
+        imported = _import_existing(repo_id, revision, progress, stage, short)
+        if imported is not None:
+            return imported
     if reuse_external and root is None:
         found = external_model(repo_id, revision)
         if found is not None:

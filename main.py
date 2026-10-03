@@ -128,7 +128,16 @@ def main(argv=None) -> int:
             first_run = bool(models_missing())
         except Exception:  # noqa: BLE001 - never get in the way of starting up
             first_run = False
-    win = StudioWindow(autocheck=not selftest, prefetch=first_run or "--prefetch" in argv)
+    importing = False
+    if not selftest:
+        try:   # an "existing models folder" (installer page / Settings) is imported on the first run
+            from infra import existing_models
+            from workers.pipeline_runner import required_model_repos
+
+            importing = existing_models.pending(required_model_repos())
+        except Exception:  # noqa: BLE001 - never get in the way of starting up
+            importing = False
+    win = StudioWindow(autocheck=not selftest, prefetch=first_run or importing or "--prefetch" in argv)
     app.aboutToQuit.connect(win.shutdown)
     win.show_studio()
     if selftest:
