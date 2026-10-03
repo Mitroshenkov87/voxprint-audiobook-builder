@@ -33,7 +33,7 @@ URL = "https://host.example/open-voice.zip"
 def package(tmp_path, spec=None):
     """Build a package from a fake adapter (default: the test-only variant); returns (zip bytes, index entry)."""
     ad = make_adapter(tmp_path / "ad", name="Open Voice", with_voice_json=True)
-    entry = mvp.build(ad, spec or TEST_ONLY_SPEC, tmp_path / "dist", URL)
+    entry = mvp.build(ad, spec or TEST_ONLY_SPEC, tmp_path / "dist", URL, typed_names=False)     # plain names: typed ones are covered in test_voice_type_names
     return (tmp_path / "dist" / "open-voice.zip").read_bytes(), entry
 
 

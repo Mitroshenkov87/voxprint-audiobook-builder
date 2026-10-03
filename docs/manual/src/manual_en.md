@@ -209,7 +209,7 @@ Open it from the **{{studio.train_title}}** card. {{ui.subtitle}}
 | **{{ui.btn_lora}}** | The main button: aligns the recording, cuts it, trains the voice and puts it in your library. |
 | **{{preview.button}}** and the check box **{{preview.compare}}** | A quick listen-and-compare test before the long run: section 6.5. |
 | Check box *{{check.checkbox}}* | After training, Voxprint re-reads a test sentence with the new voice and checks pitch and clarity automatically. Leave it on. |
-| Voice type drop-down | Optional: *{{ui.voice_type_male}}*, *{{ui.voice_type_female}}*, *{{ui.voice_type_child}}*, *{{ui.voice_type_other}}*, or *{{ui.voice_type_none}}*. Saved with the voice. |
+| Voice type drop-down | Optional: *{{ui.voice_type_male}}*, *{{ui.voice_type_female}}*, *{{ui.voice_type_child}}*, *{{ui.voice_type_other}}*, or *{{ui.voice_type_none}}*. Saved in voice.json and added to the name of the trained voice's folder (`anna_male`, `anna_female`, `anna_unspecified`). The program suggests male or female from the pitch of your recording; change it if that is wrong. Older voices without a type show as *{{ui.voice_type_none}}*. |
 | Description field | *{{ui.voice_desc_placeholder}}* |
 | **{{ui.btn_merge}}** | Merges the trained adapter into one standalone model that works in any app running Qwen3-TTS (section 6.7). |
 | **{{ui.btn_dataset}}** | Only prepares the dataset (aligned and cut clips) without training. Useful if you want to train elsewhere. |

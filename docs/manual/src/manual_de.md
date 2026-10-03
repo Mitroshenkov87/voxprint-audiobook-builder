@@ -209,7 +209,7 @@ Weitere Hinweise aus dem Skript: Gefühle müssen nicht gespielt werden – es g
 | **{{ui.btn_lora}}** | Die Hauptschaltfläche: richtet die Aufnahme aus, schneidet sie, trainiert die Stimme und legt sie in Ihrer Bibliothek ab. |
 | **{{preview.button}}** und Kontrollkästchen **{{preview.compare}}** | Ein schneller Hör- und Vergleichstest vor dem langen Lauf: Abschnitt 6.5. |
 | Kontrollkästchen „{{check.checkbox}}“ | Nach dem Training lässt Voxprint die neue Stimme einen Testsatz sprechen und prüft Tonhöhe und Verständlichkeit automatisch. Eingeschaltet lassen. |
-| Auswahl des Stimmtyps | Optional: „{{ui.voice_type_male}}“, „{{ui.voice_type_female}}“, „{{ui.voice_type_child}}“, „{{ui.voice_type_other}}“ oder „{{ui.voice_type_none}}“. Wird mit der Stimme gespeichert. |
+| Auswahl des Stimmtyps | Optional: „{{ui.voice_type_male}}“, „{{ui.voice_type_female}}“, „{{ui.voice_type_child}}“, „{{ui.voice_type_other}}“ oder „{{ui.voice_type_none}}“. Wird in voice.json gespeichert und an den Ordnernamen der trainierten Stimme angehängt (`anna_male`, `anna_female`, `anna_unspecified`). Das Programm schlägt männlich oder weiblich anhand der Tonhöhe Ihrer Aufnahme vor; ändern Sie es, falls es nicht stimmt. Ältere Stimmen ohne Typ erscheinen als „{{ui.voice_type_none}}“. |
 | Beschreibungsfeld | „{{ui.voice_desc_placeholder}}“ |
 | **{{ui.btn_merge}}** | Führt den trainierten Adapter zu einem eigenständigen Modellordner zusammen, der in jeder App mit Qwen3-TTS funktioniert (Abschnitt 6.7). |
 | **{{ui.btn_dataset}}** | Bereitet nur den Datensatz vor (ausgerichtete und geschnittene Clips), ohne Training. Nützlich, wenn Sie woanders trainieren wollen. |

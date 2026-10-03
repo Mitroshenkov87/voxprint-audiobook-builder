@@ -49,25 +49,29 @@ def index_entry(info: Dict[str, Any], zip_path: Path, url: str) -> Dict[str, Any
     return entry
 
 
-def build(adapter: Path, spec: Dict[str, Any], out: Path, url: str) -> Dict[str, Any]:
-    """Create the folder, the zip and the entry; returns the entry."""
+def build(adapter: Path, spec: Dict[str, Any], out: Path, url: str, typed_names: bool = True) -> Dict[str, Any]:
+    """Create the folder, the zip and the entry; returns the entry.
+
+    With ``typed_names`` (default) the folder and the zip carry the voice type: ``<id>_<male|female|child|other|unspecified>``.
+    ``voice.json`` inside always has the ``voice_type`` field."""
     adapter, out = Path(adapter), Path(out)
     if not (adapter / "adapter_model.safetensors").is_file() or not (adapter / "adapter_config.json").is_file():
         raise SystemExit(f"{adapter} is not a trained voice folder (adapter_model.safetensors / adapter_config.json missing)")
     info = build_voice_json(adapter, spec)
-    folder = out / info["id"]
+    base = voice_info.with_type_suffix(info["id"], info.get("voice_type", "")) if typed_names else info["id"]
+    folder = out / base
     shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True)
     for name in PACKAGE_FILES:
         if (adapter / name).is_file():
             shutil.copy2(adapter / name, folder / name)
     voice_info.write_voice_json(folder, info)
-    zip_path = out / f"{info['id']}.zip"
+    zip_path = out / f"{base}.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for f in sorted(folder.iterdir()):
-            z.write(f, f"{info['id']}/{f.name}")
+            z.write(f, f"{base}/{f.name}")
     entry = index_entry(info, zip_path, url)
-    (out / f"{info['id']}.index-entry.json").write_text(json.dumps(entry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out / f"{base}.index-entry.json").write_text(json.dumps(entry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return entry
 
 
@@ -77,10 +81,16 @@ def main(argv: Optional[list] = None) -> int:
     ap.add_argument("--adapter", required=True, type=Path)
     ap.add_argument("--spec", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
-    ap.add_argument("--url", default="https://example.org/voices/VOICE.zip", help="where the zip will be hosted (https)")
+    ap.add_argument("--url", default="https://example.org/voices/VOICE.zip",
+                    help="where the zip will be hosted (https); VOICE is replaced by the package name (<id>_<type>)")
+    ap.add_argument("--plain-names", action="store_true", help="name the zip <id>.zip without the voice type")
     a = ap.parse_args(argv)
     spec = json.loads(a.spec.read_text(encoding="utf-8"))
-    entry = build(a.adapter, spec, a.out, a.url.replace("VOICE", str(spec.get("id", "voice"))))
+    typed = not a.plain_names
+    name = str(spec.get("id", "voice"))
+    if typed:
+        name = voice_info.with_type_suffix(name, voice_info.normalize_voice_type(str(spec.get("voice_type", ""))))
+    entry = build(a.adapter, spec, a.out, a.url.replace("VOICE", name), typed_names=typed)
     print(json.dumps(entry, indent=2))      # ASCII-escaped: safe on any Windows console code page
     return 0
 

@@ -23,6 +23,10 @@ MAX_WINDOW = 4          #: a piece may contain at most this many consecutive scr
 MIN_RATIO = 0.82        #: minimal letter similarity between a recognised piece and the script window
 
 
+#: A "=== ... ===" header containing one of these (any case) starts the consent block: ru / en / de.
+CONSENT_WORDS = ("СОГЛАСИЕ", "CONSENT", "EINWILLIGUNG")
+
+
 def _letters(text: str) -> str:
     return "".join(ch for ch in text.lower().replace("\u0451", "\u0435") if ch.isalpha())
 
@@ -33,7 +37,7 @@ def parse_script_lines(script: str) -> List[str]:
     for raw in script.replace("\r\n", "\n").split("\n"):
         s = re.sub(r"\[[^\]]*\]", " ", raw)            # [stage directions / speaker labels / emotion tags]
         s = re.sub(r"\s+", " ", s).strip()
-        if raw.strip().startswith("===") and "СОГЛАСИЕ" in raw.upper():   # the spoken consent block is not training text
+        if raw.strip().startswith("===") and any(w in raw.upper() for w in CONSENT_WORDS):   # the spoken consent block is not training text
             break
         if not s or s.startswith("===") or s.startswith("---"):
             continue

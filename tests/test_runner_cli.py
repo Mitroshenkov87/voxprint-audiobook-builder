@@ -55,9 +55,9 @@ def test_run_task_lora_passes_language_and_warnings_to_trainer(tmp_path, monkeyp
                    lambda s, f, m: stages.append(s), updater=NotDueUpdater(), aligner_factory=TrueRateAligner)
     assert (res.dataset_dir / "ref.wav").exists() and (res.dataset_dir / "ref_text.txt").exists()
     assert not (res.dataset_dir / "train_24k").exists()
-    assert called["cpu"] is True and res.adapter_path == tmp_path / "out" / "output" / "Мой голос"
+    assert called["cpu"] is True and res.adapter_path == tmp_path / "out" / "output" / "Мой голос_unspecified"
     assert called["lang"] == "russian" and "предупреждение обучения" in res.warnings
-    assert called["o"] == tmp_path / "out" / "output" / "Мой голос"
+    assert called["o"] == tmp_path / "out" / "output" / "Мой голос_unspecified"
     assert Stage.SAVE not in stages  # only the trainer reports SAVE; writing the dataset is reported under "Slicing"
 
 

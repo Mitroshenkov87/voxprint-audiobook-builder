@@ -178,9 +178,12 @@ class VoiceLibrary:
             return None
         return self.root / voice_id
 
-    def unique_id(self, name: str) -> str:
-        """A free folder name derived from ``name`` (``anna``, ``anna-2``, ...)."""
+    def unique_id(self, name: str, voice_type: Optional[str] = None) -> str:
+        """A free folder name derived from ``name`` (``anna``, ``anna-2``, ...); with ``voice_type`` it carries the type
+        (``anna_male``, ``anna_female``, ``anna_unspecified``, then ``anna_male-2`` ...)."""
         base = slugify(name)
+        if voice_type is not None:
+            base = slugify(voice_info.with_type_suffix(base, voice_type))
         cand, n = base, 2
         while (self.root / cand).exists():
             cand, n = f"{base}-{n}", n + 1
@@ -188,9 +191,10 @@ class VoiceLibrary:
 
     # ------------------------------------------------------------------ adding
     def add_from_adapter(self, adapter_dir: Path, info: Optional[Dict[str, Any]] = None,
-                         name: str = "") -> VoiceRecord:
+                         name: str = "", typed_id: bool = False) -> VoiceRecord:
         """Copy an adapter folder into the library and write its ``voice.json``; returns the new record.
 
+        ``typed_id`` puts the voice type into the folder name / id (``anna_male``) - used for freshly trained voices.
         ``info`` is the dictionary from :func:`core.voice_info.build_voice_info` (read from the folder's own
         ``voice.json`` when omitted).  The source folder is left untouched.
         """
@@ -201,7 +205,7 @@ class VoiceLibrary:
                                          fallback_id=src.name)
         if name:
             data["name"] = voice_info.clean_line(name)
-        vid = self.unique_id(data["name"] or src.name)
+        vid = self.unique_id(data["name"] or src.name, data.get("voice_type", "") if typed_id else None)
         dst = self.root / vid
         tmp = Path(tempfile.mkdtemp(prefix=f".{vid}.", dir=self.root))
         try:

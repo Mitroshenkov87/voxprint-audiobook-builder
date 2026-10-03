@@ -56,8 +56,7 @@ def meta_line(rec: VoiceRecord) -> str:
     """One line: language, training length, epochs, voice type and author."""
     parts = [rec.language.capitalize() if rec.language else "", duration_text(float(rec.info.get("duration", 0))),
              tr("voices.epochs", n=int(rec.info.get("epochs", 0)))]
-    if rec.info.get("voice_type"):
-        parts.append(voice_type_label(str(rec.info["voice_type"])))
+    parts.append(voice_type_label(str(rec.info.get("voice_type") or "")))      # older voices: "not specified"
     if rec.info.get("author"):
         parts.append(tr("voices.by_author", author=rec.info["author"]))
     return " \u00b7 ".join(p for p in parts if p)

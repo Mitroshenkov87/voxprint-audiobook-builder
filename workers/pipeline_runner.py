@@ -81,6 +81,12 @@ class TaskRequest:
             return safe_name(Path(self.adapter_dir).name)
         return "voice"
 
+    def voice_folder(self) -> str:
+        """Name of the folder with the trained voice: the voice name plus its type (``anna_male``, ``anna_unspecified``)."""
+        from core import voice_info
+
+        return safe_name(voice_info.with_type_suffix(self.voice_name(), self.voice_type))
+
     def resolved_root(self) -> Path:
         """Result folder: ``out_root`` if given, else ``<audio folder>/<voice>_Voxprint``."""
         if self.out_root:
@@ -189,7 +195,7 @@ def _register_voice(adapter_dir: Path, info: dict, library=None) -> str:
     from core.voice_library import VoiceLibrary
 
     try:
-        return (library or VoiceLibrary()).add_from_adapter(adapter_dir, info).id
+        return (library or VoiceLibrary()).add_from_adapter(adapter_dir, info, typed_id=True).id
     except Exception as exc:  # noqa: BLE001 - the adapter itself is already saved; never fail the run for the library
         log.warning("cannot register the voice in the library: %s", exc)
         return ""
@@ -344,7 +350,7 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
     if req.kind == KIND_MERGE:
         return _run_merge(req, progress, cancel)
     root = req.resolved_root()
-    dataset_dir, output_dir = root / "dataset", root / "output" / req.voice_name()
+    dataset_dir, output_dir = root / "dataset", root / "output" / req.voice_folder()
     lora = req.kind == KIND_LORA
     preview = req.kind == KIND_PREVIEW
 

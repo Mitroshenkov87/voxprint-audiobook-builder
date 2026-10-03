@@ -86,7 +86,7 @@ def test_run_task_writes_voice_json_and_registers_the_voice(tmp_path, monkeypatc
                                voice_description="radio voice"),
                    updater=NotDueUpdater(), aligner_factory=TrueRateAligner, voice_library=lib)
     info = voice_info.read_voice_json(res.adapter_path)
-    assert info["name"] == res.adapter_path.name and info["language"] and info["schema"] == 2
+    assert res.adapter_path.name == info["name"] + "_male" and info["language"] and info["schema"] == 2
     assert info["epochs"] == 7 and info["base_model"] == "Qwen/Base"
     assert info["voice_type"] == "male" and info["description"] == "radio voice"
     assert info["duration"] > 0 and info["created"].endswith("Z")

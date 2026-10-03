@@ -258,6 +258,7 @@ class MainWindow(QWidget):
     go = Signal(str)                 # "studio" - ask the Studio to show another window
     closing = Signal()               # the user closed this window
     language_changed = Signal()      # the UI language was switched here
+    voice_type_suggested = Signal(str, float)   # (type, median pitch in Hz) from the background pitch analysis
     def __init__(self, runner: Callable[..., Any] = run_task, updater_factory: Optional[Callable[[], Any]] = None,
                  autocheck: bool = True, auto_open_folder: bool = True,
                  prefetch_fn: Optional[Callable[..., Any]] = None, prefetch: bool = False,
@@ -557,6 +558,14 @@ class MainWindow(QWidget):
         vrow.addWidget(self.cmb_voice_type)
         vrow.addWidget(self.edt_voice_desc, 1)
         root.addLayout(vrow)
+        self.lbl_voice_type_hint = QLabel()          # "suggested from the pitch ..." / the file-name rule
+        self.lbl_voice_type_hint.setObjectName("hint")
+        self.lbl_voice_type_hint.setWordWrap(True)
+        root.addWidget(self.lbl_voice_type_hint)
+        self._voice_type_user_set = False             # the user chose a type: the pitch suggestion must not override it
+        self._suggest_token = 0
+        self.cmb_voice_type.activated.connect(lambda _i: setattr(self, "_voice_type_user_set", True))
+        self.voice_type_suggested.connect(self._apply_voice_type_suggestion)
 
         self.btn_merge = QPushButton()      # universal (merged) model, ~4 GB; only on an explicit click
         root.addWidget(self.btn_merge)
@@ -700,6 +709,8 @@ class MainWindow(QWidget):
         for i in range(self.cmb_voice_type.count()):
             self.cmb_voice_type.setItemText(i, type_labels[self.cmb_voice_type.itemData(i)])
         self.edt_voice_desc.setPlaceholderText(tr("ui.voice_desc_placeholder"))
+        if not self.lbl_voice_type_hint.text():
+            self.lbl_voice_type_hint.setText(tr("ui.voice_type_hint"))
         if self._settings is not None:
             self._settings.retranslate()
             self._settings.sync_language()
@@ -783,6 +794,36 @@ class MainWindow(QWidget):
         self.lbl_audio.setToolTip(str(self.audio))
         self._on_preset()
         self._refresh_buttons()
+        self._suggest_voice_type(self.audio)
+
+    def _suggest_voice_type(self, audio: Path) -> None:
+        """Estimate male / female from the recording's pitch in a background thread (a hint; the user decides)."""
+        import threading
+
+        from core.voice_type import suggest_voice_type
+
+        self._suggest_token += 1
+        token = self._suggest_token
+
+        def work() -> None:
+            kind, hz = suggest_voice_type(audio)
+            if token == self._suggest_token:
+                try:
+                    self.voice_type_suggested.emit(kind, hz)
+                except RuntimeError:                  # the window was closed meanwhile
+                    pass
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _apply_voice_type_suggestion(self, kind: str, hz: float) -> None:
+        """Show the suggestion; select it if the user has not chosen a type yet."""
+        if not kind:
+            self.lbl_voice_type_hint.setText(tr("ui.voice_type_hint"))
+            return
+        if not self._voice_type_user_set and not self.cmb_voice_type.currentData():
+            self.cmb_voice_type.setCurrentIndex(max(0, self.cmb_voice_type.findData(kind)))
+        name = tr("ui.voice_type_male") if kind == "male" else tr("ui.voice_type_female")
+        self.lbl_voice_type_hint.setText(tr("ui.voice_type_suggest", type=name, hz=int(round(hz))))
 
     def set_text(self, path: Path) -> None:
         """Remember the chosen text file and update the label and button states."""

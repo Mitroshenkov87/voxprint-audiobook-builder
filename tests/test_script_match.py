@@ -93,3 +93,10 @@ def test_build_from_audio_with_script_ignores_stumbles_and_uses_script_text(tmp_
     assert [r["text"] for r in rows] == [lines[0], lines[1], lines[2]]
     drops = res.asr_report.dropped
     assert drops.get("not_in_script", 0) + drops.get("repeat", 0) == 3 and drops.get("repeat") == 1
+
+
+def test_consent_header_stops_parsing_in_ru_en_de_any_case():
+    for head in ("=== БЛОК 18. СОГЛАСИЕ ===", "=== Block 18. Consent ===", "=== consent statement ===", "=== BLOCK 18: EINWILLIGUNG ===", "=== Einwilligung ==="):
+        assert parse_script_lines("Первая строка текста.\n" + head + "\nЯ разрешаю использовать мой голос.\n") == ["Первая строка текста."], head
+    # an ordinary header is skipped, not a stop
+    assert parse_script_lines("=== Block 2 ===\nПервая строка.\nВторая строка.\n") == ["Первая строка.", "Вторая строка."]

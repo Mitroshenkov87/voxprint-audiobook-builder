@@ -83,6 +83,31 @@ def clean_names(value: Any, clean=None) -> Dict[str, str]:
     return out
 
 
+#: Word added to the names of trained voices (library folder, result folder, package zip): ``anna_male``, ``anna_female`` ...
+#: A voice whose type is not set gets ``_unspecified`` (older voices have no type and are shown as "not specified").
+TYPE_SUFFIXES = {"male": "male", "female": "female", "child": "child", "other": "other", "": "unspecified"}
+
+
+def type_suffix(voice_type: Optional[str]) -> str:
+    """``male`` / ``female`` / ``child`` / ``other`` / ``unspecified`` for any input."""
+    return TYPE_SUFFIXES[normalize_voice_type(voice_type)]
+
+
+def with_type_suffix(base: str, voice_type: Optional[str], sep: str = "_") -> str:
+    """``base`` + ``_<type>``; a type word that is already at the end of ``base`` is replaced, never doubled."""
+    base = (base or "").strip()
+    low = base.lower()
+    for word in TYPE_SUFFIXES.values():
+        for s in ("_", "-", " "):
+            if low.endswith(s + word) and len(base) > len(word) + 1:
+                base = base[: -(len(word) + 1)].rstrip("_- ")
+                break
+        else:
+            continue
+        break
+    return f"{base or 'voice'}{sep}{type_suffix(voice_type)}"
+
+
 def normalize_voice_type(value: Optional[str]) -> str:
     """Return a valid voice type (lower-case) or ``""`` for anything unknown or empty."""
     v = (value or "").strip().lower()

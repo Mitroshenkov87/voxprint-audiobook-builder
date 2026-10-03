@@ -455,7 +455,7 @@
  "ui.voice_type_male": "Männliche Stimme",
  "ui.voice_type_none": "Stimmtyp: nicht angegeben",
  "ui.voice_type_other": "Andere Stimme",
- "ui.voice_type_tip": "Optional: Stimmtyp (wird in voice.json gespeichert)",
+ "ui.voice_type_tip": "Stimmtyp (männlich / weiblich / nicht angegeben): wird in voice.json gespeichert und an den Ordnernamen der trainierten Stimme angehängt (name_male, name_female, name_unspecified)",
  "ui.yes": "Fortfahren",
  "upd.change": "{name}: {before} → {after}",
  "upd.checking": "Suche nach Updates…",
@@ -586,5 +586,7 @@
  "narr.pauses_4": "länger",
  "narr.pauses_5": "deutlich länger",
  "narr.pauses_value": "{name} (Satz {sentence} ms, Absatz {paragraph} ms)",
- "narr.pauses_hint": "Nach jedem Komma, Satz, jeder Auslassung, jedem Gedankenstrich, Absatz, Szenenwechsel und Kapitel wird Stille exakter Länge eingefügt, unabhängig davon, wie das Stimmmodell den Text phrasiert, damit die Pausen deutlich hörbar sind. „Normal“ ist etwas länger als die frühere Vertonung. Eine spätere Änderung verwendet bereits gesprochene Textteile weiter."
+ "narr.pauses_hint": "Nach jedem Komma, Satz, jeder Auslassung, jedem Gedankenstrich, Absatz, Szenenwechsel und Kapitel wird Stille exakter Länge eingefügt, unabhängig davon, wie das Stimmmodell den Text phrasiert, damit die Pausen deutlich hörbar sind. „Normal“ ist etwas länger als die frühere Vertonung. Eine spätere Änderung verwendet bereits gesprochene Textteile weiter.",
+ "ui.voice_type_hint": "Der Stimmtyp wird in voice.json und im Ordnernamen der trainierten Stimme gespeichert (zum Beispiel anna_male).",
+ "ui.voice_type_suggest": "Aus der Tonhöhe der Aufnahme vorgeschlagen: {type} (etwa {hz} Hz). Ändern Sie es, falls es nicht stimmt."
 }
