@@ -99,7 +99,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 #ifdef ONLINE
 ; the program itself is downloaded by voxprint-fetch.exe (see [Code]); only the downloader and the notices are inside
-Source: "..\build\online\voxprint-fetch.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "..\build\online\voxprint-fetch.exe"; DestDir: "{tmp}"; Flags: dontcopy
 #else
 #ifdef ONEDIR
 Source: "..\dist\Voxprint\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -237,7 +237,7 @@ begin
   end;
 end;
 
-procedure RunOnlineDownload();
+function RunOnlineDownload(): String;
 var
   Manifest, Cache, StatusFile, Exe, Params, State, Msg, Beat, LastBeat, Err: String;
   Pm, ResultCode: Integer;
@@ -245,6 +245,8 @@ var
   LastChange: Cardinal;
   Finished: Boolean;
 begin
+  Result := '';
+  ExtractTemporaryFile('voxprint-fetch.exe');
   Manifest := Trim(ExpandConstant('{param:Manifest|}'));
   if Manifest = '' then Manifest := '{#ManifestUrl}';
   Cache := ExpandConstant('{localappdata}\Voxprint\setup-cache');
@@ -297,12 +299,16 @@ begin
     Page.Hide;
   end;
   if Err <> '' then
-  begin
-    if not WizardSilent then
-      MsgBox(FmtMessage(CustomMessage('OnlineFailed'), [Err]), mbError, MB_OK);
-    Abort;
-  end;
-  DelTree(Cache, True, True, True);
+    Result := FmtMessage(CustomMessage('OnlineFailed'), [Err])
+  else
+    DelTree(Cache, True, True, True);
+end;
+
+{ The download runs before the files are copied: a failure here stops the setup with a message (a non-zero exit code when
+  silent) and the wizard goes back, so that the user can retry; the cache keeps the finished parts for the next try. }
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := RunOnlineDownload();
 end;
 #endif
 
@@ -314,9 +320,6 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-#ifdef ONLINE
-    RunOnlineDownload();
-#endif
     Dir := Trim(ModelsEdit.Text);
     if Dir <> '' then
     begin
