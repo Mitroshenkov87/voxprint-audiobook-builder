@@ -106,6 +106,7 @@ def test_detection_order(monkeypatch, tmp_path):
     for v in ("LC_ALL", "LC_MESSAGES", "LANG", "VOXPRINT_LANG"):
         monkeypatch.delenv(v, raising=False)
     monkeypatch.setattr(i18n.locale, "getlocale", lambda *a: (None, None))
+    monkeypatch.setattr(i18n.sys, "platform", "linux")      # на Windows язык ОС берётся из GetUserDefaultLocaleName, а не из LANG
     assert i18n.detect_language() == "en"                       # по умолчанию - английский
     i18n.reset()
     assert tr("ui.btn_lora") == "Create voice (LoRA)"

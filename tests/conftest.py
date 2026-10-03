@@ -17,6 +17,9 @@ def _isolated_home(tmp_path, monkeypatch):
     # Старые проверки сравнивают русские сообщения; язык по умолчанию в тестах - русский.
     # (Тесты локализации задают VOXPRINT_LANG сами.)
     monkeypatch.setenv("VOXPRINT_LANG", "ru")
+    # %APPDATA%/%LOCALAPPDATA% реальной машины не должны попадать в поиск прежних установок (Windows)
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata_roaming"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "appdata_local"))
     # Никаких обращений к сети/чужим кэшам моделей из обычных тестов (отдельные тесты включают их сами).
     monkeypatch.setenv("VOXPRINT_NO_EXTERNAL_MODELS", "1")
     monkeypatch.setenv("VOXPRINT_NO_MIRROR", "1")
