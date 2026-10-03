@@ -13,7 +13,7 @@ from core import i18n
 from infra import assets, env_probe as ep, install_state as ist, paths
 from infra.updater import Updater
 from infra.verified_manifest import Manifest
-from infra.version_manager import (ACTION_IGNORE, ACTION_INSTALL, ACTION_REUSE, ACTION_UPGRADE, PackageStatus,
+from infra.version_manager import (ACTION_IGNORE, ACTION_INSTALL, ACTION_OFFER, ACTION_REUSE, ACTION_UPGRADE, PackageStatus,
                                    check_versions, decide_package)
 
 
@@ -119,7 +119,7 @@ def test_probe_environment_reuse_upgrade_install_and_report():
     assert act["torch"] == (ACTION_UPGRADE, "torch_flavor_changed") and rep.wanted_torch_flavor == "cu128"
     assert rep.ffmpeg and rep.ffmpeg.ok and rep.ffmpeg.version == "7.1.1"
     assert rep.ignored == {"unsloth": "no_qwen3_tts_training"}
-    assert rep.counts() == {ACTION_REUSE: 4, ACTION_UPGRADE: 2, ACTION_INSTALL: 1}
+    assert rep.counts() == {ACTION_REUSE: 4, ACTION_UPGRADE: 2, ACTION_OFFER: 0, ACTION_INSTALL: 1}
 
 
 def test_broken_ffmpeg_is_not_trusted():

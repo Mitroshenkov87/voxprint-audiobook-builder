@@ -32,7 +32,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from core.errors import UpdateError
 from core.events import ProgressCallback, Stage, noop_progress
@@ -40,7 +40,8 @@ from infra import model_downloader as md
 from infra import paths
 from infra.verified_manifest import Manifest, load_manifest
 from infra.version_manager import (CHANNEL_LATEST, CHANNEL_VERIFIED, TRACKED_MODELS, TRACKED_PACKAGES,
-                                   VersionReport, check_versions, http_fetch_json, installed_version)
+                                   Offer, VersionReport, check_versions, http_fetch_json, installed_version,
+                                   make_offers)
 
 log = logging.getLogger("voxprint.updater")
 AUTOCHECK_DAYS = 7
@@ -169,8 +170,13 @@ class Updater:
                  get_remote_sha: Optional[Callable[[str], Optional[str]]] = None,
                  packages: Optional[Dict[str, str]] = None, models: Optional[tuple] = None,
                  manifest: Optional[Manifest] = None, channel: Optional[str] = None,
-                 probe_env: Optional[Callable[[], Any]] = None) -> None:
+                 probe_env: Optional[Callable[[], Any]] = None, external_env: Optional[bool] = None) -> None:
         setup_log()
+        if external_env is None:
+            from infra.env_probe import is_own_environment
+
+            external_env = not is_own_environment()
+        self.external_env = external_env     # True: Voxprint работает в окружении пользователя (устаревшее - только по запросу)
         self.probe_env = probe_env
         self._manifest = manifest
         self._channel = channel
@@ -217,7 +223,8 @@ class Updater:
     # ---- проверка
     def check(self, channel: Optional[str] = None) -> VersionReport:
         rep = check_versions(md.local_revisions(self.models), self.fetch_json, self.installed_fn,
-                             self.packages, self.models, manifest=self.manifest(), channel=channel or self.channel)
+                             self.packages, self.models, manifest=self.manifest(), channel=channel or self.channel,
+                             external_env=self.external_env)
         st = self._load_state()
         if rep.network_ok:
             st["last_check"] = self.now()
@@ -229,11 +236,32 @@ class Updater:
         return rep
 
     # ---- применение
-    def apply(self, report: VersionReport, progress: ProgressCallback = noop_progress) -> UpdateResult:
+    def apply(self, report: VersionReport, progress: ProgressCallback = noop_progress,
+              accepted: Optional[Iterable[str]] = None) -> UpdateResult:
+        """accepted - имена устаревших компонентов В ОКРУЖЕНИИ ПОЛЬЗОВАТЕЛЯ, которые он согласился обновить.
+        Согласие -> pip обновляет их там; отказ и компонент ещё совместим -> используем как есть; отказ и несовместим ->
+        собственная копия в каталоге packages Voxprint (окружение пользователя не меняется)."""
         res = UpdateResult()
-        todo = report.outdated_packages
+        todo = list(report.outdated_packages)           # собственное окружение Voxprint: обновляется само
+        yes = set(accepted or ())
+        for p in report.offered_packages:
+            if p.name in yes:
+                continue
+            if p.decision.compatible:
+                res.messages.append(tr("upg.kept", name=p.name, old=p.installed or "-"))
+                log.info("offer for %s declined; the installed %s is still compatible - reusing it", p.name, p.installed)
+            else:
+                todo.append(p)
+                res.messages.append(tr("upg.own_copy", name=p.name, old=p.installed or "-", new=p.target or "-"))
+                log.info("offer for %s declined; %s is not compatible - using Voxprint's own copy %s",
+                         p.name, p.installed, p.target)
         for p in todo:
             res.before[p.name] = p.installed
+        for p in report.offered_packages:
+            if p.name in yes and p.target:
+                progress(Stage.UPDATES, 0.05, tr("upg.progress", name=p.name, old=p.installed or "-", new=p.target,
+                                                 env=sys.prefix))
+                self._upgrade_in_place(p, res)
         if todo:
             progress(Stage.UPDATES, 0.1, tr("upd.installing"))
             self._apply_packages(todo, res)
@@ -251,6 +279,31 @@ class Updater:
         progress(Stage.UPDATES, 1.0, tr("upd.processed"))
         log.info("apply result: %s", res.summary().replace("\n", " | "))
         return res
+
+    def _upgrade_in_place(self, p, res: UpdateResult) -> None:
+        """Только после согласия пользователя: pip обновляет пакет в окружении, из которого запущен Voxprint.
+        Проверка импортом; при сбое возвращаем прежнюю версию."""
+        if not self.python:
+            res.messages.append(tr("upd.no_python"))
+            return
+        name, old, new = p.name, p.installed, p.target
+        base = [self.python, "-m", "pip", "install", "--no-deps", "--disable-pip-version-check"]
+        log.info("user accepted: pip upgrade %s %s -> %s in %s", name, old, new, sys.prefix)
+        res.before[name] = old
+        rc, out = self.run([*base, "--upgrade", f"{name}=={new}"])
+        log.info("pip rc=%s\n%s", rc, out[-2000:])
+        ok = rc == 0
+        if ok:
+            ok, _ = self._smoke(paths.staging_dir(), [name])
+        if not ok:
+            res.rolled_back = True
+            if old:
+                rc2, out2 = self.run([*base, f"{name}=={old}"])   # вернуть то, что было у пользователя
+                log.info("rollback pip rc=%s\n%s", rc2, out2[-1000:])
+            res.messages.append(tr("upg.rolled_back", name=name, old=old or "-"))
+            return
+        res.after[name] = new
+        res.needs_restart = True
 
     def _apply_packages(self, todo, res: UpdateResult) -> None:
         if not self.python:
@@ -390,7 +443,10 @@ class Updater:
             log.warning("environment probe failed: %s", exc)
 
     # ---- «всё сразу» для UI
-    def check_and_apply(self, progress: ProgressCallback = noop_progress) -> Tuple[VersionReport, UpdateResult]:
+    def check_and_apply(self, progress: ProgressCallback = noop_progress,
+                        ask: Optional[Callable[[List[Offer]], Iterable[str]]] = None) -> Tuple[VersionReport, UpdateResult]:
+        """ask(offers) -> имена, которые пользователь разрешил обновить (диалог в UI). Без ask отказ подразумевается.
+        Предложение, от которого пользователь уже отказался для этой же версии, повторно не показывается."""
         progress(Stage.UPDATES, 0.0, tr("upd.checking"))
         self._report_environment(progress)
         rep = self.check()
@@ -401,6 +457,21 @@ class Updater:
         if not rep.has_updates:
             progress(Stage.UPDATES, 1.0, tr("upd.verified_installed"))
             return rep, UpdateResult(unverified_newer=rep.unverified_newer)
-        res = self.apply(rep, progress)
+        accepted: List[str] = []
+        offers = make_offers(rep, sys.prefix)
+        if offers:
+            st = self._load_state()
+            declined = dict(st.get("declined_offers") or {})
+            fresh = [o for o in offers if declined.get(o.name) != o.target]
+            if fresh and ask is not None:
+                accepted = [n for n in ask(fresh) if n in {o.name for o in fresh}]
+                for o in fresh:
+                    if o.name in accepted:
+                        declined.pop(o.name, None)
+                    else:
+                        declined[o.name] = o.target
+                st["declined_offers"] = declined
+                self._save_state(st)
+        res = self.apply(rep, progress, accepted)
         res.unverified_newer = rep.unverified_newer
         return rep, res

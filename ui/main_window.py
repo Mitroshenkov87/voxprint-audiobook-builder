@@ -20,7 +20,7 @@ from core.i18n import tr
 from infra import paths, platform_win
 from workers.pipeline_runner import (KIND_DATASET, KIND_LORA, KIND_MERGE, TaskRequest, last_adapter, plan_for,
                                      run_task)
-from workers.process_worker import PrefetchWorker, ProcessWorker, UpdateWorker
+from workers.process_worker import PrefetchWorker, ProcessWorker, RepairWorker, StatusWorker, UpdateWorker
 
 log = logging.getLogger("voxprint.ui")
 
@@ -102,7 +102,10 @@ def open_folder(path: Path) -> None:
 class MainWindow(QWidget):
     def __init__(self, runner: Callable[..., Any] = run_task, updater_factory: Optional[Callable[[], Any]] = None,
                  autocheck: bool = True, auto_open_folder: bool = True,
-                 prefetch_fn: Optional[Callable[..., Any]] = None, prefetch: bool = False) -> None:
+                 prefetch_fn: Optional[Callable[..., Any]] = None, prefetch: bool = False,
+                 health_fn: Optional[Callable[[], list]] = None,
+                 model_states_fn: Optional[Callable[[], dict]] = None,
+                 repair_fn: Optional[Callable[..., Any]] = None) -> None:
         super().__init__()
         self.runner = runner
         self.updater_factory = updater_factory
@@ -114,6 +117,14 @@ class MainWindow(QWidget):
         self.update_worker: Optional[UpdateWorker] = None
         self.prefetch_worker: Optional[PrefetchWorker] = None
         self.prefetch_fn = prefetch_fn
+        self.health_fn = health_fn
+        self.model_states_fn = model_states_fn
+        self.repair_fn = repair_fn
+        self.status_worker: Optional[StatusWorker] = None
+        self.repair_worker: Optional[RepairWorker] = None
+        self.upgrade_dialog = None
+        self._health_reasons: list = []
+        self._model_states: dict = {}
         self._last_request: Optional[TaskRequest] = None
         self._chips: dict = {}
         self.backdrop = "plain"
@@ -224,6 +235,25 @@ class MainWindow(QWidget):
         self.lbl_status.setWordWrap(True)
         root.addWidget(self.lbl_status)
 
+        # «Repair» offer: appears only when the install check fails (stable reason codes, localized)
+        self.health_row = QWidget()
+        hl = QHBoxLayout(self.health_row)
+        hl.setContentsMargins(0, 0, 0, 0)
+        self.lbl_health = QLabel()
+        self.lbl_health.setObjectName("status")
+        self.lbl_health.setWordWrap(True)
+        self.btn_repair = QPushButton()
+        hl.addWidget(self.lbl_health, 1)
+        hl.addWidget(self.btn_repair)
+        self.health_row.hide()
+        root.addWidget(self.health_row)
+
+        self.lbl_models = QLabel()           # «Models: aligner: ready, base: missing»
+        self.lbl_models.setObjectName("hint")
+        self.lbl_models.setWordWrap(True)
+        self.lbl_models.hide()
+        root.addWidget(self.lbl_models)
+
         self.lbl_ready = QLabel()
         self.lbl_ready.setObjectName("ready")
         self.lbl_ready.hide()
@@ -250,6 +280,7 @@ class MainWindow(QWidget):
         self.btn_update.clicked.connect(self.check_updates)
         self.btn_open.clicked.connect(self.open_result)
         self.btn_cancel.clicked.connect(self.cancel)
+        self.btn_repair.clicked.connect(self.start_repair)
         self.retranslate()
 
     # ------------------------------------------------------------------ язык
@@ -277,6 +308,8 @@ class MainWindow(QWidget):
         self.btn_open.setText(tr("ui.open_folder"))
         self.btn_cancel.setText(tr("ui.cancel"))
         self.lbl_privacy.setText(tr("ui.footer_privacy"))
+        self.btn_repair.setText(tr("ui.btn_repair"))
+        self._render_status()
         if not self.busy and not self.lbl_ready.isVisible():
             self.lbl_status.setText(tr("ui.status_idle"))
         self._refresh_buttons()
@@ -515,6 +548,7 @@ class MainWindow(QWidget):
         self.update_worker = UpdateWorker(self.updater_factory, parent=self)
         self.update_worker.progress.connect(lambda p, s, m: (self.progress.setValue(p), self.lbl_status.setText(m)))
         self.update_worker.done.connect(self._on_update_done)
+        self.update_worker.offer.connect(lambda offers, w=self.update_worker: self._show_offer(w, offers))
         self.update_worker.failed.connect(lambda k, m, d, u: self.lbl_status.setText(m))
         self.update_worker.finished.connect(self._refresh_buttons)
         self.update_worker.start()
@@ -524,16 +558,80 @@ class MainWindow(QWidget):
         self.progress.setValue(100 if changed else 0)
         self.lbl_status.setText(summary or tr("upd.verified_installed") + ".")
 
+    def _show_offer(self, worker: UpdateWorker, offers: list) -> None:
+        """Outdated component in the user's environment: ask first (non-blocking dialog), then tell the worker."""
+        from ui.upgrade_dialog import UpgradeOfferDialog
+
+        dlg = UpgradeOfferDialog(offers, self)
+        self.upgrade_dialog = dlg
+        dlg.decided.connect(worker.answer)
+        dlg.open()
+
+    # ------------------------------------------------------------------ состояние установки и моделей
+    def refresh_status(self) -> None:
+        """Health of Voxprint's own install + per-model state, computed off the GUI thread."""
+        if self.status_worker and self.status_worker.isRunning():
+            return
+        w = StatusWorker(self.health_fn, self.model_states_fn, parent=self)
+        w.done.connect(self._on_status)
+        self.status_worker = w
+        w.start()
+
+    def _on_status(self, reasons: list, states: dict) -> None:
+        self._health_reasons = list(reasons)
+        self._model_states = dict(states)
+        self._render_status()
+
+    def _render_status(self) -> None:
+        if self._health_reasons:
+            self.lbl_health.setText(tr("ui.repair_offer", reasons="; ".join(self._health_reasons)))
+        self.health_row.setVisible(bool(self._health_reasons))
+        items = []
+        for repo, state in self._model_states.items():
+            if state == "ready":
+                label = tr("ui.model_state_ready")
+            elif state == "partial":
+                label = tr("ui.model_state_partial")
+            else:
+                label = tr("ui.model_state_missing")
+            items.append(tr("ui.model_item", short=repo.split("/")[-1], state=label))
+        self.lbl_models.setText(tr("ui.models_line", items=", ".join(items)) if items else "")
+        self.lbl_models.setVisible(bool(items))
+
+    def start_repair(self) -> None:
+        if self.busy or (self.repair_worker and self.repair_worker.isRunning()):
+            return
+        w = RepairWorker(self.repair_fn, parent=self)
+        self.repair_worker = w
+        self.lbl_status.setText(tr("ui.repair_running"))
+        w.progress.connect(lambda p, m: (self.progress.setValue(p), self.lbl_status.setText(m)))
+        w.done.connect(self._on_repair_done)
+        w.finished.connect(self._refresh_buttons)
+        self.btn_repair.setEnabled(False)
+        w.start()
+
+    def _on_repair_done(self, rc: int, text: str) -> None:
+        self.progress.setValue(0)
+        self.lbl_status.setText(text)
+        self.btn_repair.setEnabled(True)
+        if rc == 0:
+            self._health_reasons = []
+            self._render_status()
+        self.refresh_status()
+
     def _startup_checks(self) -> None:
         """Памятка о конфиденциальности (один раз), предупреждение об ОС (мягкое) и тихая еженедельная проверка."""
         self.maybe_show_privacy_notice()
         if not self._os_check.ok and self._os_check.message and \
                 os.environ.get("QT_QPA_PLATFORM") != "offscreen":
             QMessageBox.information(self, APP_TITLE, self._os_check.message)
+        self.refresh_status()
         if self.busy:
             return
         w = UpdateWorker(self.updater_factory, silent=True, only_if_due=True, parent=self)
         w.done.connect(lambda s, changed: changed and self.lbl_status.setText(s))
+        w.offer.connect(lambda offers, w=w: self._show_offer(w, offers))
+        w.done.connect(lambda *_: self.refresh_status())
         self.update_worker = w
         w.start()
 
@@ -563,6 +661,7 @@ class MainWindow(QWidget):
     def _on_prefetch_done(self, downloaded: list) -> None:
         self.progress.setValue(0)
         self.lbl_status.setText(tr("ui.prefetch_done") if downloaded else tr("ui.status_idle"))
+        self.refresh_status()
 
     def _on_prefetch_failed(self, message: str, url: str) -> None:
         self.progress.setValue(0)
@@ -573,6 +672,8 @@ class MainWindow(QWidget):
             open_folder(self.result_dir)
 
     def closeEvent(self, e) -> None:  # noqa: N802
+        if self.upgrade_dialog is not None:      # an unanswered offer = «Not now» (the worker must not wait)
+            self.upgrade_dialog.reject()
         if self.worker and self.worker.isRunning():
             self.worker.cancel()
             self.worker.wait(5000)

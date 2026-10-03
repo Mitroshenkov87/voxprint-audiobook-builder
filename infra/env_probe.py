@@ -1,10 +1,15 @@
 """Read-only probe of what is already installed, and the reuse / upgrade / install decision for each component.
 
-Rule (agreed with the user):
+Rule (agreed with the user, revised):
   * installed and current (== the newest stable VERIFIED version) or proven compatible -> REUSE;
-  * installed but older than the newest verified version -> UPGRADE, inside Voxprint's OWN environment
-    (``packages/`` overlay or the Voxprint venv) - never in the user's other environments;
-  * missing / incompatible -> INSTALL the newest stable verified version into Voxprint's own environment.
+  * installed in Voxprint's OWN environment (packaged exe overlay / Voxprint venv) but older than the newest verified
+    version -> UPGRADE automatically;
+  * installed in the USER's environment (Voxprint was started from a system/conda/Pinokio Python) and older ->
+    OFFER_UPGRADE: nothing is touched silently; the UI asks once (what changes, which environment).  Accepted -> pip
+    upgrades it there; declined and still compatible -> reused as it is; declined and incompatible -> Voxprint's own
+    ``packages/`` overlay shadows it (the user's environment stays untouched);
+  * missing / incompatible-and-not-outdated -> INSTALL the newest stable verified version into Voxprint's own
+    environment (the user's environment is not modified).
 Other environments (system Python, Pinokio apps, conda...) are only *looked at*: a subprocess runs
 ``importlib.metadata`` there (no package is imported, nothing is written).  Their contents inform the report and the
 choice of the Python used for ``pip --target`` (matching version), but their packages are never loaded into Voxprint:
@@ -33,7 +38,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from packaging.version import InvalidVersion, Version
 
-from infra.version_manager import (ACTION_IGNORE, ACTION_INSTALL, ACTION_REUSE, ACTION_UPGRADE, IGNORED_PACKAGES,
+from infra.version_manager import (ACTION_IGNORE, ACTION_INSTALL, ACTION_OFFER, ACTION_REUSE, ACTION_UPGRADE,
+                                   IGNORED_PACKAGES,
                                    TRACKED_PACKAGES, Decision, decide_package)
 
 log = logging.getLogger("voxprint.env")
@@ -53,6 +59,26 @@ _PROBE_CODE = (
     "    except Exception: pass\n"
     "print('VXPROBE '+json.dumps(out))\n"
 )
+
+
+def is_own_environment() -> bool:
+    """True if the interpreter running Voxprint belongs to Voxprint: the packaged exe (bundled libraries + our
+    ``packages/`` overlay) or Voxprint's own venv.  Anything else (system Python, a conda/Pinokio env the user started
+    Voxprint from) is the USER's environment: its outdated components are never changed without asking.
+    ``VOXPRINT_OWN_ENV=1/0`` overrides (tests, unusual setups)."""
+    v = os.environ.get("VOXPRINT_OWN_ENV", "").strip().lower()
+    if v in ("1", "true", "yes", "on"):
+        return True
+    if v in ("0", "false", "no", "off"):
+        return False
+    if getattr(sys, "frozen", False):
+        return True
+    try:
+        from infra import paths
+
+        return Path(sys.prefix).resolve().is_relative_to((paths.app_home() / "venv").resolve())
+    except (OSError, ValueError):
+        return False
 
 
 def _run(args: List[str]) -> Tuple[int, str]:
@@ -96,7 +122,7 @@ def _cuda_tuple(tag: str) -> Optional[Tuple[int, int]]:
     return (int(n[:-1]), int(n[-1])) if len(n) == 3 else (int(n[:2]), int(n[2:]))
 
 
-def decide_torch(installed: Optional[str], wanted_flavor: str) -> Decision:
+def decide_torch(installed: Optional[str], wanted_flavor: str, external: bool = False) -> Decision:
     """torch has no pin: any reasonably recent build is reusable; the *flavor* must fit the machine.
     CPU build on a machine with an NVIDIA driver, or a CUDA build newer than the driver supports -> replace
     (in Voxprint's own environment); an older CUDA build than the driver offers is fine (drivers are backward compatible)."""
@@ -107,14 +133,16 @@ def decide_torch(installed: Optional[str], wanted_flavor: str) -> Decision:
         return Decision("torch", installed, wanted_flavor, ACTION_REUSE, "flavor_unknown")
     if have == wanted_flavor:
         return Decision("torch", installed, wanted_flavor, ACTION_REUSE, "current")
+    change = ACTION_OFFER if external else ACTION_UPGRADE      # the user's torch is never swapped silently
     if have == "cpu" and wanted_flavor != "cpu":
-        return Decision("torch", installed, wanted_flavor, ACTION_UPGRADE, "torch_flavor_changed")
+        return Decision("torch", installed, wanted_flavor, change, "torch_flavor_changed", outdated=True)
     hv, wv = _cuda_tuple(have), _cuda_tuple(wanted_flavor)
     if hv and wv and hv <= wv:
         return Decision("torch", installed, wanted_flavor, ACTION_REUSE, "compatible_older_cuda")
     if wanted_flavor == "cpu":
         return Decision("torch", installed, wanted_flavor, ACTION_REUSE, "cuda_build_without_gpu")
-    return Decision("torch", installed, wanted_flavor, ACTION_UPGRADE, "torch_flavor_changed")
+    return Decision("torch", installed, wanted_flavor, change, "torch_flavor_changed", outdated=True,
+                    compatible=False)
 
 
 def detect_driver_cuda(run: Runner = _run, which: Callable[[str], Optional[str]] = shutil.which) -> Optional[Tuple[int, int]]:
@@ -237,7 +265,7 @@ class EnvReport:
     ignored: Dict[str, str] = field(default_factory=dict)       # package -> reason code (e.g. unsloth)
 
     def counts(self) -> Dict[str, int]:
-        c = {ACTION_REUSE: 0, ACTION_UPGRADE: 0, ACTION_INSTALL: 0}
+        c = {ACTION_REUSE: 0, ACTION_UPGRADE: 0, ACTION_OFFER: 0, ACTION_INSTALL: 0}
         for d in self.decisions:
             if d.action in c:
                 c[d.action] += 1
@@ -251,8 +279,13 @@ def probe_environment(manifest_pins: Optional[Dict[str, str]] = None,
                       installed_fn: Callable[[str], Optional[str]] = None,  # type: ignore[assignment]
                       run: Runner = _run, which: Callable[[str], Optional[str]] = shutil.which,
                       scan_other_pythons: bool = True, packages: Optional[Dict[str, str]] = None,
-                      environ: Optional[Dict[str, str]] = None) -> EnvReport:
-    """Everything read-only.  ``manifest_pins``: verified versions (None -> bundled manifest)."""
+                      environ: Optional[Dict[str, str]] = None,
+                      external_env: Optional[bool] = None) -> EnvReport:
+    """Everything read-only.  ``manifest_pins``: verified versions (None -> bundled manifest).
+    ``external_env``: the running environment is the user's own (None -> detect): outdated components then get
+    ``offer_upgrade`` instead of ``upgrade``."""
+    if external_env is None:
+        external_env = not is_own_environment()
     if installed_fn is None:
         def installed_fn(n: str) -> Optional[str]:      # type: ignore[misc]
             try:
@@ -275,12 +308,12 @@ def probe_environment(manifest_pins: Optional[Dict[str, str]] = None,
         pin = manifest_pins.get(name)
         if pin is None and inst is None and name in OPTIONAL_PACKAGES:
             continue                                   # optional and absent: nothing to do
-        d = decide_package(name, inst, pin, constraint)
+        d = decide_package(name, inst, pin, constraint, external_env)
         if d.action != ACTION_IGNORE:
             rep.decisions.append(d)
     rep.driver_cuda = detect_driver_cuda(run, which)
     rep.wanted_torch_flavor = torch_flavor_for_driver(rep.driver_cuda)
-    rep.decisions.append(decide_torch(installed_fn("torch"), rep.wanted_torch_flavor))
+    rep.decisions.append(decide_torch(installed_fn("torch"), rep.wanted_torch_flavor, external_env))
     for name, reason in IGNORED_PACKAGES.items():
         if installed_fn(name):
             rep.ignored[name] = reason
@@ -304,9 +337,12 @@ def user_messages(rep: EnvReport) -> List[str]:
     from core.i18n import tr
 
     c = rep.counts()
-    out = [tr("env.summary", reuse=c[ACTION_REUSE], upgrade=c[ACTION_UPGRADE], install=c[ACTION_INSTALL])]
+    out = [tr("env.summary", reuse=c[ACTION_REUSE], upgrade=c[ACTION_UPGRADE], offer=c[ACTION_OFFER],
+              install=c[ACTION_INSTALL])]
     for d in rep.decisions:
-        if d.action == ACTION_UPGRADE:
+        if d.action == ACTION_OFFER:
+            out.append(tr("env.offer", name=d.name, old=d.installed or "-", new=d.target or "-"))
+        elif d.action == ACTION_UPGRADE:
             out.append(tr("env.upgrade", name=d.name, old=d.installed or "-", new=d.target or "-"))
         elif d.action == ACTION_INSTALL:
             out.append(tr("env.install", name=d.name, new=d.target or "-"))

@@ -43,8 +43,12 @@ downloads from **ModelScope** (modelscope.cn, org `Qwen`; the same repository id
 confirms the revision by file sizes. Downloads resume after an interruption (`<model>.partial`, `*.incomplete`). `VOXPRINT_NO_MIRROR=1` disables it.
 
 **Components.** The same idea for Python packages and tools (`infra/env_probe.py`, read-only): *installed and current or proven compatible* -> reused;
-*older than the newest verified version* -> upgraded **inside Voxprint's own environment**; *missing/incompatible* -> installed there. Other environments (system Python,
-Pinokio apps, conda) are only asked for versions (`importlib.metadata`, isolated, nothing imported or written) and are **never modified**. torch: any
+*missing* -> the newest stable verified version is installed into **Voxprint's own environment**
+(its venv / `packages/` overlay), whose components are auto-updated. An *outdated component in your system or another environment* (system Python, Pinokio, conda) is
+**never touched silently**: Voxprint shows a one-click prompt (all 5 languages) offering to upgrade it to the newest stable version and says what changes (which packages, in which
+environment). **Upgrade** -> pip upgrades it there (smoke-tested, the old version is restored on failure); **Not now** and still compatible -> it is used as it is; **Not now** and too old
+-> Voxprint uses its own copy and your environment stays untouched. A declined offer is not repeated for the same version. Versions are read with `importlib.metadata` (nothing imported or written).
+torch: any
 build is reusable, but its CUDA flavor must fit the NVIDIA driver (`nvidia-smi` CUDA version -> cu118/124/126/128/130, else CPU). ffmpeg: a system one is used
 only if `ffmpeg -version` works, otherwise a pinned LGPL build (sha256, staging, smoke test, atomic swap, rollback; `infra/assets_manifest.json`).
 After an install/repair Voxprint writes a **completion manifest** (app/Python version, requirement hashes, torch flavor) last and atomically;
@@ -211,9 +215,11 @@ Alexandria через **Pinokio** - `<pinokio>\api\alexandria-audiobook.git\cach
 (modelscope.cn, организация `Qwen`; те же идентификаторы репозиториев и те же размеры файлов - проверено 2026-10-03), ревизия подтверждается по размерам. Загрузки
 докачиваются после обрыва. `VOXPRINT_NO_MIRROR=1` отключает зеркало.
 
-**Компоненты.** Тот же принцип для пакетов и программ (`infra/env_probe.py`, только чтение): установлено и актуально/проверенно совместимо → используется; **старее новейшей
-проверенной версии → обновляется в собственном окружении Voxprint**; нет/несовместимо → ставится туда же. Чужие окружения (системный Python, приложения Pinokio, conda) лишь опрашиваются
-(`importlib.metadata`, ничего не импортируется и не пишется) и **никогда не изменяются**. torch: подходит любая сборка, но вариант CUDA должен соответствовать драйверу NVIDIA
+**Компоненты.** Тот же принцип для пакетов и программ (`infra/env_probe.py`, только чтение): установлено и актуально/проверенно совместимо → используется; нет → новейшая стабильная проверенная версия ставится в **собственное окружение Voxprint** (его venv / каталог `packages/`), компоненты которого обновляются автоматически.
+**Устаревший компонент в вашей системе или другом окружении** (системный Python, Pinokio, conda) **молча не трогается**: Voxprint показывает простое окно в один клик (на 5 языках) с предложением
+обновить его до новейшей стабильной версии и сообщает, что изменится (какие пакеты и в каком окружении). **Обновить** → pip обновляет компонент там (с проверочным импортом, при сбое возвращается прежняя версия);
+**Не сейчас** и компонент ещё совместим → используется как есть; **Не сейчас** и он слишком старый → Voxprint использует собственную копию, ваше окружение остаётся нетронутым. Отказ для той же версии не повторяется.
+Версии читаются через `importlib.metadata` (ничего не импортируется и не пишется). torch: подходит любая сборка, но вариант CUDA должен соответствовать драйверу NVIDIA
 (`nvidia-smi` → cu118/124/126/128/130, иначе CPU). ffmpeg: системный используется, только если `ffmpeg -version` работает, иначе закреплённая LGPL-сборка (sha256, staging,
 проверочный запуск, атомарная подмена, откат). После установки/восстановления последним и атомарно пишется **манифест завершения**; `main.py --verify-install` показывает коды причин
 (на выбранном языке, без трейсбеков), `main.py --repair` восстанавливает только отличающееся в venv Voxprint (`uv`). Настройки прежней установки Voxprint подхватываются (копируются, не перезаписывая).

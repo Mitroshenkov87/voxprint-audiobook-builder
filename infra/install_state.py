@@ -306,19 +306,29 @@ def cli_verify(deep: bool = True, print_fn: Callable[[str], None] = print) -> in
     return 1
 
 
-def cli_repair(run: Callable[[List[str]], Tuple[int, str]], which: Callable[[str], Optional[str]],
-               print_fn: Callable[[str], None] = print, detect_cuda: Optional[Callable[[], object]] = None) -> int:
-    """`main.py --repair`: rebuilds only what differs in Voxprint's own venv (needs `uv` on PATH)."""
+def repair_install(run: Callable[[List[str]], Tuple[int, str]], which: Callable[[str], Optional[str]],
+                   progress: Callable[[float, str], None] = lambda f, m: None,
+                   detect_cuda: Optional[Callable[[], object]] = None) -> Tuple[int, str]:
+    """Rebuilds only what differs in Voxprint's own venv (needs `uv` on PATH).  Returns (exit code, localized text);
+    shared by `--repair` and the GUI "Repair" button."""
     from core.i18n import tr
     from infra import env_probe
 
     uv = which("uv")
     if not uv:
-        print_fn(tr("health.no_uv"))
-        return 2
+        return 2, tr("health.no_uv")
     cuda = detect_cuda() if detect_cuda else env_probe.detect_driver_cuda()
     flavor = env_probe.torch_flavor_for_driver(cuda)   # type: ignore[arg-type]
     old = (read_manifest() or {}).get("expected_torch_tag")
-    res = run_install(uv, flavor, run, current_flavor=old, progress=lambda f, m: print_fn(f"  [{int(f * 100):3d}%] {m}"))
-    print_fn(tr("health.repair_done") if res.ok else tr("health.repair_failed", step=res.failed_step))
-    return 0 if res.ok else 1
+    res = run_install(uv, flavor, run, current_flavor=old, progress=progress)
+    if res.ok:
+        return 0, tr("health.repair_done")
+    return 1, tr("health.repair_failed", step=res.failed_step)
+
+
+def cli_repair(run: Callable[[List[str]], Tuple[int, str]], which: Callable[[str], Optional[str]],
+               print_fn: Callable[[str], None] = print, detect_cuda: Optional[Callable[[], object]] = None) -> int:
+    """`main.py --repair`."""
+    rc, text = repair_install(run, which, lambda f, m: print_fn(f"  [{int(f * 100):3d}%] {m}"), detect_cuda)
+    print_fn(text)
+    return rc

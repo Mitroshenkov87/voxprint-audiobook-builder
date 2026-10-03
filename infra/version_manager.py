@@ -55,6 +55,7 @@ FetchJson = Callable[[str], Any]
 ACTION_REUSE = "reuse"        # установлено и подходит - ничего не трогаем
 ACTION_UPGRADE = "upgrade"    # установлено, но старее целевой версии - обновляем в СОБСТВЕННОМ окружении Voxprint
 ACTION_INSTALL = "install"    # нет (или несовместимо) - ставим целевую версию в собственное окружение
+ACTION_OFFER = "offer_upgrade"  # устарело в ЧУЖОМ окружении пользователя: ничего не трогаем, сначала спрашиваем
 ACTION_IGNORE = "ignore"      # не используем (например Unsloth: Qwen3-TTS он пока не поддерживает)
 #: Версии, прогнанные вместе с Voxprint, но новее закреплённой в манифесте: их тоже можно использовать как есть.
 #: peft: закреплён 0.18.1 (как у Alexandria), на CPU с крошечной моделью проверена и 0.21.2.
@@ -70,10 +71,16 @@ class Decision:
     target: Optional[str]
     action: str
     reason: str           # стабильный код: current | compatible_newer | outdated | missing | incompatible | ...
+    outdated: bool = False       # установленная версия старее целевой
+    compatible: bool = True      # установленная версия ещё подходит (укладывается в ограничения)
 
 
-def decide_package(name: str, installed: Optional[str], target: Optional[str], constraint: str = "") -> Decision:
-    """Правило: готовое используем, если оно актуально или проверенно совместимо; старее - обновляем (в окружении
+def decide_package(name: str, installed: Optional[str], target: Optional[str], constraint: str = "",
+                   external: bool = False) -> Decision:
+    """external=True: компонент живёт в окружении пользователя (не в собственном окружении Voxprint). Устаревший
+    такой компонент не обновляется молча: решение ACTION_OFFER (UI спрашивает), отказ -> см. Updater.apply.
+
+    Правило: готовое используем, если оно актуально или проверенно совместимо; старее - обновляем (в окружении
     Voxprint, чужие окружения не трогаем); нет - ставим. target - закреплённая (или новейшая стабильная) версия."""
     if name in IGNORED_PACKAGES:
         return Decision(name, installed, None, ACTION_IGNORE, IGNORED_PACKAGES[name])
@@ -83,13 +90,16 @@ def decide_package(name: str, installed: Optional[str], target: Optional[str], c
     if installed is None:
         return Decision(name, None, target, ACTION_INSTALL, "missing")
     iv = parse_version(installed)
-    if constraint and iv is not None and iv not in SpecifierSet(constraint):
-        return Decision(name, installed, target, ACTION_INSTALL, "incompatible")
     c = compare_versions(installed, target)
+    if constraint and iv is not None and iv not in SpecifierSet(constraint):
+        older = c < 0
+        return Decision(name, installed, target, ACTION_OFFER if (external and older) else ACTION_INSTALL,
+                        "incompatible", outdated=older, compatible=False)
     if c == 0:
         return Decision(name, installed, target, ACTION_REUSE, "current")
     if c < 0:
-        return Decision(name, installed, target, ACTION_UPGRADE, "outdated")
+        return Decision(name, installed, target, ACTION_OFFER if external else ACTION_UPGRADE, "outdated",
+                        outdated=True, compatible=True)
     if installed in TESTED_COMPATIBLE.get(name, ()):
         return Decision(name, installed, target, ACTION_REUSE, "compatible_newer")
     return Decision(name, installed, target, ACTION_INSTALL, "unverified_newer")
@@ -167,15 +177,21 @@ class PackageStatus:
     target: Optional[str] = None      # что нужно установить в выбранном канале (None - ничего)
     pinned: bool = False              # target взят из манифеста «проверено Voxprint»
     error: str = ""
+    external: bool = False            # установлен в окружении пользователя, а не в собственном окружении Voxprint
 
     @property
     def update_available(self) -> bool:
-        """Нужно менять установленную версию (в т.ч. откатить к проверенной)."""
+        """Нужно менять установленную версию автоматически (в т.ч. откатить к проверенной)."""
         return self.decision.action in (ACTION_UPGRADE, ACTION_INSTALL)
 
     @property
+    def offer_available(self) -> bool:
+        """Нужно спросить пользователя (устаревший компонент в его окружении)."""
+        return self.decision.action == ACTION_OFFER
+
+    @property
     def decision(self) -> Decision:
-        return decide_package(self.name, self.installed, self.target, self.constraint)
+        return decide_package(self.name, self.installed, self.target, self.constraint, self.external)
 
     @property
     def newer_unverified(self) -> bool:
@@ -223,8 +239,12 @@ class VersionReport:
         return [f"{p.name} {p.latest_stable}" for p in self.packages if p.newer_unverified]
 
     @property
+    def offered_packages(self) -> List[PackageStatus]:
+        return [p for p in self.packages if p.offer_available]
+
+    @property
     def has_updates(self) -> bool:
-        return bool(self.outdated_packages or self.outdated_models)
+        return bool(self.outdated_packages or self.outdated_models or self.offered_packages)
 
 
 def check_versions(
@@ -235,6 +255,7 @@ def check_versions(
     models: Optional[tuple] = None,
     manifest: Optional[Any] = None,
     channel: str = CHANNEL_VERIFIED,
+    external_env: bool = False,
 ) -> VersionReport:
     """manifest - infra.verified_manifest.Manifest (или None: pins нет). channel: verified | latest."""
     local_model_shas = local_model_shas or {}
@@ -244,7 +265,7 @@ def check_versions(
     errors = 0
     for name, constraint in (packages if packages is not None else TRACKED_PACKAGES).items():
         inst = installed_fn(name)
-        st = PackageStatus(name, inst, None, constraint)
+        st = PackageStatus(name, inst, None, constraint, external=external_env)
         try:
             st.latest_stable = latest_compatible_pypi(name, constraint, fetch_json)
         except (urllib.error.URLError, OSError, ValueError) as exc:
@@ -272,3 +293,18 @@ def check_versions(
     total = len(rep.packages) + len(rep.models)
     rep.network_ok = errors < total
     return rep
+
+
+@dataclass(frozen=True)
+class Offer:
+    """Что предлагаем пользователю обновить в его окружении (показывает диалог)."""
+    name: str
+    installed: str
+    target: str
+    compatible: bool      # True: при отказе используем как есть; False: при отказе - собственная копия Voxprint
+    env: str              # какое окружение изменится (путь)
+
+
+def make_offers(report: "VersionReport", env: str) -> List[Offer]:
+    return [Offer(p.name, p.installed or "", p.target or "", p.decision.compatible, env)
+            for p in report.offered_packages if p.target]
