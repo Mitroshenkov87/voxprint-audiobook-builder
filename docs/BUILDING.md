@@ -33,7 +33,7 @@ App data lives in `%LOCALAPPDATA%\Voxprint` (`models\`, `logs\`, `state\`, ...; 
 Interface language override: `VOXPRINT_LANG=en|de|ru`.
 
 ## Contributing
-Contributions are welcome - see [`CONTRIBUTING.md`](../CONTRIBUTING.md) (setup, tests, code style, localization, how to propose changes) and
+Contributions are welcome - see [`CONTRIBUTING.md`](../CONTRIBUTING.md) and [`DEVELOPMENT.md`](DEVELOPMENT.md) (setup, tests, code style, localization, how to propose changes) and
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) (module map, data flow). Quick start for developers:
 ```bash
 python -m venv .venv && . .venv/bin/activate        # Linux: enough to run the tests
