@@ -367,3 +367,20 @@ def test_all_portable_texts_exist_in_three_languages():
             m = re.search(rf"^{lang}\.{key}=(.+)$", iss, re.M)
             assert m and m.group(1).strip(), (lang, key)
     assert "portable" in re.search(r"^english\.PortableCheck=(.+)$", iss, re.M).group(1).lower()
+
+
+from tests.test_studio import app  # noqa: E402,F401  (QApplication fixture)
+
+
+def test_the_components_window_names_the_setup_folder(app, tmp_path, monkeypatch, web):
+    from core import i18n
+    from ui.modules_dialog import ModulesDialog
+
+    root, base, _ = web
+    _release(root, base)
+    folder = tmp_path / "P"
+    of.run(f"{base}/manifest.json", tmp_path / "a", tmp_path / "c", St(), roles=["core"], portable=folder, keep_all=True)
+    i18n.set_language("en")
+    assert str(folder) not in ModulesDialog(manifest_fn=lambda: {"modules": []}).lbl_hint.text()
+    monkeypatch.setenv(pt.ENV_DIR, str(folder))
+    assert str(folder) in ModulesDialog(manifest_fn=lambda: {"modules": []}).lbl_hint.text()

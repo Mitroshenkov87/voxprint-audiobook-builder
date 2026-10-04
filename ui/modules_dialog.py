@@ -112,7 +112,11 @@ class ModulesDialog(QDialog):
     def retranslate(self) -> None:
         self.setWindowTitle(tr("modules.title"))
         self.lbl_title.setText(tr("modules.title"))
-        self.lbl_hint.setText(tr("modules.hint"))
+        hint = tr("modules.hint")
+        folder = mods.setup_folder()
+        if folder is not None:                       # the installer's "portable setup folder": its files are used before any download
+            hint += "\n" + tr("modules.setup_folder", folder=str(folder))
+        self.lbl_hint.setText(hint)
         self.btn_download.setText(tr("modules.btn_download"))
         self.btn_cancel.setText(tr("ui.cancel"))
         self.btn_close.setText(tr("modules.btn_close"))
