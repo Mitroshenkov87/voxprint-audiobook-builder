@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import logging.handlers
+import os
 import sys
 
 
@@ -107,10 +108,16 @@ def _modules_cli(argv) -> int:
                     last[0] = pct
                     out(f"{pct:3d} %  {m}")
 
+            if "--own-torch" in argv:      # ignore a PyTorch found on this PC: download our own pinned copy
+                from infra import runtime_reuse
+
+                runtime_reuse.forget("torch")
+                os.environ["VOXPRINT_NO_REUSE"] = "1"
             n = modules.install(ids, prog)
             out(f"OK: {n} component(s) installed")
         for m in modules.modules(modules.load_manifest()):
-            out(f"{m.id:8} {'installed' if m.installed else 'missing  '} {m.size / 2**20:9.0f} MB  {m.title}")
+            how = "reused  " if m.reused else "installed" if m.installed else "missing  "
+            out(f"{m.id:8} {how} {m.size / 2**20:9.0f} MB  {m.title}")
         return 0
     except modules.ModulesError as exc:
         out(f"ERROR: {exc}")
@@ -199,6 +206,11 @@ def main(argv=None) -> int:
         return install_state.cli_verify(print_fn=_cli_printer("verify_install"))
     if "--selftest-imports" in argv:
         return _selftest_imports()
+    if "--probe-torch" in argv:   # child process of the PyTorch reuse check (infra/runtime_reuse.py): import + compute, print VXTORCH OK
+        from infra import modules as _m, runtime_reuse
+
+        _m.activate()
+        return runtime_reuse.probe_torch_main()
     if "--modules-status" in argv or "--install-modules" in argv:   # thin build: list / download the runtime modules (no GUI)
         return _modules_cli(argv)
     if "--selftest-text" in argv:   # headless, no GPU/models: text prep, chunking, stub translation, ffmpeg encode

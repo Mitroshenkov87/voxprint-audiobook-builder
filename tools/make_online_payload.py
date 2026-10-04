@@ -47,8 +47,13 @@ def list_files(dist: Path) -> List[Path]:
 
 
 def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = None, base_url: str = "",
-          limit_mib: int = DEFAULT_LIMIT_MIB, app_version: str = "", runtime_site: Optional[Path] = None) -> Path:
+          limit_mib: int = DEFAULT_LIMIT_MIB, app_version: str = "", runtime_site: Optional[Path] = None,
+          runtime_lock: Optional[Path] = None, mirror_base: str = "") -> Path:
     """Write the zips and the manifest into ``out``; returns the manifest path.
+
+    ``runtime_lock`` (THIN installer v2, ``docs/THIN-INSTALLER.md``): ``infra/runtime_lock.json``.  ``dist`` is the thin shell (the only
+    thing zipped); the third-party libraries are listed in the manifest with their ORIGINAL addresses (PyPI, download.pytorch.org) and
+    SHA-256 - nothing of them is repacked or uploaded.  The manifest is ``manifest-thin-<channel>.json``.
 
     ``runtime_site`` (THIN installer): the site-packages of the build environment.  ``dist`` is then the thin shell; its parts
     get ``role: core``, the heavy libraries become the runtime modules (``tools/make_runtime_modules.py``, ``role: runtime``)
@@ -61,9 +66,11 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
     channel = channel or channel_for(tag)
     base = (base_url or f"https://github.com/{repo}/releases/download/{tag}").rstrip("/")
     limit = limit_mib * 1024 * 1024
-    if runtime_site is not None:        # tell the shell where the manifest is (the app's module manager reads it)
+    thin = runtime_site is not None or runtime_lock is not None
+    mname = f"manifest-thin-{channel}.json" if runtime_lock is not None else f"manifest-{channel}.json"
+    if thin:        # tell the shell where the manifest is (the app's module manager reads it)
         mj = (dist / "_internal" if (dist / "_internal").is_dir() else dist) / "modules.json"
-        mj.write_text(json.dumps({"schema": 1, "manifest_url": f"{base}/manifest-{channel}.json", "tag": tag}, indent=1),
+        mj.write_text(json.dumps({"schema": 1, "manifest_url": f"{base}/{mname}", "tag": tag}, indent=1),
                       encoding="utf-8")
     parts: List[dict] = []
     cur: Optional[zipfile.ZipFile] = None
@@ -99,7 +106,18 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
         comps.append({"id": f"payload-{i:02d}", "file": path.name, "url": f"{base}/{path.name}", "size": path.stat().st_size,
                       "sha256": sha256_of(path), "unpacked_bytes": p["raw"], "markers": p["markers"]})
     modules: List[dict] = []
-    if runtime_site is not None:
+    meta: dict = {}
+    if runtime_lock is not None:
+        for c in comps:
+            c["role"] = "core"
+        try:
+            from tools import runtime_manifest as rm
+        except ImportError:
+            import runtime_manifest as rm                 # type: ignore[no-redef]
+
+        rt_comps, modules, meta = rm.components(json.loads(Path(runtime_lock).read_text(encoding="utf-8")), base, out, mirror_base)
+        comps += rt_comps
+    elif runtime_site is not None:
         for c in comps:
             c["role"] = "core"
         try:                                              # only the thin build needs it
@@ -111,10 +129,12 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
         comps += rt_comps
     manifest = {"schema": SCHEMA, "channel": channel, "app_version": app_version or tag.lstrip("vV"), "tag": tag, "repo": repo,
                 "created": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "components": comps}
-    if runtime_site is not None:
+    if thin:
         manifest["thin"] = True
         manifest["modules"] = modules
-    mp = out / f"manifest-{channel}.json"
+        if meta:
+            manifest["runtime"] = meta
+    mp = out / mname
     mp.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     return mp
 
@@ -129,12 +149,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--base-url", default="")
     ap.add_argument("--limit-mib", type=int, default=DEFAULT_LIMIT_MIB)
     ap.add_argument("--runtime-site", help="THIN installer: site-packages of the build environment (heavy libraries become runtime modules)")
+    ap.add_argument("--runtime-lock", help="THIN installer v2: infra/runtime_lock.json (libraries come from their upstream sites)")
+    ap.add_argument("--mirror-base", default="", help="optional fallback address prefix for the lock's files (our mirror)")
     a = ap.parse_args(argv)
     mp = build(Path(a.dist), Path(a.out), a.tag, a.repo, a.channel, a.base_url, a.limit_mib,
-               runtime_site=Path(a.runtime_site) if a.runtime_site else None)
+               runtime_site=Path(a.runtime_site) if a.runtime_site else None,
+               runtime_lock=Path(a.runtime_lock) if a.runtime_lock else None, mirror_base=a.mirror_base)
     m = json.loads(mp.read_text(encoding="utf-8"))
     for c in m["components"]:
-        print(f"{c['file']}  {c['size']:>12}  {c['sha256']}")
+        print(f"{c['file']}  {c['size']:>12}  {c['sha256']}  {c.get('role', 'core')}")
     print(f"manifest: {mp}")
     return 0
 

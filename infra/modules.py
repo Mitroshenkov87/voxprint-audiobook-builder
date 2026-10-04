@@ -46,6 +46,7 @@ class Module:
     unpacked: int                   # bytes on disk
     components: List[str] = field(default_factory=list)
     installed: bool = False
+    reused: bool = False            # satisfied by a verified copy that another program installed
 
 
 # ------------------------------------------------------------------------------------------------ configuration
@@ -89,6 +90,36 @@ def cache_dir() -> Path:
     return p
 
 
+_FLAVOR_CACHE: Dict[str, Any] = {}
+
+
+def driver_cuda() -> Optional[tuple]:
+    """CUDA version of the NVIDIA driver (``nvidia-smi``), cached for the process; None = no NVIDIA GPU."""
+    if "cuda" not in _FLAVOR_CACHE:
+        try:
+            from infra import env_probe
+
+            _FLAVOR_CACHE["cuda"] = env_probe.detect_driver_cuda()
+        except Exception:  # noqa: BLE001
+            _FLAVOR_CACHE["cuda"] = None
+    return _FLAVOR_CACHE["cuda"]
+
+
+def flavor_for(manifest: Dict[str, Any]) -> str:
+    """The PyTorch flavor (``cu128`` / ``cu126`` / ``cpu``) this PC gets; '' when the manifest has none (classic modules)."""
+    flavors = list((manifest.get("runtime") or {}).get("flavors") or [])
+    if not flavors:
+        return ""
+    from infra import runtime_reuse
+
+    return runtime_reuse.choose_flavor(flavors, driver_cuda())
+
+
+def _components_of(module: Dict[str, Any], by_id: Dict[str, Any], flavor: str) -> List[Dict[str, Any]]:
+    """Components of a module; a component with a ``flavor`` belongs to this PC only if it matches."""
+    return [by_id[i] for i in module.get("components", []) if i in by_id and (not by_id[i].get("flavor") or by_id[i]["flavor"] == flavor)]
+
+
 def _fetch_module():
     from tools import online_fetch
 
@@ -125,13 +156,22 @@ def modules(manifest: Dict[str, Any]) -> List[Module]:
     of = _fetch_module()
     state = of.load_state(runtime_dir())
     by_id = {c["id"]: c for c in manifest.get("components", [])}
+    flavor = flavor_for(manifest)
     out: List[Module] = []
     for m in manifest.get("modules", []):
-        comps = [by_id[i] for i in m.get("components", []) if i in by_id]
-        out.append(Module(str(m["id"]), str(m.get("title", m["id"])), bool(m.get("required", True)),
-                          sum(int(c["size"]) for c in comps), sum(int(c.get("unpacked_bytes", 0)) for c in comps),
-                          [c["id"] for c in comps],
-                          bool(comps) and all(of.installed_ok(c, state, runtime_dir()) for c in comps)))
+        comps = _components_of(m, by_id, flavor)
+        ok = bool(comps) and all(of.installed_ok(c, state, runtime_dir()) for c in comps)
+        reused = False
+        if not ok and m.get("reusable") == "torch":
+            from infra import runtime_reuse
+
+            reused = ok = runtime_reuse.reused("torch") is not None           # a verified copy from another program
+        mod = Module(str(m["id"]), str(m.get("title", m["id"])), bool(m.get("required", True)),
+                     0 if reused else sum(int(c["size"]) for c in comps),
+                     0 if reused else sum(int(c.get("unpacked_bytes", 0)) for c in comps),
+                     [c["id"] for c in comps], ok)
+        mod.reused = reused
+        out.append(mod)
     return out
 
 
@@ -179,6 +219,7 @@ def install(module_ids: Optional[List[str]] = None, progress: Optional[Progress]
     man = load_manifest(src)
     mods = modules(man)
     chosen = [m for m in mods if (m.id in module_ids if module_ids else (m.required and not m.installed))]
+    chosen = _reuse_first(man, chosen, progress)
     comp_ids = [c for m in chosen for c in m.components]
     if not comp_ids:
         activate()
@@ -194,18 +235,47 @@ def install(module_ids: Optional[List[str]] = None, progress: Optional[Progress]
     return n
 
 
+def _reuse_first(man: Dict[str, Any], chosen: List[Module], progress: Optional[Progress]) -> List[Module]:
+    """Before downloading PyTorch look for a working copy on this PC (``infra/runtime_reuse.py``); drop it from the list if found."""
+    reusable = {str(m["id"]) for m in man.get("modules", []) if m.get("reusable") == "torch"}
+    if not any(m.id in reusable for m in chosen):
+        return chosen
+    from infra import runtime_reuse
+
+    flavor = flavor_for(man)
+    say = (lambda t: progress(0.0, t)) if progress else (lambda t: None)
+    try:
+        ext = runtime_reuse.try_reuse_torch(man.get("runtime") or {}, driver_cuda(), flavor, say)
+    except Exception as exc:  # noqa: BLE001 - never let the search break the download
+        log.warning("search for an existing PyTorch failed: %s", exc)
+        ext = None
+    if ext is None:
+        return chosen
+    return [m for m in chosen if m.id not in reusable]
+
+
 def activate() -> Optional[Path]:
     """Put the runtime folder on ``sys.path`` (after the updater's ``packages`` overlay).  Safe to call repeatedly."""
+    rd = paths.app_home() / "runtime"
     try:
-        rd = paths.app_home() / "runtime"
-        if rd.is_dir() and any(rd.iterdir()):
+        if rd.is_dir() and any(p.name != "reuse.json" for p in rd.iterdir()):
             sp = str(rd)
             if sp not in sys.path:
                 sys.path.insert(1 if sys.path and sys.path[0] == str(paths.packages_dir()) else 0, sp)
             import importlib
 
             importlib.invalidate_caches()
-            return rd
     except OSError:
         pass
-    return None
+    try:                                   # a verified foreign PyTorch: LAST on the path, our own pinned libraries win
+        from infra import runtime_reuse
+
+        for extra in runtime_reuse.extra_paths():
+            if extra not in sys.path:
+                sys.path.append(extra)
+        import importlib
+
+        importlib.invalidate_caches()
+    except Exception:  # noqa: BLE001
+        pass
+    return rd if rd.is_dir() else None
