@@ -272,3 +272,63 @@ def test_a_disk_error_does_not_make_hugging_face_look_slow(manifest, fast_watch)
                         hf_mirror_fetch=_fetcher({}), mirror_manifest=manifest)
     assert ms.hf_verdict() is not False
     assert md._is_network_failure(dw.Stalled("x")) and md._is_network_failure(TimeoutError()) and not md._is_network_failure(PermissionError())
+
+
+# ------------------------------------------------------------------------------------------------ one download per model
+def test_the_model_lock_excludes_a_second_holder_and_is_released(tmp_path):
+    a, b = md.ModelLock(tmp_path / ".m.lock"), md.ModelLock(tmp_path / ".m.lock")
+    assert a.try_acquire() and not b.try_acquire()
+    a.release()
+    assert b.try_acquire()
+    b.release()
+
+
+def test_the_lock_dies_with_its_process(tmp_path):
+    import subprocess
+    import sys
+
+    code = ("import sys,time; sys.path.insert(0, %r)\nfrom infra.model_downloader import ModelLock\n"
+            "l = ModelLock(__import__('pathlib').Path(%r)); assert l.try_acquire(); print('held', flush=True); time.sleep(60)"
+            % (str(Path(md.__file__).resolve().parent.parent), str(tmp_path / ".m.lock")))
+    proc = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, text=True)
+    try:
+        assert proc.stdout.readline().strip() == "held"
+        mine = md.ModelLock(tmp_path / ".m.lock")
+        assert not mine.try_acquire()                  # another process holds it
+        proc.kill()
+        proc.wait()
+        deadline = time.monotonic() + 5
+        while not mine.try_acquire():                  # a killed holder never leaves a stale lock
+            assert time.monotonic() < deadline
+            time.sleep(0.05)
+        mine.release()
+    finally:
+        proc.kill()
+
+
+def test_two_requests_for_one_model_download_it_once(manifest, fast_watch):
+    calls, first_in = [], threading.Event()
+
+    def snap(repo_id, local_dir, revision=None, **kw):
+        calls.append(repo_id)
+        first_in.set()
+        time.sleep(0.4)                                # the second request arrives while this one is downloading
+        for n, b in FILES.items():
+            t = Path(local_dir) / Path(*n.split("/"))
+            t.parent.mkdir(parents=True, exist_ok=True)
+            t.write_bytes(b)
+        return str(local_dir)
+
+    out, waits = [], []
+
+    def run(progress):
+        out.append(md.ensure_model(REPO, progress, snapshot_download=snap, revision=SHA_A, hf_probe=lambda r: True,
+                                   mirror_manifest=manifest))
+
+    t1 = threading.Thread(target=run, args=(lambda *a: None,))
+    t1.start()
+    assert first_in.wait(5)
+    run(lambda stage, f, m: waits.append(m))
+    t1.join(10)
+    assert len(calls) == 1 and len(out) == 2 and out[0] == out[1] and md.verify_local_model(out[0])
+    assert waits                                       # the second request said it was waiting

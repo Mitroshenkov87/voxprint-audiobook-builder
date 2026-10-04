@@ -122,6 +122,7 @@
  "err.mismatch_length": "Aufnahme und Text scheinen nicht zusammenzupassen: Der Text ist deutlich länger oder kürzer als die Aufnahme. Prüfen Sie, ob Sie die richtigen Dateien gewählt und den ganzen Text gelesen haben.",
  "err.model_partial": "Das Modell {short} wurde nicht vollständig heruntergeladen. Bitte versuchen Sie es erneut.",
  "err.model_finalize": "Das Modell {short} wurde heruntergeladen, aber Windows ließ Voxprint den Ordner nicht abschließen (Virenscanner oder ein anderes Voxprint-Fenster nutzt ihn). Schließen Sie andere Voxprint-Fenster, warten Sie eine Minute und versuchen Sie es erneut – es muss nichts erneut geladen werden.",
+ "progress.model_wait": "{short}: Ein anderer Voxprint-Prozess lädt dieses Modell gerade – warte darauf…",
  "err.narration_aac_disabled": "Die Option M4B (AAC) ist in dieser Installation deaktiviert.",
  "err.narration_chunk": "Die Sprach-Engine ist bei Fragment {n} fehlgeschlagen. Fertige Fragmente sind gespeichert – starten Sie erneut, um fortzusetzen.",
  "err.narration_encoder": "Diese ffmpeg-Version kann das gewählte Format nicht kodieren (fehlt: {encoder}). Wählen Sie ein anderes Format.",

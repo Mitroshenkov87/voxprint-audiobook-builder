@@ -407,7 +407,95 @@ def _hf_fast(repo_id: str, hf_probe: Optional[Callable[[str], bool]]) -> bool:
     return fast
 
 
-def ensure_model(
+# ------------------------------------------------------------------------------------------------ one download per model
+class ModelLock:
+    """Cross-process lock for one model folder (an OS file lock: it disappears with a crashed process, so it is never stale).
+
+    The background workers (``auto_quality_worker`` and the main worker's prefetch) may ask for the same model at the same
+    moment; a second request waits here and then finds the finished model instead of downloading and renaming it in parallel.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self._fh: Any = None
+
+    def try_acquire(self) -> bool:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        fh = open(self.path, "a+b")
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            fh.close()
+            return False
+        self._fh = fh
+        return True
+
+    def release(self) -> None:
+        fh, self._fh = self._fh, None
+        if fh is None:
+            return
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                fh.seek(0)
+                msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            pass
+        finally:
+            fh.close()
+
+    def acquire(self, on_wait: Callable[[float], None], poll: float = 0.5) -> None:
+        t0 = time.monotonic()
+        waited = False
+        while not self.try_acquire():
+            if not waited:
+                log.info("another process is downloading %s - waiting for it", self.path.name)
+                waited = True
+            on_wait(time.monotonic() - t0)             # may raise (the user cancelled)
+            _sleep(poll)
+        if waited:
+            log.info("the other download of %s ended after %.0f s", self.path.name, time.monotonic() - t0)
+
+
+def ensure_model(*args: Any, **kwargs: Any) -> Path:
+    """Same as :func:`_ensure_model` (see there) but only one process at a time works on a given model."""
+    import inspect
+
+    bound = inspect.signature(_ensure_model).bind(*args, **kwargs)
+    bound.apply_defaults()
+    a = bound.arguments
+    repo_id, root, progress, stage = a["repo_id"], a["root"], a["progress"], a["stage"]
+    target = local_dir_for(repo_id, root)
+    if verify_local_model(target):
+        return target
+    lock = ModelLock(target.parent / f".{target.name}.lock")
+    short = repo_id.split("/")[-1]
+
+    def waiting(seconds: float) -> None:
+        progress(stage, 0.0, tr("progress.model_wait", short=short))
+
+    lock.acquire(waiting)
+    try:
+        return _ensure_model(*args, **kwargs)              # re-checks: the other process may have finished the model
+    finally:
+        lock.release()
+
+
+
+def _ensure_model(
     repo_id: str,
     progress: ProgressCallback = noop_progress,
     root: Optional[Path] = None,
