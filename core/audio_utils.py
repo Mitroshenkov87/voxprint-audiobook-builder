@@ -32,7 +32,7 @@ def ensure_ffmpeg() -> Optional[str]:
     candidates: List[str] = []
     exe_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
     base = Path(getattr(sys, "_MEIPASS", Path(sys.argv[0]).resolve().parent))
-    for d in (base, Path(sys.executable).resolve().parent):
+    for d in (base, Path(sys.executable).parent):   # no resolve(): a venv's python links to /usr/bin, whose ffmpeg is not 'next to the program'
         p = d / exe_name
         if p.exists():
             candidates.append(str(p))
