@@ -111,7 +111,7 @@ def test_fetch_error_becomes_mirror_error(manifest, tmp_path):
         mir.download(mir.load(manifest)[REPO], tmp_path / "d", fetch=boom)
 
 
-def test_ensure_model_falls_back_to_hf_mirror_last(manifest, tmp_path, monkeypatch):
+def test_ensure_model_falls_back_to_hf_mirror_right_after_the_original(manifest, tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path / "h"))
     monkeypatch.setenv("USERPROFILE", str(tmp_path / "h"))
     monkeypatch.setenv("VOXPRINT_NO_EXTERNAL_MODELS", "1")
@@ -129,9 +129,35 @@ def test_ensure_model_falls_back_to_hf_mirror_last(manifest, tmp_path, monkeypat
     calls = []
     got = md.ensure_model(REPO, snapshot_download=hf, revision=SHA_A, hf_probe=lambda r: True, mirror_download=ms,
                           hf_mirror_fetch=_fetcher(calls=calls), mirror_manifest=manifest)
-    assert order == ["hf", "hf", "ms"] and calls                           # original sources first, the mirror last
+    assert order == ["hf", "hf"] and calls                                 # original first, then our mirror - ModelScope is not needed
     assert md.verify_local_model(got)
     assert (got / ".revision").read_text() == SHA_A
+
+
+def test_modelscope_is_the_last_resort_after_the_original_and_our_mirror(manifest, tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "h"))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "h"))
+    monkeypatch.chdir(tmp_path)
+    order = []
+
+    def hf(**kw):
+        order.append("hf")
+        raise OSError("network down")
+
+    def broken_fetch(repo, name, rev, dest):
+        order.append("hfm")
+        raise OSError("mirror down")
+
+    def ms(repo, dest, progress, expected):
+        order.append("ms")
+        for n, b in FILES.items():
+            t = Path(dest).joinpath(*n.split("/"))
+            t.parent.mkdir(parents=True, exist_ok=True)
+            t.write_bytes(b)
+
+    got = md.ensure_model(REPO, snapshot_download=hf, revision=SHA_A, hf_probe=lambda r: True, mirror_download=ms,
+                          hf_mirror_fetch=broken_fetch, mirror_manifest=manifest)
+    assert order[:2] == ["hf", "hf"] and order[-2:] == ["hfm", "ms"] and md.verify_local_model(got)
 
 
 def test_original_success_never_touches_the_mirror(manifest, tmp_path, monkeypatch):

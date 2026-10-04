@@ -21,7 +21,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from core.errors import ModelDownloadError
 from core.events import ProgressCallback, Stage, noop_progress
-from infra import download_watch, model_mirrors, modelscope_mirror, netroute, paths
+from infra import download_watch, model_mirrors, model_release, modelscope_mirror, netroute, paths
 
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 netroute.disable_xet()      # plain HTTP: the xet/CAS transfer path stalls on networks that block its host (VOXPRINT_ALLOW_XET=1 keeps it)
@@ -80,9 +80,28 @@ def mirror_enabled() -> bool:
     return os.environ.get(ENV_NO_MIRROR, "").strip().lower() not in ("1", "true", "yes", "on")
 
 
-def _default_mirror_download(repo_id, dest, progress, expected_sizes):
+def _default_mirror_download(repo_id, dest, progress, expected_sizes, on_total=None):
     """Default mirror downloader (injectable in tests): ModelScope with size verification."""
-    return modelscope_mirror.download_repo(repo_id, dest, progress, expected_sizes)
+    return modelscope_mirror.download_repo(repo_id, dest, progress, expected_sizes, on_total=on_total)
+
+
+#: Seconds the Hugging Face file-size lookup (for the stable "N MB of TOTAL") may take; it is optional.
+SIZES_TIMEOUT = 6.0
+
+
+def _hf_sizes(repo_id: str, revision: Optional[str], patterns: Optional[List[str]]) -> Optional[Dict[str, int]]:
+    """``{file: size}`` from the Hugging Face API (best effort, short timeout), limited by the glob ``patterns``."""
+    try:
+        from huggingface_hub import HfApi
+
+        info = HfApi().model_info(repo_id, revision=revision, files_metadata=True, timeout=SIZES_TIMEOUT)
+        sizes = {f.rfilename: int(f.size) for f in (info.siblings or []) if getattr(f, "size", None)}
+    except Exception as exc:  # noqa: BLE001 - optional; without it the line shows only what was downloaded
+        log.debug("file sizes of %s unavailable: %s", repo_id, exc)
+        return None
+    if patterns:
+        sizes = {n: v for n, v in sizes.items() if any(fnmatch.fnmatchcase(n, p) for p in patterns)}
+    return sizes or None
 
 
 def external_model(repo_id: str, revision: Optional[str] = None):
@@ -375,7 +394,7 @@ def _is_network_failure(exc: BaseException) -> bool:
 
 #: Longest pre-download check of "is Hugging Face usable" (seconds); a slower answer counts as "slow".
 PROBE_CAP = 5.0
-_SOURCE_NAMES = {"hf": "Hugging Face", "ms": "ModelScope", "hfm": "Hugging Face mirror"}
+_SOURCE_NAMES = {"gh": "GitHub", "hf": "Hugging Face", "ms": "ModelScope", "hfm": "Hugging Face mirror"}
 
 
 def _hf_fast(repo_id: str, hf_probe: Optional[Callable[[str], bool]]) -> bool:
@@ -510,6 +529,9 @@ def _ensure_model(
     mirror_manifest: Optional[Path] = None,
     allow_patterns: Optional[List[str]] = None,
     mirror_only: bool = False,
+    get_remote_sizes: Optional[Callable[[str, Optional[str], Optional[List[str]]], Optional[Dict[str, int]]]] = None,
+    release_manifest: Optional[Path] = None,
+    release_opener: Optional[Callable[..., Any]] = None,
 ) -> Path:
     """Return the path of the local model, downloading it on first use (automatically).
 
@@ -519,9 +541,14 @@ def _ensure_model(
 
     ``revision`` is the HF commit; by default the verified revision from the "verified by Voxprint" manifest is used.
     If the pinned revision is unavailable the latest one is tried once (and logged).  Sources are tried in order
-    Hugging Face -> ModelScope (reversed when Hugging Face is slow/unreachable); if both fail, the project's Hugging
-    Face backup mirror (:mod:`infra.model_mirrors`, every file verified by SHA-256) is the last resort.  The result lands in ``<name>.partial``
-    first and is renamed only after verification.
+    Hugging Face -> the project's Hugging Face backup mirror (:mod:`infra.model_mirrors`, every file verified by SHA-256)
+    -> ModelScope (ModelScope first when Hugging Face is slow/unreachable).  SMALL models (the release manifest
+    :mod:`infra.model_release`) are taken from the GitHub release assets FIRST, with the same fallbacks.  The result lands
+    in ``<name>.partial`` first and is renamed only after verification.
+
+    The progress line shows a STABLE total (the sum of the file sizes known up front: pinned sizes, the mirror /
+    release manifest, the Hugging Face API or the ModelScope file list), a counter that never goes backwards and the
+    current source.
 
     ``allow_patterns`` (glob list) restricts the Hugging Face download to some files (a repository that also holds TF / Rust /
     Flax copies of the weights); ModelScope, which copies whole repositories, is not used then, but the backup mirror is (it
@@ -575,16 +602,7 @@ def _ensure_model(
     partial = target.with_name(target.name + ".partial")   # survives between runs: the download resumes where it stopped
     cur: Dict[str, Any] = {"f": 0.0, "meter": None, "cancel": threading.Event()}
 
-    def report(f: float) -> None:
-        """One progress report of the running source: records it, aborts an abandoned download, shows the detail line."""
-        if cur["cancel"].is_set():
-            raise download_watch.Stalled("download abandoned (no data)")
-        cur["f"] = f
-        meter = cur["meter"]
-        text = meter.text(tr, short, int(f * 100)) if meter is not None else tr("progress.downloading", short=short, pct=int(f * 100))
-        progress(stage, f, text)
-
-    tracker = _ByteProgress(report)
+    tracker = _ByteProgress(lambda f: report(f))
     state = {"sha": sha}
 
     def _download(rev: Optional[str]) -> None:
@@ -630,8 +648,11 @@ def _ensure_model(
 
         known = model_locator.KNOWN_SIZES.get(repo_id)
         expected = known[1] if known and revision and known[0] == revision else None
-        progress(stage, 0.0, tr("progress.mirror_modelscope", short=short))
-        mirror_download(repo_id, partial, report, expected)
+        progress(stage, cur["f"], tr("progress.mirror_modelscope", short=short))
+        if mirror_download is _default_mirror_download:
+            _default_mirror_download(repo_id, partial, report, expected, on_total=meter.set_total)
+        else:
+            mirror_download(repo_id, partial, report, expected)
         # ModelScope has no commit sha: the revision is confirmed only when the sizes matched the pinned commit
         state["sha"] = revision if expected else None
 
@@ -643,9 +664,14 @@ def _ensure_model(
         if revision and revision != entry.source_revision:
             raise ModelDownloadError(f"the backup mirror holds {entry.source_revision[:8]}, not the requested {revision[:8]}",
                                      url=hf_url(repo_id))
-        progress(stage, 0.0, tr("progress.mirror_hf", short=short))
+        progress(stage, cur["f"], tr("progress.mirror_hf", short=short))
         state["sha"] = model_mirrors.download(
             entry, partial, report, hf_mirror_fetch, allow_patterns)
+
+    def _from_github() -> None:
+        """Small models: the release assets of the project repository (every file verified by SHA-256)."""
+        progress(stage, cur["f"], tr("progress.mirror_github", short=short))
+        state["sha"] = model_release.download(rel, partial, report, allow_patterns, release_opener)
 
     def complete() -> bool:
         return partial_is_complete(partial, repo_id, revision, mirror_manifest, allow_patterns)
@@ -657,33 +683,78 @@ def _ensure_model(
         finished = True
         state["sha"] = revision
     mirror_ok = mirror_enabled() and root is None and not allow_patterns and not finished   # updates through the staging folder always go straight to Hugging Face
-    if mirror_ok:
-        mirror_download = mirror_download or _default_mirror_download
+    use_hfm = root is None and not finished and model_mirrors.entry_for(repo_id, mirror_manifest) is not None
+    rel = None
+    if root is None and not finished and not mirror_only:
+        rel = model_release.entry_for(repo_id, revision, release_manifest)      # small models: GitHub release assets first
+        if rel is not None:
+            try:
+                rel.selected(allow_patterns)
+            except model_release.ReleaseError as exc:
+                log.warning("GitHub release copy of %s unusable: %s", repo_id, exc)
+                rel = None
+    if mirror_only or finished:
+        order: List[str] = []
+    elif mirror_ok:
         fast = _hf_fast(repo_id, hf_probe)
-        order = ["hf", "ms"] if fast else ["ms", "hf"]
+        mirror_download = mirror_download or _default_mirror_download
+        order = ["hf", "hfm", "ms"] if fast else ["ms", "hf", "hfm"]
         if not fast:
             log.warning("Hugging Face is slow or unreachable - trying ModelScope first for %s", repo_id)
     else:
-        order = ["hf"]
-    if mirror_only or finished:
-        order = []
-    if root is None and not finished and model_mirrors.entry_for(repo_id, mirror_manifest) is not None:
-        order.append("hfm")                     # the project's Hugging Face backup mirror, always last
+        order = ["hf", "hfm"]
+    if mirror_only:
+        order = ["hfm"]
+    if not use_hfm:
+        order = [o for o in order if o != "hfm"]
+    if rel is not None:
+        order.insert(0, "gh")                  # the stall watchdog abandons a slow GitHub; the others follow
     errors: List[str] = []
     ok_source = "partial" if finished else ""
-    funcs = {"hf": _from_hf, "hfm": _from_hf_mirror, "ms": _from_modelscope}
+    funcs = {"gh": _from_github, "hf": _from_hf, "hfm": _from_hf_mirror, "ms": _from_modelscope}
 
-    def tick(meter: "download_watch.Meter") -> None:
+    # ONE meter for the whole model: the counter never goes backwards and the total is the sum of the file sizes known up
+    # front, so neither jumps when the download changes the source or a retry re-reads a file
+    meter = download_watch.Meter(_SOURCE_NAMES[order[0]] if order else "")
+    cur["meter"] = meter
+
+    def _frac(source_fraction: float) -> float:
+        """Overall fraction: from the byte counter when the total is known (the sources count differently), else the
+        source's own report; never backwards."""
+        total = meter.total
+        f = min(0.99, meter.done / total) if total > 0 else source_fraction
+        return max(cur["f"], f)
+
+    def report(f: float) -> None:
+        """One progress report of the running source: records it, aborts an abandoned download, shows the detail line."""
+        if cur["cancel"].is_set():
+            raise download_watch.Stalled("download abandoned (no data)")
+        cur["f"] = _frac(f)
         progress(stage, cur["f"], meter.text(tr, short, int(cur["f"] * 100)))
+
+    def known_total(src: str) -> int:
+        """Total size of this download from what is known without a transfer (pinned sizes, release / mirror manifests)."""
+        sizes = _expected_sizes(repo_id, revision, mirror_manifest, allow_patterns)
+        if not sizes and rel is not None:
+            sizes = rel.sizes(allow_patterns)
+        if not sizes and src == "hf" and (get_remote_sizes is not None or (
+                snapshot_download is None and modelscope_mirror.hf_verdict() is not False)):
+            sizes = (get_remote_sizes or _hf_sizes)(repo_id, revision, allow_patterns)
+        return sum(sizes.values()) if sizes else 0
+
+    def tick(m: "download_watch.Meter") -> None:
+        cur["f"] = _frac(cur["f"])
+        progress(stage, cur["f"], m.text(tr, short, int(cur["f"] * 100)))
 
     for src in order:
         label = _SOURCE_NAMES[src]
-        meter = download_watch.Meter(label, lambda: tracker.total or (
-            int(cur["meter"].done / cur["f"]) if cur["meter"] is not None and cur["f"] > 0.01 else 0))
-        cur["meter"], cur["f"], cur["cancel"] = meter, 0.0, threading.Event()
+        meter.set_source(label)
+        cur["cancel"] = threading.Event()
         tracker.cancel = cur["cancel"]
         tracker.total = tracker.done = 0
         try:
+            if not meter.total:
+                meter.set_total(known_total(src))
             if src == "hfm":
                 log.warning("download of %s from the original sources failed - trying the Hugging Face backup mirror", repo_id)
             elif src == "ms" and errors:

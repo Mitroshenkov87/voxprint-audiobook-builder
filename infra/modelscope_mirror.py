@@ -122,7 +122,7 @@ def _safe_rel(rel: str) -> bool:
 
 def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = lambda f: None,
                   expected_sizes: Optional[Dict[str, int]] = None, opener: Opener = _open,
-                  timeout: float = 30.0) -> Dict[str, int]:
+                  timeout: float = 30.0, on_total: Optional[Callable[[int], None]] = None) -> Dict[str, int]:
     """Download all files of ``repo_id`` into ``dest`` (resuming), verify the sizes and return ``{path: size}``.
 
     ``expected_sizes`` are the sizes of the verified revision; every one of those files that exists on the mirror must
@@ -135,6 +135,8 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
             if rel in sizes and sizes[rel] != size:
                 raise MirrorError(f"{rel}: size {sizes[rel]} differs from the verified revision ({size})")
     total = sum(s for _, s in files) or 1
+    if on_total is not None:
+        on_total(total)                       # the whole size is known before the first byte: the caller shows a stable total
     done = 0
     for rel, size in files:
         if not _safe_rel(rel):

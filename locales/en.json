@@ -349,6 +349,7 @@
  "progress.ffmpeg_ready": "ffmpeg is ready",
  "progress.first_download": "First start: downloading the model {short} (this is done once)…",
  "progress.merging": "Merging the voice into the model…",
+ "progress.mirror_github": "Downloading {short} from the project's GitHub release (verified by SHA-256)…",
  "progress.mirror_hf": "The original sources failed - downloading {short} from the project's Hugging Face backup mirror (verified by SHA-256)…",
  "progress.mirror_modelscope": "Hugging Face is slow or unreachable - downloading {short} from the ModelScope mirror (modelscope.cn)…",
  "progress.model_done": "Model {short} is ready",
