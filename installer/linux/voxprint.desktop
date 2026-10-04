@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Voxprint AI Audiobook Builder
+GenericName=Audiobook Builder
+Comment=Offline voice cloning and audiobook narration (experimental Linux build)
+Comment[ru]=Клонирование голоса и озвучка книг офлайн (экспериментальная сборка для Linux)
+Comment[de]=Stimmklonen und Hörbuch-Vertonung offline (experimentelle Linux-Version)
+Exec=@LAUNCHER@ %U
+Icon=voxprint
+Terminal=false
+Categories=AudioVideo;Audio;AudioVideoEditing;
+Keywords=audiobook;tts;voice;clone;speech;
+StartupWMClass=voxprint

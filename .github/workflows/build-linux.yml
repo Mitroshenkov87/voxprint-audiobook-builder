@@ -1,0 +1,107 @@
+name: build-linux
+
+# EXPERIMENTAL Linux package of Voxprint (no frozen build: the program is Python source, installed into a venv by
+# install-voxprint-linux.sh).  On a clean, free ubuntu-24.04 runner this job
+#   1. builds the package twice: a test copy that points at a local web server, and the release copy that points at GitHub;
+#   2. runs the installer from the test copy exactly as a user would (apt dependencies, venv, PyTorch via uv - CPU here -,
+#      launcher, .desktop entry) and its built-in self-tests (imports of all libraries, text/translation-stub/ffmpeg pipeline
+#      step, offscreen start of the window);
+#   3. runs the unit-test suite with the installed environment (QT_QPA_PLATFORM=offscreen);
+#   4. smoke-tests the installed launcher, the menu entry, a second run (update) and --uninstall;
+#   5. on a tag "v*" or a manual run with release_tag: attaches Voxprint-linux-* assets + SHA256SUMS-linux.txt to that release.
+# GPU / CUDA, audio output and a real desktop session cannot be tested here: see docs/LINUX-TEST-CHECKLIST.md.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Attach the Linux package to this existing release tag (empty = artifacts only)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write      # attach the assets to the release
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      QT_QPA_PLATFORM: offscreen
+      REL_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the package (test copy -> local server, release copy -> GitHub)
+        run: |
+          TAG="${REL_TAG:-v0.0.0-ci}"
+          python3 tools/make_linux_package.py --out build/linux-test --tag "$TAG" --repo "$GITHUB_REPOSITORY" --base-url http://127.0.0.1:8099
+          python3 tools/make_linux_package.py --out build/linux --tag "$TAG" --repo "$GITHUB_REPOSITORY"
+          ls -l build/linux
+          bash -n build/linux/install-voxprint-linux.sh
+
+      - name: Install it like a user would (apt dependencies, venv, PyTorch, launcher, self-tests)
+        run: |
+          python3 -m http.server 8099 --bind 127.0.0.1 --directory build/linux-test >/dev/null 2>&1 &
+          sleep 1
+          export VOXPRINT_BASE_URL=http://127.0.0.1:8099
+          bash build/linux-test/install-voxprint-linux.sh --check || true
+          bash build/linux-test/install-voxprint-linux.sh --install-deps --yes
+          test -x ~/.local/bin/voxprint
+          test -f ~/.local/share/applications/voxprint.desktop
+          test -f ~/.local/share/icons/hicolor/256x256/apps/voxprint.png
+          cat ~/.local/share/voxprint/install.json
+
+      - name: Unit tests with the installed environment
+        run: |
+          V=~/.local/share/voxprint/venv
+          $V/bin/uv pip install --python $V/bin/python -r requirements-dev.txt
+          $V/bin/python -m pytest -q -p no:cacheprovider
+
+      - name: Smoke tests of the installed program
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          voxprint --selftest-imports
+          voxprint --selftest-text
+          voxprint --selftest
+          sudo apt-get install -y desktop-file-utils
+          desktop-file-validate ~/.local/share/applications/voxprint.desktop
+          # update path: running the installer again keeps the environment and succeeds quickly
+          VOXPRINT_BASE_URL=http://127.0.0.1:8099 bash build/linux-test/install-voxprint-linux.sh --yes --skip-check
+          # the one-file archive installs from its own tree (no network for the program itself)
+          mkdir -p /tmp/tarcheck && tar xzf build/linux/Voxprint-linux-experimental.tar.gz -C /tmp/tarcheck
+          test -f /tmp/tarcheck/voxprint-linux/app/main.py
+          bash /tmp/tarcheck/voxprint-linux/install-voxprint-linux.sh --help | grep -q uninstall
+          # removal
+          bash build/linux-test/install-voxprint-linux.sh --uninstall
+          test ! -e ~/.local/bin/voxprint
+          test ! -e ~/.local/share/applications/voxprint.desktop
+
+      - name: SHA-256 of the release assets
+        run: |
+          cd build/linux
+          sha256sum -c SHA256SUMS-linux.txt
+          cat SHA256SUMS-linux.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Voxprint-linux-experimental
+          path: |
+            build/linux/Voxprint-linux-app.zip
+            build/linux/Voxprint-linux-experimental.tar.gz
+            build/linux/manifest-linux.json
+            build/linux/voxprint-fetch.py
+            build/linux/install-voxprint-linux.sh
+            build/linux/SHA256SUMS-linux.txt
+
+      - name: Attach to the release (tag builds, or a dispatch with release_tag)
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$REL_TAG" >/dev/null 2>&1 || gh release create "$REL_TAG" --prerelease --title "$REL_TAG" --notes "Built from source by GitHub Actions."
+          cd build/linux
+          for f in Voxprint-linux-app.zip manifest-linux.json voxprint-fetch.py install-voxprint-linux.sh Voxprint-linux-experimental.tar.gz SHA256SUMS-linux.txt; do
+            gh release upload "$REL_TAG" "$f" --clobber
+          done

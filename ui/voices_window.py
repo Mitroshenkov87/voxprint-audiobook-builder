@@ -531,6 +531,14 @@ class VoicesWindow(SubWindow):
         self.empty.setVisible(not items)
 
     # ------------------------------------------------------------------ online voices
+    def shutdown(self) -> None:
+        """Application exit: wait for the index / download threads (a QThread destroyed while running aborts the process)."""
+        for w in (self._dl_worker, self._index_worker):
+            if w is not None and w.isRunning():
+                if hasattr(w, "cancel"):
+                    w.cancel()
+                w.wait(3000)
+
     def refresh_remote(self) -> None:
         """Fetch the index in the background (does nothing while the repository is not configured)."""
         if not repo.is_configured() or (self._index_worker is not None and self._index_worker.isRunning()):

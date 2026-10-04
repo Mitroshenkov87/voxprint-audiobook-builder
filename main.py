@@ -138,6 +138,10 @@ def main(argv=None) -> int:
         return install_state.cli_verify(print_fn=_cli_printer("verify_install"))
     if "--selftest-imports" in argv:
         return _selftest_imports()
+    if "--selftest-text" in argv:   # headless, no GPU/models: text prep, chunking, stub translation, ffmpeg encode
+        from workers import selftest_text
+
+        return selftest_text.run()
     if "--selftest-narrate" in argv:   # headless: narrate two sentences with the first voice (argument after the flag = voice id)
         from workers import selftest_narrate
 
@@ -152,12 +156,15 @@ def main(argv=None) -> int:
 
     app = QApplication.instance() or QApplication(argv)
     app.setApplicationName("Voxprint")
+    app.setDesktopFileName("voxprint")      # Linux: ties the window to voxprint.desktop (icon / Wayland app-id); ignored elsewhere
     try:   # window / taskbar icon (the file ships in assets/, next to the other resources in a build)
         from PySide6.QtGui import QIcon
 
         from infra import paths
 
-        ico = paths.resource_dir() / "assets" / "voxprint.ico"
+        ico = paths.resource_dir() / "assets" / ("voxprint.ico" if sys.platform == "win32" else "voxprint.png")
+        if not ico.is_file():
+            ico = paths.resource_dir() / "assets" / "voxprint.ico"
         if ico.is_file():
             app.setWindowIcon(QIcon(str(ico)))
     except Exception:  # noqa: BLE001 - the icon is optional

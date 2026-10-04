@@ -308,6 +308,7 @@ class StudioWindow(SubWindow):
         self._shutting_down = True
         self._timer.stop()
         self.narrate_window.shutdown()
+        self.voices_window.shutdown()
         self.trainer.close()
         for w in (self.voices_window, self.narrate_window):
             w.hide()

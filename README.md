@@ -27,7 +27,7 @@ The voice goes into your **voice library**; then pick a book (TXT, FB2, EPUB) an
 **Recording scripts (ru / en / de, TXT + PDF dark and print):** ready-made texts to read when you record a voice, with emotion blocks, computer stories, a reading guide and the consent sentence, no profanity - [`docs/recording-scripts/`](docs/recording-scripts/).
 
 ## Contents
-[Concept](#concept-and-philosophy) · [Features](#features) · [Screenshots](#screenshots) · [Installation](#installation) ·
+[Concept](#concept-and-philosophy) · [Features](#features) · [Screenshots](#screenshots) · [Installation](#installation) · [Linux](#linux-experimental) ·
 [Using Voxprint](#using-voxprint) · [Narrate a book](#narrate-a-book) · [My voices](#my-voices-and-licences) · [AAC / M4B notice](#aac--m4b-patents-please-read) ·
 [How it works](#how-it-works) · [Output format](#output-format) ·
 [Hardware requirements](#hardware-requirements) · [Model reuse](#reusing-what-is-already-on-your-computer) · [Backup and restore](#backup-restore-and-existing-models) ·
@@ -132,6 +132,26 @@ python -m bitsandbytes                                     :: optional check of 
 python main.py
 ```
 **Never run `uv run` without `--no-sync`** - it re-syncs the environment and replaces CUDA torch with the CPU build. flash-attn is not needed on Windows.
+
+### Linux (experimental)
+**Status: experimental.** The Linux package is built and checked by the public workflow `.github/workflows/build-linux.yml` on a clean Ubuntu 24.04 runner (install, the whole unit-test suite, text/translation/ffmpeg pipeline step, headless start of the window). What no CI can check - a real desktop session, sound output, NVIDIA/CUDA - is still **untested**; please test with [`docs/LINUX-TEST-CHECKLIST.md`](docs/LINUX-TEST-CHECKLIST.md) and report problems. Targets: Ubuntu 24.04 / Debian 12-13 and derivatives (AnduinOS, Linux Mint, Pop!_OS), x86-64, Python 3.10-3.13. Other distributions: install the equivalent packages yourself (`--no-system-check`).
+
+There is no frozen binary: the installer script creates a Python environment (venv) for your user only - nothing is installed system-wide except the optional `apt` libraries.
+```bash
+# download the installer script and check its SHA-256 (see the release notes / SHA256SUMS-linux.txt)
+curl -fsSLO https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.1.0-beta/install-voxprint-linux.sh
+sha256sum install-voxprint-linux.sh
+bash install-voxprint-linux.sh --check            # lists missing system packages (Qt xcb libraries, ffmpeg, python3-venv ...)
+bash install-voxprint-linux.sh --install-deps     # installs them with sudo apt-get, then Voxprint (about 3-8 GB with PyTorch)
+voxprint                                          # or start "Voxprint AI Audiobook Builder" from the application menu
+```
+* **Where things are:** program `~/.local/share/voxprint/app`, environment `~/.local/share/voxprint/venv`, models / voices / settings / logs `~/.local/share/voxprint/` (`$XDG_DATA_HOME`, or `VOXPRINT_HOME`), launcher `~/.local/bin/voxprint`, menu entry `~/.local/share/applications/voxprint.desktop`. Results go to `~/Documents/Voxprint` as on Windows.
+* **PyTorch:** the CUDA build matching your NVIDIA driver is chosen automatically (`uv pip install torch --torch-backend=auto`); without an NVIDIA GPU, or if that fails, the CPU build (`--cpu` forces it). Narration and training on the CPU work but are very slow. `ffmpeg` comes from apt; the bundled `imageio-ffmpeg` is the fallback.
+* **Update:** run the script again (the environment is reused). **Remove:** `bash install-voxprint-linux.sh --uninstall` (models and voices stay; `--purge` deletes them too).
+* **One-file alternative:** `Voxprint-linux-experimental.tar.gz` contains the same script and the program tree (`tar xzf ...; ./voxprint-linux/install-voxprint-linux.sh`); Python packages are still downloaded from PyPI. The script downloads `Voxprint-linux-app.zip` through the manifest `manifest-linux.json` with the same SHA-256-verified, resumable downloader as the Windows online installer (`voxprint-fetch.py`).
+* **Wayland / Qt problems:** `QT_QPA_PLATFORM=xcb voxprint` forces X11 (XWayland). A missing `xcb` plugin message means a missing `libxcb-cursor0`.
+* **Not available on Linux:** the Windows-only window effects (Mica); an AppImage / Flatpak / Snap is not provided (PyTorch + CUDA make them several GB; the venv installer is simpler and easier to repair).
+* Self-tests: `voxprint --selftest-imports`, `--selftest-text` (no GPU or model needed), `--selftest`; logs in `~/.local/share/voxprint/logs`.
 
 ### Build options
 ```bat
@@ -386,7 +406,7 @@ Using the merged model: `Qwen3TTSModel.from_pretrained(folder).generate_custom_v
 ## Hardware requirements
 | | Minimum | Recommended |
 |---|---|---|
-| OS | Windows 11 24H2 (build 26100) x64 | Windows 11 26H2 |
+| OS | Windows 11 24H2 (build 26100) x64 (Linux: experimental, Ubuntu 24.04 or newer, x86-64) | Windows 11 26H2 |
 | GPU | NVIDIA with ~6 GB VRAM (0.6B model, 8-bit Adam) | NVIDIA with 16 GB VRAM (1.7B model); a 4090 peaked at 6.1 GB whole-GPU usage for a 170 s recording |
 | Without NVIDIA | dataset only; training on the CPU is possible but very slow | - |
 | Disk | ~12 GB (models ~7 GB, program 3.6 GB installed) + ~4.2 GB for the optional universal model | SSD |
@@ -500,7 +520,7 @@ Ideas, not promises:
 * **Android** - later: convert the merged model for phones (GGUF / LiteRT; today the merged folder is a plain Hugging Face directory a converter can start from).
 * **Installer channels** - *online* (small installer, downloads components), *offline* (everything included), and *beta* (pre-releases).
 * A public repository URL (the source-code licence is chosen: Apache-2.0).
-* More languages in the UI (see "Adding a language" below) and Linux/macOS builds.
+* More languages in the UI (see "Adding a language" below) and a macOS build (Linux: experimental, see [Installation](#linux-experimental)).
 
 ## Contributing
 Contributions are welcome - see [`CONTRIBUTING.md`](CONTRIBUTING.md) (setup, tests, code style, localization, how to propose changes) and

@@ -1,4 +1,5 @@
-"""Application directories (Windows: ``%LOCALAPPDATA%\\Voxprint``; overridable with ``VOXPRINT_HOME``).
+"""Application directories (Windows: ``%LOCALAPPDATA%\\Voxprint``; Linux: ``~/.local/share/voxprint``;
+overridable with ``VOXPRINT_HOME``).
 
 Layout under :func:`app_home`::
 
@@ -21,14 +22,17 @@ APP_NAME = "Voxprint"
 
 
 def app_home() -> Path:
-    """Root data directory: ``$VOXPRINT_HOME``, else ``%LOCALAPPDATA%\\Voxprint`` (Windows) / ``$XDG_DATA_HOME/Voxprint``."""
+    """Root data directory: ``$VOXPRINT_HOME``, else ``%LOCALAPPDATA%\\Voxprint`` (Windows) / ``$XDG_DATA_HOME/voxprint``
+    (Linux and others, default ``~/.local/share/voxprint`` - lower case by XDG habit; the Linux installer keeps ``app/`` and
+    ``venv/`` there too)."""
     env = os.environ.get("VOXPRINT_HOME")
     if env:
         p = Path(env)
     elif sys.platform == "win32":
         p = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / APP_NAME
     else:
-        p = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / APP_NAME
+        xdg = os.environ.get("XDG_DATA_HOME", "").strip()
+        p = (Path(xdg) if xdg and os.path.isabs(xdg) else Path.home() / ".local" / "share") / APP_NAME.lower()
     p.mkdir(parents=True, exist_ok=True)
     return p
 
@@ -110,7 +114,7 @@ def previous_homes() -> list:
                 cands.append(Path(base) / APP_NAME.lower())
     try:
         home = Path.home()
-        cands += [home / ".voxprint", home / ".local" / "share" / APP_NAME]
+        cands += [home / ".voxprint", home / ".local" / "share" / APP_NAME, home / ".local" / "share" / APP_NAME.lower()]
     except (RuntimeError, OSError):
         pass
     out = []

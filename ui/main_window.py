@@ -98,7 +98,7 @@ def _check_icon_url() -> str:
 
 
 STYLE_TEMPLATE = """
-* {{{{ font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif; font-size: 14px; color: {text}; }}}}
+* {{{{ font-family: "Segoe UI Variable Text", "Segoe UI", "Ubuntu", "Noto Sans", "Cantarell", "DejaVu Sans", sans-serif; font-size: 14px; color: {text}; }}}}
 QWidget#root {{{{ background: {{root_bg}}; }}}}
 QLabel#title {{{{ font-size: 26px; font-weight: 600; }}}}
 QLabel#subtitle {{{{ color: {muted}; }}}}
