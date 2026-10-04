@@ -33,7 +33,8 @@ def test_descendants_are_found_and_killed():
         killed = hard_exit.kill_descendants(parent.pid)
         assert set(killed) >= {child, grand}
         assert hard_exit.wait_gone([child, grand])
-        assert parent.poll() is None                              # only the helpers, not the parent
+        if sys.platform != "win32":      # (a venv's python.exe on Windows is a launcher whose real child is the "parent" script)
+            assert parent.poll() is None                          # only the helpers, not the parent
     finally:
         parent.kill()
         parent.wait()
