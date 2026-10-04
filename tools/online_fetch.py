@@ -125,12 +125,12 @@ def _open(url: str, headers: Optional[Dict[str, str]] = None, timeout: float = 3
     return urllib.request.urlopen(req, timeout=timeout)
 
 
-def read_manifest(source: str) -> dict:
+def read_manifest(source: str, attempts: int = 4) -> dict:
     """Load and validate the manifest from a URL or a local file."""
     try:
         if re.match(r"^https?://", source):
             last: Optional[Exception] = None
-            for attempt in range(4):
+            for attempt in range(attempts):
                 try:
                     with _open(source) as r:
                         raw = r.read(8 << 20)
@@ -139,7 +139,8 @@ def read_manifest(source: str) -> dict:
                     raise
                 except Exception as exc:  # noqa: BLE001
                     last = exc
-                    time.sleep(1 + 2 * attempt)
+                    if attempt + 1 < attempts:
+                        time.sleep(1 + 2 * attempt)
             else:
                 raise FetchError(f"Could not download the manifest: {last}")
         else:
@@ -383,28 +384,91 @@ def write_portable_index(root: Path, man: dict, comps: List[dict]) -> None:
     (root / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="ascii")
 
 
+def _portable_mod():
+    """``infra.portable`` (flavor choice, diff, models) or None where it is not bundled (the single-file Linux downloader)."""
+    try:
+        from infra import portable as mod
+        return mod
+    except ImportError:
+        return None
+
+
+def _have_size(path: Path, comp: dict) -> bool:
+    try:
+        return path.is_file() and path.stat().st_size == int(comp["size"])
+    except OSError:
+        return False
+
+
 def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Optional[List[str]] = None,
         sleep: Callable[[float], None] = time.sleep, roles: Optional[List[str]] = None,
-        portable: Optional[Path] = None) -> int:
-    """Install every component of the manifest into ``dest``; returns the number of components fetched.
+        portable: Optional[Path] = None, keep_all: bool = False, offline: bool = False, flavor: str = "auto") -> int:
+    """Install the components of the manifest into ``dest``; returns the number of components fetched.
 
-    ``portable``: a *portable setup folder* (foundation, see docs/THIN-INSTALLER.md): EVERY selected component is also kept there
-    (``components/<id>/<file>`` + ``manifest.json`` + ``SHA256SUMS.txt``), even if it is already installed; a file that is already in
-    the folder and passes the SHA-256 check is used instead of the network, so the folder works for an offline re-install."""
+    ``portable``: a *portable setup folder* (docs/THIN-INSTALLER.md).  Every selected component is also kept there
+    (``components/<id>/<file>``), even if it is already installed; a file that is already in the folder and passes the SHA-256
+    check is used instead of the network, so the folder works for an offline re-install.
+    ``keep_all``: keep ALL components of the manifest (those of the PyTorch ``flavor`` this PC gets: ``auto``, a flavor name or
+    ``all``) in the folder, not only the ones installed now (``roles`` / ``only``); the installer uses it to keep the runtime too.
+    ``offline``: never touch the network; the manifest is ``<portable>/manifest.json`` and every needed file must be in the folder.
+    Without internet a folder that has a manifest is used automatically.  When the folder was made from an older manifest, only the
+    parts whose SHA-256 changed are fetched and the files of the old version are removed at the end."""
+    pm = _portable_mod() if portable is not None else None
     status.write("running", 0.0, "Reading the manifest", force=True)
-    man = read_manifest(manifest_source)
-    comps = [c for c in man["components"] if (not only or c["id"] in only) and (not roles or c.get("role", "core") in roles)]
+    local_manifest = portable / "manifest.json" if portable is not None else None
+    old_man: Optional[dict] = None
+    if local_manifest is not None and local_manifest.is_file():
+        try:
+            old_man = validate_manifest(json.loads(local_manifest.read_text(encoding="utf-8-sig")))
+        except (OSError, ValueError, FetchError):
+            old_man = None
+    if offline:
+        if old_man is None:
+            raise FetchError("The setup folder has no usable manifest.json.")
+        man = old_man
+    else:
+        try:
+            man = read_manifest(manifest_source, attempts=4 if old_man is None else 1)     # a setup folder is the fallback: no long retries
+        except FetchError as exc:
+            if old_man is None:
+                raise
+            man, offline = old_man, True
+            status.write("running", 0.0, "No internet connection - installing from the setup folder", force=True)
+            print(f"{exc} - using the setup folder", file=sys.stderr, flush=True)
+    fl = ""
+    if portable is not None and pm is not None:
+        fl = pm.flavor_of(man, flavor)
+    elif portable is not None and flavor not in ("auto", "all", ""):
+        fl = flavor
+    flavored = (lambda c: pm.matches_flavor(c, fl)) if (pm is not None and fl) else (lambda c: True)
+    comps = [c for c in man["components"] if (not only or c["id"] in only) and (not roles or c.get("role", "core") in roles)
+             and (portable is None or flavored(c))]
+    keep = [c for c in man["components"] if flavored(c)] if (portable is not None and keep_all) else (comps if portable is not None else [])
+    if old_man is not None and not offline and pm is not None and old_man["components"] != man["components"]:
+        d = pm.diff(old_man, man, fl or "all")
+        if d.newer:
+            status.write("running", 0.0, d.text(), force=True)
     dest.mkdir(parents=True, exist_ok=True)
     state = load_state(dest)
     todo = [c for c in comps if not installed_ok(c, state, dest)]
-    fetch = comps if portable is not None else todo           # a portable folder wants all of them
+    fetch = keep if portable is not None else todo
+    for c in todo:                                               # not yet in the install folder: it must come from somewhere
+        if c not in fetch:
+            fetch.append(c)
     reused = len(comps) - len(todo)
-    need = sum(int(c.get("unpacked_bytes", c["size"] * 2)) for c in todo) + sum(int(c["size"]) for c in fetch)
+    if offline:
+        lost = [portable_file(portable, c).name for c in todo if not _portable_valid(portable_file(portable, c), c)]
+        if lost:
+            raise FetchError("The setup folder is incomplete or damaged (" + ", ".join(lost[:4]) + (" ..." if len(lost) > 4 else "")
+                             + "). Run the installer with an internet connection to repair it.")
+        fetch = [c for c in fetch if c in todo]               # offline: only what is installed now
+    missing = [c for c in fetch if not (portable is not None and _have_size(portable_file(portable, c), c))]
+    need = sum(int(c.get("unpacked_bytes", c["size"] * 2)) for c in todo) + sum(int(c["size"]) for c in missing)
     try:
         free = shutil.disk_usage(dest).free
     except OSError:
         free = None
-    if fetch and free is not None and free < need * 1.05:
+    if missing and free is not None and free < need * 1.05:
         raise FetchError(f"Not enough free disk space: about {need >> 20} MB needed, {free >> 20} MB free.")
     weights = [int(c["size"]) * 2 for c in fetch] or [1]      # download + verify/extract
     total_w, base, fetched = float(sum(weights)), 0.0, 0
@@ -412,24 +476,23 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
         status.write("running", 0.0, f"{reused} component(s) already installed, skipped", force=True)
     for c, w in zip(fetch, weights):
         name = c.get("file") or c["id"]
-        size = int(c["size"])
         install = c in todo
 
         def dl(done: int, total: int, c=c, name=name, w=w, base=base) -> None:
             status.write("running", (base + w / 2 * done / max(1, total)) / total_w,
                          f"Downloading {name}: {done >> 20} of {total >> 20} MB")
 
-        keep = portable_file(portable, c) if portable is not None else None
-        if keep is not None and _portable_valid(keep, c):
-            zpath = keep                                          # offline: the folder already has it
+        keepfile = portable_file(portable, c) if portable is not None else None
+        if keepfile is not None and _portable_valid(keepfile, c):
+            zpath = keepfile                                      # the folder already has it (no network)
             status.write("running", base / total_w, f"Using {name} from the setup folder")
         else:
             zpath = download(c, cache, dl, sleep)
-            if keep is not None:
-                keep.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(zpath, keep)
+            if keepfile is not None:
+                keepfile.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(zpath, keepfile)
                 zpath.unlink(missing_ok=True)
-                zpath = keep
+                zpath = keepfile
         base += w / 2
 
         if install:
@@ -445,15 +508,73 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
             zpath.unlink(missing_ok=True)
     if not todo:
         save_state(dest, state, str(man.get("app_version", "")))
-    if portable is not None:
-        write_portable_index(portable, man, comps)
+    if portable is not None and not offline:
+        if keep_all or old_man is None:
+            (portable / "manifest.json").parent.mkdir(parents=True, exist_ok=True)
+            (portable / "manifest.json").write_text(json.dumps(man, indent=1), encoding="utf-8")
+        if keep_all and pm is not None and not only:
+            pm.prune(portable, man, fl or "all")                  # the files of the old version are no longer needed
+        if pm is not None:
+            pm.write_sums(portable, json.loads((portable / "manifest.json").read_text(encoding="utf-8")), fl or "all")
+        else:
+            write_portable_index(portable, man, keep)
     status.write("done", 1.0, "Done", force=True)
     return fetched
 
 
+class _Sub:
+    """A slice of the overall progress (components first, then the models) on top of a :class:`Status`."""
+
+    def __init__(self, status: Status, base: float, span: float) -> None:
+        self.status, self.base, self.span = status, base, span
+
+    def write(self, state: str, fraction: float, text: str, force: bool = False) -> None:
+        if state == "error":
+            self.status.write(state, fraction, text, force=True)
+        else:
+            self.status.write("running", self.base + self.span * fraction, text, force=force and state != "done")
+
+
+def run_portable(manifest_source: str, dest: Path, cache: Path, status: Status, portable: Path, roles: Optional[List[str]] = None,
+                 models: str = "auto", flavor: str = "auto", keep_all: bool = True, offline: bool = False,
+                 sleep: Callable[[float], None] = time.sleep) -> int:
+    """Components (+ models) into the setup folder and the install of ``roles``; see :func:`run`.  Models are a bonus: if they cannot
+    be had the install still succeeds and the final message says so."""
+    pm = _portable_mod()
+    if pm is None:
+        raise FetchError("This build cannot keep a setup folder.")
+    repos: List[str] = []
+    if models != "none" and not offline:
+        repos = pm.models_for(models, pm.detect_vram_mb())
+    mbytes = 0
+    if repos:
+        ents = pm.model_mirrors.load()
+        mbytes = sum(int(m["size"]) for r in repos if r in ents for m in ents[r].downloadable().values())
+    man_bytes = 1
+    try:
+        man = read_manifest(manifest_source) if not offline else json.loads((portable / "manifest.json").read_text(encoding="utf-8-sig"))
+        fl = pm.flavor_of(man, flavor)
+        man_bytes = sum(int(c["size"]) for c in man["components"] if pm.matches_flavor(c, fl)) or 1
+    except (FetchError, OSError, ValueError):
+        pass
+    share = man_bytes / float(man_bytes + mbytes) if mbytes else 1.0
+    n = run(manifest_source, dest, cache, _Sub(status, 0.0, share), roles=roles, portable=portable, keep_all=keep_all,
+            offline=offline, flavor=flavor, sleep=sleep)
+    note = ""
+    if repos:
+        try:
+            pm.fetch_models(portable, repos, lambda f, t: status.write("running", share + (1 - share) * f, t))
+            pm.write_sums(portable, json.loads((portable / "manifest.json").read_text(encoding="utf-8")), pm.flavor_of(man, flavor) or "all")
+        except Exception as exc:  # noqa: BLE001 - a bonus: the program downloads missing models itself
+            note = f" (models are incomplete: {exc})"
+            print(f"WARNING: {exc}", file=sys.stderr, flush=True)
+    status.write("done", 1.0, "Done" + note, force=True)
+    return n
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(prog="voxprint-fetch", description=__doc__.split("\n")[0])
-    ap.add_argument("--manifest", required=True, help="URL (https) or local path of the manifest JSON")
+    ap.add_argument("--manifest", help="URL (https) or local path of the manifest JSON (not needed with --from-folder)")
     ap.add_argument("--dest", required=True, help="install folder")
     ap.add_argument("--cache", required=True, help="folder for partial / verified downloads")
     ap.add_argument("--status", help="status file polled by the installer")
@@ -462,6 +583,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                                                     "default 'core'); without --role every component is installed")
     ap.add_argument("--portable", help="also keep every selected component in this setup folder (components/<id>/<file>, manifest.json, "
                                        "SHA256SUMS.txt); files already there are used instead of the network (offline re-install)")
+    ap.add_argument("--portable-all", action="store_true", help="with --portable: keep ALL components (and the models) in the folder, "
+                                                                "not only what is installed now")
+    ap.add_argument("--from-folder", help="install from this setup folder without any network access (its manifest.json is used)")
+    ap.add_argument("--flavor", default="auto", help="PyTorch flavor kept in the setup folder: auto (this PC), cu128 / cu126 / cpu, or all")
+    ap.add_argument("--models", choices=("none", "auto", "all"), default=None,
+                    help="models to put into the setup folder (default: auto with --portable-all, else none)")
     ap.add_argument("--iface", help="network interface / local IP to use, 'auto' (default) or 'default' (never hop); "
                                     "same as the VOXPRINT_NET_IFACE variable")
     try:
@@ -475,7 +602,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     st = Status(Path(a.status) if a.status else None)
     st.start_heartbeat()
     try:
-        n = run(a.manifest, Path(a.dest), Path(a.cache), st, a.only, roles=a.role, portable=Path(a.portable) if a.portable else None)
+        if a.from_folder:
+            n = run_portable("", Path(a.dest), Path(a.cache), st, Path(a.from_folder), roles=a.role, models="none", flavor=a.flavor,
+                             keep_all=False, offline=True)
+        elif not a.manifest:
+            raise FetchError("--manifest or --from-folder is required")
+        elif a.portable and a.portable_all:
+            n = run_portable(a.manifest, Path(a.dest), Path(a.cache), st, Path(a.portable), roles=a.role,
+                             models=a.models or "auto", flavor=a.flavor)
+        else:
+            n = run(a.manifest, Path(a.dest), Path(a.cache), st, a.only, roles=a.role, portable=Path(a.portable) if a.portable else None,
+                    flavor=a.flavor)
     except FetchError as exc:
         st.write("error", 0.0, str(exc), force=True)
         print(f"ERROR: {exc}", file=sys.stderr)

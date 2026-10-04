@@ -120,6 +120,16 @@ def _components_of(module: Dict[str, Any], by_id: Dict[str, Any], flavor: str) -
     return [by_id[i] for i in module.get("components", []) if i in by_id and (not by_id[i].get("flavor") or by_id[i]["flavor"] == flavor)]
 
 
+def setup_folder() -> Optional[Path]:
+    """The portable setup folder of this PC (``infra/portable.py``; the installer remembers it), or None."""
+    try:
+        from infra import portable
+
+        return portable.configured_folder()
+    except Exception:  # noqa: BLE001 - optional
+        return None
+
+
 def _fetch_module():
     from tools import online_fetch
 
@@ -136,7 +146,7 @@ def load_manifest(source: Optional[str] = None, offline_ok: bool = True) -> Dict
         raise ModulesError("no manifest address (modules.json)")
     cache = paths.state_dir() / MANIFEST_CACHE
     try:
-        man = of.read_manifest(src)
+        man = of.read_manifest(src, attempts=1 if setup_folder() is not None else 4)
         try:
             cache.write_text(json.dumps(man), encoding="utf-8")
         except OSError:
@@ -148,6 +158,12 @@ def load_manifest(source: Optional[str] = None, offline_ok: bool = True) -> Dict
                 return of.validate_manifest(json.loads(cache.read_text(encoding="utf-8")))
             except (OSError, ValueError, of.FetchError):
                 pass
+            folder = setup_folder()                     # no internet and no cached copy: the manifest of the setup folder
+            if folder is not None:
+                try:
+                    return of.validate_manifest(json.loads((folder / "manifest.json").read_text(encoding="utf-8-sig")))
+                except (OSError, ValueError, of.FetchError):
+                    pass
         raise ModulesError(str(exc)) from exc
 
 
@@ -226,7 +242,9 @@ def install(module_ids: Optional[List[str]] = None, progress: Optional[Progress]
         return 0
     st = _Status(progress or (lambda f, t: None), cancelled)
     try:
-        n = of.run(src, runtime_dir(), cache_dir(), st, only=comp_ids)
+        # a setup folder (installer option "Keep a portable setup folder") is used first: valid files there need no download,
+        # newly downloaded ones are kept in it; without internet its own manifest is used
+        n = of.run(src, runtime_dir(), cache_dir(), st, only=comp_ids, portable=setup_folder(), flavor=flavor_for(man) or "auto")
     except of.FetchError as exc:
         if st.was_cancelled:
             raise Cancelled("cancelled") from exc
