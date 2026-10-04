@@ -20,11 +20,13 @@ A copy is accepted only if it is **complete** (valid `config.json`, every file o
 (HF snapshot folder name = commit sha; folders without a sha are accepted only when the weight-file sizes equal the verified commit).
 On a mismatch the verified revision is downloaded. The updater never touches reused copies.
 
-**Download mirror.** If Hugging Face is slow or unreachable (6 s probe; skipped when you set your own `HF_ENDPOINT`) or fails, Voxprint downloads from
-**ModelScope** (modelscope.cn, org `Qwen`; same repository ids, byte-identical file sizes - verified 2026-10-03) and confirms the revision by file sizes.
-Downloads resume after an interruption. `VOXPRINT_NO_MIRROR=1` disables the mirror.
+**Download order.**
+* **Small models** (whole model up to 500 MB: the four Opus-MT translation models and SAGE, 1.6 GB together) come **first** from the GitHub pre-release [`models-v1`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/models-v1) (one asset per file, SHA-256 pinned in `infra/model_release.json`) -> original Hugging Face repository -> our Hugging Face mirror -> ModelScope. If GitHub stalls (45 s without data) the next source takes over.
+* **Large models** (Qwen3 TTS / ASR / aligner, 1.8-4.5 GB): original Hugging Face repository -> our Hugging Face mirror -> ModelScope; if Hugging Face is slow or unreachable (6 s probe; skipped when you set your own `HF_ENDPOINT`) ModelScope goes first.
 
-**Backup mirrors on Hugging Face.** As the very last source, models with permissive licences are also kept under `Mitroshenkov87/voxprint-mirror-*` (Qwen3 TTS / ASR / aligner, SAGE, and the four Opus-MT translation models `opus-mt-ru-en`, `en-ru`, `de-en`, `en-de` by Helsinki-NLP, CC-BY-4.0 / Apache-2.0). Order: models folder -> original repository -> mirror. The files are byte-identical to the pinned commit of the original, every file is checked against the SHA-256 in `infra/model_mirrors.json` (a mismatch deletes it), and each mirror's model card names the original, the licence and the commit. `VOXPRINT_NO_HF_MIRROR=1` disables it.
+ModelScope (modelscope.cn, org `Qwen`) has the same repository ids and byte-identical file sizes (verified 2026-10-03); the revision is confirmed by file sizes. Downloads resume after an interruption. The progress line shows the source, a fixed total (the sum of the file sizes known up front), a counter that never goes back and a steady time left. `VOXPRINT_NO_MIRROR=1` disables all mirrors, `VOXPRINT_NO_GITHUB_MODELS=1` only the GitHub source. The release is (re)created by `python tools/make_model_release.py --fetch --upload` (downloads from Hugging Face, checks every hash, uploads with `gh`).
+
+**Backup mirrors on Hugging Face.** Models with permissive licences are also kept under `Mitroshenkov87/voxprint-mirror-*` (Qwen3 TTS / ASR / aligner, SAGE, and the four Opus-MT translation models `opus-mt-ru-en`, `en-ru`, `de-en`, `en-de` by Helsinki-NLP, CC-BY-4.0 / Apache-2.0). The files are byte-identical to the pinned commit of the original, every file is checked against the SHA-256 in `infra/model_mirrors.json` (a mismatch deletes it), and each mirror's model card names the original, the licence and the commit. `VOXPRINT_NO_HF_MIRROR=1` disables it.
 
 **Components.** The same idea applies to Python packages and tools (`infra/env_probe.py`, read-only): installed and current / proven compatible -> reused;
 missing -> the newest verified version is installed into **Voxprint's own environment** (its venv / `packages/` overlay), which is auto-updated.

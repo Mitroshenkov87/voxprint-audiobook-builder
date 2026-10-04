@@ -1,0 +1,232 @@
+{
+ "models": {
+  "Helsinki-NLP/opus-mt-de-en": {
+   "files": {
+    "config.json": {
+     "asset": "opus-mt-de-en--config.json",
+     "sha256": "89368ef76ea89581025cdf605caac75b8a22af2c1a90ec57c8a5001f10537eeb",
+     "size": 1381
+    },
+    "generation_config.json": {
+     "asset": "opus-mt-de-en--generation_config.json",
+     "sha256": "e5cccf365761fb31175fc978a75f5e857a822f173d0e447aa3a25d7cbcda15a4",
+     "size": 293
+    },
+    "pytorch_model.bin": {
+     "asset": "opus-mt-de-en--pytorch_model.bin",
+     "sha256": "e743c3070f61f477cb62fe95ef2c9be2e77f3e488cb6b8030ff8a19e8295c87d",
+     "size": 297928209
+    },
+    "source.spm": {
+     "asset": "opus-mt-de-en--source.spm",
+     "sha256": "bbd1f495eea99c8e21ae086d9146e0fa7b096c3dfdd9ba07ab8b631889df5c9b",
+     "size": 796845
+    },
+    "target.spm": {
+     "asset": "opus-mt-de-en--target.spm",
+     "sha256": "678f2a1177d8389f67b66299762dcc4fc567e89b07e212ba91b0c56daecf47ce",
+     "size": 768489
+    },
+    "tokenizer_config.json": {
+     "asset": "opus-mt-de-en--tokenizer_config.json",
+     "sha256": "51c3c3260d27cb7c4d11d0c53752b8fe87f2367129d7636fa917ce588b97306c",
+     "size": 42
+    },
+    "vocab.json": {
+     "asset": "opus-mt-de-en--vocab.json",
+     "sha256": "0d70d89fee4a8b4ef99a56d712163baadcabd5600a597f71515547ee70306329",
+     "size": 1273232
+    }
+   },
+   "license": "Apache-2.0",
+   "source_revision": "1a922f3b32a8e809e17a47d4b32142d8105924e5"
+  },
+  "Helsinki-NLP/opus-mt-en-de": {
+   "files": {
+    "config.json": {
+     "asset": "opus-mt-en-de--config.json",
+     "sha256": "41c7890e6f6c1f72c5c626569cfe739a8362080940edbb1747f25173f541653b",
+     "size": 1335
+    },
+    "generation_config.json": {
+     "asset": "opus-mt-en-de--generation_config.json",
+     "sha256": "e5cccf365761fb31175fc978a75f5e857a822f173d0e447aa3a25d7cbcda15a4",
+     "size": 293
+    },
+    "pytorch_model.bin": {
+     "asset": "opus-mt-en-de--pytorch_model.bin",
+     "sha256": "da068344b1b0c20e6d4a8f77f48e06646b90d679029006b18579e68977206bdd",
+     "size": 297928209
+    },
+    "source.spm": {
+     "asset": "opus-mt-en-de--source.spm",
+     "sha256": "678f2a1177d8389f67b66299762dcc4fc567e89b07e212ba91b0c56daecf47ce",
+     "size": 768489
+    },
+    "target.spm": {
+     "asset": "opus-mt-en-de--target.spm",
+     "sha256": "bbd1f495eea99c8e21ae086d9146e0fa7b096c3dfdd9ba07ab8b631889df5c9b",
+     "size": 796845
+    },
+    "tokenizer_config.json": {
+     "asset": "opus-mt-en-de--tokenizer_config.json",
+     "sha256": "052c28be2c51ea3398bf9b9de92004270e29a51f8404f9921ec025986ffbefae",
+     "size": 42
+    },
+    "vocab.json": {
+     "asset": "opus-mt-en-de--vocab.json",
+     "sha256": "0d70d89fee4a8b4ef99a56d712163baadcabd5600a597f71515547ee70306329",
+     "size": 1273232
+    }
+   },
+   "license": "CC-BY-4.0",
+   "source_revision": "6183067f769a302e3861815543b9f312c71b0ca4"
+  },
+  "Helsinki-NLP/opus-mt-en-ru": {
+   "files": {
+    "config.json": {
+     "asset": "opus-mt-en-ru--config.json",
+     "sha256": "d3c2614fd099bc228fc257f047e46f1c6f94cfa12dee2b1fa6c0d780e6b7de06",
+     "size": 1381
+    },
+    "generation_config.json": {
+     "asset": "opus-mt-en-ru--generation_config.json",
+     "sha256": "152452cb7a96bff6c20b54f91fae2a655b72a8a9ce978ca3e9384f87253d5281",
+     "size": 293
+    },
+    "pytorch_model.bin": {
+     "asset": "opus-mt-en-ru--pytorch_model.bin",
+     "sha256": "d15fa58c6bc3efd3629c1b6b86d9aa6d15d2751a4620aa4cdd7eed7b5cbe583b",
+     "size": 306991893
+    },
+    "source.spm": {
+     "asset": "opus-mt-en-ru--source.spm",
+     "sha256": "16bebef1389a0b8ab452772c4e35b9e605e5713f8ac7baa71ca701394eaa086d",
+     "size": 802781
+    },
+    "target.spm": {
+     "asset": "opus-mt-en-ru--target.spm",
+     "sha256": "745998e51ba5b058e38b7ac7765c25c43ed5c1c39cc92b27163b9b2e323c9d7c",
+     "size": 1080169
+    },
+    "tokenizer_config.json": {
+     "asset": "opus-mt-en-ru--tokenizer_config.json",
+     "sha256": "eca697b0e7109b94a9f2a1de82173fdbd4ddee97d1fd46a15b3162f191e6eed2",
+     "size": 42
+    },
+    "vocab.json": {
+     "asset": "opus-mt-en-ru--vocab.json",
+     "sha256": "33e95da3be3fa3b50169c4c46693ba2f29fbf4cb29d99044bd07d72d181fa1e9",
+     "size": 2601758
+    }
+   },
+   "license": "Apache-2.0",
+   "source_revision": "bb09c99d180016eac6819df3dae68edb1690fdee"
+  },
+  "Helsinki-NLP/opus-mt-ru-en": {
+   "files": {
+    "config.json": {
+     "asset": "opus-mt-ru-en--config.json",
+     "sha256": "5ea76c78596bce8fe005ef89e00de0924bf83e5f532ce08784ff1fcefb699f5f",
+     "size": 1381
+    },
+    "generation_config.json": {
+     "asset": "opus-mt-ru-en--generation_config.json",
+     "sha256": "31cff5e74efc263ff53efac09e3e350cd462d5c8198b1136b455d63a02d8cad5",
+     "size": 293
+    },
+    "pytorch_model.bin": {
+     "asset": "opus-mt-ru-en--pytorch_model.bin",
+     "sha256": "535450eb5613f3cc912f9ca3e54cfef6c14d201b319c24a88faf776a65538b5d",
+     "size": 306991893
+    },
+    "source.spm": {
+     "asset": "opus-mt-ru-en--source.spm",
+     "sha256": "745998e51ba5b058e38b7ac7765c25c43ed5c1c39cc92b27163b9b2e323c9d7c",
+     "size": 1080169
+    },
+    "target.spm": {
+     "asset": "opus-mt-ru-en--target.spm",
+     "sha256": "16bebef1389a0b8ab452772c4e35b9e605e5713f8ac7baa71ca701394eaa086d",
+     "size": 802781
+    },
+    "tokenizer_config.json": {
+     "asset": "opus-mt-ru-en--tokenizer_config.json",
+     "sha256": "8d826099b8c67179c83ab4ff94aff7ca7bf24ca14319cb0287b9a0b4c40b2a96",
+     "size": 42
+    },
+    "vocab.json": {
+     "asset": "opus-mt-ru-en--vocab.json",
+     "sha256": "33e95da3be3fa3b50169c4c46693ba2f29fbf4cb29d99044bd07d72d181fa1e9",
+     "size": 2601758
+    }
+   },
+   "license": "CC-BY-4.0",
+   "source_revision": "fbd6dc73284f95536648512cc21d57f19191961a"
+  },
+  "ai-forever/sage-fredt5-distilled-95m": {
+   "files": {
+    ".gitattributes": {
+     "asset": "sage-fredt5-distilled-95m--.gitattributes",
+     "sha256": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361",
+     "size": 1519
+    },
+    ".gitignore": {
+     "asset": "sage-fredt5-distilled-95m--.gitignore",
+     "sha256": "cf237c7aff44efbe6e502e645c3e06da03a69d7bdeb43392108ef3348143417e",
+     "size": 10
+    },
+    "added_tokens.json": {
+     "asset": "sage-fredt5-distilled-95m--added_tokens.json",
+     "sha256": "72eb0881ed66d14bf9bdef9a7d2e349feac12192b637cea434eb8d613363d096",
+     "size": 2718
+    },
+    "config.json": {
+     "asset": "sage-fredt5-distilled-95m--config.json",
+     "sha256": "72b90b12d36ff093addc0a9ebb5a787d66f9d63179c26eaba0403e18af04495d",
+     "size": 789
+    },
+    "generation_config.json": {
+     "asset": "sage-fredt5-distilled-95m--generation_config.json",
+     "sha256": "5acde765853e2cb8bcbd8cb58b2ee4576a68169db358ec3ece84034d13f753cb",
+     "size": 184
+    },
+    "images/sage_banner.jpg": {
+     "asset": "sage-fredt5-distilled-95m--images--sage_banner.jpg",
+     "sha256": "041a946c6a1e3f0bea74bec36fd8b4345166ae47fa86235be950888eb3af8af8",
+     "size": 44852
+    },
+    "merges.txt": {
+     "asset": "sage-fredt5-distilled-95m--merges.txt",
+     "sha256": "bd05ba8658a199897510cd84cd98ec1424c812259db6e03319c33a5bfcac2b90",
+     "size": 1270925
+    },
+    "model.safetensors": {
+     "asset": "sage-fredt5-distilled-95m--model.safetensors",
+     "sha256": "e005b48ae460cbf5f82f0f3da8b13d5df7c2c98eb1e02ed8a7d525d3de7a9bfe",
+     "size": 382561704
+    },
+    "special_tokens_map.json": {
+     "asset": "sage-fredt5-distilled-95m--special_tokens_map.json",
+     "sha256": "b0f214e9f7abc4670a0a45ebd82a0695eb9555848fe719dc52dc66b83604d827",
+     "size": 689
+    },
+    "tokenizer_config.json": {
+     "asset": "sage-fredt5-distilled-95m--tokenizer_config.json",
+     "sha256": "f3cdf7bc5498f4698b6822de7c9c5bef60e76cd9aec7db8d0d3f26c09945d713",
+     "size": 20309
+    },
+    "vocab.json": {
+     "asset": "sage-fredt5-distilled-95m--vocab.json",
+     "sha256": "a1bbb734326805d8ef4c6ff183cc6b7bbaa382e666f5eaa2c9b2381c4ea89378",
+     "size": 1813640
+    }
+   },
+   "license": "MIT",
+   "source_revision": "ed51b4a46603931380951a3d8456685c9215864f"
+  }
+ },
+ "repo": "Mitroshenkov87/voxprint-audiobook-builder",
+ "schema": 1,
+ "tag": "models-v1"
+}
