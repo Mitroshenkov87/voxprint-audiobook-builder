@@ -31,16 +31,10 @@ More: [all features and screenshots](docs/FEATURES.md) · [how it works](docs/HO
 ## Download
 | Build | File | Size |
 |---|---|---|
-| **Recommended - online installer** | [`Voxprint-Setup-online.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.1.0-beta/Voxprint-Setup-online.exe) | about 33 MB (+ about 3 GB downloaded during setup) |
-| Full installer (built by GitHub Actions) | [`Voxprint-Setup-github-build.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.1.0-beta/Voxprint-Setup-github-build.exe) | about 1.96 GiB |
-| Linux (**experimental**, Ubuntu 24.04 / Debian 12-13, x86-64) | [`install-voxprint-linux.sh`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.1.0-beta/install-voxprint-linux.sh) | script; sets up a user-only venv (3-8 GB with PyTorch) |
+| **Online installer (Windows 11 x64, NVIDIA GPU)** | [`Voxprint-Setup-online.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.1.0-beta/Voxprint-Setup-online.exe) | 34,650,472 bytes (about 33 MB; downloads about 3 GB during setup) |
 
-All files are on the [release page](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.0-beta) (pre-release). The installer is **not code-signed**: Windows SmartScreen will warn - choose *More info -> Run anyway* only after the SHA-256 matches. Hashes and verification commands: [docs/DOWNLOADS.md](docs/DOWNLOADS.md). Models (about 7 GB) are downloaded once on the first start.
-**Linux, one line** (check the hash against [docs/DOWNLOADS.md](docs/DOWNLOADS.md) first; untested on real desktops, please report problems with the [checklist](docs/LINUX-TEST-CHECKLIST.md)):
-```bash
-curl -fsSLO https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.1.0-beta/install-voxprint-linux.sh && sha256sum install-voxprint-linux.sh && bash install-voxprint-linux.sh --install-deps
-```
-Options, paths, removal and the one-file tarball: [docs/LINUX.md](docs/LINUX.md).
+SHA-256: `acbc6fa8efb6a52bf76fd5caa1a00d3fc54e13fee1e2600a020a1c295e5596e9` - release page: [v0.1.0-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.0-beta) (pre-release). The installer is **not code-signed**: Windows SmartScreen will warn - choose *More info -> Run anyway* only after the SHA-256 matches ([how to check](docs/DOWNLOADS.md)). Models (about 7 GB) are downloaded once on the first start.
+Standalone full installer and Linux version: temporarily unavailable, being rebuilt.
 
 ## Quick start
 1. Install and start Voxprint - the **Studio** opens. Under *Train your voice* choose your recording and the text you read, press **Create voice (LoRA)**.

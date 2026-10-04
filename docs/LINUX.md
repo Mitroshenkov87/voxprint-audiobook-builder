@@ -1,5 +1,7 @@
 # Linux (experimental)
 
+> **Temporarily unavailable:** the Linux package is being rebuilt and is not advertised right now (the release files are kept but may be stale; see [DOWNLOADS.md](DOWNLOADS.md#temporarily-unavailable--outdated)). The notes below describe the intended installation.
+
 **Status: experimental.** The Linux package is built and checked by the public workflow `.github/workflows/build-linux.yml` on a clean Ubuntu 24.04 runner (install, the whole unit-test suite, text/translation/ffmpeg pipeline step, headless start of the window). What no CI can check - a real desktop session, sound output, NVIDIA/CUDA - is still **untested**; please test with [`docs/LINUX-TEST-CHECKLIST.md`](LINUX-TEST-CHECKLIST.md) and report problems. Hashes of the Linux assets of `v0.1.0-beta`: `install-voxprint-linux.sh` `a408b15ac59d351a2ce6dfef665dd21cdf22725162bcf349227f913e8c15dec7`, `Voxprint-linux-experimental.tar.gz` `3f062016ae4e300453baef09c9609a8d3c2bd67fe2b3a29f7b50ceee838fb614`, `Voxprint-linux-app.zip` `d21e0713fc67f5cec015daa527e4357fce3943eb69be44e25145991814c42701` (all in `SHA256SUMS-linux.txt`). Targets: Ubuntu 24.04 / Debian 12-13 and derivatives (AnduinOS, Linux Mint, Pop!_OS), x86-64, Python 3.10-3.13. Other distributions: install the equivalent packages yourself (`--no-system-check`).
 
 There is no frozen binary: the installer script creates a Python environment (venv) for your user only - nothing is installed system-wide except the optional `apt` libraries.

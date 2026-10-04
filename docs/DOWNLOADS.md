@@ -2,7 +2,9 @@
 
 The first pre-release is **[v0.1.0-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.0-beta)** (marked *pre-release*). Planned installer channels are listed in the [Roadmap](ROADMAP.md).
 
-## SHA-256 of the current release assets (v0.1.0-beta, rebuilt 2026-10-04)
+**Right now only the small online installer is offered** (`Voxprint-Setup-online.exe`, 34,650,472 bytes). The standalone full installer and the Linux version are temporarily unavailable and being rebuilt - see [the section at the end](#temporarily-unavailable--outdated).
+
+## Current download: SHA-256 (v0.1.0-beta, rebuilt 2026-10-04)
 
 | File | SHA-256 |
 |---|---|
@@ -10,16 +12,8 @@ The first pre-release is **[v0.1.0-beta](https://github.com/Mitroshenkov87/voxpr
 | `Voxprint-payload-01.zip` | `20fd7d078d9de501f8d0a63c166e85acc6b3cbd96e5cb964da88fcc47654a764` |
 | `Voxprint-payload-02.zip` | `e0d82f0b1c97368e7bc8212fc320ecb0ce01d03a271e0ee0bc54a28b9f7807d4` |
 | `manifest-beta.json` | `0791bb4f3badd67f5e83ab4cea87bf3d912c592b6510946e96ba654c4e9ed1a4` |
-| `Voxprint-Setup-github-build.exe` (full, about 1.96 GiB) | `582cd36a4e26861841014e864c7b1c00a3a759dc978d4cb2c528087e36a6ca1c` |
-| `Voxprint-Setup-grokbot-build.exe` (full, earlier build made before the translation feature; prefer the others) | `c2f8f01dc02568a55b60a1c5ed1f456c2f0c03fa4468f27fdc54a93cb53ebc24` |
-| `install-voxprint-linux.sh` (Linux, experimental) | `a408b15ac59d351a2ce6dfef665dd21cdf22725162bcf349227f913e8c15dec7` |
-| `Voxprint-linux-experimental.tar.gz` (Linux, script + program tree) | `e7858f8c0942ba48f91b52b950658ce4306b6e2c3aa0c9302de3197527d55c90` |
-| `Voxprint-linux-app.zip` (Linux program, fetched by the script) | `3a486ec3c23ec40ed61806e8193281faa4662349bb1d128347e15996d2fb76d0` |
-| `manifest-linux.json` | `db5b162d44a5e36752f28b0f12f97363e7b8fa2cc97a072cd62507085bddd3b4` |
-| `voxprint-fetch.py` (downloader used by the Linux script) | `a914947c8861fe8425b3dd6111cb1eabee76a4a79b1a708698b9356d9050ff0b` |
 
-The Linux hashes are also in `SHA256SUMS-linux.txt` of the release (`sha256sum -c SHA256SUMS-linux.txt`). The online installer verifies the payload parts itself with the SHA-256 values in `manifest-beta.json`; you only need to check the `.exe` you start.
-If the numbers here and in the release differ, the release (its `.sha256` files and the digest shown by GitHub) is authoritative and this page is out of date - please open an issue.
+The online installer verifies the payload parts itself with the SHA-256 values in `manifest-beta.json`; you only need to check the `.exe` you start. If the numbers here and in the release differ, the release (its `.sha256` file and the digest shown by GitHub) is authoritative and this page is out of date - please open an issue.
 
 **Verify a download** - compare the output with the table above or with the `.sha256` file next to the asset:
 
@@ -32,22 +26,6 @@ sha256sum Voxprint-Setup-online.exe                              # Linux / macOS
 sha256sum -c Voxprint-Setup-online.exe.sha256                    # with the .sha256 file in the same folder
 ```
 
-## Download the installer (Windows 11 x64, NVIDIA GPU)
-The release has two builds of the **same program**; take either one:
-
-| File | Built by | Size |
-|---|---|---|
-| `Voxprint-Setup-github-build.exe` (+ `.sha256`) | the public **GitHub Actions** workflow `.github/workflows/build-installer.yml` from the tagged source - the build log is public, so you can see how it was made | about 1.96 GiB |
-| `Voxprint-Setup-grokbot-build.exe` (+ `.sha256`) | built before the repository was renamed (its old URLs redirect), by the maintainers' AI assistant on a Windows GPU server with the same `build.bat` and `installer\Voxprint.iss` (maximum LZMA2 compression); it is the build that was installed and tested end to end | about 1.86 GiB |
-| `Voxprint-Setup-online.exe` (+ `.sha256`, `manifest-beta.json`, `Voxprint-payload-NN.zip`) | the small online installer (about 33 MB; see "Online installer" below); downloads the two payload parts (about 3.1 GB) and verifies them with the manifest | about 33 MB + 3.1 GB |
-
-Both are full installers (PyTorch with CUDA is inside, about 3.8 GB installed); the models (about 7 GB) are downloaded once on the first start. If in doubt, use the **github-build**.
-
-**Verify the download** (SHA-256). Each file has a `.sha256` file next to it with the expected hash. In PowerShell:
-```powershell
-Get-FileHash .\Voxprint-Setup-github-build.exe -Algorithm SHA256     # compare with the text in Voxprint-Setup-github-build.exe.sha256
-# or:  certutil -hashfile Voxprint-Setup-github-build.exe SHA256
-```
 ## Online installer (small download)
 `Voxprint-Setup-online.exe` (a few MB, from the same release) is the **smart installer**: it downloads the program in parts (`Voxprint-payload-NN.zip`, each below the 2 GiB GitHub limit) listed in `manifest-beta.json` / `manifest-stable.json` (the channel follows the release: a pre-release such as `v0.1.0-beta` is *beta*). Every part is **verified by its SHA-256** from the manifest, a broken or interrupted download is **resumed** (HTTP `Range`; a corrupt part is discarded), and parts that are **already installed** (same SHA-256 recorded in `voxprint-components.json` in the install folder) are skipped on a re-run or repair. It asks for administrator rights **once** (UAC); your data (models, voices, logs) stays in `%LOCALAPPDATA%\Voxprint`. Silent install: `Voxprint-Setup-online.exe /VERYSILENT /DIR="C:\Voxprint"`; `/Manifest=<url or file>` uses another manifest (a mirror, a test). Unlike the full installer it needs the internet during the setup (about 2 GB of parts, then about 7 GB of models on the first start). Source: `tools/online_fetch.py` (downloader), `tools/make_online_payload.py` (splitter), `installer/Voxprint.iss /DONLINE`, `installer/build_online.ps1`.
 
@@ -67,6 +45,41 @@ Get-FileHash .\Voxprint-Setup-github-build.exe -Algorithm SHA256     # compare w
 
 The VRAM tiers used by the planner: >= 14 GB -> 1.7B; >= 10 GB -> 1.7B + 8-bit Adam; >= 6 GB -> 0.6B + 8-bit Adam; otherwise CPU.
 
-## Linux
+## Temporarily unavailable / outdated
 
-Linux is **experimental**: install script, options and the test checklist are in [LINUX.md](LINUX.md) (one-line install: see the [README](../README.md#download)).
+> **Not recommended right now.** The files below are still attached to the release (nothing was deleted), but they are **stale** (built before the latest changes) or being rebuilt. The hashes are kept so that the files can still be verified. Use the online installer above.
+
+### Hashes of the old assets
+
+| File | SHA-256 |
+|---|---|
+| `Voxprint-Setup-github-build.exe` (full, about 1.96 GiB) | `582cd36a4e26861841014e864c7b1c00a3a759dc978d4cb2c528087e36a6ca1c` |
+| `Voxprint-Setup-grokbot-build.exe` (full, earlier build made before the translation feature; prefer the others) | `c2f8f01dc02568a55b60a1c5ed1f456c2f0c03fa4468f27fdc54a93cb53ebc24` |
+| `install-voxprint-linux.sh` (Linux, experimental) | `a408b15ac59d351a2ce6dfef665dd21cdf22725162bcf349227f913e8c15dec7` |
+| `Voxprint-linux-experimental.tar.gz` (Linux, script + program tree) | `e7858f8c0942ba48f91b52b950658ce4306b6e2c3aa0c9302de3197527d55c90` |
+| `Voxprint-linux-app.zip` (Linux program, fetched by the script) | `3a486ec3c23ec40ed61806e8193281faa4662349bb1d128347e15996d2fb76d0` |
+| `manifest-linux.json` | `db5b162d44a5e36752f28b0f12f97363e7b8fa2cc97a072cd62507085bddd3b4` |
+| `voxprint-fetch.py` (downloader used by the Linux script) | `a914947c8861fe8425b3dd6111cb1eabee76a4a79b1a708698b9356d9050ff0b` |
+
+The Linux hashes are also in `SHA256SUMS-linux.txt` of the release (`sha256sum -c SHA256SUMS-linux.txt`). These files are **stale**: the files attached to the release may no longer match the hashes listed here until they are rebuilt (the `.sha256` file next to each asset is authoritative).
+
+### Standalone full installers (Windows 11 x64, NVIDIA GPU)
+Full installers with everything inside (kept for reference; currently stale, being rebuilt):
+
+| File | Built by | Size |
+|---|---|---|
+| `Voxprint-Setup-github-build.exe` (+ `.sha256`) | the public **GitHub Actions** workflow `.github/workflows/build-installer.yml` from the tagged source - the build log is public, so you can see how it was made | about 1.96 GiB |
+| `Voxprint-Setup-grokbot-build.exe` (+ `.sha256`) | built before the repository was renamed (its old URLs redirect), by the maintainers' AI assistant on a Windows GPU server with the same `build.bat` and `installer\Voxprint.iss` (maximum LZMA2 compression); it is the build that was installed and tested end to end | about 1.86 GiB |
+| `Voxprint-Setup-online.exe` (+ `.sha256`, `manifest-beta.json`, `Voxprint-payload-NN.zip`) | the small online installer (about 33 MB; see [Online installer](#online-installer-small-download) above); downloads the two payload parts (about 3.1 GB) and verifies them with the manifest | about 33 MB + 3.1 GB |
+
+Both are full installers (PyTorch with CUDA is inside, about 3.8 GB installed); the models (about 7 GB) are downloaded once on the first start.
+
+**Verify the download** (SHA-256). Each file has a `.sha256` file next to it with the expected hash. In PowerShell:
+```powershell
+Get-FileHash .\Voxprint-Setup-github-build.exe -Algorithm SHA256     # compare with the text in Voxprint-Setup-github-build.exe.sha256
+# or:  certutil -hashfile Voxprint-Setup-github-build.exe SHA256
+```
+
+### Linux (experimental)
+
+Linux is **experimental**: install script, options and the test checklist are in [LINUX.md](LINUX.md) (one-line install command and hashes: see the Linux notes there).
