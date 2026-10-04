@@ -6,17 +6,17 @@ The first pre-release is **[v0.1.0-beta](https://github.com/Mitroshenkov87/voxpr
 
 | File | SHA-256 |
 |---|---|
-| `Voxprint-Setup-online.exe` (recommended, about 33 MB) | `701e3584f97ade9943e96be435b8bee8ef0dc58beac13f445ea3b25294725ecd` |
-| `Voxprint-payload-01.zip` | `a94c596674fba4bc2793ba61a9e6c02b734ea8169edc87cc006a41e7f08b9c3f` |
-| `Voxprint-payload-02.zip` | `a321bc045d1b80858e5ba98818429920a657c11301c9a76f5e5880c3be6e641d` |
-| `manifest-beta.json` | `a34f8a87abfdf7cb16bde8e975a7278e3ec43115e8854583b7b5917ad4dd5e51` |
-| `Voxprint-Setup-github-build.exe` (full, about 1.96 GiB) | `92c86d6229a877a204db0f7db25a0909a48736a6800ac9570b7b26b59fc02bfa` |
+| `Voxprint-Setup-online.exe` (recommended, about 33 MB; 34,650,472 bytes) | `acbc6fa8efb6a52bf76fd5caa1a00d3fc54e13fee1e2600a020a1c295e5596e9` |
+| `Voxprint-payload-01.zip` | `20fd7d078d9de501f8d0a63c166e85acc6b3cbd96e5cb964da88fcc47654a764` |
+| `Voxprint-payload-02.zip` | `e0d82f0b1c97368e7bc8212fc320ecb0ce01d03a271e0ee0bc54a28b9f7807d4` |
+| `manifest-beta.json` | `0791bb4f3badd67f5e83ab4cea87bf3d912c592b6510946e96ba654c4e9ed1a4` |
+| `Voxprint-Setup-github-build.exe` (full, about 1.96 GiB) | `582cd36a4e26861841014e864c7b1c00a3a759dc978d4cb2c528087e36a6ca1c` |
 | `Voxprint-Setup-grokbot-build.exe` (full, earlier build made before the translation feature; prefer the others) | `c2f8f01dc02568a55b60a1c5ed1f456c2f0c03fa4468f27fdc54a93cb53ebc24` |
 | `install-voxprint-linux.sh` (Linux, experimental) | `a408b15ac59d351a2ce6dfef665dd21cdf22725162bcf349227f913e8c15dec7` |
-| `Voxprint-linux-experimental.tar.gz` (Linux, script + program tree) | `3f062016ae4e300453baef09c9609a8d3c2bd67fe2b3a29f7b50ceee838fb614` |
-| `Voxprint-linux-app.zip` (Linux program, fetched by the script) | `d21e0713fc67f5cec015daa527e4357fce3943eb69be44e25145991814c42701` |
-| `manifest-linux.json` | `e4063abf1ee1840b857189488126841fff0eb58bdf2fa30ba290ab0e4f4f077a` |
-| `voxprint-fetch.py` (downloader used by the Linux script) | `ba6fc0a8db2b3915e261e61f897e73446647d2c823a58efb87a95c30e8f3b272` |
+| `Voxprint-linux-experimental.tar.gz` (Linux, script + program tree) | `e7858f8c0942ba48f91b52b950658ce4306b6e2c3aa0c9302de3197527d55c90` |
+| `Voxprint-linux-app.zip` (Linux program, fetched by the script) | `3a486ec3c23ec40ed61806e8193281faa4662349bb1d128347e15996d2fb76d0` |
+| `manifest-linux.json` | `db5b162d44a5e36752f28b0f12f97363e7b8fa2cc97a072cd62507085bddd3b4` |
+| `voxprint-fetch.py` (downloader used by the Linux script) | `a914947c8861fe8425b3dd6111cb1eabee76a4a79b1a708698b9356d9050ff0b` |
 
 The Linux hashes are also in `SHA256SUMS-linux.txt` of the release (`sha256sum -c SHA256SUMS-linux.txt`). The online installer verifies the payload parts itself with the SHA-256 values in `manifest-beta.json`; you only need to check the `.exe` you start.
 If the numbers here and in the release differ, the release (its `.sha256` files and the digest shown by GitHub) is authoritative and this page is out of date - please open an issue.
