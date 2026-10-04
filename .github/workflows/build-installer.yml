@@ -229,7 +229,13 @@ jobs:
           VOXPRINT_HOME: C:\vxhome1
         run: |
           $ErrorActionPreference = "Stop"
-          $man = (Resolve-Path build\online-release\manifest-thin-*.json).Path
+          # the few files we ship ourselves (the shell, wheels built from sdists) are not on the release yet: serve them from localhost
+          $tag = if ($env:REL_TAG) { $env:REL_TAG } else { "v0.0.0-dev" }
+          $src = (Resolve-Path build\online-release\manifest-thin-*.json).Path
+          $man = "C:\vx-manifest.json"
+          (Get-Content $src -Raw).Replace("https://github.com/${{ github.repository }}/releases/download/$tag", "http://127.0.0.1:8099") | Out-File -Encoding ascii $man
+          Start-Process python -ArgumentList "-m","http.server","8099","--bind","127.0.0.1","--directory","build\online-release" -WindowStyle Hidden
+          Start-Sleep 3
           @{ schema = 1; manifest_url = $man } | ConvertTo-Json | Out-File -Encoding ascii C:\vx-modules.json
           $env:VOXPRINT_MODULES_CONFIG = "C:\vx-modules.json"
           $exe = (Resolve-Path dist\thin\Voxprint\Voxprint.exe).Path
