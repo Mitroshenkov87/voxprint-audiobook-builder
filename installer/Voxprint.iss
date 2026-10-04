@@ -42,6 +42,8 @@ OutputBaseFilename=Voxprint-Setup
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+; End User Agreement (plain text generated from docs/legal/EULA-audiobook-builder.md by tools/gen_eula_txt.py)
+LicenseFile=..\docs\legal\EULA-audiobook-builder.txt
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible

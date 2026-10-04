@@ -33,3 +33,6 @@ packages (`tools\gen_notices.py --with-installed`, called by `build.bat`). Voxpr
   * every **voice** carries its own licence in `voice.json` (see *My voices and licences*). Voices you train are `custom/personal-only` until you decide otherwise;
   * voice packages are not part of this repository or the installer; a voice marked **"test use only"** (`custom/test-use-only`) may be used to try the program only: do not publish audio made with it and do not use it commercially.
 * Third-party components: `THIRD_PARTY_NOTICES.md` and `licenses\`.
+
+### Terms of use
+The End User Agreement of this program is [`legal/EULA-audiobook-builder.md`](legal/EULA-audiobook-builder.md) (shown by the installer as plain text). It is built from [`legal/EULA-TEMPLATE.md`](legal/EULA-TEMPLATE.md), the common template of all Voxprint programs; a draft for the future Movie Dubber is [`legal/EULA-movie-dubber-DRAFT.md`](legal/EULA-movie-dubber-DRAFT.md). **Not legal advice; the author is not a lawyer.**
