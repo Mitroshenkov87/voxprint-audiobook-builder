@@ -12,8 +12,13 @@ The first pre-release is **[v0.1.0-beta](https://github.com/Mitroshenkov87/voxpr
 | `manifest-beta.json` | `a34f8a87abfdf7cb16bde8e975a7278e3ec43115e8854583b7b5917ad4dd5e51` |
 | `Voxprint-Setup-github-build.exe` (full, about 1.96 GiB) | `92c86d6229a877a204db0f7db25a0909a48736a6800ac9570b7b26b59fc02bfa` |
 | `Voxprint-Setup-grokbot-build.exe` (full, earlier build made before the translation feature; prefer the others) | `c2f8f01dc02568a55b60a1c5ed1f456c2f0c03fa4468f27fdc54a93cb53ebc24` |
+| `install-voxprint-linux.sh` (Linux, experimental) | `a408b15ac59d351a2ce6dfef665dd21cdf22725162bcf349227f913e8c15dec7` |
+| `Voxprint-linux-experimental.tar.gz` (Linux, script + program tree) | `3f062016ae4e300453baef09c9609a8d3c2bd67fe2b3a29f7b50ceee838fb614` |
+| `Voxprint-linux-app.zip` (Linux program, fetched by the script) | `d21e0713fc67f5cec015daa527e4357fce3943eb69be44e25145991814c42701` |
+| `manifest-linux.json` | `e4063abf1ee1840b857189488126841fff0eb58bdf2fa30ba290ab0e4f4f077a` |
+| `voxprint-fetch.py` (downloader used by the Linux script) | `ba6fc0a8db2b3915e261e61f897e73446647d2c823a58efb87a95c30e8f3b272` |
 
-The online installer verifies the payload parts itself with the SHA-256 values in `manifest-beta.json`; you only need to check the `.exe` you start.
+The Linux hashes are also in `SHA256SUMS-linux.txt` of the release (`sha256sum -c SHA256SUMS-linux.txt`). The online installer verifies the payload parts itself with the SHA-256 values in `manifest-beta.json`; you only need to check the `.exe` you start.
 If the numbers here and in the release differ, the release (its `.sha256` files and the digest shown by GitHub) is authoritative and this page is out of date - please open an issue.
 
 **Verify a download** - compare the output with the table above or with the `.sha256` file next to the asset:
@@ -62,4 +67,4 @@ The VRAM tiers used by the planner: >= 14 GB -> 1.7B; >= 10 GB -> 1.7B + 8-bit A
 
 ## Linux
 
-Linux is **experimental**: see [LINUX.md](LINUX.md).
+Linux is **experimental**: install script, options and the test checklist are in [LINUX.md](LINUX.md) (one-line install: see the [README](../README.md#download)).
