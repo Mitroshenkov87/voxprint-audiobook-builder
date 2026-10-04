@@ -2,18 +2,18 @@
 
 The first pre-release is **[v0.1.0-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.0-beta)** (marked *pre-release*). Planned installer channels are listed in the [Roadmap](ROADMAP.md).
 
-**Right now only the small online installer is offered** (`Voxprint-Setup-online.exe`, 34,651,725 bytes). The standalone full installer and the Linux version are temporarily unavailable and being rebuilt - see [the section at the end](#temporarily-unavailable--outdated).
+**Right now only the small online installer is offered** (`Voxprint-Setup-online.exe`, 34,653,757 bytes). The standalone full installer and the Linux version are temporarily unavailable and being rebuilt - see [the section at the end](#temporarily-unavailable--outdated).
 
 ## Current download: SHA-256 (v0.1.0-beta, rebuilt 2026-10-04)
 
 | File | SHA-256 |
 |---|---|
-| `Voxprint-Setup-online.exe` (recommended, about 33 MB; 34,651,725 bytes) | `8a506d4c10d50941ecb9958fa73656a8c2c726d750925640929f3c4d2397da1c` |
-| `Voxprint-payload-01.zip` | `69395fa4fa47327880649eec8dccb0adc1c0bdf7e4ad040edfeb5ea54b2fd6ff` |
-| `Voxprint-payload-02.zip` | `46a3000625d4fa1e4acd4455f84f7b7f6b3d07457b07d760d2a997ce31074456` |
-| `manifest-beta.json` | `b46bade7bccfff6410750b05ff1d3b473f4fb20150d72d2976434c12529e62d7` |
+| `Voxprint-Setup-online.exe` (recommended, about 33 MB; 34,653,757 bytes) | `f323ffd7c07a7a18433fc31014d991d91cf1cf27e1b19b241dadf69c529e6760` |
+| `Voxprint-shell-01.zip` (our program shell, 77,461,877 bytes; fetched by the installer) | `8fb79cbe626e8fe6b37b631e84beb9b082cf1223d2f3bdaa3076358e7c66cf63` |
+| `manifest-thin-beta.json` (the list of everything the installer downloads, 40,844 bytes) | `d59cd9951db698d14d12a9c4f75ddabc2a8486cb3fe6efa66e29b61aae528b00` |
+| `docopt-0.6.2-...whl`, `eng_to_ipa-0.0.2-...whl`, `sox-1.5.0-...whl` (tiny pure-Python packages that have no wheel upstream; built in CI) | `aa013a4e...0139`, `a287de76...fa8b`, `44e0d93c...971` |
 
-The online installer verifies the payload parts itself with the SHA-256 values in `manifest-beta.json`; you only need to check the `.exe` you start. If the numbers here and in the release differ, the release (its `.sha256` file and the digest shown by GitHub) is authoritative and this page is out of date - please open an issue.
+The installer downloads the PyTorch libraries from **download.pytorch.org**, the other ~70 Python libraries from **PyPI**, the Visual C++ runtime from **Microsoft** (skipped if already present) and ffmpeg from its official build host - each file is verified against a SHA-256 pinned in the manifest. Only our own small files come from this release. Details: [THIN-INSTALLER.md](THIN-INSTALLER.md). You only need to check the `.exe` you start. If the numbers here and in the release differ, the release (its `.sha256` file and the digest shown by GitHub) is authoritative and this page is out of date - please open an issue.
 
 **Verify a download** - compare the output with the table above or with the `.sha256` file next to the asset:
 
@@ -27,6 +27,8 @@ sha256sum -c Voxprint-Setup-online.exe.sha256                    # with the .sha
 ```
 
 ## Online installer (small download)
+> The paragraph below describes the earlier *classic* online installer (`Voxprint-payload-NN.zip`, `manifest-beta.json`; these files are still in the release, unchanged, and are legacy). The current installer works as described in [THIN-INSTALLER.md](THIN-INSTALLER.md).
+
 `Voxprint-Setup-online.exe` (a few MB, from the same release) is the **smart installer**: it downloads the program in parts (`Voxprint-payload-NN.zip`, each below the 2 GiB GitHub limit) listed in `manifest-beta.json` / `manifest-stable.json` (the channel follows the release: a pre-release such as `v0.1.0-beta` is *beta*). Every part is **verified by its SHA-256** from the manifest, a broken or interrupted download is **resumed** (HTTP `Range`; a corrupt part is discarded), and parts that are **already installed** (same SHA-256 recorded in `voxprint-components.json` in the install folder) are skipped on a re-run or repair. It asks for administrator rights **once** (UAC); your data (models, voices, logs) stays in `%LOCALAPPDATA%\Voxprint`. Silent install: `Voxprint-Setup-online.exe /VERYSILENT /DIR="C:\Voxprint"`; `/Manifest=<url or file>` uses another manifest (a mirror, a test). Unlike the full installer it needs the internet during the setup (about 2 GB of parts, then about 7 GB of models on the first start). Source: `tools/online_fetch.py` (downloader), `tools/make_online_payload.py` (splitter), `installer/Voxprint.iss /DONLINE`, `installer/build_online.ps1`.
 
 **Shortcuts.** The installers create no desktop shortcut (on purpose): Voxprint is in the Start menu (folder *Voxprint AI Audiobook Builder*) and in *Settings -> Apps*, where it is uninstalled. An upgrade over an older install removes a desktop shortcut that an earlier version created.
