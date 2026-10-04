@@ -1,4 +1,6 @@
-# Recording scripts for voice training
+# Recording scripts: texts to read aloud when you record your own voice for Voxprint
+
+**In short:** pick your language, read the text for about 10-13 minutes (plus 2-3 optional minutes), record it, and give the recording and the TXT file to the *Train your voice* window. The consent sentence for the voice owner is at the end of every script. No profanity.
 
 Ready-made texts to read aloud when you record a voice for Voxprint (the Train window takes the TXT file as the "text"; see the
 [manual](../manual/), chapter *Train your voice*). Version 4, written natively in each language - they are **not** translations of each other:

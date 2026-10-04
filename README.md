@@ -8,6 +8,15 @@
 
 <p align="center"><img src="docs/screenshots/studio_home.png" alt="Voxprint Studio" width="420"> <img src="docs/screenshots/train_notranscript.png" alt="Train your voice" width="460"></p>
 
+## 🎙 Train your own voice: read one of these scripts
+> **Recording scripts (EN / RU / DE)** - ready-made texts to read aloud when you record your voice for Voxprint. Read for **about 10-13 minutes** (plus 2-3 optional minutes), save the recording, give the app the TXT as the text - done. The **consent sentence** is built in at the end, no swear words.
+>
+> | English | Русский | Deutsch |
+> |---|---|---|
+> | [TXT](docs/recording-scripts/Voxprint-RecordingScript-v4-en.txt) · [PDF](docs/recording-scripts/Voxprint-RecordingScript-v4-en.pdf) · [print](docs/recording-scripts/Voxprint-RecordingScript-v4-en-print.pdf) | [TXT](docs/recording-scripts/Voxprint-RecordingScript-v4-ru.txt) · [PDF](docs/recording-scripts/Voxprint-RecordingScript-v4-ru.pdf) · [print](docs/recording-scripts/Voxprint-RecordingScript-v4-ru-print.pdf) | [TXT](docs/recording-scripts/Voxprint-RecordingScript-v4-de.txt) · [PDF](docs/recording-scripts/Voxprint-RecordingScript-v4-de.pdf) · [print](docs/recording-scripts/Voxprint-RecordingScript-v4-de-print.pdf) |
+>
+> Only record your own voice, or one whose owner agreed. More: [about the scripts](docs/recording-scripts/README.md).
+
 ## What it does
 * **Narrate books** - TXT, FB2 (also `.fb2.zip`) and EPUB with chapters; output as one Opus file, MP3 per chapter or M4B; pause, cancel and resume at any time.
 * **Train your voice** - give it a 5-15 minute recording (yours, or of someone who agreed) and the text you read; everything else is automatic ([Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) LoRA).
