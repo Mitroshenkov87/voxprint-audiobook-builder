@@ -23,6 +23,11 @@ on:
         type: boolean
         required: false
         default: false
+      skip_tests:
+        description: "build-thin only: skip the unit-test step (to repeat a build quickly)"
+        type: boolean
+        required: false
+        default: false
       smoke_only:
         description: "Only run the quick smoke jobs (online-smoke, thin-smoke); no full build, nothing is attached to a release"
         type: boolean
@@ -210,6 +215,7 @@ jobs:
           Get-Content build-req.txt
           .venv\Scripts\python.exe -m pip install --quiet -r build-req.txt pyinstaller pytest
       - name: Tests that need no PyTorch
+        if: ${{ !inputs.skip_tests }}
         shell: pwsh
         run: .venv\Scripts\python.exe -m pytest -q --deselect tests/test_ui.py::test_selftest_imports_reports_and_writes_log --deselect tests/test_frozen_install.py --deselect tests/test_linux_package.py::test_text_selftest_passes_without_models
       - name: Thin shell (PyInstaller, heavy libraries excluded)
@@ -257,6 +263,7 @@ jobs:
           # "another program": a venv-like folder that holds the torch wheels we downloaded in the previous step
           New-Item -ItemType Directory -Force C:\otherapp\.venv\Lib\site-packages | Out-Null
           Get-ChildItem C:\vxhome1\runtime -Directory | Where-Object { $_.Name -like "torch*" } | ForEach-Object { Copy-Item $_.FullName C:\otherapp\.venv\Lib\site-packages\ -Recurse }
+          Get-ChildItem C:\otherapp\.venv\Lib\site-packages | Select-Object -ExpandProperty Name
           $env:VOXPRINT_MODULES_CONFIG = "C:\vx-modules.json"
           $env:VIRTUAL_ENV = "C:\otherapp\.venv"
           $exe = (Resolve-Path dist\thin\Voxprint\Voxprint.exe).Path

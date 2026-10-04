@@ -423,6 +423,9 @@ def try_reuse_torch(lock: Dict, driver_cuda: Optional[Tuple[int, int]], wanted_f
         return None
     t0 = time.monotonic()
     progress("Looking for an existing PyTorch on this PC")
+    prefixes = list(prefixes) if prefixes is not None else candidate_prefixes()
+    log.info("looking for PyTorch in %d folders, e.g. %s; VIRTUAL_ENV=%s", len(prefixes), [str(p) for p in prefixes[:4]],
+             os.environ.get("VIRTUAL_ENV", ""))
     found = find_torch(prefixes)
     log.info("existing PyTorch copies found: %s (%.1f s)", [f"{e.torch} in {e.site}" for e in found] or "none", time.monotonic() - t0)
     for ext in found:
