@@ -34,7 +34,7 @@ More: [all features and screenshots](docs/FEATURES.md) · [how it works](docs/HO
 | **Online installer (Windows 11 x64, NVIDIA GPU)** | [`Voxprint-Setup-online.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.1.0-beta/Voxprint-Setup-online.exe) | 34,653,757 bytes (about 33 MB; downloads the libraries from PyTorch/PyPI during setup) |
 
 SHA-256: `f323ffd7c07a7a18433fc31014d991d91cf1cf27e1b19b241dadf69c529e6760` - release page: [v0.1.0-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.0-beta) (pre-release). The installer is **not code-signed**: Windows SmartScreen will warn - choose *More info -> Run anyway* only after the SHA-256 matches ([how to check](docs/DOWNLOADS.md)). Models (about 7 GB) are downloaded once on the first start.
-Standalone full installer and Linux version: temporarily unavailable, being rebuilt.
+A full offline installer may return later; the Linux version is temporarily unavailable.
 
 ## Quick start
 1. Install and start Voxprint - the **Studio** opens. Under *Train your voice* choose your recording and the text you read, press **Create voice (LoRA)**.
