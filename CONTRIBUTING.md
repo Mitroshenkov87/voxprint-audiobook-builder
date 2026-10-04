@@ -6,8 +6,8 @@ Please read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) first - it explains t
 ## Ground rules
 * **Voices need consent.** Use your own voice, or the voice of someone who has explicitly given permission, in examples, issues, test data and screenshots. Never commit recordings of other people without their permission.
 * Be kind and constructive. Assume good intent.
-* Mind licences: do not add GPL/AGPL Python dependencies to the shipped program (e.g. `soynlp` is deliberately not installed - a test guards this); the README's
-  licence section explains the existing exceptions. Everything third-party must be listed in `credits.json` (see "Third-party components" below).
+* Mind licences: do not add GPL/AGPL Python dependencies to the shipped program (e.g. `soynlp` is deliberately not installed - a test guards this); [docs/LICENSES.md](docs/LICENSES.md)
+  explains the existing exceptions. Everything third-party must be listed in `credits.json` (see "Third-party components" below).
 * **No behaviour changes in pure refactor / documentation PRs.**
 
 ## Development setup
@@ -22,7 +22,7 @@ pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev
 pip install --no-deps -r requirements-nodeps.txt          # qwen-asr / qwen-tts: their transformers pins conflict
 QT_QPA_PLATFORM=offscreen python -m pytest                # ~250 tests; Windows: set QT_QPA_PLATFORM=offscreen
 ```
-Running the GUI and the full pipeline needs Windows 11 and an NVIDIA GPU - see "Run from source" in the README.
+Running the GUI and the full pipeline needs Windows 11 and an NVIDIA GPU - see "Run from source" in [docs/BUILDING.md](docs/BUILDING.md).
 A dry run of the pipeline without any model: `python -m core.cli audio.wav text.txt --out dataset --fake-aligner`.
 
 On Windows, never run `uv run` without `--no-sync` (it replaces CUDA torch with the CPU build).
@@ -60,7 +60,7 @@ Pin new runtime packages in `infra/verified_manifest.json` only after testing th
 * One topic per PR; describe what you changed, how you tested it and (for UI changes) attach an English screenshot - `docs/screenshots/` shows how they are made
   (offscreen Qt `widget.grab()`).
 * Update `CHANGELOG.md` (the "Unreleased" section) for user-visible changes.
-* If you change the output formats (`dataset/`, adapter folder, `voice.json`), update the README and `docs/ARCHITECTURE.md`; `voice.json` carries a `schema` number for exactly this reason.
+* If you change the output formats (`dataset/`, adapter folder, `voice.json`), update `docs/HOW-IT-WORKS.md` and `docs/ARCHITECTURE.md`; `voice.json` carries a `schema` number for exactly this reason.
 
 ## Reporting bugs
 Open an issue with: Windows build, GPU/driver, what you did, the message shown (it has a stable wording per error kind) and the relevant lines of

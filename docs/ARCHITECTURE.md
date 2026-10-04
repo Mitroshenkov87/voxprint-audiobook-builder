@@ -162,7 +162,7 @@ claim more than its licence gives. Schema 1 (`voice_name`, `speech_seconds`) is 
 
 **Repository index** (`infra/voice_repository.py`): `{"schema": 1, "voices": [{id, name, language, author, license, license_url, description, voice_type, base_model, url, sha256, size_bytes, names?, descriptions?}]}` (`names` / `descriptions`: optional `{ru,en,de}` maps).
 
-**Audiobook output**: see README "Output format"; format keys and defaults are in `core/audiobook_export.py` (`DEFAULT_FORMATS = (opus_single,)`).
+**Audiobook output**: see [HOW-IT-WORKS.md](HOW-IT-WORKS.md) ("Output format"); format keys and defaults are in `core/audiobook_export.py` (`DEFAULT_FORMATS = (opus_single,)`).
 
 **Feature flag**: `aac_m4b` in `state/features.json` / `VOXPRINT_ENABLE_AAC` (`infra/features.py`). AAC is patent-encumbered; see the notice in `THIRD_PARTY_NOTICES.md`.
 
@@ -173,4 +173,4 @@ claim more than its licence gives. Schema 1 (`voice_name`, `speech_seconds`) is 
 * `tests/test_i18n.py` guards the localization rules; `tests/test_credits.py` keeps `credits.json`, the notices and the installer in sync.
 * The narrator is tested with a fake `TTSEngine` and a fake ffmpeg runner (`tests/test_narration.py`): chunk cache and resume, cancel / pause, ETA, chapter assembly, ffmetadata / m3u8 content, command lines, the AAC flag.
   Backup / restore / import: `tests/test_backup.py` (temporary folders, fake disk usage; cancel, resume, space, hash mismatch, hard link vs copy), `tests/test_backup_ui.py` (Settings section), `tests/test_installer_models_page.py` (lints `installer/Voxprint.iss`: encoding, message tables for en/ru/de, Pascal structure, the contract with the app; the script is never compiled on Linux). Text preparation: `tests/test_text_prep.py` (every rule step, ru + en), `tests/test_text_cleanup.py` (validator, cache / resume / cancel, registry, fake download, narration wiring), `tests/test_narrate_prep_ui.py` (check boxes, presets, expanders, model states). Parsers and the chunker: `tests/test_books.py`; the library, licences and repository: `tests/test_voice_*.py`; the windows (navigation, language switch, cards, formats, disclaimer, run / pause / cancel): `tests/test_studio.py`.
-* Windows-only behaviour (Acrylic, real GPU training, the real Qwen3-TTS engine, the real ffmpeg encoders) is verified manually - see the "Tested on Windows" section of the README.
+* Windows-only behaviour (Acrylic, real GPU training, the real Qwen3-TTS engine, the real ffmpeg encoders) is verified manually - see [TESTING.md](TESTING.md) ("Tested on Windows").
