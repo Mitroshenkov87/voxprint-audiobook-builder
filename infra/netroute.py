@@ -458,7 +458,7 @@ def urlopen(req, timeout: float = 30.0, context: Optional[ssl.SSLContext] = None
 
 
 # ----------------------------------------------------------------------------------------------- huggingface_hub (requests)
-_hf_state: Tuple[float, str] = (0.0, "")
+_hf_state: Tuple[float, str] = (float("-inf"), "")
 
 
 def _probe(host: str, port: int, route: Route, timeout: float) -> bool:
@@ -534,7 +534,7 @@ def prepare_hf(host: str = "huggingface.co", force: bool = False) -> str:
 def reset_memory() -> None:
     """Forget everything kept in memory (tests)."""
     global _remembered, _loaded, _announced, _hf_state
-    _remembered, _loaded, _announced, _hf_state = None, False, None, (0.0, "")
+    _remembered, _loaded, _announced, _hf_state = None, False, None, (float("-inf"), "")
 
 
 def describe() -> str:
