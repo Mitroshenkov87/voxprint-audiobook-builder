@@ -7,6 +7,7 @@ switch to the next one - the partial files stay and are resumed.  Standard libra
 from __future__ import annotations
 
 import logging
+import math
 import os
 import threading
 import time
@@ -58,36 +59,94 @@ def fmt_bytes(n: float) -> str:
     return f"{n / 1024:.0f} KB"
 
 
-class Meter:
-    """Bytes done, smoothed speed and the source label of one download."""
+def fmt_duration(seconds: float) -> str:
+    """Coarse remaining time that does not flicker: ``45 s`` / ``3 min 10 s`` / ``1 h 20 min`` (rounded to 5 s / 10 s / 5 min)."""
+    s = max(0, int(round(seconds)))
+    if s < 60:
+        return f"{max(5, int(round(s / 5.0)) * 5)} s"
+    if s < 3600:
+        s = int(round(s / 10.0)) * 10
+        m, sec = divmod(s, 60)
+        return f"{m} min {sec} s" if sec else f"{m} min"
+    s = int(round(s / 300.0)) * 300
+    h, rest = divmod(s, 3600)
+    return f"{h} h {rest // 60} min" if rest else f"{h} h"
 
-    def __init__(self, source: str, total: Callable[[], int], clock: Callable[[], float] = time.monotonic) -> None:
+
+class Meter:
+    """Bytes done, smoothed speed, remaining time and the source label of ONE model download (all its sources).
+
+    * ``done`` never decreases (a source switch or a retry that re-reads a file must not move the counter backwards);
+    * ``total`` is the size of the whole download known up front (:meth:`set_total`; it is not re-estimated while
+      downloading, so "N MB of TOTAL" does not jump); without it the line shows only what was downloaded;
+    * the speed is an exponential moving average (time constant about ``TAU`` seconds) and the remaining time is taken
+      from it, shown only after ``ETA_AFTER`` seconds of measurement and kept steady (it counts down between updates and
+      is replaced only when the new estimate differs clearly).
+    """
+
+    TAU = 12.0
+    ETA_AFTER = 6.0
+
+    def __init__(self, source: str, total: Optional[Callable[[], int]] = None, clock: Callable[[], float] = time.monotonic) -> None:
         self.source = source
         self.total_fn = total
         self.clock = clock
         self.done = 0
-        self.speed = 0.0                    # bytes per second, smoothed over about 8 s
+        self.speed = 0.0                    # bytes per second, moving average
         self._last: Optional[tuple] = None
+        self._t_first: Optional[float] = None
+        self._fixed_total = 0
+        self._eta: Optional[tuple] = None   # (shown seconds, clock time of that value)
         self.fraction = 0.0                 # the source's own progress report (0..1)
+
+    def set_source(self, source: str) -> None:
+        """A new source continues the same download: counter, speed and total are kept."""
+        self.source = source
+
+    def set_total(self, total: int) -> None:
+        """Total size of the whole download (sum of the file sizes known up front); the largest value given wins."""
+        if total and int(total) > self._fixed_total:
+            self._fixed_total = int(total)
 
     def sample(self, done: int) -> None:
         now = self.clock()
+        done = max(self.done, int(done))                    # monotonic
+        if self._t_first is None:
+            self._t_first = now
         if self._last is not None:
             t0, d0 = self._last
             dt = now - t0
             if dt > 0:
                 inst = max(0, done - d0) / dt
-                alpha = min(1.0, dt / 8.0)
+                alpha = 1.0 - math.exp(-dt / self.TAU)
                 self.speed = inst if self.speed == 0 else self.speed + alpha * (inst - self.speed)
         self._last = (now, done)
         self.done = done
 
     @property
     def total(self) -> int:
+        if self._fixed_total:
+            return self._fixed_total
+        if self.total_fn is None:
+            return 0
         try:
             return int(self.total_fn() or 0)
         except Exception:  # noqa: BLE001
             return 0
+
+    def eta(self) -> Optional[float]:
+        """Seconds left (steady value) or None while it cannot be told yet."""
+        total, now = self.total, self.clock()
+        if total <= 0 or self.speed <= 1024 or self._t_first is None or now - self._t_first < self.ETA_AFTER or self.done >= total:
+            return None
+        new = (total - self.done) / self.speed
+        if self._eta is not None:
+            shown = max(0.0, self._eta[0] - (now - self._eta[1]))     # counts down by itself
+            if abs(new - shown) <= max(10.0, 0.25 * new):
+                self._eta = (shown, now)
+                return shown
+        self._eta = (new, now)
+        return new
 
     def text(self, tr: Callable[..., str], short: str, plain_pct: int) -> str:
         """The status line: detailed once something was measured, otherwise the plain percentage line."""
@@ -96,9 +155,14 @@ class Meter:
         total = self.total
         speed = f"{fmt_bytes(self.speed)}/s" if self.speed > 0 else "..."
         if total > 0:
-            pct = max(plain_pct, min(99, int(self.done * 100 / total)))
-            return tr("progress.detail", short=short, pct=pct, done=fmt_bytes(self.done), total=fmt_bytes(total),
+            done = min(self.done, total)
+            pct = max(plain_pct, min(99, int(done * 100 / total)))
+            line = tr("progress.detail", short=short, pct=pct, done=fmt_bytes(done), total=fmt_bytes(total),
                       speed=speed, source=self.source)
+            eta = self.eta()
+            if eta is not None:
+                line += tr("progress.eta", eta=fmt_duration(eta))
+            return line
         return tr("progress.detail_unknown", short=short, done=fmt_bytes(self.done), speed=speed, source=self.source)
 
 

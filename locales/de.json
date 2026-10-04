@@ -342,6 +342,7 @@
  "progress.downloading": "Modell {short} wird heruntergeladen: {pct}%",
  "progress.detail": "{short}: {pct}% - {done} von {total} - {speed} - Quelle: {source}",
  "progress.detail_unknown": "{short}: {done} geladen - {speed} - Quelle: {source}",
+ "progress.eta": " - noch etwa {eta}",
  "progress.export_done": "Universalmodell fertig",
  "progress.export_writing": "Modell wird auf die Festplatte geschrieben (ca. 4 GB)…",
  "progress.ffmpeg_downloading": "ffmpeg (Audiowerkzeug) wird heruntergeladen (einmalig, per Prüfsumme geprüft)…",

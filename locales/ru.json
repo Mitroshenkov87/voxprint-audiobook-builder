@@ -342,6 +342,7 @@
  "progress.downloading": "Скачиваю модель {short}: {pct}%",
  "progress.detail": "{short}: {pct}% - {done} из {total} - {speed} - источник: {source}",
  "progress.detail_unknown": "{short}: загружено {done} - {speed} - источник: {source}",
+ "progress.eta": " - осталось около {eta}",
  "progress.export_done": "Универсальная модель готова",
  "progress.export_writing": "Записываю модель на диск (около 4 ГБ)…",
  "progress.ffmpeg_downloading": "Скачиваю аудио-инструмент ffmpeg (один раз, проверка по контрольной сумме)…",
