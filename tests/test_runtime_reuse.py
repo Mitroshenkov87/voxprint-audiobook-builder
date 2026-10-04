@@ -218,7 +218,7 @@ def test_the_manifest_points_to_the_upstream_files_and_the_release_holds_only_th
     srv, mp, out, wheels = upstream
     man = json.loads(mp.read_text())
     assert mp.name == "manifest-thin-beta.json" and man["thin"] and man["runtime"]["flavors"] == ["cu128", "cu126", "cpu"]
-    assert sorted(p.name for p in out.glob("*.zip")) == ["Voxprint-payload-01.zip"]            # nothing third-party is repacked
+    assert sorted(p.name for p in out.glob("*.zip")) == ["Voxprint-shell-01.zip"]            # nothing third-party is repacked
     core = [c for c in man["components"] if c["role"] == "core"]
     rt = [c for c in man["components"] if c["role"] == "runtime"]
     assert len(core) == 1 and len(rt) == len(wheels) and all(c["kind"] == "wheel" for c in rt)

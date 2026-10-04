@@ -48,6 +48,9 @@ GROUPS = [
     ("text", "Text and language", ("nagisa", "pymorphy3", "pymorphy3-dicts-ru", "ru-normalizr", "rutextnorm", "num2words", "eng-to-ipa",
                                    "sentencepiece", "regex", "dawg2-python", "docopt-ng", "six", "dynet", "cython")),
 ]
+#: Libraries (besides the shell's) that the unit tests import; the thin build's CI installs them to run the suite without PyTorch.
+TEST_EXTRAS = {"huggingface-hub", "requests", "scipy", "pyyaml", "tqdm", "urllib3", "filelock", "fsspec", "typing-extensions",
+               "hf-xet", "idna", "charset-normalizer"}
 COMPAT = {"torch": ">=2.8,<2.13", "python_minor_must_match": True}
 
 
@@ -177,10 +180,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--python", default="3.11")
     ap.add_argument("--out", default=str(LOCK))
     ap.add_argument("--shell-requirements", action="store_true", help="print the pinned shell packages (for CI) and exit")
+    ap.add_argument("--test-requirements", action="store_true",
+                    help="like --shell-requirements plus the few pure libraries the unit tests import (CI of the thin build)")
     a = ap.parse_args(argv)
-    if a.shell_requirements:
+    if a.shell_requirements or a.test_requirements:
         lock = json.loads(Path(a.out).read_text(encoding="utf-8"))
-        print("\n".join(f"{n}=={v}" for n, v in lock["shell"].items()))
+        pins = dict(lock["shell"])
+        if a.test_requirements:
+            for w in lock["wheels"]:
+                if w["dist"] in TEST_EXTRAS:
+                    pins[w["dist"]] = w["version"]
+        print("\n".join(f"{n}=={v}" for n, v in pins.items()))
         return 0
     lock = build(a.python, a.torch)
     Path(a.out).write_text(json.dumps(lock, indent=1) + "\n", encoding="utf-8")

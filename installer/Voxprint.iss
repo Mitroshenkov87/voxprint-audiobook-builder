@@ -331,6 +331,19 @@ end;
 { The Visual C++ runtime (PyTorch needs it): installed quietly.  Exit codes that are NOT errors: 0 installed, 1638 a newer
   version is already present, 3010 / 1641 installed (a restart is pending).  Nothing is shown to the user either way; an
   unexpected code only goes to the setup log. }
+{ True when a Visual C++ 2015-2022 runtime of version 14.29 or newer (what current PyTorch builds need) is already installed. }
+function VcRuntimePresent(): Boolean;
+var
+  Installed, Major, Minor: Cardinal;
+  Key: String;
+begin
+  Result := False;
+  Key := 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64';
+  if RegQueryDWordValue(HKLM64, Key, 'Installed', Installed) and (Installed = 1) and
+     RegQueryDWordValue(HKLM64, Key, 'Major', Major) and RegQueryDWordValue(HKLM64, Key, 'Minor', Minor) then
+    Result := (Major > 14) or ((Major = 14) and (Minor >= 29));
+end;
+
 procedure InstallVcRedist();
 var
   Exe: String;
@@ -338,6 +351,11 @@ var
 begin
   Exe := ExpandConstant('{tmp}\vc_redist.x64.exe');
   if not FileExists(Exe) then Exit;
+  if VcRuntimePresent() then
+  begin
+    Log('The Visual C++ runtime is already installed - not installing it again');
+    Exit;
+  end;
   WizardForm.StatusLabel.Caption := CustomMessage('VcRedistStatus');
   if Exec(Exe, '/install /quiet /norestart', '', SW_HIDE, ewWaitUntilTerminated, Rc) then
   begin

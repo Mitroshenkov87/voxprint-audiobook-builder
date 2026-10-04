@@ -280,10 +280,20 @@ def probe_command() -> List[str]:
 
 def verify(ext: ExternalTorch, run: Optional[Callable[[List[str], Dict[str, str], int], Tuple[int, str]]] = None) -> Tuple[bool, str]:
     """Rule 6: import and use the candidate in a child process of Voxprint (its own interpreter / DLLs / numpy)."""
+    import tempfile
+
     env = dict(os.environ)
     env["VOXPRINT_EXTRA_SITE"] = ext.site
+    fd, result_file = tempfile.mkstemp(prefix="vxprobe", suffix=".txt")      # a windowed exe has no stdout: the result also goes to a file
+    os.close(fd)
+    env["VOXPRINT_PROBE_OUT"] = result_file
     run = run or _run_child
     rc, out = run(probe_command(), env, VERIFY_TIMEOUT)
+    try:
+        out = out + "\n" + Path(result_file).read_text(encoding="utf-8", errors="replace")
+        os.unlink(result_file)
+    except OSError:
+        pass
     ok = rc == 0 and OK_MARK in out
     detail = next((l for l in out.splitlines() if OK_MARK in l), (out.strip().splitlines() or [""])[-1])
     return ok, detail[:300]
@@ -303,6 +313,18 @@ def probe_torch_main() -> int:
     extra = os.environ.get("VOXPRINT_EXTRA_SITE", "")
     if extra and extra not in sys.path:
         sys.path.append(extra)
+
+    def say(line: str) -> None:
+        try:
+            print(line, flush=True)
+        except Exception:  # noqa: BLE001 - no console
+            pass
+        try:
+            target = os.environ.get("VOXPRINT_PROBE_OUT") or str(paths.logs_dir() / "probe_torch.txt")
+            Path(target).write_text(line + "\n", encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
+
     try:
         import numpy as np
         import torch
@@ -316,10 +338,10 @@ def probe_torch_main() -> int:
             torch.cuda.synchronize()
             assert float(y) == 1 + 9 + 25 + 49
             dev = "cuda:" + torch.cuda.get_device_name(0)
-        print(f"{OK_MARK} torch {torch.__version__} from {Path(torch.__file__).parent.parent} on {dev}", flush=True)
+        say(f"{OK_MARK} torch {torch.__version__} from {Path(torch.__file__).parent.parent} on {dev}")
         return 0
     except BaseException as exc:  # noqa: BLE001 - any failure = not usable
-        print(f"VXTORCH FAIL {type(exc).__name__}: {exc}", flush=True)
+        say(f"VXTORCH FAIL {type(exc).__name__}: {exc}")
         return 1
 
 

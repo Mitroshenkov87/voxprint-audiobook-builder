@@ -12,7 +12,10 @@ param(
     [int]$LimitMib = 1800,          # part size limit: a release asset must be below 2 GiB
     [string]$Python = ".venv\Scripts\python.exe",
     [switch]$Thin,                  # THIN installer: $Dist is the thin shell (build_thin.bat); the heavy libraries become runtime modules
-    [string]$RuntimeSite = ""       # site-packages with those libraries (default: that of $Python's environment)
+    [string]$RuntimeSite = "",      # site-packages with those libraries (default: that of $Python's environment)
+    [string]$RuntimeLock = "",      # THIN v2: infra\runtime_lock.json - the libraries stay at their upstream sites (PyPI, download.pytorch.org);
+                                    #   the release gets only the shell + manifest-thin-<channel>.json; the installer is named Voxprint-Setup-online.exe
+    [string]$MirrorBase = ""        # optional fallback address prefix for the locked files (our mirror)
 )
 $ErrorActionPreference = "Stop"
 function Check([string]$what) { if ($LASTEXITCODE -ne 0) { throw "$what failed (exit code $LASTEXITCODE)" } }
@@ -34,7 +37,11 @@ if ($fetchMb -gt 60) { throw "voxprint-fetch.exe is $([int]$fetchMb) MB - an imp
 $pargs = @("tools\make_online_payload.py", "--dist", $Dist, "--out", "build\online-release", "--tag", $Tag, "--repo", $Repo,
            "--limit-mib", "$LimitMib")
 if ($BaseUrl) { $pargs += @("--base-url", $BaseUrl) }
-if ($Thin) {
+if ($RuntimeLock) {
+    $Thin = $true
+    $pargs += @("--runtime-lock", $RuntimeLock)
+    if ($MirrorBase) { $pargs += @("--mirror-base", $MirrorBase) }
+} elseif ($Thin) {
     if (-not $RuntimeSite) { $RuntimeSite = (& $Python -c "import sysconfig; print(sysconfig.get_paths()['purelib'])").Trim() }
     $pargs += @("--runtime-site", $RuntimeSite)
 }
@@ -42,13 +49,14 @@ if ($Thin) {
 Check "make_online_payload"
 
 $channel = if ($Tag -match '^[vV]?[0-9][0-9.]*-') { "beta" } else { "stable" }
-$manifest = "manifest-$channel.json"
+$manifest = if ($RuntimeLock) { "manifest-thin-$channel.json" } else { "manifest-$channel.json" }
 if (-not (Test-Path "build\online-release\$manifest")) { throw "$manifest was not written" }
 if (-not $ManifestUrl) { $ManifestUrl = "https://github.com/$Repo/releases/download/$Tag/$manifest" }
 
 $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $iscc)) { $iscc = "$env:ProgramFiles\Inno Setup 6\ISCC.exe" }
 $setupName = if ($Thin) { "Voxprint-Setup-thin.exe" } else { "Voxprint-Setup-online.exe" }
+$finalName = if ($RuntimeLock) { "Voxprint-Setup-online.exe" } else { $setupName }
 $isArgs = @("/DONLINE", "/DONEDIR", "/DManifestUrl=$ManifestUrl")
 if ($Thin) { $isArgs += "/DTHIN" }
 & $iscc @isArgs installer\Voxprint.iss
@@ -56,8 +64,8 @@ Check "Inno Setup (online)"
 
 $setupMb = (Get-Item "installer\Output\$setupName").Length / 1MB
 if ($setupMb -gt 200) { throw "$setupName is $([int]$setupMb) MB (expected a few tens of MB)" }
-Move-Item "installer\Output\$setupName" "build\online-release\$setupName" -Force
-$h = (Get-FileHash "build\online-release\$setupName" -Algorithm SHA256).Hash.ToLower()
-"$h  $setupName" | Out-File -Encoding ascii "build\online-release\$setupName.sha256"
+Move-Item "installer\Output\$setupName" "build\online-release\$finalName" -Force
+$h = (Get-FileHash "build\online-release\$finalName" -Algorithm SHA256).Hash.ToLower()
+"$h  $finalName" | Out-File -Encoding ascii "build\online-release\$finalName.sha256"
 Get-ChildItem build\online-release | Format-Table Name, Length
 "manifest: $manifest   installer manifest url: $ManifestUrl"

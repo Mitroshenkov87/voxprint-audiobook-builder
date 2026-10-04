@@ -174,8 +174,115 @@ jobs:
         shell: pwsh
         run: if (Test-Path C:\vxthin.log) { Get-Content C:\vxthin.log -Tail 40 }
 
+  # THE ONLINE INSTALLER (docs/THIN-INSTALLER.md): builds only our small shell (Qt + program) and a manifest that points to the libraries at
+  # their upstream sites (PyPI, download.pytorch.org - infra/runtime_lock.json).  No PyTorch is installed, repacked or uploaded here: minutes, not an hour.
+  # Besides building, the job really installs the runtime from upstream with the frozen shell (CPU PyTorch = 100 MB) and imports it,
+  # then repeats it with "another program's" PyTorch to prove the reuse path.
+  build-thin:
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.smoke_only && !inputs.build_full }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: "1"
+      REL_TAG: ${{ inputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Inno Setup 6
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Visual C++ runtime from Microsoft (embedded in the installer, installed only when the PC lacks it)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force installer\redist | Out-Null
+          Invoke-WebRequest https://aka.ms/vs/17/release/vc_redist.x64.exe -OutFile installer\redist\vc_redist.x64.exe
+      - name: The lock is still valid (every file exists upstream with the pinned size)
+        shell: pwsh
+        run: python tools\check_lock_urls.py
+      - name: Shell environment (only the pinned packages the shell bundles) + PyInstaller
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          python tools\make_runtime_lock.py --test-requirements | Out-File -Encoding ascii build-req.txt
+          Get-Content build-req.txt
+          .venv\Scripts\python.exe -m pip install --quiet -r build-req.txt pyinstaller pytest
+      - name: Tests that need no PyTorch
+        shell: pwsh
+        run: .venv\Scripts\python.exe -m pytest -q --deselect tests/test_ui.py::test_selftest_imports_reports_and_writes_log --deselect tests/test_frozen_install.py
+      - name: Thin shell (PyInstaller, heavy libraries excluded)
+        shell: cmd
+        run: build_thin.bat
+      - name: Online installer = shell zip + manifest (libraries stay upstream) + Voxprint-Setup-online.exe
+        shell: pwsh
+        run: |
+          $tag = if ($env:REL_TAG) { $env:REL_TAG } else { "v0.0.0-dev" }
+          ./installer/build_online.ps1 -Dist dist\thin\Voxprint -Tag $tag -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
+          Get-ChildItem build\online-release | Format-Table Name, Length
+      - name: End to end with the frozen shell - download the runtime from upstream (CPU PyTorch) and import it
+        shell: pwsh
+        env:
+          VOXPRINT_TORCH_FLAVOR: cpu
+          VOXPRINT_NO_REUSE: "1"
+          VOXPRINT_HOME: C:\vxhome1
+        run: |
+          $ErrorActionPreference = "Stop"
+          $man = (Resolve-Path build\online-release\manifest-thin-*.json).Path
+          @{ schema = 1; manifest_url = $man } | ConvertTo-Json | Out-File -Encoding ascii C:\vx-modules.json
+          $env:VOXPRINT_MODULES_CONFIG = "C:\vx-modules.json"
+          $exe = (Resolve-Path dist\thin\Voxprint\Voxprint.exe).Path
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          $p = Start-Process $exe -ArgumentList "--install-modules" -Wait -PassThru
+          "install-modules: exit $($p.ExitCode) in $([int]$sw.Elapsed.TotalSeconds) s"
+          Get-Content C:\vxhome1\logs\modules.txt | Select-Object -Last 15
+          if ($p.ExitCode -ne 0) { throw "--install-modules failed" }
+          $p = Start-Process $exe -ArgumentList "--probe-torch" -Wait -PassThru
+          Get-Content C:\vxhome1\logs\probe_torch.txt
+          if ($p.ExitCode -ne 0) { throw "the frozen shell cannot import the downloaded PyTorch" }
+      - name: End to end - another program's PyTorch is detected, checked and reused instead of downloaded
+        shell: pwsh
+        env:
+          VOXPRINT_TORCH_FLAVOR: cpu
+          VOXPRINT_HOME: C:\vxhome2
+        run: |
+          $ErrorActionPreference = "Stop"
+          # "another program": a venv-like folder that holds the torch wheels we downloaded in the previous step
+          New-Item -ItemType Directory -Force C:\otherapp\.venv\Lib\site-packages | Out-Null
+          Get-ChildItem C:\vxhome1\runtime -Directory | Where-Object { $_.Name -like "torch*" } | ForEach-Object { Copy-Item $_.FullName C:\otherapp\.venv\Lib\site-packages\ -Recurse }
+          $env:VOXPRINT_MODULES_CONFIG = "C:\vx-modules.json"
+          $env:VIRTUAL_ENV = "C:\otherapp\.venv"
+          $exe = (Resolve-Path dist\thin\Voxprint\Voxprint.exe).Path
+          $p = Start-Process $exe -ArgumentList "--install-modules" -Wait -PassThru
+          Get-Content C:\vxhome2\logs\modules.txt
+          Get-Content C:\vxhome2\logs\voxprint.log -ErrorAction SilentlyContinue | Select-String "reuse|PyTorch|torch" | Select-Object -Last 12
+          if ($p.ExitCode -ne 0) { throw "--install-modules failed" }
+          $line = Get-Content C:\vxhome2\logs\modules.txt | Select-String "^torch" | Select-Object -First 1
+          if ($line -notmatch "reused") { throw "PyTorch was not reused: $line" }
+          if (Test-Path C:\vxhome2\runtime\torch) { throw "PyTorch was downloaded although it is on the PC" }
+          $p = Start-Process $exe -ArgumentList "--probe-torch" -Wait -PassThru
+          Get-Content C:\vxhome2\logs\probe_torch.txt
+          if ($p.ExitCode -ne 0) { throw "the reused PyTorch does not work" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Voxprint-Setup-online
+          path: |
+            build/online-release/Voxprint-Setup-online.exe
+            build/online-release/Voxprint-Setup-online.exe.sha256
+            build/online-release/manifest-thin-*.json
+          retention-days: 14
+      - name: Attach to the release (installer, hash, manifest, shell parts; older assets are not touched)
+        if: ${{ env.REL_TAG != '' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = Get-ChildItem build\online-release -File | ForEach-Object { $_.FullName } | Sort-Object { (Get-Item $_).Length }
+          foreach ($f in $files) { gh release upload $env:REL_TAG $f --clobber; if ($LASTEXITCODE -ne 0) { throw "upload failed: $f" } }
+
   build:
-    if: ${{ !inputs.smoke_only }}
+    if: ${{ !inputs.smoke_only && (github.event_name != 'workflow_dispatch' || inputs.build_full) }}
     runs-on: windows-latest
     timeout-minutes: 150
     env:

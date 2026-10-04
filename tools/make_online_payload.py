@@ -48,7 +48,7 @@ def list_files(dist: Path) -> List[Path]:
 
 def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = None, base_url: str = "",
           limit_mib: int = DEFAULT_LIMIT_MIB, app_version: str = "", runtime_site: Optional[Path] = None,
-          runtime_lock: Optional[Path] = None, mirror_base: str = "") -> Path:
+          runtime_lock: Optional[Path] = None, mirror_base: str = "", prefix: str = "") -> Path:
     """Write the zips and the manifest into ``out``; returns the manifest path.
 
     ``runtime_lock`` (THIN installer v2, ``docs/THIN-INSTALLER.md``): ``infra/runtime_lock.json``.  ``dist`` is the thin shell (the only
@@ -60,6 +60,7 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
     and a ``modules.json`` (where the app finds the manifest) is added to the shell.  Without it every part is ``core`` and the
     manifest is exactly as before."""
     dist, out = Path(dist), Path(out)
+    prefix = prefix or ("Voxprint-shell" if runtime_lock is not None else PREFIX)      # never the name of an older release asset
     if not dist.is_dir():
         raise SystemExit(f"{dist} is not a folder")
     out.mkdir(parents=True, exist_ok=True)
@@ -88,7 +89,7 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
 
     for f in list_files(dist):
         if cur is None:
-            cur_path = out / f"{PREFIX}-{len(parts) + 1:02d}.zip"
+            cur_path = out / f"{prefix}-{len(parts) + 1:02d}.zip"
             cur = zipfile.ZipFile(cur_path, "w", zipfile.ZIP_DEFLATED, compresslevel=6, allowZip64=True)
         rel = f.relative_to(dist).as_posix()
         cur.write(f, rel)
@@ -103,7 +104,7 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
         path = p["path"]
         if path.stat().st_size >= 2 * 1024 ** 3:
             raise SystemExit(f"{path.name} is {path.stat().st_size} bytes: over the 2 GiB asset limit, lower --limit-mib")
-        comps.append({"id": f"payload-{i:02d}", "file": path.name, "url": f"{base}/{path.name}", "size": path.stat().st_size,
+        comps.append({"id": f"{'shell' if runtime_lock is not None else 'payload'}-{i:02d}", "file": path.name, "url": f"{base}/{path.name}", "size": path.stat().st_size,
                       "sha256": sha256_of(path), "unpacked_bytes": p["raw"], "markers": p["markers"]})
     modules: List[dict] = []
     meta: dict = {}
