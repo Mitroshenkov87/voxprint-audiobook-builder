@@ -25,6 +25,9 @@ Remove-Item build\online-release\* -Force -ErrorAction SilentlyContinue
 
 & $Python -m PyInstaller --onefile --console --name voxprint-fetch --distpath build\online --workpath build\online-work `
     --specpath build\online-work --noconfirm --log-level WARN --paths infra --hidden-import netroute `
+    --hidden-import infra.portable --hidden-import infra.model_release --hidden-import infra.model_mirrors `
+    --hidden-import infra.modelscope_mirror --hidden-import infra.download_watch --hidden-import infra.net --hidden-import infra.paths `
+    --add-data "infra\model_mirrors.json;infra" --add-data "infra\model_release.json;infra" `
     --exclude-module torch --exclude-module torchaudio --exclude-module transformers --exclude-module huggingface_hub --exclude-module requests `
     --exclude-module numpy --exclude-module scipy --exclude-module PySide6 --exclude-module psutil --exclude-module tkinter `
     tools\online_fetch.py

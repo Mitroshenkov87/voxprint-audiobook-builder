@@ -319,3 +319,51 @@ def test_run_portable_installs_even_if_the_models_fail(tmp_path, web, monkeypatc
     n = of.run_portable(f"{base}/manifest.json", tmp_path / "a", tmp_path / "c", st, tmp_path / "P", roles=["core"], models="auto")
     assert n == 1 and (tmp_path / "a" / "Voxprint.exe").is_file()
     assert st.lines[-1][0] == "done" and "models are incomplete" in st.lines[-1][2]
+
+
+# ------------------------------------------------------------------------------------------------ the installer script
+def _iss():
+    return (Path(__file__).resolve().parents[1] / "installer" / "Voxprint.iss").read_bytes().decode("utf-8-sig")
+
+
+def test_the_wizard_page_and_the_downloader_agree():
+    import re
+    iss = _iss()
+    # the option, its folder chooser and its default folder
+    assert "PortableCheck" in iss and "BrowseForFolder(CustomMessage('PortablePrompt')" in iss and r"{userdocs}\Voxprint Portable" in iss
+    assert "CreatePortablePage();" in iss
+    # the command line the installer builds is accepted by the downloader
+    ap_help = _help()
+    for flag in ("--portable", "--portable-all", "--from-folder", "--models", "--role"):
+        assert flag in ap_help and flag in iss
+    # the file the installer writes is the file the program reads; the layout names are the same
+    assert pt.STATE_FILE in iss and r"state\portable_dir.txt" in iss
+    assert "manifest.json" in iss
+    # no desktop shortcut
+    assert not re.search(r"^\[Tasks\]", iss, re.M) and not re.search(r'^Name: "\{(common|user)desktop\}', iss, re.M)
+    # strictly offline with /FromFolder, silent switches
+    for sw in ("{param:Portable|0}", "{param:PortableDir|}", "{param:PortableModels|auto}", "{param:FromFolder|}"):
+        assert sw in iss
+
+
+def _help():
+    import io
+    from contextlib import redirect_stdout
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        try:
+            of.main(["--help"])
+        except SystemExit:
+            pass
+    return buf.getvalue()
+
+
+def test_all_portable_texts_exist_in_three_languages():
+    import re
+    iss = _iss()
+    for key in ("PortablePageCaption", "PortablePageDescription", "PortableCheck", "PortableInfo", "PortableFoundInfo", "PortablePrompt",
+                "PortableBadFolder", "PortableMissing"):
+        for lang in ("english", "russian", "german"):
+            m = re.search(rf"^{lang}\.{key}=(.+)$", iss, re.M)
+            assert m and m.group(1).strip(), (lang, key)
+    assert "portable" in re.search(r"^english\.PortableCheck=(.+)$", iss, re.M).group(1).lower()

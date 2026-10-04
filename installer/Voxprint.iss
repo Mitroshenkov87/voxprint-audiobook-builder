@@ -12,6 +12,11 @@
 ; payload parts listed in the manifest (release assets, each < 2 GiB, verified by SHA-256, resumable, parts that are already
 ; installed are skipped) and unpacks them into {app}.  One UAC prompt (PrivilegesRequired=admin) covers everything; the
 ; user data stays in %LOCALAPPDATA%\Voxprint.  /Manifest=<url or file> overrides the baked-in manifest (tests, mirrors).
+; PORTABLE SETUP FOLDER (online variant, docs/THIN-INSTALLER.md): an optional wizard page "Keep a portable setup folder" (default
+; Documents\Voxprint Portable).  When ticked, voxprint-fetch keeps ALL components (and the models this PC needs) in that folder with
+; manifest.json + SHA256SUMS.txt, installs from it, and the folder is remembered (state\portable_dir.txt).  A later run finds the folder
+; (/FromFolder=<dir>, the remembered one, Documents\Voxprint Portable, or next to the installer) and installs without internet; with
+; internet only the changed parts are fetched.  Silent: /Portable=1 [/PortableDir=<dir>] [/PortableModels=none|auto|all] [/FromFolder=<dir>].
 ; THIN variant (add /DTHIN to the ONLINE command; see docs/THIN-INSTALLER.md): only the components with role "core" (the small
 ; UI shell built by build_thin.bat) are installed -> Output\Voxprint-Setup-thin.exe; the app downloads the heavy runtime modules
 ; (PyTorch ...) itself on its first start (infra/modules.py, window "Components").
@@ -103,6 +108,32 @@ english.OnlineStalled=The downloader stopped responding.
 russian.OnlineStalled=Загрузчик перестал отвечать.
 german.OnlineStalled=Der Downloader antwortet nicht mehr.
 
+english.PortablePageCaption=Portable setup folder (optional)
+russian.PortablePageCaption=Переносимая папка установки (необязательно)
+german.PortablePageCaption=Portabler Setup-Ordner (optional)
+english.PortablePageDescription=Keep everything the setup downloads, for an offline reinstall.
+russian.PortablePageDescription=Сохранить всё, что скачивает установка, для переустановки без интернета.
+german.PortablePageDescription=Alles behalten, was das Setup lädt, für eine Neuinstallation ohne Internet.
+english.PortableCheck=Keep a portable setup folder (all components and models, for offline reinstall)
+russian.PortableCheck=Хранить переносимую папку установки (все компоненты и модели, для переустановки без интернета)
+german.PortableCheck=Portablen Setup-Ordner behalten (alle Komponenten und Modelle, für Neuinstallation ohne Internet)
+english.PortableInfo=The setup downloads ALL components and the models this PC needs into this folder (even those already on the PC) with a checksum list, and installs from it. Later you can run the installer again, or copy the folder to another PC, and install without internet; when the internet is available, only newer parts are downloaded. This needs about 3 GB for the program and up to 10 GB more for the models. No desktop shortcuts are created.
+russian.PortableInfo=Установка скачает ВСЕ компоненты и нужные этому ПК модели в эту папку (даже те, что уже есть на ПК) со списком контрольных сумм и установит из неё. Позже можно запустить установщик снова или скопировать папку на другой ПК и установить без интернета; при наличии интернета докачиваются только более новые части. Нужно около 3 ГБ для программы и до 10 ГБ для моделей. Ярлыки на рабочем столе не создаются.
+german.PortableInfo=Das Setup lädt ALLE Komponenten und die für diesen PC nötigen Modelle in diesen Ordner (auch bereits vorhandene) mit einer Prüfsummenliste und installiert daraus. Später können Sie das Setup erneut starten oder den Ordner auf einen anderen PC kopieren und ohne Internet installieren; ist Internet vorhanden, werden nur neuere Teile geladen. Erforderlich sind etwa 3 GB für das Programm und bis zu 10 GB für die Modelle. Es werden keine Desktop-Verknüpfungen erstellt.
+english.PortableFoundInfo=A setup folder was found: %1%n%nThe setup installs from it. Without internet nothing is downloaded; with internet only newer parts are fetched.
+russian.PortableFoundInfo=Найдена папка установки: %1%n%nУстановка пойдёт из неё. Без интернета ничего не скачивается; при наличии интернета докачиваются только более новые части.
+german.PortableFoundInfo=Ein Setup-Ordner wurde gefunden: %1%n%nDas Setup installiert daraus. Ohne Internet wird nichts geladen; mit Internet werden nur neuere Teile geholt.
+english.PortablePrompt=Setup folder:
+russian.PortablePrompt=Папка установки:
+german.PortablePrompt=Setup-Ordner:
+english.PortableBadFolder=The folder %1 cannot be used (it cannot be created or written to). Choose another folder.
+russian.PortableBadFolder=Папку %1 нельзя использовать (её нельзя создать или записать в неё). Выберите другую папку.
+german.PortableBadFolder=Der Ordner %1 kann nicht verwendet werden (er kann nicht angelegt oder beschrieben werden). Wählen Sie einen anderen Ordner.
+
+english.PortableMissing=The setup folder %1 (from /FromFolder) was not found or has no manifest.json.
+russian.PortableMissing=Папка установки %1 (из /FromFolder) не найдена или в ней нет manifest.json.
+german.PortableMissing=Der Setup-Ordner %1 (aus /FromFolder) wurde nicht gefunden oder enthält keine manifest.json.
+
 ; No desktop shortcut on purpose (no [Tasks] section at all, so no task can be selected, silent or not): only the Start menu entry below + the Apps list entry.
 [InstallDelete]
 ; an upgrade removes a desktop shortcut that an earlier version of this installer may have created (all users / current user)
@@ -150,6 +181,13 @@ Filename: "{app}\{#AppExe}"; Parameters: "--prefetch"; Description: "{cm:RunPref
 var
   ModelsPage: TWizardPage;
   ModelsEdit: TNewEdit;
+#ifdef ONLINE
+  PortablePage: TWizardPage;
+  PortableCheck: TNewCheckBox;
+  PortableEdit: TNewEdit;
+  PortableBrowse: TNewButton;
+  PortableFound: String;
+#endif
 
 function InitializeSetup(): Boolean;
 var
@@ -171,6 +209,127 @@ begin
   if BrowseForFolder(CustomMessage('ModelsPagePrompt'), Dir, False) then
     ModelsEdit.Text := Dir;
 end;
+
+#ifdef ONLINE
+{ A setup folder made by an earlier run: /FromFolder=<dir>, the one remembered in state\portable_dir.txt, Documents\Voxprint Portable,
+  or a folder next to the installer (copied together with it).  A folder counts if it has a manifest.json. }
+function IsSetupFolder(const Dir: String): Boolean;
+begin
+  Result := (Dir <> '') and FileExists(AddBackslash(Dir) + 'manifest.json');
+end;
+
+function FindPortableFolder(): String;
+var
+  S: String;
+  Lines: TArrayOfString;
+begin
+  Result := RemoveBackslash(Trim(ExpandConstant('{param:FromFolder|}')));
+  if IsSetupFolder(Result) then Exit;
+  S := ExpandConstant('{localappdata}\Voxprint\state\portable_dir.txt');
+  if FileExists(S) and LoadStringsFromFile(S, Lines) and (GetArrayLength(Lines) > 0) then
+  begin
+    Result := RemoveBackslash(Trim(Lines[0]));
+    if IsSetupFolder(Result) then Exit;
+  end;
+  Result := ExpandConstant('{userdocs}\Voxprint Portable');
+  if IsSetupFolder(Result) then Exit;
+  Result := RemoveBackslash(ExtractFilePath(ExpandConstant('{srcexe}'))) + '\Voxprint Portable';
+  if IsSetupFolder(Result) then Exit;
+  Result := RemoveBackslash(ExtractFilePath(ExpandConstant('{srcexe}')));
+  if IsSetupFolder(Result) then Exit;
+  Result := '';
+end;
+
+procedure PortableCheckClick(Sender: TObject);
+begin
+  PortableEdit.Enabled := PortableCheck.Checked;
+  PortableBrowse.Enabled := PortableCheck.Checked;
+end;
+
+procedure PortableBrowseClick(Sender: TObject);
+var
+  Dir: String;
+begin
+  Dir := PortableEdit.Text;
+  if BrowseForFolder(CustomMessage('PortablePrompt'), Dir, True) then
+    PortableEdit.Text := Dir;
+end;
+
+{ The folder to use ('' = the option is off).  /FromFolder=<dir> forces it (strictly offline, see RunOnlineDownload). }
+function PortableDir(): String;
+begin
+  Result := '';
+  if Trim(ExpandConstant('{param:FromFolder|}')) <> '' then Result := PortableFound
+  else if PortableCheck.Checked then Result := RemoveBackslash(Trim(PortableEdit.Text));
+end;
+
+procedure CreatePortablePage();
+var
+  Info, Prompt: TNewStaticText;
+  Dir: String;
+  Silent: Boolean;
+begin
+  PortableFound := FindPortableFolder();
+  PortablePage := CreateCustomPage(ModelsPage.ID, CustomMessage('PortablePageCaption'), CustomMessage('PortablePageDescription'));
+  PortableCheck := TNewCheckBox.Create(PortablePage);
+  PortableCheck.Parent := PortablePage.Surface;
+  PortableCheck.Left := 0;
+  PortableCheck.Top := 0;
+  PortableCheck.Width := PortablePage.SurfaceWidth;
+  PortableCheck.Caption := CustomMessage('PortableCheck');
+  PortableCheck.OnClick := @PortableCheckClick;
+  Info := TNewStaticText.Create(PortablePage);
+  Info.Parent := PortablePage.Surface;
+  Info.WordWrap := True;
+  Info.AutoSize := False;
+  Info.Left := 0;
+  Info.Top := ScaleY(28);
+  Info.Width := PortablePage.SurfaceWidth;
+  Info.Height := ScaleY(120);
+  if PortableFound <> '' then
+    Info.Caption := FmtMessage(CustomMessage('PortableFoundInfo'), [PortableFound])
+  else
+    Info.Caption := CustomMessage('PortableInfo');
+  Prompt := TNewStaticText.Create(PortablePage);
+  Prompt.Parent := PortablePage.Surface;
+  Prompt.Left := 0;
+  Prompt.Top := ScaleY(156);
+  Prompt.Caption := CustomMessage('PortablePrompt');
+  PortableEdit := TNewEdit.Create(PortablePage);
+  PortableEdit.Parent := PortablePage.Surface;
+  PortableEdit.Left := 0;
+  PortableEdit.Top := ScaleY(174);
+  PortableEdit.Width := PortablePage.SurfaceWidth - ScaleX(96);
+  Dir := Trim(ExpandConstant('{param:PortableDir|}'));
+  if Dir = '' then Dir := PortableFound;
+  if Dir = '' then Dir := ExpandConstant('{userdocs}\Voxprint Portable');
+  PortableEdit.Text := Dir;
+  PortableBrowse := TNewButton.Create(PortablePage);
+  PortableBrowse.Parent := PortablePage.Surface;
+  PortableBrowse.Left := PortableEdit.Width + ScaleX(8);
+  PortableBrowse.Top := PortableEdit.Top - ScaleY(1);
+  PortableBrowse.Width := ScaleX(88);
+  PortableBrowse.Height := PortableEdit.Height + ScaleY(2);
+  PortableBrowse.Caption := WizardForm.DirBrowseButton.Caption;
+  PortableBrowse.OnClick := @PortableBrowseClick;
+  { off by default; on when a setup folder exists or the silent switch asks for it }
+  Silent := (ExpandConstant('{param:Portable|0}') = '1') or (Trim(ExpandConstant('{param:FromFolder|}')) <> '');
+  PortableCheck.Checked := Silent or (PortableFound <> '');
+  PortableCheckClick(nil);
+end;
+
+{ The checked folder must be creatable and writable (a read-only USB stick, a typo ...). }
+function PortableFolderUsable(const Dir: String): Boolean;
+var
+  Probe: String;
+begin
+  Result := False;
+  if (Dir = '') or (not ForceDirectories(Dir)) then Exit;
+  Probe := AddBackslash(Dir) + '.voxprint-write-test';
+  Result := SaveStringToFile(Probe, 'x', False);
+  if Result then DeleteFile(Probe);
+end;
+#endif
 
 { Optional page after the install folder: a folder with models from a previous install. Nothing is copied here.
   A plain custom page, NOT CreateInputDirPage: that one refuses an empty field ("You must enter a full path"), which broke
@@ -209,6 +368,9 @@ begin
   Browse.Height := ModelsEdit.Height + ScaleY(2);
   Browse.Caption := WizardForm.DirBrowseButton.Caption;
   Browse.OnClick := @ModelsBrowseClick;
+#ifdef ONLINE
+  CreatePortablePage();
+#endif
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -225,6 +387,17 @@ begin
       Result := False;
     end;
   end;
+#ifdef ONLINE
+  if CurPageID = PortablePage.ID then
+  begin
+    Dir := PortableDir();
+    if (Dir <> '') and (Trim(ExpandConstant('{param:FromFolder|}')) = '') and not PortableFolderUsable(Dir) then
+    begin
+      MsgBox(FmtMessage(CustomMessage('PortableBadFolder'), [Dir]), mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+#endif
 end;
 
 #ifdef ONLINE
@@ -251,7 +424,7 @@ end;
 
 function RunOnlineDownload(): String;
 var
-  Manifest, Cache, StatusFile, Exe, Params, State, Msg, Beat, LastBeat, Err: String;
+  Manifest, Cache, StatusFile, Exe, Params, State, Msg, Beat, LastBeat, Err, Folder: String;
   Pm, ResultCode: Integer;
   Page: TOutputProgressWizardPage;
   LastChange: Cardinal;
@@ -272,6 +445,21 @@ begin
   { THIN installer: only the shell (role "core") is installed here; the app downloads the runtime modules itself }
   Params := Params + ' --role core';
 #endif
+  { Portable setup folder: keep ALL components (+ the models this PC needs) there and install from it.  /FromFolder= is strictly
+    offline; otherwise the folder is a cache first and the internet only supplies what is missing or newer. }
+  Folder := PortableDir();
+  if (Folder = '') and (Trim(ExpandConstant('{param:FromFolder|}')) <> '') then
+  begin
+    Result := FmtMessage(CustomMessage('PortableMissing'), [Trim(ExpandConstant('{param:FromFolder|}'))]);
+    Exit;
+  end;
+  if Folder <> '' then
+  begin
+    if Trim(ExpandConstant('{param:FromFolder|}')) <> '' then
+      Params := Params + ' --from-folder ' + AddQuotes(Folder)
+    else
+      Params := Params + ' --portable ' + AddQuotes(Folder) + ' --portable-all --models ' + ExpandConstant('{param:PortableModels|auto}');
+  end;
   Page := CreateOutputProgressPage(CustomMessage('OnlineStatus'), '');
   Page.Show;
   Err := '';
@@ -373,6 +561,26 @@ var
   Lines: TArrayOfString;
 begin
   if CurStep = ssPostInstall then InstallVcRedist();
+#ifdef ONLINE
+  if CurStep = ssPostInstall then
+  begin
+    Dir := PortableDir();
+    if Dir <> '' then
+    begin
+      { the program installs its modules from this folder (infra/portable.py reads this file); its models/ are an "existing models folder" }
+      StateDir := ExpandConstant('{localappdata}\Voxprint\state');
+      ForceDirectories(StateDir);
+      SetArrayLength(Lines, 1);
+      Lines[0] := Dir;
+      SaveStringsToUTF8File(StateDir + '\portable_dir.txt', Lines, False);
+      if (Trim(ModelsEdit.Text) = '') and DirExists(AddBackslash(Dir) + 'models') then
+      begin
+        Lines[0] := Dir;
+        SaveStringsToUTF8File(StateDir + '\existing_models_dir.txt', Lines, False);
+      end;
+    end;
+  end;
+#endif
   if CurStep = ssPostInstall then
   begin
     Dir := Trim(ModelsEdit.Text);
