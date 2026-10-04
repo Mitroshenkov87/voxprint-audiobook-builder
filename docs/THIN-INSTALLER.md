@@ -55,6 +55,8 @@ are < 2 GiB each (several parts if needed), listed in the same manifest (`thin: 
 * Build: `build_thin.bat` (PyInstaller with the heavy libraries excluded - they must not be baked into the shell's PYZ); `tools/make_online_payload.py --runtime-site` writes roles, `modules`, `modules.json`.
 * App: `infra/modules.py`, `ui/modules_dialog.py`, `main.py` (activation, thin start flow, CLI), Settings button.
 
-## Not tested yet (needs Windows)
+## Tested / not tested
 
-Compiling the changed `Voxprint.iss`; a real `build_thin.bat` run; importing torch from the runtime folder inside a frozen exe (DLL search path of `torch/lib`, `os.add_dll_directory`); Windows adapter enumeration in `netroute`; real VPN setups. The Linux/Windows logic itself is covered by `tests/test_thin_modules.py` and `tests/test_netroute.py`. Plan: a manual-only smoke job on the GitHub Windows runner (fake program folder -> `build_online.ps1 -Thin` -> silent install -> only core files present -> `--install-modules`), without rebuilding the release assets.
+Checked on the GitHub Windows runner (manual run with `smoke_only`, no release assets touched; jobs `online-smoke` and `thin-smoke`): the changed `Voxprint.iss` compiles for the online and the thin flavour; the online installer still installs, reuses, fails and uninstalls correctly; the thin installer installs only the shell (+ `modules.json`), `Voxprint --modules-status / --install-modules` downloads and unpacks the modules into the runtime folder; Windows adapter enumeration of `netroute` (ctypes) lists the real adapters. Covered on Linux by `tests/test_thin_modules.py` and `tests/test_netroute.py`.
+
+Still untested: a real `build_thin.bat` run (PyInstaller with the exclusions), importing torch from the runtime folder inside a frozen exe (DLL search path of `torch/lib`, `os.add_dll_directory`), the `vc_redist` step with a real redistributable, the Components window on Windows, real VPN setups.
