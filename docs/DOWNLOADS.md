@@ -2,16 +2,16 @@
 
 The first pre-release is **[v0.1.0-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.0-beta)** (marked *pre-release*). Planned installer channels are listed in the [Roadmap](ROADMAP.md).
 
-**Right now only the small online installer is offered** (`Voxprint-Setup-online.exe`, 34,650,472 bytes). The standalone full installer and the Linux version are temporarily unavailable and being rebuilt - see [the section at the end](#temporarily-unavailable--outdated).
+**Right now only the small online installer is offered** (`Voxprint-Setup-online.exe`, 34,651,725 bytes). The standalone full installer and the Linux version are temporarily unavailable and being rebuilt - see [the section at the end](#temporarily-unavailable--outdated).
 
 ## Current download: SHA-256 (v0.1.0-beta, rebuilt 2026-10-04)
 
 | File | SHA-256 |
 |---|---|
-| `Voxprint-Setup-online.exe` (recommended, about 33 MB; 34,650,472 bytes) | `acbc6fa8efb6a52bf76fd5caa1a00d3fc54e13fee1e2600a020a1c295e5596e9` |
-| `Voxprint-payload-01.zip` | `20fd7d078d9de501f8d0a63c166e85acc6b3cbd96e5cb964da88fcc47654a764` |
-| `Voxprint-payload-02.zip` | `e0d82f0b1c97368e7bc8212fc320ecb0ce01d03a271e0ee0bc54a28b9f7807d4` |
-| `manifest-beta.json` | `0791bb4f3badd67f5e83ab4cea87bf3d912c592b6510946e96ba654c4e9ed1a4` |
+| `Voxprint-Setup-online.exe` (recommended, about 33 MB; 34,651,725 bytes) | `8a506d4c10d50941ecb9958fa73656a8c2c726d750925640929f3c4d2397da1c` |
+| `Voxprint-payload-01.zip` | `69395fa4fa47327880649eec8dccb0adc1c0bdf7e4ad040edfeb5ea54b2fd6ff` |
+| `Voxprint-payload-02.zip` | `46a3000625d4fa1e4acd4455f84f7b7f6b3d07457b07d760d2a997ce31074456` |
+| `manifest-beta.json` | `b46bade7bccfff6410750b05ff1d3b473f4fb20150d72d2976434c12529e62d7` |
 
 The online installer verifies the payload parts itself with the SHA-256 values in `manifest-beta.json`; you only need to check the `.exe` you start. If the numbers here and in the release differ, the release (its `.sha256` file and the digest shown by GitHub) is authoritative and this page is out of date - please open an issue.
 
