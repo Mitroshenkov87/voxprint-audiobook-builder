@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QHBox
 from core import i18n
 from core.errors import BackupError
 from core.i18n import tr
-from infra import auto_steps, backup, existing_models
+from infra import auto_steps, backup, existing_models, netroute
 from workers import backup_runner
 from workers.auto_quality_worker import AutoQualityWorker
 from workers.backup_worker import BackupWorker
@@ -68,6 +68,18 @@ class SettingsDialog(QDialog):
         row.addStretch(1)
         row.addWidget(self.cmb_lang)
         lay.addLayout(row)
+
+        # --- network interface (infra/netroute.py): Auto / system default / a specific adapter ---
+        nrow = QHBoxLayout()
+        self.lbl_net = QLabel()
+        self.cmb_net = QComboBox()
+        self.cmb_net.setMinimumWidth(220)
+        nrow.addWidget(self.lbl_net)
+        nrow.addStretch(1)
+        nrow.addWidget(self.cmb_net)
+        lay.addLayout(nrow)
+        self._fill_net()
+        self.cmb_net.currentIndexChanged.connect(self._on_net_changed)
 
         # --- service buttons ---
         self.btn_update = QPushButton()
@@ -174,6 +186,10 @@ class SettingsDialog(QDialog):
         self.setWindowTitle(tr("ui.settings_title"))
         self.lbl_title.setText(tr("ui.settings_title"))
         self.lbl_language.setText(tr("ui.language"))
+        self.lbl_net.setText(tr("ui.net_iface"))
+        self.cmb_net.setToolTip(tr("ui.net_iface_tip"))
+        self.lbl_net.setToolTip(tr("ui.net_iface_tip"))
+        self._fill_net()
         self.btn_update.setText(tr("ui.btn_update"))
         self.btn_models.setText(tr("ui.settings_models_folder"))
         self.btn_data.setText(tr("ui.settings_data_folder"))
@@ -195,6 +211,41 @@ class SettingsDialog(QDialog):
         self.btn_existing.setText(tr("existing.choose"))
         self.btn_existing_clear.setText(tr("existing.clear"))
         self._render_existing()
+
+    # ------------------------------------------------------------------ network interface
+    def _fill_net(self) -> None:
+        """Items: Automatic, System default only, then every local interface/address (the saved choice stays selectable)."""
+        if not hasattr(self, "cmb_net"):
+            return
+        pref = netroute.preference()
+        self.cmb_net.blockSignals(True)
+        self.cmb_net.clear()
+        self.cmb_net.addItem(tr("ui.net_iface_auto"), "auto")
+        self.cmb_net.addItem(tr("ui.net_iface_default"), "default")
+        seen = set()
+        try:
+            addrs = netroute.local_addresses()
+        except Exception:  # noqa: BLE001
+            addrs = []
+        for name, ip in addrs:
+            if name not in seen:
+                seen.add(name)
+                self.cmb_net.addItem(f"{name} ({ip})" if name != ip else ip, name)
+        i = self.cmb_net.findData(pref)
+        if i < 0 and pref not in ("auto", "default"):
+            self.cmb_net.addItem(pref, pref)             # a saved adapter that is not up right now
+            i = self.cmb_net.count() - 1
+        self.cmb_net.setCurrentIndex(max(0, i))
+        self.cmb_net.blockSignals(False)
+
+    def _on_net_changed(self, _index: int = 0) -> None:
+        """Save the choice (``net_iface.txt`` in the state folder; the next download uses it)."""
+        value = self.cmb_net.currentData()
+        try:
+            netroute.set_preference(str(value or "auto"))
+            netroute.forget()
+        except OSError:
+            log.warning("could not save the network interface choice")
 
     # ------------------------------------------------------------------ Maximum quality (auto)
     @property

@@ -378,25 +378,30 @@ def test_offline_check_and_apply(tmp_path):
 def test_net_urlopen_retries_with_certifi_on_cert_error(monkeypatch):
     import ssl
     import urllib.error
-    import urllib.request
-    from infra import net
+    from infra import net, netroute
 
     calls = []
 
-    def fake(req, timeout=10.0, context=None):
-        calls.append(context)
-        if context is None:
-            raise urllib.error.URLError(ssl.SSLCertVerificationError("CERTIFICATE_VERIFY_FAILED"))
-        return "ok"
+    class Op:
+        def __init__(self, ctx):
+            self.ctx = ctx
 
-    monkeypatch.setattr(urllib.request, "urlopen", fake)
+        def open(self, req, timeout=None):
+            calls.append(self.ctx)
+            if self.ctx is None:
+                raise urllib.error.URLError(ssl.SSLCertVerificationError("CERTIFICATE_VERIFY_FAILED"))
+            return "ok"
+
+    monkeypatch.setattr(netroute, "_opener", lambda route, ctx, ct: Op(ctx))
+    monkeypatch.setattr(netroute, "candidates", lambda host: [netroute.DEFAULT])
     assert net.urlopen("https://example.org", 3) == "ok"
     assert calls[0] is None and calls[1] is not None             # second attempt carries the certifi context
 
-    def other(req, timeout=10.0, context=None):
-        raise urllib.error.URLError(OSError("network down"))
+    class Down:
+        def open(self, req, timeout=None):
+            raise urllib.error.URLError(OSError("network down"))
 
-    monkeypatch.setattr(urllib.request, "urlopen", other)
+    monkeypatch.setattr(netroute, "_opener", lambda route, ctx, ct: Down())
     import pytest
     with pytest.raises(urllib.error.URLError):
         net.urlopen("https://example.org", 3)

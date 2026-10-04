@@ -19,7 +19,7 @@ New-Item -ItemType Directory -Force build\online, build\online-release | Out-Nul
 Remove-Item build\online-release\* -Force -ErrorAction SilentlyContinue
 
 & $Python -m PyInstaller --onefile --console --name voxprint-fetch --distpath build\online --workpath build\online-work `
-    --specpath build\online-work --noconfirm --log-level WARN tools\online_fetch.py
+    --specpath build\online-work --noconfirm --log-level WARN --paths infra --hidden-import netroute tools\online_fetch.py
 Check "PyInstaller (voxprint-fetch)"
 
 $pargs = @("tools\make_online_payload.py", "--dist", $Dist, "--out", "build\online-release", "--tag", $Tag, "--repo", $Repo,

@@ -30,6 +30,17 @@ import zipfile
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
+# --- netroute: the "interface hopper" (infra/netroute.py).  Frozen exe: bundled with --paths infra; the single-file Linux copy
+# --- (voxprint-fetch.py) has the module inlined here by tools/make_linux_package.py; without it plain urllib is used.
+try:
+    import netroute as _nr
+except ImportError:
+    try:
+        from infra import netroute as _nr
+    except ImportError:
+        _nr = None
+# --- end netroute
+
 SCHEMA = 1
 STATE_FILE = "voxprint-components.json"
 UA = "voxprint-fetch/1"
@@ -109,6 +120,8 @@ def check_url(url: str) -> None:
 def _open(url: str, headers: Optional[Dict[str, str]] = None, timeout: float = 30.0):
     check_url(url)
     req = urllib.request.Request(url, headers={"User-Agent": UA, **(headers or {})})
+    if _nr is not None:       # short connect timeout, then the other network interfaces (VPN / odd adapters)
+        return _nr.urlopen(req, timeout=timeout)
     return urllib.request.urlopen(req, timeout=timeout)
 
 
@@ -291,11 +304,11 @@ def extract(zip_path: Path, dest: Path, progress: Callable[[int, int], None]) ->
 
 # --------------------------------------------------------------------------- the whole job
 def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Optional[List[str]] = None,
-        sleep: Callable[[float], None] = time.sleep) -> int:
+        sleep: Callable[[float], None] = time.sleep, roles: Optional[List[str]] = None) -> int:
     """Install every component of the manifest into ``dest``; returns the number of components fetched."""
     status.write("running", 0.0, "Reading the manifest", force=True)
     man = read_manifest(manifest_source)
-    comps = [c for c in man["components"] if not only or c["id"] in only]
+    comps = [c for c in man["components"] if (not only or c["id"] in only) and (not roles or c.get("role", "core") in roles)]
     dest.mkdir(parents=True, exist_ok=True)
     state = load_state(dest)
     todo = [c for c in comps if not installed_ok(c, state, dest)]
@@ -344,14 +357,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--cache", required=True, help="folder for partial / verified downloads")
     ap.add_argument("--status", help="status file polled by the installer")
     ap.add_argument("--only", action="append", help="install only this component id (repeatable)")
+    ap.add_argument("--role", action="append", help="install only components of this role (repeatable; manifest field 'role', "
+                                                    "default 'core'); without --role every component is installed")
+    ap.add_argument("--iface", help="network interface / local IP to use, 'auto' (default) or 'default' (never hop); "
+                                    "same as the VOXPRINT_NET_IFACE variable")
     try:
         a = ap.parse_args(argv)
     except SystemExit:
         return 2
+    if a.iface:
+        os.environ["VOXPRINT_NET_IFACE"] = a.iface
+    if _nr is not None:
+        _nr.on_event = lambda msg: print(msg, file=sys.stderr, flush=True)
     st = Status(Path(a.status) if a.status else None)
     st.start_heartbeat()
     try:
-        n = run(a.manifest, Path(a.dest), Path(a.cache), st, a.only)
+        n = run(a.manifest, Path(a.dest), Path(a.cache), st, a.only, roles=a.role)
     except FetchError as exc:
         st.write("error", 0.0, str(exc), force=True)
         print(f"ERROR: {exc}", file=sys.stderr)

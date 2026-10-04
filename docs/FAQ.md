@@ -38,5 +38,9 @@ The installer is not code-signed, so Windows shows "Unknown publisher". Check th
 ## Does it work on Linux or without an NVIDIA GPU?
 Linux is experimental ([LINUX.md](LINUX.md)). Without an NVIDIA GPU the dataset is still created, but training falls back to the CPU (very slow, with a warning).
 
+## Downloads fail with a VPN or an unusual network adapter
+Voxprint tries the normal connection first (8 s connect timeout). If it cannot connect, it lists your local network interfaces (IPv4/IPv6, loopback and link-local skipped) and retries from each address in turn, also without the system proxy; the first one that works is remembered (`state/net_route.json`), used for the rest of the download - resumed ranges and the local -> original -> mirror order included - and re-tested if it stops working. This covers the online installer (`voxprint-fetch`), model, translation-model, voice and update downloads that Voxprint makes itself (`pip` runs of the updater only honour the system proxy). The log line is short, e.g. `network route for huggingface.co: tun0 (10.8.0.2)`.
+Choose manually in *Settings -> Network interface* (Automatic / System default only / a specific adapter) or with the environment variable `VOXPRINT_NET_IFACE` (`auto`, `default`, an adapter name or a local IP; the installer downloader also has `--iface`). A named adapter is used alone, with no fallback. Hugging Face downloads through a specific address use the plain Python downloader (the Rust accelerator `hf_xet` cannot bind to an address). Nothing here detects particular VPN programs.
+
 ## Where do I find the manual?
 PDF manuals in English, Russian and German are in [`manual/`](manual/); recording scripts in [`recording-scripts/`](recording-scripts/).

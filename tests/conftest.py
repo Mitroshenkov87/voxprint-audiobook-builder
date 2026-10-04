@@ -29,6 +29,10 @@ def _isolated_home(tmp_path, monkeypatch):
     # (a late answer adds online voices to the list in the middle of a test). Tests that need an index pass their own fetch/URL.
     monkeypatch.setenv("VOXPRINT_VOICES_INDEX", "offline://tests")
     monkeypatch.setenv("VOXPRINT_OWN_ENV", "1")   # the test interpreter counts as Voxprint-owned (auto-upgrade); external-env tests pass external_env=True
+    monkeypatch.delenv("VOXPRINT_NET_IFACE", raising=False)
+    from infra import netroute
+
+    netroute.reset_memory()
     from core import i18n
 
     i18n.reset()

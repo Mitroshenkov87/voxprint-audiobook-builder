@@ -67,6 +67,18 @@ def app_files(root: Path) -> List[str]:
     return sorted(rels)
 
 
+def inline_netroute(fetch_src: str, netroute_src: str) -> str:
+    """The single-file downloader: ``tools/online_fetch.py`` with ``infra/netroute.py`` (the interface hopper) inlined."""
+    a, b = fetch_src.index("# --- netroute:"), fetch_src.index("# --- end netroute")
+    block = ("# --- netroute (inlined from infra/netroute.py by tools/make_linux_package.py)\n"
+             "import types as _types\n"
+             f"_NETROUTE_SRC = {netroute_src!r}\n"
+             "_nr = _types.ModuleType('netroute')\n"
+             "sys.modules['netroute'] = _nr\n"
+             "exec(compile(_NETROUTE_SRC, 'netroute.py', 'exec'), _nr.__dict__)\n")
+    return fetch_src[:a] + block + fetch_src[b:]
+
+
 def _fix_script(text: str, repo: str, tag: str) -> str:
     return text.replace("@REPO@", repo).replace("@TAG@", tag)
 
@@ -91,7 +103,9 @@ def build(root: Path, out: Path, tag: str, repo: str = DEFAULT_REPO, base_url: s
     script_text = _fix_script(script_src, repo, tag)
     (out / SCRIPT_NAME).write_text(script_text, encoding="utf-8", newline="\n")
     (out / SCRIPT_NAME).chmod(0o755)
-    shutil.copyfile(root / "tools" / "online_fetch.py", out / FETCH_NAME)
+    (out / FETCH_NAME).write_text(inline_netroute((root / "tools" / "online_fetch.py").read_text(encoding="utf-8"),
+                                                  (root / "infra" / "netroute.py").read_text(encoding="utf-8")),
+                                  encoding="utf-8", newline="\n")
 
     stamp = (1980, 1, 1, 0, 0, 0)      # fixed timestamps: the zip depends only on the content
     zp = out / ZIP_NAME

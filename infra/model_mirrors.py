@@ -118,6 +118,12 @@ def _default_fetch(mirror_repo: str, filename: str, revision: str, local_dir: Pa
     """Download one file of the mirror repository with huggingface_hub (resumable)."""
     from huggingface_hub import hf_hub_download
 
+    try:
+        from infra import netroute
+
+        netroute.prepare_hf()
+    except Exception:  # noqa: BLE001 - never block the download
+        pass
     return hf_hub_download(repo_id=mirror_repo, filename=filename, revision=revision, local_dir=str(local_dir))
 
 

@@ -3,7 +3,8 @@
 On a "fresh" Windows (especially Windows Server) the certificate store may lack some root certificates, so ``ssl``
 answers ``CERTIFICATE_VERIFY_FAILED`` even though the site is reachable (downloading through ``requests``/certifi
 works fine in the same situation).  We first try the normal context and, only on a certificate verification error,
-retry exactly once with the certifi bundle.
+retry exactly once with the certifi bundle.  Connections that cannot be made are retried through the other network
+interfaces (:mod:`infra.netroute`).
 """
 from __future__ import annotations
 
@@ -37,11 +38,9 @@ def certifi_context() -> Optional[ssl.SSLContext]:
 
 
 def urlopen(req, timeout: float = 10.0):
-    """Like :func:`urllib.request.urlopen`, but retries once through certifi on a certificate verification error."""
-    try:
-        return urllib.request.urlopen(req, timeout=timeout)  # noqa: S310 - https only
-    except (urllib.error.URLError, ssl.SSLError, OSError) as exc:
-        ctx = certifi_context() if _is_cert_error(exc) else None
-        if ctx is None:
-            raise
-        return urllib.request.urlopen(req, timeout=timeout, context=ctx)  # noqa: S310
+    """Like :func:`urllib.request.urlopen`, with two fallbacks (see :mod:`infra.netroute`): a connection that cannot be made
+    is retried from the other network interfaces (VPN / odd adapters), and a certificate verification error is retried
+    once through the certifi bundle."""
+    from infra import netroute
+
+    return netroute.urlopen(req, timeout=timeout)  # noqa: S310 - https only

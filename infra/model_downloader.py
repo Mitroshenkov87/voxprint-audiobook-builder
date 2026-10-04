@@ -221,6 +221,16 @@ class _ByteProgress:
         return _Tqdm
 
 
+def _prepare_network() -> None:
+    """Pick a network route that reaches Hugging Face (VPN / odd adapters: see :mod:`infra.netroute`); never fails."""
+    try:
+        from infra import netroute
+
+        netroute.prepare_hf()
+    except Exception as exc:  # noqa: BLE001
+        log.debug("network route preparation skipped: %s", exc)
+
+
 def ensure_model(
     repo_id: str,
     progress: ProgressCallback = noop_progress,
@@ -282,6 +292,8 @@ def ensure_model(
             tr("err.disk_model", short=short, need=f"{need_gb:.0f}", free=f"{free_gb:.1f}"),
             url=hf_url(repo_id))
 
+    if snapshot_download is None:
+        _prepare_network()
     if revision is None:
         revision = pinned_revision(repo_id)
     sha: Optional[str] = revision
