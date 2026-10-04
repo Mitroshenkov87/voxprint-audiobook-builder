@@ -21,8 +21,15 @@ New-Item -ItemType Directory -Force build\online, build\online-release | Out-Nul
 Remove-Item build\online-release\* -Force -ErrorAction SilentlyContinue
 
 & $Python -m PyInstaller --onefile --console --name voxprint-fetch --distpath build\online --workpath build\online-work `
-    --specpath build\online-work --noconfirm --log-level WARN --paths infra --hidden-import netroute tools\online_fetch.py
+    --specpath build\online-work --noconfirm --log-level WARN --paths infra --hidden-import netroute `
+    --exclude-module torch --exclude-module torchaudio --exclude-module transformers --exclude-module huggingface_hub --exclude-module requests `
+    --exclude-module numpy --exclude-module scipy --exclude-module PySide6 --exclude-module psutil --exclude-module tkinter `
+    tools\online_fetch.py
 Check "PyInstaller (voxprint-fetch)"
+# guard: the downloader must stay small (it once pulled PyTorch in through an optional import: 3 GB installer)
+$fetchMb = (Get-Item build\online\voxprint-fetch.exe).Length / 1MB
+"voxprint-fetch.exe: {0:N1} MB" -f $fetchMb
+if ($fetchMb -gt 60) { throw "voxprint-fetch.exe is $([int]$fetchMb) MB - an import pulled heavy packages into it" }
 
 $pargs = @("tools\make_online_payload.py", "--dist", $Dist, "--out", "build\online-release", "--tag", $Tag, "--repo", $Repo,
            "--limit-mib", "$LimitMib")
@@ -47,6 +54,8 @@ if ($Thin) { $isArgs += "/DTHIN" }
 & $iscc @isArgs installer\Voxprint.iss
 Check "Inno Setup (online)"
 
+$setupMb = (Get-Item "installer\Output\$setupName").Length / 1MB
+if ($setupMb -gt 200) { throw "$setupName is $([int]$setupMb) MB (expected a few tens of MB)" }
 Move-Item "installer\Output\$setupName" "build\online-release\$setupName" -Force
 $h = (Get-FileHash "build\online-release\$setupName" -Algorithm SHA256).Hash.ToLower()
 "$h  $setupName" | Out-File -Encoding ascii "build\online-release\$setupName.sha256"

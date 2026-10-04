@@ -18,6 +18,11 @@ on:
         description: "Attach the builds to this existing release tag (empty = artifacts only)"
         required: false
         default: ""
+      build_full:
+        description: "Also build and attach the big full installer (Voxprint-Setup-github-build.exe). false = only the small online installer + payload parts + manifest"
+        type: boolean
+        required: false
+        default: false
       smoke_only:
         description: "Only run the quick smoke jobs (online-smoke, thin-smoke); no full build, nothing is attached to a release"
         type: boolean
@@ -177,6 +182,7 @@ jobs:
       QT_QPA_PLATFORM: offscreen            # the tests create Qt widgets without a display
       VOX_TORCH_BACKEND: cu128              # CUDA wheels even though the runner has no GPU (the installer is for GPU machines)
       PYTHONUTF8: "1"
+      VOX_SKIP_INSTALLER: ${{ (github.event_name == 'workflow_dispatch' && !inputs.build_full) && '1' || '' }}   # no full Inno compile when only the online installer is wanted
     steps:
       - uses: actions/checkout@v4
 
@@ -202,6 +208,7 @@ jobs:
         run: build.bat onedir
 
       - name: Name the installer and write its SHA-256
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_full }}
         shell: pwsh
         run: |
           Move-Item installer\Output\Voxprint-Setup.exe installer\Output\Voxprint-Setup-github-build.exe
@@ -211,6 +218,7 @@ jobs:
           Get-Content installer\Output\Voxprint-Setup-github-build.exe.sha256
 
       - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_full }}
         with:
           name: Voxprint-Setup-github-build
           path: |
@@ -220,7 +228,7 @@ jobs:
           retention-days: 14
 
       - name: Attach to the release (tag builds, or a dispatch with release_tag; GitHub allows 2 GiB per asset)
-        if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
+        if: ${{ (github.event_name != 'workflow_dispatch' || inputs.build_full) && (startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '') }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}

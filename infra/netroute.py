@@ -21,6 +21,7 @@ the working source address is installed once as the hub's HTTP backend), :func:`
 from __future__ import annotations
 
 import http.client
+import importlib
 import ipaddress
 import json
 import logging
@@ -100,7 +101,7 @@ def _usable(ip: str) -> bool:
 
 
 def _from_psutil() -> List[Tuple[str, str]]:
-    import psutil      # optional
+    psutil = importlib.import_module("psutil")      # optional; loaded by name so PyInstaller does not bundle it into voxprint-fetch.exe
 
     out = []
     stats = psutil.net_if_stats()
@@ -472,13 +473,14 @@ def _probe(host: str, port: int, route: Route, timeout: float) -> bool:
 def _install_hf_adapter(ip: str) -> None:
     """Make huggingface_hub's requests sessions bind to ``ip`` ("" = back to the default).  The Rust downloader (hf_xet)
     cannot bind, so it is switched off while a specific address is used."""
-    from huggingface_hub import configure_http_backend
+    # loaded by name: voxprint-fetch.exe (PyInstaller) must not pull huggingface_hub / requests / torch into the installer
+    configure_http_backend = importlib.import_module("huggingface_hub").configure_http_backend
 
     if not ip:
         configure_http_backend()
         return
-    import requests
-    from requests.adapters import HTTPAdapter
+    requests = importlib.import_module("requests")
+    HTTPAdapter = importlib.import_module("requests.adapters").HTTPAdapter
 
     class Bound(HTTPAdapter):
         def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
@@ -494,9 +496,7 @@ def _install_hf_adapter(ip: str) -> None:
     configure_http_backend(backend_factory=factory)
     os.environ["HF_HUB_DISABLE_XET"] = "1"
     try:
-        from huggingface_hub import constants
-
-        constants.HF_HUB_DISABLE_XET = True
+        importlib.import_module("huggingface_hub.constants").HF_HUB_DISABLE_XET = True
     except Exception:  # noqa: BLE001
         pass
 
