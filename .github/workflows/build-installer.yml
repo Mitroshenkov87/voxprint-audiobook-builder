@@ -260,12 +260,11 @@ jobs:
           VOXPRINT_HOME: C:\vxhome2
         run: |
           $ErrorActionPreference = "Stop"
-          # "another program": a venv-like folder that holds the torch wheels we downloaded in the previous step
-          New-Item -ItemType Directory -Force C:\otherapp\.venv\Lib\site-packages | Out-Null
-          Get-ChildItem C:\vxhome1\runtime -Directory | Where-Object { $_.Name -like "torch*" } | ForEach-Object { Copy-Item $_.FullName C:\otherapp\.venv\Lib\site-packages\ -Recurse }
-          Get-ChildItem C:\otherapp\.venv\Lib\site-packages | Select-Object -ExpandProperty Name
+          # "another program": a project venv in the user's profile that holds the torch wheels we downloaded in the previous step
+          New-Item -ItemType Directory -Force $env:USERPROFILE\my-ai-app\.venv\Lib\site-packages | Out-Null
+          Get-ChildItem C:\vxhome1\runtime -Directory | Where-Object { $_.Name -like "torch*" } | ForEach-Object { Copy-Item $_.FullName $env:USERPROFILE\my-ai-app\.venv\Lib\site-packages\ -Recurse }
+          Get-ChildItem $env:USERPROFILE\my-ai-app\.venv\Lib\site-packages | Select-Object -ExpandProperty Name
           $env:VOXPRINT_MODULES_CONFIG = "C:\vx-modules.json"
-          $env:VIRTUAL_ENV = "C:\otherapp\.venv"
           $exe = (Resolve-Path dist\thin\Voxprint\Voxprint.exe).Path
           $p = Start-Process $exe -ArgumentList "--install-modules" -Wait -PassThru
           Get-Content C:\vxhome2\logs\modules.txt
