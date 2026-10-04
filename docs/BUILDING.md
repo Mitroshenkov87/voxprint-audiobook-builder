@@ -68,3 +68,8 @@ The GitHub URL lives in one place: `"repo_url"` in `credits.json` (read as `core
 (rolling back if needed: `restore_verified()`) and merely logs newer PyPI releases as "not verified yet". Channel "latest": `VOXPRINT_CHANNEL=latest`
 (or `{"channel":"latest"}` in `state\updater_state.json`). `requirements-verified.txt` / `requirements-nodeps.txt` are generated from the manifest
 (`python -m infra.verified_manifest [--nodeps]`; a test keeps them in sync).
+
+### Closing the app and model downloads (runtime behaviour)
+- **X on the main window = hard exit.** `ui/studio.py` calls `infra.hard_exit.fire()` from `closeEvent`: every descendant process is killed and the process ends with `os._exit` (no waiting for threads that sit in a socket read). `main.py` arms it only for a real run; tests and `--selftest*` are unaffected. On Windows `arm()` also puts the process into a job object with KILL_ON_JOB_CLOSE. Interrupted downloads are resumable (`.partial` folders), so nothing is lost.
+- **One download per model.** `infra.model_downloader.ensure_model` takes an OS file lock `models/.<name>.lock`; a second process/thread asking for the same model waits and then returns the finished folder. The lock is released by the OS when its owner dies.
+- **Finishing a download** (`finalize_download`): `.partial` that is already complete is not downloaded again; the rename is retried (10 attempts, ~30 s), the hub's `.cache` is removed first, and a copy is the last resort. The log names the processes that hold files open.

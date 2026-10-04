@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QProgressBar, 
 from core import i18n
 from core.i18n import tr
 from core.voice_library import VoiceLibrary
+from infra import hard_exit
 from ui.main_window import APP_TITLE, MainWindow
 from ui.narrate_window import NarrateWindow
 from ui.settings_dialog import SettingsDialog
@@ -315,6 +316,7 @@ class StudioWindow(SubWindow):
 
     def _on_child_closed(self) -> None:
         """A sub-window was closed by the user: end the application."""
+        hard_exit.fire()                          # armed (real run): kill every helper process and leave at once
         if self._shutting_down:
             return
         self.shutdown()
@@ -323,6 +325,7 @@ class StudioWindow(SubWindow):
             QTimer.singleShot(0, app.quit)
 
     def closeEvent(self, e) -> None:  # noqa: N802
-        """Closing the Studio ends the application."""
+        """Closing the Studio ends the application - hard: all child processes are killed, nothing lingers."""
+        hard_exit.fire()
         self.shutdown()
         super().closeEvent(e)

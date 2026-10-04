@@ -259,6 +259,10 @@ def main(argv=None) -> int:
     want_prefetch = first_run or importing or "--prefetch" in argv
     win = StudioWindow(autocheck=not selftest and not thin_wait, prefetch=want_prefetch and not thin_wait)
     app.aboutToQuit.connect(win.shutdown)
+    if not selftest:
+        from infra import hard_exit
+
+        hard_exit.arm()          # closing the main window kills every helper process at once (docs/BUILDING.md)
     win.show_studio()
     if thin_wait:
         _offer_components(win, app, want_prefetch)
