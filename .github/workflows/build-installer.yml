@@ -211,7 +211,7 @@ jobs:
           .venv\Scripts\python.exe -m pip install --quiet -r build-req.txt pyinstaller pytest
       - name: Tests that need no PyTorch
         shell: pwsh
-        run: .venv\Scripts\python.exe -m pytest -q --deselect tests/test_ui.py::test_selftest_imports_reports_and_writes_log --deselect tests/test_frozen_install.py
+        run: .venv\Scripts\python.exe -m pytest -q --deselect tests/test_ui.py::test_selftest_imports_reports_and_writes_log --deselect tests/test_frozen_install.py --deselect tests/test_linux_package.py::test_text_selftest_passes_without_models
       - name: Thin shell (PyInstaller, heavy libraries excluded)
         shell: cmd
         run: build_thin.bat
