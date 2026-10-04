@@ -107,3 +107,27 @@ def test_the_manifest_checks_fallback_addresses_and_kind():
         of.validate_manifest({"schema": 1, "components": [dict(base, urls=["http://evil.example/a"])]})
     with pytest.raises(of.FetchError):
         of.validate_manifest({"schema": 1, "components": [dict(base, kind="exe")]})
+
+
+# ------------------------------------------------------------------------------------------------ portable setup folder (foundation)
+def test_a_portable_folder_keeps_everything_and_serves_an_offline_reinstall(tmp_path, server):
+    import json
+
+    root, base = server
+    whl = make_wheel(root / "demo-1.0-py3-none-any.whl")
+    mp = tmp_path / "m.json"
+    c = comp(whl, f"{base}/demo-1.0-py3-none-any.whl")
+    mp.write_text(json.dumps(manifest(c)))
+    port, dest = tmp_path / "Voxprint Portable", tmp_path / "rt"
+    assert of.run(str(mp), dest, tmp_path / "cache", St(), portable=port) == 1
+    kept = port / "components" / "whl-demo" / "demo-1.0-py3-none-any.whl"
+    assert kept.is_file() and (port / "manifest.json").is_file()
+    assert (port / "SHA256SUMS.txt").read_text().strip() == f"{c['sha256']} *components/whl-demo/demo-1.0-py3-none-any.whl"
+    # already installed on this PC, still kept in the folder (the folder is meant to be complete)
+    port2 = tmp_path / "Portable2"
+    assert of.run(str(mp), dest, tmp_path / "cache", St(), portable=port2) == 0 and (port2 / "components" / "whl-demo").is_dir()
+    # offline re-install into a fresh folder from the portable one: the server is not asked for the file any more
+    (root / "demo-1.0-py3-none-any.whl").unlink()
+    dest2 = tmp_path / "rt2"
+    assert of.run(str(mp), dest2, tmp_path / "cache2", St(), portable=port) == 1
+    assert (dest2 / "demo" / "__init__.py").is_file()

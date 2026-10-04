@@ -1,62 +1,98 @@
-# Thin installer: design and status
+# Online installer (thin): design and status
 
-Goal: the online installer puts only a small program shell on the disk, starts it, and the shell downloads the heavy parts as **modules**
-with progress in the UI. Status: groundwork is in the repository (opt-in, the current full and online installers are unchanged);
-what is untested is listed at the end.
+**Goal.** `Voxprint-Setup-online.exe` is a small file (a few tens of MB). It installs only our own program shell (Qt + the Voxprint code)
+and then downloads whatever is missing **from the developers' own sites** — PyTorch from `download.pytorch.org`, every other library from
+PyPI — pinned by version and SHA-256. Before downloading anything it looks at what the PC already has and reuses it. Nothing third-party
+is repacked or uploaded by us, so a CI build takes minutes instead of an hour and the release holds only the shell and a manifest.
 
-## Where the 5 GB go (release v0.1.0-beta, measured)
+## What comes from where
 
-| Part | Unpacked | Note |
-|---|---|---|
-| `_internal/torch/lib` (CUDA/cuDNN/cuBLAS DLLs) | ~4.0 GB | about 80 % of everything |
-| the rest of the PyInstaller folder | ~0.95 GB | bitsandbytes 117 MB, llvmlite 114, imageio-ffmpeg 83, `Voxprint.exe` 74, av 62, scipy 52, nagisa 46, transformers 44, onnxruntime 35, PySide6 ... |
-| total installed | ~5.0 GB | 2 payload zips, 1.9 + 1.0 GB to download |
-| models (downloaded by the app, not by the installer) | ~7 GB + 4 x ~0.3 GB translation | `infra/model_downloader.py`, mirrors, resumable |
-
-The program itself imports only numpy and soundfile at start; torch, transformers, scipy, librosa ... are imported inside functions.
-Checked: the Studio window opens with every heavy package blocked from importing (the GPU line then says "no GPU" until PyTorch is there).
-
-## Modules
-
-`tools/make_runtime_modules.py` splits the installed distributions of the build environment (files from each `RECORD`) into modules. Zips
-are < 2 GiB each (several parts if needed), listed in the same manifest (`thin: true`, `modules: [...]`, `role: runtime`).
-
-| Module | Contents | Size (zip, approx.) | Required |
+| Part | Source | Pinned by | Fallback |
 |---|---|---|---|
-| shell (`role: core`, in the installer) | Qt (PySide6), numpy, soundfile, certifi, psutil, the program, `voxprint-fetch` | 150-250 MB unpacked | yes |
-| `torch` | torch, torchaudio, nvidia-* CUDA libraries | ~2.5-3 GB (CUDA build) | yes |
-| `audio` | scipy, librosa, numba, llvmlite, sklearn, onnxruntime, av, PIL | ~0.45 GB | yes |
-| `text` | nagisa, pymorphy3, ru_normalizr, num2words, eng_to_ipa ... | ~0.1 GB | yes |
-| `ffmpeg` | imageio-ffmpeg | ~0.08 GB | yes |
-| `ml` | everything else (transformers, qwen-tts/asr, peft, bitsandbytes, accelerate, safetensors ...) | ~0.2 GB | yes |
-| models | Qwen3-TTS, ASR, aligner, translation | ~7 GB | on demand, existing downloader |
+| Voxprint shell (Qt, numpy, soundfile, our code) | our GitHub release (`Voxprint-shell-01.zip`) | SHA-256 in the manifest | — |
+| PyTorch + torchaudio (2.11.0; `cu128`, `cu126` or `cpu`) | `download.pytorch.org/whl/<flavor>/` | `infra/runtime_lock.json` | optional mirror (`urls`) |
+| ~70 other libraries (transformers, scipy, librosa, onnxruntime, peft ...) | PyPI (`files.pythonhosted.org`) | `infra/runtime_lock.json` | optional mirror |
+| 3 sdist-only pure-Python packages (`eng-to-ipa`, `sox`, `docopt`) | built from the hash-checked PyPI sdist in CI, shipped as small wheels in our release | SHA-256 in the manifest | — |
+| Visual C++ runtime | Microsoft (`aka.ms/vs/17/release/vc_redist.x64.exe`, fetched by CI and embedded in the setup) — installed only if the PC lacks 14.29 or newer | — | — |
+| ffmpeg | the PC's own, else the pinned LGPL build of BtbN/FFmpeg-Builds (`infra/assets_manifest.json`, SHA-256) — on first use, as before | SHA-256 | bundled `imageio-ffmpeg` |
+| Models (Qwen3 TTS / ASR / aligner, translation) | Hugging Face → ModelScope → our HF backup mirror (`infra/model_downloader.py`) | pinned revisions + sizes/SHA-256 | see `docs/MODELS.md` |
 
-(`python tools/make_runtime_modules.py --site <site-packages> --out x --base-url x --list` prints the real split of an environment.) Phase 2: a CPU-only
-`torch` variant (~0.2 GB) for users without an NVIDIA GPU, per-module feature gating.
+Every download: HTTP `Range` resume, retries, size + SHA-256 check, zip-slip-safe unpack, **network interface hopping** (`infra/netroute.py`,
+Settings → Network interface) and the stall watchdog; a component with several addresses (`urls`) tries the upstream one first, then the fallbacks.
+The lock is regenerated with `python tools/make_runtime_lock.py` (uses `uv pip compile`; review the diff; `tools/check_lock_urls.py` verifies that
+every file is still at its address with the pinned size). CI only reads the committed lock.
+
+## What is detected before anything is downloaded
+
+1. **Our own runtime folder** (`%LOCALAPPDATA%\Voxprint\runtime`, survives uninstall/reinstall): every component whose SHA-256 is recorded is skipped.
+2. **PyTorch of another program** (system Python, conda, a project venv, a Pinokio app, `VIRTUAL_ENV`): `infra/runtime_reuse.py` reads the
+   `torch-*.dist-info` folders it finds (nothing is executed from foreign environments), applies the rules below and then **runs a check in a child
+   process of Voxprint** (`Voxprint.exe --probe-torch`: import torch/torchaudio, a tensor computation, a NumPy round trip, and a CUDA computation if
+   the PC has an NVIDIA GPU). Only if it passes is that `site-packages` appended to the **end** of `sys.path` (our own pinned libraries always win; the
+   foreign environment only supplies `torch` and `torchaudio`) and remembered in `runtime\reuse.json`. If a remembered copy changes or disappears it is
+   forgotten and the module is downloaded. `Voxprint.exe --install-modules --own-torch` forces our own copy; `VOXPRINT_NO_REUSE=1` switches the search off.
+3. **ffmpeg** on `PATH` (smoke-tested) is used before the pinned download (`core/audio_utils.ensure_ffmpeg`, `infra/assets.py`).
+4. **Visual C++ runtime**: the setup reads `HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64` and skips the redistributable when 14.29+ is present.
+
+### Compatibility rules for a PyTorch found on the PC (all must hold; each rejection is logged with its reason)
+
+| # | Rule |
+|---|---|
+| 1 | Same CPython minor version as Voxprint (the `Tag:` of the installed wheel, now `cp311`) and `win_amd64` |
+| 2 | `torch` inside `compat.torch` of the lock (now `>=2.8,<2.13`; we tested 2.11.0) |
+| 3 | `torchaudio` in the same `site-packages`, same release number as `torch` |
+| 4 | Flavor: a CPU build only on a PC without an NVIDIA GPU; a CUDA build must not need a newer driver than installed (older CUDA builds are fine); a build without a local tag on Windows counts as CPU |
+| 5 | `torch/lib`, `torch/__init__.py`, `torchaudio/__init__.py` exist |
+| 6 | The child-process check passes (150 s limit) |
+
+The flavor we download follows the driver (`nvidia-smi`): CUDA ≥ 12.8 → `cu128`, ≥ 12.6 → `cu126`, otherwise `cpu` (`VOXPRINT_TORCH_FLAVOR` forces one).
 
 ## Start-up flow
 
-1. `Voxprint-Setup-thin.exe` (Inno, `/DONLINE /DTHIN`) runs `voxprint-fetch --role core`: downloads the shell only (admin rights as before, `Program Files`), writes `_internal\modules.json` (manifest address). vc_redist is installed silently; exit codes 0, 1638 (newer version present), 3010, 1641 are fine and never shown.
-2. The app starts, sees `modules.json` (`infra/modules.is_thin()`), activates what is already in `<app home>\runtime` (`modules.activate()` puts it first on `sys.path`; no restart is needed after a download) and opens the **Components** window (also: Settings -> Components).
-3. The window reads the manifest (last good copy cached in the state folder, so it also works offline), lists the modules and downloads the missing ones into `<app home>\runtime` (user-writable, no admin) with the same `tools/online_fetch.py` and the network interface hopper.
-4. When all required modules are present: the GPU is detected again, the model prefetch starts (as before), the features work. Until then the Studio window is usable for everything that needs no heavy library (opening the manual, settings, voice library browsing).
-5. CLI for scripts and CI: `Voxprint.exe --modules-status`, `--install-modules [ids]`. A full build prints "This is a full build".
+1. `Voxprint-Setup-online.exe` (Inno, `/DONLINE /DTHIN`) runs `voxprint-fetch --role core`: downloads the shell, writes `_internal\modules.json`
+   (manifest address `manifest-thin-<channel>.json`), installs the Visual C++ runtime if needed.
+2. The app starts, activates what is in the runtime folder (`infra/modules.activate()`), and opens the **Components** window (also Settings → Components).
+3. The window reads the manifest (last good copy cached offline), looks for a reusable PyTorch, and downloads the missing modules (`libs`, `text`,
+   `audio`, `torch`) with progress. No restart is needed afterwards; features that need a module work as soon as it is ready; the first-run model
+   download starts when all required modules are there.
+4. CLI for scripts and CI: `Voxprint.exe --modules-status`, `--install-modules [ids] [--own-torch]`, `--probe-torch` (results also in `logs\modules.txt`, `logs\probe_torch.txt`).
 
 ## Failure and resume
 
-* Every part: HTTP Range resume, up to 8 retries, size + SHA-256 check, safe unzip; finished parts are recorded in `voxprint-components.json` (in the runtime folder) and skipped next time. Closing the window or the PC going to sleep just stops; "Download" continues.
-* Network problems: short connect timeout, then the interface hopper (`infra/netroute.py`, Settings -> Network interface), remembered route.
-* Cancel is checked between blocks. A broken part is deleted and downloaded again. The runtime folder can be deleted at any time (the window offers the download again).
-* Updates: a new release has a new manifest; changed parts have a new hash and are replaced; unchanged modules stay.
+Finished components are recorded (SHA-256) and skipped next time; a broken one is deleted and fetched again; closing the window or going offline just
+stops (press Download again); the runtime folder can be deleted at any time. A new release has a new manifest — changed files get new hashes, the rest stays.
 
-## What changes
+## CI (`build-thin` job of `.github/workflows/build-installer.yml`)
 
-* Installer: `Voxprint.iss` `THIN` flavour (own output name, `--role core`, less disk space); `installer/build_online.ps1 -Thin -RuntimeSite <site-packages>`; the old `[Run]` vc_redist entry became `InstallVcRedist()` in `[Code]`.
-* Build: `build_thin.bat` (PyInstaller with the heavy libraries excluded - they must not be baked into the shell's PYZ); `tools/make_online_payload.py --runtime-site` writes roles, `modules`, `modules.json`.
-* App: `infra/modules.py`, `ui/modules_dialog.py`, `main.py` (activation, thin start flow, CLI), Settings button.
+Installs only the pinned shell packages (Qt, numpy, soundfile ...) into a venv, runs the unit tests that need no PyTorch, builds the shell with
+PyInstaller (`build_thin.bat`), writes `Voxprint-shell-01.zip` + `manifest-thin-<channel>.json` and compiles `Voxprint-Setup-online.exe`
+(`installer/build_online.ps1 -RuntimeLock infra\runtime_lock.json`). It then **really runs the product on the runner**: the frozen shell downloads the whole
+runtime from upstream (CPU PyTorch), imports it, and a second run proves that a PyTorch lying around on the PC is found, checked and reused instead of
+downloaded. Only then are the installer, its hash and the manifest attached to the release (older assets are never touched).
 
-## Tested / not tested
+## Portable setup folder (foundation; the installer checkbox comes later)
 
-Checked on the GitHub Windows runner (manual run with `smoke_only`, no release assets touched; jobs `online-smoke` and `thin-smoke`): the changed `Voxprint.iss` compiles for the online and the thin flavour; the online installer still installs, reuses, fails and uninstalls correctly; the thin installer installs only the shell (+ `modules.json`), `Voxprint --modules-status / --install-modules` downloads and unpacks the modules into the runtime folder; Windows adapter enumeration of `netroute` (ctypes) lists the real adapters. Covered on Linux by `tests/test_thin_modules.py` and `tests/test_netroute.py`.
+Planned: an optional **"Keep a portable setup folder"** checkbox. The installer then downloads **all** components — and later the models — into one user
+folder (e.g. `Voxprint Portable`) even if the PC already has some, installs from it, and the folder can be reused for an offline re-install or copied to
+another PC. On the next run the installer compares the manifest (new installer/app version) and fetches only the components whose hash changed. This replaces
+the idea of a big offline installer.
 
-Still untested: a real `build_thin.bat` run (PyInstaller with the exclusions), importing torch from the runtime folder inside a frozen exe (DLL search path of `torch/lib`, `os.add_dll_directory`), the `vc_redist` step with a real redistributable, the Components window on Windows, real VPN setups.
+Already in place: the layout and the downloader switch `voxprint-fetch --portable <folder>`:
+
+```
+Voxprint Portable/
+  manifest.json          the manifest the folder was made from
+  SHA256SUMS.txt         <sha256> *components/<id>/<file>
+  components/<id>/<file> one folder per component (shell part, wheel, later model archives)
+```
+
+With `--portable`, every selected component is kept in the folder (also those already installed); a file in the folder that passes the SHA-256 check is used
+instead of the network. Test: `tests/test_upstream_fetch.py`. Missing: the installer checkbox/page, models in the folder, "newer version available" check,
+a launcher that installs from the folder without any manifest URL.
+
+## Decisions to know about
+
+* PyTorch 2.11.0 is the version tested so far; reusing 2.8–2.12 from another program is allowed by the rules above but only the child-process check proves it works.
+* The mirror fallback (`urls`) is implemented but no mirror is populated yet: the CUDA wheel of PyTorch (2.6 GB) is above GitHub's 2 GiB asset limit, so a mirror
+  would have to live on Hugging Face (or be split). If upstream removes an old wheel, the lock must be regenerated (`tools/check_lock_urls.py` warns in CI).
+* Python 3.11 / Windows x64 only (the lock is for `cp311-win_amd64`). Linux keeps its own installer.

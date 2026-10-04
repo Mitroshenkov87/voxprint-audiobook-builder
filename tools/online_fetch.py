@@ -366,49 +366,87 @@ def extract_wheel(whl: Path, dest: Path, progress: Callable[[int, int], None]) -
 
 
 # --------------------------------------------------------------------------- the whole job
+def portable_file(root: Path, comp: dict) -> Path:
+    """Where a component lives in a portable setup folder: ``<root>/components/<id>/<file>`` (see docs/THIN-INSTALLER.md)."""
+    return root / "components" / comp["id"] / (comp.get("file") or f"{comp['sha256']}.zip")
+
+
+def _portable_valid(path: Path, comp: dict) -> bool:
+    return path.is_file() and path.stat().st_size == int(comp["size"]) and sha256_file(path) == comp["sha256"]
+
+
+def write_portable_index(root: Path, man: dict, comps: List[dict]) -> None:
+    """``manifest.json`` (the manifest the folder was made from) and ``SHA256SUMS.txt`` next to ``components/``."""
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "manifest.json").write_text(json.dumps(man, indent=1), encoding="utf-8")
+    lines = [f"{c['sha256']} *{portable_file(root, c).relative_to(root).as_posix()}" for c in comps if portable_file(root, c).is_file()]
+    (root / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="ascii")
+
+
 def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Optional[List[str]] = None,
-        sleep: Callable[[float], None] = time.sleep, roles: Optional[List[str]] = None) -> int:
-    """Install every component of the manifest into ``dest``; returns the number of components fetched."""
+        sleep: Callable[[float], None] = time.sleep, roles: Optional[List[str]] = None,
+        portable: Optional[Path] = None) -> int:
+    """Install every component of the manifest into ``dest``; returns the number of components fetched.
+
+    ``portable``: a *portable setup folder* (foundation, see docs/THIN-INSTALLER.md): EVERY selected component is also kept there
+    (``components/<id>/<file>`` + ``manifest.json`` + ``SHA256SUMS.txt``), even if it is already installed; a file that is already in
+    the folder and passes the SHA-256 check is used instead of the network, so the folder works for an offline re-install."""
     status.write("running", 0.0, "Reading the manifest", force=True)
     man = read_manifest(manifest_source)
     comps = [c for c in man["components"] if (not only or c["id"] in only) and (not roles or c.get("role", "core") in roles)]
     dest.mkdir(parents=True, exist_ok=True)
     state = load_state(dest)
     todo = [c for c in comps if not installed_ok(c, state, dest)]
+    fetch = comps if portable is not None else todo           # a portable folder wants all of them
     reused = len(comps) - len(todo)
-    need = sum(int(c.get("unpacked_bytes", c["size"] * 2)) for c in todo) + sum(int(c["size"]) for c in todo)
+    need = sum(int(c.get("unpacked_bytes", c["size"] * 2)) for c in todo) + sum(int(c["size"]) for c in fetch)
     try:
         free = shutil.disk_usage(dest).free
     except OSError:
         free = None
-    if todo and free is not None and free < need * 1.05:
+    if fetch and free is not None and free < need * 1.05:
         raise FetchError(f"Not enough free disk space: about {need >> 20} MB needed, {free >> 20} MB free.")
-    weights = [int(c["size"]) * 2 for c in todo] or [1]      # download + verify/extract
+    weights = [int(c["size"]) * 2 for c in fetch] or [1]      # download + verify/extract
     total_w, base, fetched = float(sum(weights)), 0.0, 0
     if reused:
         status.write("running", 0.0, f"{reused} component(s) already installed, skipped", force=True)
-    for c, w in zip(todo, weights):
+    for c, w in zip(fetch, weights):
         name = c.get("file") or c["id"]
         size = int(c["size"])
+        install = c in todo
 
         def dl(done: int, total: int, c=c, name=name, w=w, base=base) -> None:
             status.write("running", (base + w / 2 * done / max(1, total)) / total_w,
                          f"Downloading {name}: {done >> 20} of {total >> 20} MB")
 
-        zpath = download(c, cache, dl, sleep)
+        keep = portable_file(portable, c) if portable is not None else None
+        if keep is not None and _portable_valid(keep, c):
+            zpath = keep                                          # offline: the folder already has it
+            status.write("running", base / total_w, f"Using {name} from the setup folder")
+        else:
+            zpath = download(c, cache, dl, sleep)
+            if keep is not None:
+                keep.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(zpath, keep)
+                zpath.unlink(missing_ok=True)
+                zpath = keep
         base += w / 2
 
-        def ex(done: int, total: int, name=name, w=w, base=base) -> None:
-            status.write("running", (base + w / 2 * done / max(1, total)) / total_w, f"Unpacking {name}")
+        if install:
+            def ex(done: int, total: int, name=name, w=w, base=base) -> None:
+                status.write("running", (base + w / 2 * done / max(1, total)) / total_w, f"Unpacking {name}")
 
-        (extract_wheel if c.get("kind") == "wheel" else extract)(zpath, dest, ex)
+            (extract_wheel if c.get("kind") == "wheel" else extract)(zpath, dest, ex)
+            state[c["id"]] = c["sha256"]
+            save_state(dest, state, str(man.get("app_version", "")))
+            fetched += 1
         base += w / 2
-        state[c["id"]] = c["sha256"]
-        save_state(dest, state, str(man.get("app_version", "")))
-        zpath.unlink(missing_ok=True)
-        fetched += 1
+        if portable is None:
+            zpath.unlink(missing_ok=True)
     if not todo:
         save_state(dest, state, str(man.get("app_version", "")))
+    if portable is not None:
+        write_portable_index(portable, man, comps)
     status.write("done", 1.0, "Done", force=True)
     return fetched
 
@@ -422,6 +460,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--only", action="append", help="install only this component id (repeatable)")
     ap.add_argument("--role", action="append", help="install only components of this role (repeatable; manifest field 'role', "
                                                     "default 'core'); without --role every component is installed")
+    ap.add_argument("--portable", help="also keep every selected component in this setup folder (components/<id>/<file>, manifest.json, "
+                                       "SHA256SUMS.txt); files already there are used instead of the network (offline re-install)")
     ap.add_argument("--iface", help="network interface / local IP to use, 'auto' (default) or 'default' (never hop); "
                                     "same as the VOXPRINT_NET_IFACE variable")
     try:
@@ -435,7 +475,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     st = Status(Path(a.status) if a.status else None)
     st.start_heartbeat()
     try:
-        n = run(a.manifest, Path(a.dest), Path(a.cache), st, a.only, roles=a.role)
+        n = run(a.manifest, Path(a.dest), Path(a.cache), st, a.only, roles=a.role, portable=Path(a.portable) if a.portable else None)
     except FetchError as exc:
         st.write("error", 0.0, str(exc), force=True)
         print(f"ERROR: {exc}", file=sys.stderr)
