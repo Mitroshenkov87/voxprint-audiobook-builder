@@ -58,7 +58,7 @@ def test_bundled_manifest_is_valid_and_permissive():
         assert e.license in ("Apache-2.0", "MIT", "CC0-1.0", "CC-BY-4.0"), repo
         assert e.mirror_repo.startswith("Mitroshenkov87/voxprint-mirror-")
         assert len(e.source_revision) == 40 and len(e.mirror_revision) == 40
-        assert "model.safetensors" in e.files and "config.json" in e.files
+        assert ("model.safetensors" in e.files or "pytorch_model.bin" in e.files) and "config.json" in e.files
         assert all(len(m["sha256"]) == 64 and m["size"] > 0 for m in e.files.values())
 
 

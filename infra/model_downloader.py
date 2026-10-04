@@ -235,6 +235,7 @@ def ensure_model(
     hf_mirror_fetch: Optional[Callable[..., Any]] = None,
     mirror_manifest: Optional[Path] = None,
     allow_patterns: Optional[List[str]] = None,
+    mirror_only: bool = False,
 ) -> Path:
     """Return the path of the local model, downloading it on first use (automatically).
 
@@ -249,7 +250,9 @@ def ensure_model(
     first and is renamed only after verification.
 
     ``allow_patterns`` (glob list) restricts the Hugging Face download to some files (a repository that also holds TF / Rust /
-    Flax copies of the weights); the ModelScope and backup mirrors, which copy whole repositories, are not used then.
+    Flax copies of the weights); ModelScope, which copies whole repositories, is not used then, but the backup mirror is (it
+    fetches only the files matching the patterns, each checked by SHA-256).  ``mirror_only`` skips the original sources and
+    goes straight to the backup mirror (used when a download from the original failed the caller's hash check).
     """
     target = local_dir_for(repo_id, root)
     if verify_local_model(target):
@@ -356,7 +359,7 @@ def ensure_model(
         progress(stage, 0.0, tr("progress.mirror_hf", short=short))
         state["sha"] = model_mirrors.download(
             entry, partial, lambda f: progress(stage, f, tr("progress.downloading", short=short, pct=int(f * 100))),
-            hf_mirror_fetch)
+            hf_mirror_fetch, allow_patterns)
 
     mirror_ok = mirror_enabled() and root is None and not allow_patterns   # updates through the staging folder always go straight to Hugging Face
     if mirror_ok:
@@ -367,7 +370,9 @@ def ensure_model(
             log.warning("Hugging Face is slow or unreachable - trying ModelScope first for %s", repo_id)
     else:
         order = ["hf"]
-    if root is None and not allow_patterns and model_mirrors.entry_for(repo_id, mirror_manifest) is not None:
+    if mirror_only:
+        order = []
+    if root is None and model_mirrors.entry_for(repo_id, mirror_manifest) is not None:
         order.append("hfm")                     # the project's Hugging Face backup mirror, always last
     errors: List[str] = []
     ok_source = ""

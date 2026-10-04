@@ -417,6 +417,8 @@ On a mismatch the verified revision is downloaded. The updater never touches reu
 **ModelScope** (modelscope.cn, org `Qwen`; same repository ids, byte-identical file sizes - verified 2026-10-03) and confirms the revision by file sizes.
 Downloads resume after an interruption. `VOXPRINT_NO_MIRROR=1` disables the mirror.
 
+**Backup mirrors on Hugging Face.** As the very last source, models with permissive licences are also kept under `Mitroshenkov87/voxprint-mirror-*` (Qwen3 TTS / ASR / aligner, SAGE, and the four Opus-MT translation models `opus-mt-ru-en`, `en-ru`, `de-en`, `en-de` by Helsinki-NLP, CC-BY-4.0 / Apache-2.0). Order: models folder -> original repository -> mirror. The files are byte-identical to the pinned commit of the original, every file is checked against the SHA-256 in `infra/model_mirrors.json` (a mismatch deletes it), and each mirror's model card names the original, the licence and the commit. `VOXPRINT_NO_HF_MIRROR=1` disables it.
+
 **Components.** The same idea applies to Python packages and tools (`infra/env_probe.py`, read-only): installed and current / proven compatible -> reused;
 missing -> the newest verified version is installed into **Voxprint's own environment** (its venv / `packages/` overlay), which is auto-updated.
 An *outdated component in your own environment* (system Python, Pinokio, conda) is **never touched silently**: a one-click prompt offers to upgrade it

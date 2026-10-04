@@ -11,13 +11,14 @@ model card written for the mirror (flag ``card``), so it is not downloaded.
 """
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Iterable, Optional
 
 log = logging.getLogger("voxprint.models")
 
@@ -43,9 +44,20 @@ class MirrorEntry:
     mirror_revision: str
     files: Dict[str, Dict[str, Any]]      # relative posix path -> {"size", "sha256", ["card"]}
 
-    def downloadable(self) -> Dict[str, Dict[str, Any]]:
-        """Files that make up the model (the mirror's own model card is left out)."""
-        return {n: m for n, m in self.files.items() if not m.get("card")}
+    def downloadable(self, patterns: Optional[Iterable[str]] = None) -> Dict[str, Dict[str, Any]]:
+        """Files that make up the model (the mirror's own model card is left out).
+
+        ``patterns`` (glob list, like ``allow_patterns`` of ``snapshot_download``) selects a subset; every pattern must match
+        at least one mirrored file, otherwise ``MirrorError`` is raised (the mirror does not hold what the caller needs).
+        """
+        files = {n: m for n, m in self.files.items() if not m.get("card")}
+        pats = list(patterns or ())
+        if not pats:
+            return files
+        missing = [p for p in pats if not any(fnmatch.fnmatchcase(n, p) for n in files)]
+        if missing:
+            raise MirrorError(f"{self.mirror_repo}: no mirrored file matches {', '.join(missing)}")
+        return {n: m for n, m in files.items() if any(fnmatch.fnmatchcase(n, p) for p in pats)}
 
 
 def enabled() -> bool:
@@ -110,15 +122,15 @@ def _default_fetch(mirror_repo: str, filename: str, revision: str, local_dir: Pa
 
 
 def download(entry: MirrorEntry, dest: Path, progress: Callable[[float], None] = lambda f: None,
-             fetch: Optional[Fetch] = None) -> str:
+             fetch: Optional[Fetch] = None, patterns: Optional[Iterable[str]] = None) -> str:
     """Download the mirror copy into ``dest`` and verify every file against the manifest.
 
     Files already in ``dest`` with the right size and hash are kept (resume).  A file with a wrong hash is deleted
-    and ``MirrorError`` is raised; nothing unverified stays behind.  Returns the original commit sha the files
+    and ``MirrorError`` is raised; ``patterns`` limits the download to some files (an Opus-MT mirror holds only the files the app needs); nothing unverified stays behind.  Returns the original commit sha the files
     are identical to.
     """
     fetch = fetch or _default_fetch
-    files = entry.downloadable()
+    files = entry.downloadable(patterns)
     total = sum(int(m["size"]) for m in files.values()) or 1
     done = 0
     dest.mkdir(parents=True, exist_ok=True)

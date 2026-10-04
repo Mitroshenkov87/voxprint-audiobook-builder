@@ -335,3 +335,119 @@ def test_translate_card_is_localized_in_en_ru_de(app, lib, tmp_path):
         seen.add(tuple(names))
     assert len(seen) == 3
     i18n.set_language("en")
+
+
+# ----------------------------------------------------------------------------- Hugging Face backup mirrors of the Opus-MT models
+def test_bundled_manifest_mirrors_the_four_opus_models_with_the_registry_pins():
+    from infra import model_mirrors as mir
+    entries = mir.load()
+    for key, lic in (("opus-ru-en", "CC-BY-4.0"), ("opus-en-ru", "Apache-2.0"), ("opus-de-en", "Apache-2.0"), ("opus-en-de", "CC-BY-4.0")):
+        m = text_models.get(key)
+        e = entries[m.repo]
+        assert e.license == lic == m.license                                  # the original licence is kept
+        assert e.source_revision == m.revision                                # the mirror holds exactly the pinned commit
+        assert e.mirror_repo == "Mitroshenkov87/voxprint-mirror-" + m.repo.split("/")[1].lower()
+        assert set(e.downloadable()) == set(text_models.OPUS_FILES)
+        assert e.files["pytorch_model.bin"]["sha256"] == dict(m.sha256)["pytorch_model.bin"]   # same hash as the registry check
+        assert len(e.mirror_revision) == 40 and e.files["README.md"]["card"] and e.files[".gitattributes"]["card"]
+        assert set(e.downloadable(text_models.OPUS_FILES)) == set(text_models.OPUS_FILES)      # the patterns of the app select all of them
+
+
+def _opus_fixture(tmp_path, monkeypatch):
+    import hashlib
+    import json
+    monkeypatch.delenv("VOXPRINT_NO_MIRROR", raising=False)
+    monkeypatch.delenv("VOXPRINT_NO_HF_MIRROR", raising=False)
+    monkeypatch.setenv("VOXPRINT_NO_EXTERNAL_MODELS", "1")
+    content = {n: (b"W" * 40 if n == "pytorch_model.bin" else b"x" + n.encode()) for n in text_models.OPUS_FILES}
+    h = lambda b: hashlib.sha256(b).hexdigest()
+    files = {n: {"size": len(b), "sha256": h(b)} for n, b in content.items()}
+    files["README.md"] = {"size": 3, "sha256": h(b"hey"), "card": True}
+    rev = "c" * 40
+    man = tmp_path / "mirrors.json"
+    man.write_text(json.dumps({"schema": 1, "models": {"Org/opus-mt-xx-yy": {
+        "source_repo": "Org/opus-mt-xx-yy", "source_revision": rev, "license": "Apache-2.0",
+        "mirror_repo": "Me/voxprint-mirror-opus-mt-xx-yy", "mirror_revision": "m" * 40, "files": files}}}), encoding="utf-8")
+    model = text_models.TextModel("opus-xx-yy", text_models.KIND_TRANSLATE, text_models.STEP_TRANSLATE, "Opus-MT xx -> yy", ("xx", "yy"),
+                                  "Org/opus-mt-xx-yy", rev, 1, "Apache-2.0", True,
+                                  (("pytorch_model.bin", h(content["pytorch_model.bin"])),), text_models.OPUS_FILES, ("xx", "yy"))
+
+    def writer(local_dir, data):
+        for n, b in data.items():
+            (Path(local_dir) / n).parent.mkdir(parents=True, exist_ok=True)
+            (Path(local_dir) / n).write_bytes(b)
+
+    def fetcher(calls, data=content):
+        def fetch(repo, name, revision, local_dir):
+            calls.append((repo, name, revision))
+            writer(local_dir, {name: data[name]})
+        return fetch
+
+    def broken(**kw):
+        raise OSError("hugging face unreachable")
+    return model, man, content, writer, fetcher, broken
+
+
+def test_opus_download_order_cache_then_original_then_mirror(tmp_path, monkeypatch):
+    model, man, content, writer, fetcher, broken = _opus_fixture(tmp_path, monkeypatch)
+    # original works: the mirror is never touched
+    seen = []
+
+    def original(repo_id, local_dir, **kw):
+        seen.append(tuple(kw.get("allow_patterns") or ()))
+        writer(local_dir, content)
+    path = text_models.ensure(model, snapshot_download=original, get_remote_sha=lambda r: None, mirror_manifest=man,
+                              hf_mirror_fetch=lambda *a: (_ for _ in ()).throw(AssertionError("mirror must not be used")))
+    assert seen == [text_models.OPUS_FILES] and text_models.state(model) == text_models.STATE_READY
+    # the cache comes first: nothing is fetched at all
+    assert text_models.ensure(model, snapshot_download=broken, mirror_manifest=man) == path
+    # original down -> the mirror, only the app's files, every one hash-checked
+    import shutil
+    shutil.rmtree(path)
+    calls = []
+    path = text_models.ensure(model, snapshot_download=lambda *a, **k: broken(), get_remote_sha=lambda r: None, mirror_manifest=man,
+                              hf_mirror_fetch=fetcher(calls))
+    assert {c[1] for c in calls} == set(text_models.OPUS_FILES) and "README.md" not in {c[1] for c in calls}
+    assert {c[0] for c in calls} == {"Me/voxprint-mirror-opus-mt-xx-yy"} and (path / "pytorch_model.bin").read_bytes() == content["pytorch_model.bin"]
+    assert text_models.state(model) == text_models.STATE_READY
+
+
+def test_opus_original_with_wrong_hash_is_replaced_by_the_mirror_copy(tmp_path, monkeypatch):
+    model, man, content, writer, fetcher, broken = _opus_fixture(tmp_path, monkeypatch)
+    calls = []
+
+    def tampered(repo_id, local_dir, **kw):
+        writer(local_dir, {**content, "pytorch_model.bin": b"EVIL" * 10})
+    path = text_models.ensure(model, snapshot_download=tampered, get_remote_sha=lambda r: None, mirror_manifest=man,
+                              hf_mirror_fetch=fetcher(calls))
+    assert calls and (path / "pytorch_model.bin").read_bytes() == content["pytorch_model.bin"]
+
+
+def test_opus_tampered_mirror_is_rejected_and_nothing_is_kept(tmp_path, monkeypatch):
+    model, man, content, writer, fetcher, broken = _opus_fixture(tmp_path, monkeypatch)
+    evil = {**content, "pytorch_model.bin": b"EVIL" * 10}
+    with pytest.raises(ModelDownloadError):                                # original unreachable, mirror serves a modified weights file
+        text_models.ensure(model, snapshot_download=lambda *a, **k: broken(), get_remote_sha=lambda r: None, mirror_manifest=man,
+                           hf_mirror_fetch=fetcher([], evil))
+    assert not model.local_dir.exists() and text_models.state(model) == text_models.STATE_NEEDS_DOWNLOAD
+    # both the original (wrong hash) and the mirror (wrong hash) fail -> an error, no model
+    tamper = lambda repo_id, local_dir, **kw: writer(local_dir, evil)
+    with pytest.raises(ModelDownloadError):
+        text_models.ensure(model, snapshot_download=tamper, get_remote_sha=lambda r: None, mirror_manifest=man, hf_mirror_fetch=fetcher([], evil))
+    assert not model.local_dir.exists()
+
+
+def test_opus_mirror_can_be_switched_off_and_needs_every_pattern(tmp_path, monkeypatch):
+    from infra import model_mirrors as mir
+    model, man, content, writer, fetcher, broken = _opus_fixture(tmp_path, monkeypatch)
+    monkeypatch.setenv("VOXPRINT_NO_HF_MIRROR", "1")
+    calls = []
+    with pytest.raises(ModelDownloadError):
+        text_models.ensure(model, snapshot_download=lambda *a, **k: broken(), get_remote_sha=lambda r: None, mirror_manifest=man,
+                           hf_mirror_fetch=fetcher(calls))
+    assert calls == []
+    monkeypatch.delenv("VOXPRINT_NO_HF_MIRROR")
+    entry = mir.load(man)[model.repo]
+    with pytest.raises(mir.MirrorError):
+        entry.downloadable(["config.json", "nonexistent.bin"])
+    assert set(entry.downloadable(["*.spm"])) == {"source.spm", "target.spm"}

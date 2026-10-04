@@ -21,6 +21,7 @@ from core.errors import ModelDownloadError
 from core.events import ProgressCallback, noop_progress
 from core.i18n import tr
 from infra import model_downloader as md
+from infra import model_mirrors
 
 KIND_CLEANUP, KIND_PUNCT, KIND_STRESS, KIND_TRANSLATE, KIND_ROLES = "cleanup", "punct", "stress", "translate", "roles"
 STATE_READY, STATE_NEEDS_DOWNLOAD, STATE_PLANNED = "ready", "needs_download", "planned"
@@ -107,16 +108,36 @@ def state(model: TextModel) -> str:
     return STATE_READY if md.verify_local_model(model.local_dir) else STATE_NEEDS_DOWNLOAD
 
 
+def _hash_ok(model: TextModel, path: Path) -> bool:
+    return all(sha256_of(path / name) == digest for name, digest in model.sha256)
+
+
 def ensure(model: TextModel, progress: ProgressCallback = noop_progress, **kw) -> Path:
-    """Download the model if needed (pinned revision) and return its folder."""
+    """Download the model if needed (pinned revision) and return its folder.
+
+    Order: the models folder (already downloaded) -> the original repository (Hugging Face) -> the project's Hugging Face backup mirror
+    (:mod:`infra.model_mirrors`, if the model is mirrored).  The SHA-256 of the key files is checked on every path; a folder that fails
+    the check (corrupt, tampered, or another revision) is deleted and replaced once by the hash-verified mirror copy, otherwise the
+    download fails.
+    """
     if not model.integrated or not model.repo:
         raise ValueError(f"{model.key} is a placeholder")
-    path = md.ensure_model(model.repo, progress, revision=model.revision or None, reuse_external=False,
-                           allow_patterns=list(model.files) or None, **kw)
-    for name, digest in model.sha256:
-        if sha256_of(path / name) != digest:
-            shutil.rmtree(path, ignore_errors=True)               # a corrupt or tampered download is never kept
-            raise ModelDownloadError(tr("err.model_hash", short=model.repo.split("/")[-1]), url=md.hf_url(model.repo))
+    kw.setdefault("reuse_external", False)
+    patterns = list(model.files) or None
+    path = md.ensure_model(model.repo, progress, revision=model.revision or None, allow_patterns=patterns, **kw)
+    if _hash_ok(model, path):
+        return path
+    shutil.rmtree(path, ignore_errors=True)                       # a corrupt or tampered download is never kept
+    err = ModelDownloadError(tr("err.model_hash", short=model.repo.split("/")[-1]), url=md.hf_url(model.repo))
+    if kw.get("root") is not None or not model_mirrors.enabled() or model_mirrors.entry_for(model.repo, kw.get("mirror_manifest")) is None:
+        raise err
+    try:
+        path = md.ensure_model(model.repo, progress, revision=model.revision or None, allow_patterns=patterns, mirror_only=True, **kw)
+    except ModelDownloadError:
+        raise err from None
+    if not _hash_ok(model, path):
+        shutil.rmtree(path, ignore_errors=True)
+        raise err
     return path
 
 
