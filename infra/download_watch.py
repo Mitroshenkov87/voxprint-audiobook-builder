@@ -19,6 +19,8 @@ log = logging.getLogger("voxprint.models")
 STALL_SECONDS = float(os.environ.get("VOXPRINT_STALL_SECONDS", "45") or 45)
 #: Seconds the helper thread gets to finish after an abort before the next source starts.
 ABORT_GRACE = 10.0
+#: Sampling interval of the watchdog / progress line (seconds).
+POLL = 1.0
 
 
 class Stalled(OSError):
@@ -101,12 +103,13 @@ class Meter:
 
 
 def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threading.Event,
-                on_tick: Optional[Callable[[Meter], None]] = None, stall: Optional[float] = None, poll: float = 1.0,
+                on_tick: Optional[Callable[[Meter], None]] = None, stall: Optional[float] = None, poll: Optional[float] = None,
                 clock: Callable[[], float] = time.monotonic, grace: Optional[float] = None, log_every: float = 15.0) -> Any:
     """Run ``fn`` in a helper thread and watch ``folder``.  Returns its result, re-raises its exception, or raises
     :class:`Stalled` (after setting ``cancel`` so that the helper stops at its next progress call)."""
     stall = STALL_SECONDS if stall is None else stall
     grace = ABORT_GRACE if grace is None else grace
+    poll = POLL if poll is None else poll
     box: dict = {}
 
     def target() -> None:
