@@ -17,9 +17,10 @@ from typing import Any, Callable, Dict, List, Optional
 
 from core.errors import ModelDownloadError
 from core.events import ProgressCallback, Stage, noop_progress
-from infra import model_mirrors, modelscope_mirror, paths
+from infra import download_watch, model_mirrors, modelscope_mirror, netroute, paths
 
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+netroute.disable_xet()      # plain HTTP: the xet/CAS transfer path stalls on networks that block its host (VOXPRINT_ALLOW_XET=1 keeps it)
 log = logging.getLogger("voxprint.models")
 
 ALIGNER_REPO = "Qwen/Qwen3-ForcedAligner-0.6B"
@@ -190,6 +191,7 @@ class _ByteProgress:
         self.lock = threading.Lock()
         self.total = 0
         self.done = 0
+        self.cancel: Optional[threading.Event] = None      # set by the stall watchdog: the next update aborts the download
 
     def make_tqdm_class(self):
         """Build a tqdm subclass that reports byte progress to this tracker (non-byte bars are disabled)."""
@@ -211,6 +213,8 @@ class _ByteProgress:
             def update(self, n: float = 1) -> Optional[bool]:
                 """Count the transferred bytes and report the overall fraction."""
                 r = super().update(n)
+                if tracker.cancel is not None and tracker.cancel.is_set():
+                    raise download_watch.Stalled("download abandoned (no data)")
                 if getattr(self, "_is_bytes", False):
                     with tracker.lock:
                         tracker.done += int(n)
@@ -229,6 +233,40 @@ def _prepare_network() -> None:
         netroute.prepare_hf()
     except Exception as exc:  # noqa: BLE001
         log.debug("network route preparation skipped: %s", exc)
+
+
+#: Longest pre-download check of "is Hugging Face usable" (seconds); a slower answer counts as "slow".
+PROBE_CAP = 5.0
+_SOURCE_NAMES = {"hf": "Hugging Face", "ms": "ModelScope", "hfm": "Hugging Face mirror"}
+
+
+def _hf_fast(repo_id: str, hf_probe: Optional[Callable[[str], bool]]) -> bool:
+    """Is Hugging Face usable?  The verdict is remembered for the session (later models do not probe again) and the
+    probe itself is capped at ``PROBE_CAP`` seconds."""
+    if os.environ.get("HF_ENDPOINT"):
+        return True
+    if hf_probe is None:
+        known = modelscope_mirror.hf_verdict()
+        if known is not None:
+            return known
+    fn = hf_probe or modelscope_mirror.hf_is_fast
+    box: Dict[str, bool] = {}
+
+    def run() -> None:
+        try:
+            box["fast"] = bool(fn(repo_id))
+        except Exception:  # noqa: BLE001
+            box["fast"] = False
+
+    th = threading.Thread(target=run, daemon=True, name="vx-hf-probe")
+    th.start()
+    th.join(PROBE_CAP)
+    fast = box.get("fast", False)
+    if th.is_alive():
+        log.info("huggingface.co did not answer within %.0f s", PROBE_CAP)
+    if hf_probe is None:
+        modelscope_mirror.remember_hf(fast)
+    return fast
 
 
 def ensure_model(
@@ -292,7 +330,7 @@ def ensure_model(
             tr("err.disk_model", short=short, need=f"{need_gb:.0f}", free=f"{free_gb:.1f}"),
             url=hf_url(repo_id))
 
-    if snapshot_download is None:
+    if snapshot_download is None and modelscope_mirror.hf_verdict() is not False:   # "slow" is remembered: no more route searching
         _prepare_network()
     if revision is None:
         revision = pinned_revision(repo_id)
@@ -309,7 +347,18 @@ def ensure_model(
             log.warning("remote sha unavailable: %s", exc)
 
     partial = target.with_name(target.name + ".partial")   # survives between runs: the download resumes where it stopped
-    tracker = _ByteProgress(lambda f: progress(stage, f, tr("progress.downloading", short=short, pct=int(f * 100))))
+    cur: Dict[str, Any] = {"f": 0.0, "meter": None, "cancel": threading.Event()}
+
+    def report(f: float) -> None:
+        """One progress report of the running source: records it, aborts an abandoned download, shows the detail line."""
+        if cur["cancel"].is_set():
+            raise download_watch.Stalled("download abandoned (no data)")
+        cur["f"] = f
+        meter = cur["meter"]
+        text = meter.text(tr, short, int(f * 100)) if meter is not None else tr("progress.downloading", short=short, pct=int(f * 100))
+        progress(stage, f, text)
+
+    tracker = _ByteProgress(report)
     state = {"sha": sha}
 
     def _download(rev: Optional[str]) -> None:
@@ -334,6 +383,8 @@ def ensure_model(
         """Download from Hugging Face; fall back once to the latest revision if the pinned one is unavailable."""
         try:
             _download(revision)
+        except download_watch.Stalled:
+            raise                       # the watchdog gave up on this source: the caller switches to the next one
         except Exception as exc:  # noqa: BLE001
             if not revision:
                 raise
@@ -354,9 +405,7 @@ def ensure_model(
         known = model_locator.KNOWN_SIZES.get(repo_id)
         expected = known[1] if known and revision and known[0] == revision else None
         progress(stage, 0.0, tr("progress.mirror_modelscope", short=short))
-        mirror_download(repo_id, partial,
-                        lambda f: progress(stage, f, tr("progress.downloading", short=short, pct=int(f * 100))),
-                        expected)
+        mirror_download(repo_id, partial, report, expected)
         # ModelScope has no commit sha: the revision is confirmed only when the sizes matched the pinned commit
         state["sha"] = revision if expected else None
 
@@ -370,13 +419,12 @@ def ensure_model(
                                      url=hf_url(repo_id))
         progress(stage, 0.0, tr("progress.mirror_hf", short=short))
         state["sha"] = model_mirrors.download(
-            entry, partial, lambda f: progress(stage, f, tr("progress.downloading", short=short, pct=int(f * 100))),
-            hf_mirror_fetch, allow_patterns)
+            entry, partial, report, hf_mirror_fetch, allow_patterns)
 
     mirror_ok = mirror_enabled() and root is None and not allow_patterns   # updates through the staging folder always go straight to Hugging Face
     if mirror_ok:
         mirror_download = mirror_download or _default_mirror_download
-        fast = (hf_probe or modelscope_mirror.hf_is_fast)(repo_id)
+        fast = _hf_fast(repo_id, hf_probe)
         order = ["hf", "ms"] if fast else ["ms", "hf"]
         if not fast:
             log.warning("Hugging Face is slow or unreachable - trying ModelScope first for %s", repo_id)
@@ -388,22 +436,34 @@ def ensure_model(
         order.append("hfm")                     # the project's Hugging Face backup mirror, always last
     errors: List[str] = []
     ok_source = ""
+    funcs = {"hf": _from_hf, "hfm": _from_hf_mirror, "ms": _from_modelscope}
+
+    def tick(meter: "download_watch.Meter") -> None:
+        progress(stage, cur["f"], meter.text(tr, short, int(cur["f"] * 100)))
+
     for src in order:
+        label = _SOURCE_NAMES[src]
+        meter = download_watch.Meter(label, lambda: tracker.total or (
+            int(cur["meter"].done / cur["f"]) if cur["meter"] is not None and cur["f"] > 0.01 else 0))
+        cur["meter"], cur["f"], cur["cancel"] = meter, 0.0, threading.Event()
+        tracker.cancel = cur["cancel"]
+        tracker.total = tracker.done = 0
         try:
-            if src == "hf":
-                _from_hf()
-            elif src == "hfm":
+            if src == "hfm":
                 log.warning("download of %s from the original sources failed - trying the Hugging Face backup mirror", repo_id)
-                _from_hf_mirror()
-            else:
-                if errors:
-                    log.warning("download of %s from Hugging Face failed - trying ModelScope", repo_id)
-                _from_modelscope()
+            elif src == "ms" and errors:
+                log.warning("download of %s from Hugging Face failed - trying ModelScope", repo_id)
+            log.info("downloading %s from %s", repo_id, label)
+            download_watch.run_watched(funcs[src], partial, meter, cur["cancel"], on_tick=tick)
             ok_source = src
+            if src == "hf" and mirror_ok:
+                modelscope_mirror.remember_hf(True)
             break
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{src}: {type(exc).__name__}: {exc}")
             log.warning("download of %s from %s failed: %s", repo_id, src, exc)
+            if src == "hf" and mirror_ok:
+                modelscope_mirror.remember_hf(False)      # later models go to ModelScope first
     if not ok_source:
         # the .partial folder stays on disk: the next attempt continues where this one stopped
         raise ModelDownloadError(

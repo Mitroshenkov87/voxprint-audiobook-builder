@@ -31,6 +31,7 @@ import socket
 import ssl
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -459,6 +460,62 @@ def urlopen(req, timeout: float = 30.0, context: Optional[ssl.SSLContext] = None
 
 
 # ----------------------------------------------------------------------------------------------- huggingface_hub (requests)
+#: The whole route search before a model download may take this long (seconds); the routes are probed in parallel.
+PROBE_CAP = 5.0
+
+
+def disable_xet() -> None:
+    """Plain HTTP downloads for huggingface_hub: its Rust "xet" transfer path (hf_xet) talks to a separate CAS host that some
+    networks block or throttle (downloads then sit at 0 bytes).  ``VOXPRINT_ALLOW_XET=1`` keeps it."""
+    if os.environ.get("VOXPRINT_ALLOW_XET"):
+        return
+    os.environ["HF_HUB_DISABLE_XET"] = "1"
+    consts = sys.modules.get("huggingface_hub.constants")
+    if consts is not None:
+        try:
+            consts.HF_HUB_DISABLE_XET = True
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _first_reachable(host: str, routes: List[Route], cap: float = PROBE_CAP) -> Optional[Route]:
+    """Probe the routes in parallel and return the best one that connects within ``cap`` seconds: the first route (the
+    remembered / default one) if it works, otherwise the earliest alternative that does; ``None`` if none connects."""
+    routes = routes[:MAX_HOPS]
+    if not routes:
+        return None
+    cond = threading.Condition()
+    results: dict = {}
+
+    def work(i: int, r: Route) -> None:
+        try:
+            ok = bool(_probe(host, 443, r, cap))
+        except Exception:  # noqa: BLE001
+            ok = False
+        with cond:
+            results[i] = ok
+            cond.notify_all()
+
+    for i, r in enumerate(routes):
+        threading.Thread(target=work, args=(i, r), daemon=True, name="vx-route-probe").start()
+    deadline = time.monotonic() + cap
+    with cond:
+        while True:
+            for i in range(len(routes)):          # the earliest route that works, once every earlier one has failed
+                if i not in results:
+                    break
+                if results[i]:
+                    return routes[i]
+            else:
+                return None                       # all failed
+            left = deadline - time.monotonic()
+            if left <= 0:
+                break
+            cond.wait(left)
+        ok = [i for i in sorted(results) if results[i]]
+        return routes[ok[0]] if ok else None
+
+
 _hf_state: Tuple[float, str] = (float("-inf"), "")
 
 
@@ -505,6 +562,7 @@ def prepare_hf(host: str = "huggingface.co", force: bool = False) -> str:
     """Before a huggingface_hub download: pick a route that reaches ``host`` and install it for the hub.  Returns its label
     (``""`` when nothing had to change).  Cheap when repeated (the answer is kept for 5 minutes)."""
     global _hf_state
+    disable_xet()
     now = time.monotonic()
     if not force and now - _hf_state[0] < HF_PROBE_TTL:
         return _hf_state[1]
@@ -515,7 +573,7 @@ def prepare_hf(host: str = "huggingface.co", force: bool = False) -> str:
             _install_hf_adapter("")
         else:
             routes = candidates(host)
-            chosen = next((r for r in routes if _probe(host, 443, r, CONNECT_TIMEOUT if r is routes[0] else HOP_TIMEOUT)), None)
+            chosen = _first_reachable(host, routes)
             if chosen is None or not chosen.ip:
                 _install_hf_adapter("")
                 if chosen is None and len(routes) > 1:

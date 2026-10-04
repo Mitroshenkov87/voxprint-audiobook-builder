@@ -338,6 +338,8 @@
  "progress.consent_reading": "Reading the spoken consent statement…",
  "progress.dataset_saved": "Dataset saved",
  "progress.downloading": "Downloading the model {short}: {pct}%",
+ "progress.detail": "{short}: {pct}% - {done} of {total} - {speed} - from {source}",
+ "progress.detail_unknown": "{short}: {done} downloaded - {speed} - from {source}",
  "progress.export_done": "Universal model ready",
  "progress.export_writing": "Writing the model to disk (about 4 GB)…",
  "progress.ffmpeg_downloading": "Downloading the ffmpeg audio tool (once, checked by checksum)…",

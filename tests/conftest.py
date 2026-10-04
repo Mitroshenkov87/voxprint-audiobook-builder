@@ -33,6 +33,9 @@ def _isolated_home(tmp_path, monkeypatch):
     from infra import netroute
 
     netroute.reset_memory()
+    from infra import modelscope_mirror
+
+    modelscope_mirror.reset_verdict()
     from core import i18n
 
     i18n.reset()

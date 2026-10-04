@@ -33,7 +33,29 @@ BASE_URL = os.environ.get("VOXPRINT_MODELSCOPE_URL", "https://modelscope.cn").rs
 REVISION = "master"   # ModelScope has no commit sha for these files; sizes are verified instead (see module docstring)
 CHUNK = 1024 * 1024
 #: Hugging Face counts as "slow/unreachable" if a tiny API request takes longer than this (seconds).
-HF_PROBE_TIMEOUT = 6.0
+HF_PROBE_TIMEOUT = 5.0
+#: How long the "Hugging Face is slow / unreachable" verdict of this session is trusted (seconds).
+VERDICT_TTL = 1800.0
+_verdict: tuple = (None, 0.0)      # (fast: Optional[bool], time.monotonic() when it was learned)
+
+
+def remember_hf(fast: bool) -> None:
+    """Keep the verdict "Hugging Face is fast / slow" for the rest of the session, so that later models do not probe again."""
+    global _verdict
+    _verdict = (bool(fast), time.monotonic())
+
+
+def hf_verdict() -> Optional[bool]:
+    """The remembered verdict, or ``None`` if there is none (or it is older than ``VERDICT_TTL``)."""
+    fast, at = _verdict
+    if fast is None or time.monotonic() - at > VERDICT_TTL:
+        return None
+    return fast
+
+
+def reset_verdict() -> None:
+    global _verdict
+    _verdict = (None, 0.0)
 
 Opener = Callable[[urllib.request.Request, float], "object"]
 
