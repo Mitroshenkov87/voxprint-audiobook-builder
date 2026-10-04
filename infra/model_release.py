@@ -129,7 +129,7 @@ def _open(req: urllib.request.Request, timeout: float):
     return net.urlopen(req, timeout)  # noqa: S310 - https to github.com only (the manifest base URL)
 
 
-def _fetch_file(url: str, target: Path, meta: Dict[str, Any], on_bytes: Callable[[int], None], opener: Opener,
+def fetch_file(url: str, target: Path, meta: Dict[str, Any], on_bytes: Callable[[int], None], opener: Opener,
                 timeout: float) -> None:
     """Download one asset into ``target`` (resuming ``target.incomplete``) and verify it; raises ReleaseError."""
     size = int(meta["size"])
@@ -190,7 +190,7 @@ def download(entry: ReleaseEntry, dest: Path, progress: Callable[[float], None] 
             _b[0] += n
             progress(min(1.0, (base + _b[0]) / total))
 
-        _fetch_file(entry.url(name), target, meta, on_bytes, opener, timeout)
+        fetch_file(entry.url(name), target, meta, on_bytes, opener, timeout)
         done += int(meta["size"])
         progress(min(1.0, done / total))
     return entry.source_revision
