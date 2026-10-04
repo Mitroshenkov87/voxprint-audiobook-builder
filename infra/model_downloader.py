@@ -8,10 +8,14 @@ Pinokio/Alexandria, ModelScope ...) are reused in place, read-only - see :mod:`c
 from __future__ import annotations
 
 from core.i18n import tr
+import fnmatch
+import gc
 import logging
 import os
 import shutil
+import stat
 import threading
+import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -235,6 +239,140 @@ def _prepare_network() -> None:
         log.debug("network route preparation skipped: %s", exc)
 
 
+# ------------------------------------------------------------------------------------------------ finished downloads
+#: Renaming ``<name>.partial`` -> ``<name>`` can fail on Windows while an antivirus scanner or a stale process still holds a
+#: handle inside the folder: try again for about half a minute, then copy instead.
+FINALIZE_ATTEMPTS = 10
+_sleep = time.sleep
+
+
+def _expected_sizes(repo_id: str, revision: Optional[str], mirror_manifest: Optional[Path],
+                    patterns: Optional[List[str]]) -> Optional[Dict[str, int]]:
+    """``{file: size}`` of the pinned revision (core.model_locator.KNOWN_SIZES or the backup-mirror manifest), if known."""
+    from core import model_locator
+
+    sizes: Optional[Dict[str, int]] = None
+    known = model_locator.KNOWN_SIZES.get(repo_id)
+    if known and (revision is None or known[0] == revision):
+        sizes = dict(known[1])
+    else:
+        entry = model_mirrors.entry_for(repo_id, mirror_manifest)
+        if entry is not None and revision and entry.source_revision == revision:
+            try:
+                sizes = {n: int(m["size"]) for n, m in entry.downloadable(patterns).items()}
+            except Exception:  # noqa: BLE001
+                sizes = None
+    if sizes and patterns:
+        sizes = {n: v for n, v in sizes.items() if any(fnmatch.fnmatchcase(n, p) for p in patterns)}
+    return sizes or None
+
+
+def partial_is_complete(partial: Path, repo_id: str, revision: Optional[str], mirror_manifest: Optional[Path] = None,
+                        patterns: Optional[List[str]] = None) -> bool:
+    """True if ``partial`` already holds every file of the pinned revision with the right size and no unfinished leftovers
+    (nothing is left to download).  Unknown sizes = cannot be proven = False."""
+    from core import model_locator
+
+    if not verify_local_model(partial):
+        return False
+    expected = _expected_sizes(repo_id, revision, mirror_manifest, patterns)
+    if not expected:
+        return False
+    for rel, size in expected.items():
+        if rel in model_locator._OPTIONAL_FILES:
+            continue
+        try:
+            if (partial / Path(*rel.split("/"))).stat().st_size != size:
+                return False
+        except OSError:
+            return False
+    for root, _dirs, files in os.walk(partial):
+        if any(f.endswith(".incomplete") for f in files):
+            return False
+    return True
+
+
+def _rmtree(folder: Path) -> None:
+    """Remove a folder tree, clearing read-only attributes (Windows) on the way; never raises."""
+    if not folder.exists():
+        return
+    shutil.rmtree(folder, ignore_errors=True)
+    if folder.exists():
+        _make_writable(folder)
+        shutil.rmtree(folder, ignore_errors=True)
+
+
+def _make_writable(folder: Path) -> None:
+    for root, dirs, files in os.walk(folder):
+        for n in dirs + files:
+            try:
+                full = os.path.join(root, n)
+                os.chmod(full, os.stat(full).st_mode | stat.S_IWRITE | stat.S_IREAD)
+            except OSError:
+                pass
+
+
+def _holders(folder: Path) -> str:
+    """Names/PIDs of processes that have a file open inside ``folder`` (needs psutil; best effort, for the log)."""
+    try:
+        import psutil
+
+        out = []
+        prefix = str(folder).lower()
+        for p in psutil.process_iter(["pid", "name"]):
+            try:
+                if any(str(f.path).lower().startswith(prefix) for f in p.open_files()):
+                    out.append(f"{p.info['name']}({p.info['pid']})")
+            except Exception:  # noqa: BLE001 - access denied, process gone
+                continue
+        return ", ".join(out) or "none found"
+    except Exception:  # noqa: BLE001
+        return "unknown"
+
+
+def finalize_download(partial: Path, target: Path) -> None:
+    """Make the finished ``.partial`` folder the model folder.  Closes our own handles first, drops the hub's ``.cache``
+    (lock files), then renames with retries and backoff; if Windows keeps refusing, copies the tree instead.  Raises
+    ``OSError`` (with the reason of the last failure) only if everything failed."""
+    gc.collect()                                              # closes file objects of finished downloads (sessions, locks)
+    _rmtree(partial / ".cache")
+    _rmtree(target)
+    last: Optional[BaseException] = None
+    for attempt in range(1, FINALIZE_ATTEMPTS + 1):
+        try:
+            partial.rename(target)
+            if attempt > 1:
+                log.info("model folder renamed on attempt %d", attempt)
+            return
+        except OSError as exc:
+            last = exc
+            log.warning("renaming %s -> %s failed (attempt %d of %d): %s", partial.name, target.name, attempt,
+                        FINALIZE_ATTEMPTS, exc)
+            if attempt == 3:
+                log.warning("files in %s are open in: %s", partial.name, _holders(partial))
+                _make_writable(partial)
+            if target.exists() and not partial.exists():
+                return                                         # another process finished it
+            gc.collect()
+            _sleep(min(5.0, 0.5 * 1.6 ** (attempt - 1)))
+    log.warning("rename kept failing (%s) - copying the model folder instead", last)
+    try:
+        _rmtree(target)
+        shutil.copytree(partial, target)
+    except OSError as exc:
+        shutil.rmtree(target, ignore_errors=True)
+        raise OSError(f"{last}; copy failed too: {exc}") from exc
+    _rmtree(partial)
+
+
+_NETWORK_WORDS = ("Timeout", "Connection", "SSL", "Proxy", "HTTPError", "URLError", "Stalled", "Offline", "gaierror")
+
+
+def _is_network_failure(exc: BaseException) -> bool:
+    """A network problem (timeout, reset, DNS, proxy, stall) - as opposed to a disk / permission / logic error."""
+    return any(any(w in c.__name__ for w in _NETWORK_WORDS) for c in type(exc).__mro__)
+
+
 #: Longest pre-download check of "is Hugging Face usable" (seconds); a slower answer counts as "slow".
 PROBE_CAP = 5.0
 _SOURCE_NAMES = {"hf": "Hugging Face", "ms": "ModelScope", "hfm": "Hugging Face mirror"}
@@ -421,7 +559,16 @@ def ensure_model(
         state["sha"] = model_mirrors.download(
             entry, partial, report, hf_mirror_fetch, allow_patterns)
 
-    mirror_ok = mirror_enabled() and root is None and not allow_patterns   # updates through the staging folder always go straight to Hugging Face
+    def complete() -> bool:
+        return partial_is_complete(partial, repo_id, revision, mirror_manifest, allow_patterns)
+
+    finished = False
+    if partial.is_dir() and complete():
+        # an earlier run downloaded everything but could not rename the folder: nothing to download, only finish
+        log.info("%s: the .partial folder is already complete - finishing without a download", repo_id)
+        finished = True
+        state["sha"] = revision
+    mirror_ok = mirror_enabled() and root is None and not allow_patterns and not finished   # updates through the staging folder always go straight to Hugging Face
     if mirror_ok:
         mirror_download = mirror_download or _default_mirror_download
         fast = _hf_fast(repo_id, hf_probe)
@@ -430,12 +577,12 @@ def ensure_model(
             log.warning("Hugging Face is slow or unreachable - trying ModelScope first for %s", repo_id)
     else:
         order = ["hf"]
-    if mirror_only:
+    if mirror_only or finished:
         order = []
-    if root is None and model_mirrors.entry_for(repo_id, mirror_manifest) is not None:
+    if root is None and not finished and model_mirrors.entry_for(repo_id, mirror_manifest) is not None:
         order.append("hfm")                     # the project's Hugging Face backup mirror, always last
     errors: List[str] = []
-    ok_source = ""
+    ok_source = "partial" if finished else ""
     funcs = {"hf": _from_hf, "hfm": _from_hf_mirror, "ms": _from_modelscope}
 
     def tick(meter: "download_watch.Meter") -> None:
@@ -454,7 +601,7 @@ def ensure_model(
             elif src == "ms" and errors:
                 log.warning("download of %s from Hugging Face failed - trying ModelScope", repo_id)
             log.info("downloading %s from %s", repo_id, label)
-            download_watch.run_watched(funcs[src], partial, meter, cur["cancel"], on_tick=tick)
+            download_watch.run_watched(funcs[src], partial, meter, cur["cancel"], on_tick=tick, idle_ok=complete)
             ok_source = src
             if src == "hf" and mirror_ok:
                 modelscope_mirror.remember_hf(True)
@@ -462,8 +609,8 @@ def ensure_model(
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{src}: {type(exc).__name__}: {exc}")
             log.warning("download of %s from %s failed: %s", repo_id, src, exc)
-            if src == "hf" and mirror_ok:
-                modelscope_mirror.remember_hf(False)      # later models go to ModelScope first
+            if src == "hf" and mirror_ok and _is_network_failure(exc) and not complete():
+                modelscope_mirror.remember_hf(False)      # measured: no data / network error; later models go to ModelScope first
     if not ok_source:
         # the .partial folder stays on disk: the next attempt continues where this one stopped
         raise ModelDownloadError(
@@ -476,9 +623,11 @@ def ensure_model(
                                  url=hf_url(repo_id))
     if sha:
         (partial / ".revision").write_text(sha, encoding="utf-8")
-    if target.exists():
-        shutil.rmtree(target, ignore_errors=True)
-    partial.rename(target)
+    try:
+        finalize_download(partial, target)
+    except OSError as exc:
+        log.error("could not finish %s: %s", repo_id, exc)
+        raise ModelDownloadError(tr("err.model_finalize", short=short), url=hf_url(repo_id), details=str(exc)) from exc
     progress(stage, 1.0, tr("progress.model_done", short=short))
     return target
 

@@ -103,7 +103,7 @@ class Meter:
 
 
 def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threading.Event,
-                on_tick: Optional[Callable[[Meter], None]] = None, stall: Optional[float] = None, poll: Optional[float] = None,
+                on_tick: Optional[Callable[[Meter], None]] = None, idle_ok: Optional[Callable[[], bool]] = None, stall: Optional[float] = None, poll: Optional[float] = None,
                 clock: Callable[[], float] = time.monotonic, grace: Optional[float] = None, log_every: float = 15.0) -> Any:
     """Run ``fn`` in a helper thread and watch ``folder``.  Returns its result, re-raises its exception, or raises
     :class:`Stalled` (after setting ``cancel`` so that the helper stops at its next progress call)."""
@@ -142,6 +142,12 @@ def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threa
             log.info("download via %s: %s%s, %s/s", meter.source, fmt_bytes(meter.done),
                      f" of {fmt_bytes(meter.total)}" if meter.total else "", fmt_bytes(meter.speed))
         if now - last_move >= stall:
+            if idle_ok is not None and idle_ok():
+                # nothing is left to download (everything is on disk): that is not a stall - finish with what we have
+                log.info("download via %s: all files are present, finishing", meter.source)
+                cancel.set()
+                th.join(grace)
+                return box.get("result")
             cancel.set()
             th.join(grace)
             raise Stalled(f"no data from {meter.source} for {int(stall)} s")

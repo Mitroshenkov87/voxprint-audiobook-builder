@@ -168,3 +168,107 @@ def test_xet_is_switched_off_unless_allowed(monkeypatch):
     monkeypatch.setenv("VOXPRINT_ALLOW_XET", "1")
     nr.disable_xet()
     assert os.environ["HF_HUB_DISABLE_XET"] == "0"
+
+
+# ------------------------------------------------------------------------------------------------ finishing a download
+def _write_partial(repo, files=FILES):
+    part = md.local_dir_for(repo).with_name(md.local_dir_for(repo).name + ".partial")
+    for n, b in files.items():
+        t = part.joinpath(*n.split("/"))
+        t.parent.mkdir(parents=True, exist_ok=True)
+        t.write_bytes(b)
+    return part
+
+
+def _no_network(*a, **k):
+    raise AssertionError("nothing may be downloaded: the .partial folder is complete")
+
+
+def test_a_complete_partial_folder_is_finished_without_any_download(manifest, fast_watch):
+    part = _write_partial(REPO)
+    (part / ".cache" / "huggingface" / "download").mkdir(parents=True)
+    (part / ".cache" / "huggingface" / "download" / "x.lock").write_bytes(b"")
+    got = md.ensure_model(REPO, snapshot_download=_no_network, revision=SHA_A, hf_probe=_no_network,
+                          mirror_download=_no_network, hf_mirror_fetch=_no_network, mirror_manifest=manifest)
+    assert md.verify_local_model(got) and not part.exists() and not (got / ".cache").exists()
+    assert (got / ".revision").read_text() == SHA_A
+
+
+def test_an_incomplete_partial_folder_is_not_taken_for_complete(manifest, fast_watch):
+    part = _write_partial(REPO, {"config.json": FILES["config.json"], "model.safetensors": b"short"})
+    assert not md.partial_is_complete(part, REPO, SHA_A, manifest)
+    part = _write_partial(REPO)
+    assert md.partial_is_complete(part, REPO, SHA_A, manifest)
+    (part / "model.safetensors.x.incomplete").write_bytes(b"1")
+    assert not md.partial_is_complete(part, REPO, SHA_A, manifest)
+
+
+def _flaky_rename(monkeypatch, failures):
+    real = Path.rename
+    calls = []
+
+    def rename(self, target):
+        if self.name.endswith(".partial") and (failures is None or len(calls) < failures):
+            calls.append(1)
+            raise PermissionError(5, "Access is denied (WinError 5)")
+        return real(self, target)
+
+    monkeypatch.setattr(Path, "rename", rename)
+    return calls
+
+
+def test_rename_is_retried_when_windows_denies_access(manifest, fast_watch, monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(md, "_sleep", sleeps.append)
+    calls = _flaky_rename(monkeypatch, 3)
+    _write_partial(REPO)
+    got = md.ensure_model(REPO, snapshot_download=_no_network, revision=SHA_A, hf_probe=_no_network,
+                          mirror_download=_no_network, mirror_manifest=manifest)
+    assert md.verify_local_model(got) and len(calls) == 3 and len(sleeps) == 3 and sleeps == sorted(sleeps)
+
+
+def test_when_rename_never_works_the_folder_is_copied(manifest, fast_watch, monkeypatch):
+    monkeypatch.setattr(md, "_sleep", lambda s: None)
+    calls = _flaky_rename(monkeypatch, None)
+    part = _write_partial(REPO)
+    got = md.ensure_model(REPO, snapshot_download=_no_network, revision=SHA_A, hf_probe=_no_network,
+                          mirror_download=_no_network, mirror_manifest=manifest)
+    assert len(calls) == md.FINALIZE_ATTEMPTS and md.verify_local_model(got) and not part.exists()
+    assert (got / "model.safetensors").read_bytes() == FILES["model.safetensors"]
+
+
+def test_when_everything_fails_the_error_says_nothing_must_be_downloaded_again(manifest, fast_watch, monkeypatch):
+    from core.errors import ModelDownloadError
+
+    monkeypatch.setattr(md, "_sleep", lambda s: None)
+    _flaky_rename(monkeypatch, None)
+    monkeypatch.setattr(md.shutil, "copytree", lambda *a, **k: (_ for _ in ()).throw(PermissionError("copy denied")))
+    part = _write_partial(REPO)
+    with pytest.raises(ModelDownloadError) as ei:
+        md.ensure_model(REPO, snapshot_download=_no_network, revision=SHA_A, hf_probe=_no_network,
+                        mirror_download=_no_network, mirror_manifest=manifest)
+    assert "WinError 5" in (ei.value.details or "") and "copy denied" in (ei.value.details or "")
+    assert part.is_dir() and not md.local_dir_for(REPO).exists()       # the complete .partial stays: the next try only renames
+
+
+def test_all_files_present_is_not_a_stall(tmp_path):
+    cancel = threading.Event()
+
+    def hangs_on_verification():                  # everything is on disk, the hub still talks to the server
+        while not cancel.is_set():
+            time.sleep(0.02)
+
+    t0 = time.monotonic()
+    dw.run_watched(hangs_on_verification, tmp_path, meter(), cancel, stall=0.3, poll=0.05, grace=1.0, idle_ok=lambda: True)
+    assert time.monotonic() - t0 < 3 and cancel.is_set()
+
+
+def test_a_disk_error_does_not_make_hugging_face_look_slow(manifest, fast_watch):
+    def hf(**kw):
+        raise PermissionError("disk")
+
+    with pytest.raises(Exception):
+        md.ensure_model(REPO, snapshot_download=hf, revision=SHA_A, hf_probe=lambda r: True, mirror_download=_fail_ms,
+                        hf_mirror_fetch=_fetcher({}), mirror_manifest=manifest)
+    assert ms.hf_verdict() is not False
+    assert md._is_network_failure(dw.Stalled("x")) and md._is_network_failure(TimeoutError()) and not md._is_network_failure(PermissionError())

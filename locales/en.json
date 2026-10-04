@@ -121,6 +121,7 @@
  "err.mismatch_extra": "The recording has long stretches of speech that are not in the text (at the beginning or the end). Trim the extra part or choose another text.",
  "err.mismatch_length": "The recording and the text do not seem to match: the text is much longer or shorter than the recording. Check that you chose the right files and read the whole text.",
  "err.model_partial": "The model {short} was not downloaded completely. Please try again.",
+ "err.model_finalize": "The model {short} was downloaded, but Windows would not let Voxprint finish it (an antivirus scan or another running Voxprint window may be using the folder). Close other Voxprint windows, wait a minute and press Try again - nothing has to be downloaded again.",
  "err.narration_aac_disabled": "The M4B (AAC) option is disabled in this installation.",
  "err.narration_chunk": "The voice engine failed on fragment {n}. Finished fragments are saved - start again to continue.",
  "err.narration_encoder": "This ffmpeg build cannot encode the chosen format (missing: {encoder}). Choose another format.",
