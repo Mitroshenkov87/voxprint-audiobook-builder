@@ -169,6 +169,10 @@ def validate_manifest(data: dict) -> dict:
         if size <= 0 or not SHA_RE.match(sha):
             raise FetchError(f"Bad size or SHA-256 for {cid}.")
         check_url(url)
+        for u in c.get("urls", []):                 # fallback sources (our mirror), tried after ``url`` (the upstream site)
+            check_url(str(u))
+        if c.get("kind", "zip") not in ("zip", "wheel"):
+            raise FetchError(f"Unknown kind for {cid}.")
         c["sha256"] = sha
     return data
 
@@ -211,8 +215,36 @@ def sha256_file(path: Path, progress: Optional[Callable[[int], None]] = None) ->
     return h.hexdigest()
 
 
+def sources(comp: dict) -> List[str]:
+    """Addresses of a component, best first: the upstream site (``url``), then the fallbacks (``urls``, e.g. our mirror)."""
+    out: List[str] = []
+    for u in [comp["url"], *comp.get("urls", [])]:
+        if u not in out:
+            out.append(str(u))
+    return out
+
+
 def download(comp: dict, cache: Path, progress: Callable[[int, int], None], sleep: Callable[[float], None] = time.sleep) -> Path:
-    """Download one component into ``cache`` (resumable) and return the verified zip path."""
+    """Download one component into ``cache`` (resumable) and return the verified file path.  Every source is tried in turn (the
+    partial file is kept: all sources serve the same bytes, the SHA-256 decides)."""
+    srcs = sources(comp)
+    last: Optional[FetchError] = None
+    for i, url in enumerate(srcs):
+        try:
+            return _download_from(comp, url, cache, progress, sleep, RETRIES if i == len(srcs) - 1 else 3)
+        except FetchError as exc:
+            if str(exc) == "cancelled":
+                raise
+            last = exc
+            if i + 1 < len(srcs):
+                print(f"{exc} - trying {srcs[i + 1].split('/')[2]}", file=sys.stderr, flush=True)
+    assert last is not None
+    raise last
+
+
+def _download_from(comp: dict, url: str, cache: Path, progress: Callable[[int, int], None], sleep: Callable[[float], None],
+                   retries: int) -> Path:
+    """Download one component from one address into ``cache`` (resumable) and return the verified file path."""
     size, sha = int(comp["size"]), comp["sha256"]
     cache.mkdir(parents=True, exist_ok=True)
     final, part = cache / f"{sha}.zip", cache / f"{sha}.part"
@@ -221,7 +253,7 @@ def download(comp: dict, cache: Path, progress: Callable[[int, int], None], slee
         return final
     final.unlink(missing_ok=True)
     last_err = ""
-    for attempt in range(RETRIES):
+    for attempt in range(retries):
         have = part.stat().st_size if part.is_file() else 0
         if have > size:
             part.unlink()
@@ -229,7 +261,7 @@ def download(comp: dict, cache: Path, progress: Callable[[int, int], None], slee
         try:
             if have < size:
                 headers = {"Range": f"bytes={have}-"} if have else {}
-                with _open(comp["url"], headers) as r:
+                with _open(url, headers) as r:
                     code = getattr(r, "status", 200)
                     if have and code != 206:          # the server ignored Range: start over
                         have = 0
@@ -302,6 +334,37 @@ def extract(zip_path: Path, dest: Path, progress: Callable[[int, int], None]) ->
     return n
 
 
+def extract_wheel(whl: Path, dest: Path, progress: Callable[[int, int], None]) -> int:
+    """Install a wheel into ``dest`` (a site-packages-like folder): files as they are, ``*.data/purelib|platlib`` merged into the root,
+    scripts / headers / data skipped.  Zip-slip protected.  The ``.dist-info`` stays, so ``importlib.metadata`` sees the package."""
+    n = 0
+    with zipfile.ZipFile(whl) as z:
+        infos = z.infolist()
+        total = sum(i.file_size for i in infos) or 1
+        done = 0
+        for info in infos:
+            name = info.filename
+            m = re.match(r"^[^/]+\.data/([^/]+)/(.*)$", name)
+            if m:
+                if m.group(1) not in ("purelib", "platlib"):
+                    continue
+                name = m.group(2)
+            if not name or info.is_dir():
+                continue
+            target = _safe_target(dest, name)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with z.open(info) as src, open(target, "wb") as out:
+                while True:
+                    b = src.read(CHUNK)
+                    if not b:
+                        break
+                    out.write(b)
+                    done += len(b)
+                    progress(done, total)
+            n += 1
+    return n
+
+
 # --------------------------------------------------------------------------- the whole job
 def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Optional[List[str]] = None,
         sleep: Callable[[float], None] = time.sleep, roles: Optional[List[str]] = None) -> int:
@@ -338,7 +401,7 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
         def ex(done: int, total: int, name=name, w=w, base=base) -> None:
             status.write("running", (base + w / 2 * done / max(1, total)) / total_w, f"Unpacking {name}")
 
-        extract(zpath, dest, ex)
+        (extract_wheel if c.get("kind") == "wheel" else extract)(zpath, dest, ex)
         base += w / 2
         state[c["id"]] = c["sha256"]
         save_state(dest, state, str(man.get("app_version", "")))
