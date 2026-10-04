@@ -41,8 +41,8 @@ def test_every_custom_message_exists_in_all_languages_and_every_use_is_defined()
             assert m.group(3).strip(), line
             defined[m.group(1)].add(m.group(2))
     assert defined["english"] == defined["russian"] == defined["german"] and len(defined["english"]) >= 9
-    # {cm:Name} in script sections, CustomMessage('Name') in [Code]; CreateDesktopIcon / AdditionalIcons ship with Inno
-    builtin = {"CreateDesktopIcon", "AdditionalIcons"}
+    # {cm:Name} in script sections, CustomMessage('Name') in [Code]
+    builtin = set()
     used = set(re.findall(r"\{cm:(\w+)", text())) | set(re.findall(r"CustomMessage\('(\w+)'\)", text()))
     assert used - builtin <= defined["english"], used - builtin - defined["english"]
     assert {"ModelsPageCaption", "ModelsPageDescription", "ModelsPageSubCaption", "ModelsPagePrompt", "ModelsPageBadFolder"} <= used
@@ -90,3 +90,13 @@ def test_what_the_page_writes_is_what_the_app_reads(tmp_path):
     # the installer writes a UTF-8 file (SaveStringsToUTF8File: BOM, CRLF) with one line
     existing_models.config_file().write_bytes(b"\xef\xbb\xbf" + str(folder).encode("utf-8") + b"\r\n")
     assert existing_models.configured() == folder
+
+
+def test_no_desktop_shortcut_only_start_menu_and_upgrades_remove_the_old_one():
+    t = text()
+    assert "desktopicon" not in t and "{autodesktop}" not in t and "CreateDesktopIcon" not in t
+    assert not re.search(r"^\[Tasks\]", t, re.M)
+    icons = section("Icons")
+    assert "{group}\\{#AppDisplayName}" in icons and "desktop" not in icons.lower()
+    deletes = section("InstallDelete")
+    assert "{commondesktop}\\{#AppDisplayName}.lnk" in deletes and "{userdesktop}\\{#AppDisplayName}.lnk" in deletes

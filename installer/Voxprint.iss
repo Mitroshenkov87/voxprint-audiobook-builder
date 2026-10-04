@@ -93,8 +93,13 @@ english.OnlineStalled=The downloader stopped responding.
 russian.OnlineStalled=Загрузчик перестал отвечать.
 german.OnlineStalled=Der Downloader antwortet nicht mehr.
 
-[Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
+; No desktop shortcut on purpose (no [Tasks] section at all, so no task can be selected, silent or not): only the Start menu entry below + the Apps list entry.
+[InstallDelete]
+; an upgrade removes a desktop shortcut that an earlier version of this installer may have created (all users / current user)
+Type: files; Name: "{commondesktop}\{#AppDisplayName}.lnk"
+Type: files; Name: "{userdesktop}\{#AppDisplayName}.lnk"
+Type: files; Name: "{commondesktop}\{#AppName}.lnk"
+Type: files; Name: "{userdesktop}\{#AppName}.lnk"
 
 [Files]
 #ifdef ONLINE
@@ -126,7 +131,6 @@ Type: filesandordirs; Name: "{app}"
 
 [Icons]
 Name: "{group}\{#AppDisplayName}"; Filename: "{app}\{#AppExe}"
-Name: "{autodesktop}\{#AppDisplayName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
 #ifexist "redist\vc_redist.x64.exe"
