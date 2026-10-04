@@ -118,7 +118,7 @@ jobs:
       - name: Windows network adapters (infra/netroute.py)
         shell: pwsh
         run: |
-          python -c "from infra import netroute as n; a = n.local_addresses(); print([(x.name, x.ip) for x in a]); import sys; sys.exit(0 if a else 1)"
+          python -c "from infra import netroute as n; w = n._from_windows(); print('ctypes:', w); a = n.local_addresses(); print('all:', a); import sys; sys.exit(0 if w and a else 1)"
       - name: A fake thin shell and a fake site-packages
         shell: pwsh
         run: |
