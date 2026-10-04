@@ -18,10 +18,13 @@ set HEAVY=torch torchaudio transformers tokenizers safetensors huggingface_hub h
 set EXCL=
 for %%m in (%HEAVY%) do call set EXCL=%%EXCL%% --exclude-module %%m
 
+rem  The runtime (PyTorch & co.) is downloaded later and imports the WHOLE standard library (timeit, unittest ...): bundle all of it.
+python tools\gen_stdlib_bundle.py build\stdlib_bundle || (echo [ERROR] stdlib list. & exit /b 1)
+
 echo === Build thin shell ===
 pyinstaller --onedir --windowed --noconfirm --clean --name Voxprint --distpath dist\thin --workpath build\thin-work --specpath build\thin-work ^
   --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" ^
-  --paths "%CD%" --paths "%CD%\infra" ^
+  --paths "%CD%" --paths "%CD%\infra" --paths "%CD%\build\stdlib_bundle" --hidden-import _vx_stdlib ^
   --add-data "%CD%\infra\verified_manifest.json;infra" --add-data "%CD%\infra\assets_manifest.json;infra" --add-data "%CD%\infra\model_mirrors.json;infra" ^
   --add-data "%CD%\locales;locales" --add-data "%CD%\credits.json;." --add-data "%CD%\licenses;licenses" ^
   --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^

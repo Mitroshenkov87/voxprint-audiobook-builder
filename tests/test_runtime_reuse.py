@@ -315,3 +315,17 @@ def test_a_non_pure_sdist_is_refused(tmp_path):
 
     with pytest.raises(SystemExit, match="not pure"):
         rm.build_sdist_wheel(w, tmp_path / "w", tmp_path / "o", fetch=lambda u, d: None, run=run)
+
+
+def test_the_thin_shell_bundles_the_whole_standard_library(tmp_path):
+    """The downloaded libraries import the whole stdlib; the CI end-to-end check once failed with ``No module named 'timeit'``."""
+    from tools import gen_stdlib_bundle as gen
+
+    gen.main([str(tmp_path)])
+    src = (tmp_path / "_vx_stdlib.py").read_text(encoding="utf-8")
+    compile(src, "_vx_stdlib.py", "exec")
+    for need in ("timeit", "unittest", "doctest", "sched", "pdb", "zipfile", "sqlite3", "ctypes", "multiprocessing"):
+        assert f"import {need}\n" in src, need
+    assert "import tkinter\n" not in src and "import this\n" not in src
+    bat = (ROOT / "build_thin.bat").read_text(encoding="utf-8")
+    assert "gen_stdlib_bundle.py" in bat and "--hidden-import _vx_stdlib" in bat
