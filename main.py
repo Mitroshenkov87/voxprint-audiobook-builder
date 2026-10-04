@@ -87,6 +87,61 @@ def _selftest_imports() -> int:
     return 1 if bad else 0
 
 
+def _modules_cli(argv) -> int:
+    """``--modules-status`` prints the modules; ``--install-modules [id ...]`` downloads the missing required ones (or those named)."""
+    from infra import modules
+
+    out = _cli_printer("modules")
+    if not modules.is_thin():
+        out("This is a full build: all components are included (no modules.json).")
+        return 0
+    try:
+        if "--install-modules" in argv:
+            i = argv.index("--install-modules")
+            ids = [a for a in argv[i + 1:] if not a.startswith("--")] or None
+            last = [-1]
+
+            def prog(f: float, m: str = "") -> None:
+                pct = int(f * 100)
+                if pct != last[0]:
+                    last[0] = pct
+                    out(f"{pct:3d} %  {m}")
+
+            n = modules.install(ids, prog)
+            out(f"OK: {n} component(s) installed")
+        for m in modules.modules(modules.load_manifest()):
+            out(f"{m.id:8} {'installed' if m.installed else 'missing  '} {m.size / 2**20:9.0f} MB  {m.title}")
+        return 0
+    except modules.ModulesError as exc:
+        out(f"ERROR: {exc}")
+        return 1
+
+
+def _offer_components(win, app, then_prefetch: bool) -> None:
+    """Thin build, first start: show the Components window (download the runtime modules) and, when they are ready,
+    start the first-run model download that was waiting for them."""
+    from PySide6.QtCore import QTimer
+
+    from ui.modules_dialog import ModulesDialog
+
+    dlg = ModulesDialog(win.styleSheet(), win)
+    win._components = dlg                    # keep a reference
+
+    def ready() -> None:
+        try:   # PyTorch is there now: detect the GPU again (the first detection ran without it)
+            win.trainer._gpu = None
+            win.trainer.refresh_estimate()
+        except Exception:  # noqa: BLE001
+            pass
+        if then_prefetch:
+            QTimer.singleShot(300, win.start_prefetch)
+
+    dlg.ready.connect(ready)
+    app.aboutToQuit.connect(dlg.shutdown)
+    dlg.show()
+    QTimer.singleShot(0, dlg.refresh)
+
+
 def _cli_printer(name: str):
     """print() that also appends to ``<logs>/<name>.txt``: a windowed (PyInstaller) build has no console, so the result of
     ``--verify-install`` / ``--repair`` would otherwise be invisible.  The file is rewritten on the first line of each run."""
@@ -119,6 +174,12 @@ def main(argv=None) -> int:
     from infra.updater import activate_overlay
 
     activate_overlay()
+    try:   # thin build: the downloaded runtime modules (PyTorch ...) join sys.path before any heavy import (no-op otherwise)
+        from infra import modules as _modules
+
+        _modules.activate()
+    except Exception:  # noqa: BLE001
+        pass
     _setup_logging()
     try:   # settings of an earlier Voxprint install (copied if not present yet; the old folder is left untouched)
         from infra import paths
@@ -138,6 +199,8 @@ def main(argv=None) -> int:
         return install_state.cli_verify(print_fn=_cli_printer("verify_install"))
     if "--selftest-imports" in argv:
         return _selftest_imports()
+    if "--modules-status" in argv or "--install-modules" in argv:   # thin build: list / download the runtime modules (no GUI)
+        return _modules_cli(argv)
     if "--selftest-text" in argv:   # headless, no GPU/models: text prep, chunking, stub translation, ffmpeg encode
         from workers import selftest_text
 
@@ -171,6 +234,13 @@ def main(argv=None) -> int:
         pass
     from workers.pipeline_runner import models_missing
 
+    from infra import modules as _mods
+
+    thin_wait = False        # thin build, runtime modules missing: the model download waits until they are installed
+    try:
+        thin_wait = (not selftest) and _mods.is_thin() and not _mods.installed_without_network()
+    except Exception:  # noqa: BLE001
+        thin_wait = False
     first_run = False
     if not selftest:
         try:
@@ -186,9 +256,12 @@ def main(argv=None) -> int:
             importing = existing_models.pending(required_model_repos())
         except Exception:  # noqa: BLE001 - never get in the way of starting up
             importing = False
-    win = StudioWindow(autocheck=not selftest, prefetch=first_run or importing or "--prefetch" in argv)
+    want_prefetch = first_run or importing or "--prefetch" in argv
+    win = StudioWindow(autocheck=not selftest and not thin_wait, prefetch=want_prefetch and not thin_wait)
     app.aboutToQuit.connect(win.shutdown)
     win.show_studio()
+    if thin_wait:
+        _offer_components(win, app, want_prefetch)
     if selftest:
         QTimer.singleShot(300, app.quit)
     return app.exec()

@@ -12,6 +12,9 @@
 ; payload parts listed in the manifest (release assets, each < 2 GiB, verified by SHA-256, resumable, parts that are already
 ; installed are skipped) and unpacks them into {app}.  One UAC prompt (PrivilegesRequired=admin) covers everything; the
 ; user data stays in %LOCALAPPDATA%\Voxprint.  /Manifest=<url or file> overrides the baked-in manifest (tests, mirrors).
+; THIN variant (add /DTHIN to the ONLINE command; see docs/THIN-INSTALLER.md): only the components with role "core" (the small
+; UI shell built by build_thin.bat) are installed -> Output\Voxprint-Setup-thin.exe; the app downloads the heavy runtime modules
+; (PyTorch ...) itself on its first start (infra/modules.py, window "Components").
 
 #define AppName "Voxprint"
 ; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
@@ -34,8 +37,13 @@ UninstallDisplayIcon={app}\{#AppExe}
 SetupIconFile=..\assets\voxprint-setup.ico
 OutputDir=Output
 #ifdef ONLINE
+#ifdef THIN
+OutputBaseFilename=Voxprint-Setup-thin
+ExtraDiskSpaceRequired=800000000
+#else
 OutputBaseFilename=Voxprint-Setup-online
 ExtraDiskSpaceRequired=4500000000
+#endif
 #else
 OutputBaseFilename=Voxprint-Setup
 #endif
@@ -135,9 +143,7 @@ Type: filesandordirs; Name: "{app}"
 Name: "{group}\{#AppDisplayName}"; Filename: "{app}\{#AppExe}"
 
 [Run]
-#ifexist "redist\vc_redist.x64.exe"
-Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "{cm:VcRedistStatus}"; Flags: waituntilterminated
-#endif
+; (the Visual C++ runtime is installed from [Code]: InstallVcRedist)
 Filename: "{app}\{#AppExe}"; Parameters: "--prefetch"; Description: "{cm:RunPrefetch,{#AppDisplayName}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
@@ -262,6 +268,10 @@ begin
   Exe := ExpandConstant('{tmp}\voxprint-fetch.exe');
   Params := '--manifest ' + AddQuotes(Manifest) + ' --dest ' + AddQuotes(ExpandConstant('{app}')) +
             ' --cache ' + AddQuotes(Cache) + ' --status ' + AddQuotes(StatusFile);
+#ifdef THIN
+  { THIN installer: only the shell (role "core") is installed here; the app downloads the runtime modules itself }
+  Params := Params + ' --role core';
+#endif
   Page := CreateOutputProgressPage(CustomMessage('OnlineStatus'), '');
   Page.Show;
   Err := '';
@@ -318,12 +328,33 @@ begin
 end;
 #endif
 
+{ The Visual C++ runtime (PyTorch needs it): installed quietly.  Exit codes that are NOT errors: 0 installed, 1638 a newer
+  version is already present, 3010 / 1641 installed (a restart is pending).  Nothing is shown to the user either way; an
+  unexpected code only goes to the setup log. }
+procedure InstallVcRedist();
+var
+  Exe: String;
+  Rc: Integer;
+begin
+  Exe := ExpandConstant('{tmp}\vc_redist.x64.exe');
+  if not FileExists(Exe) then Exit;
+  WizardForm.StatusLabel.Caption := CustomMessage('VcRedistStatus');
+  if Exec(Exe, '/install /quiet /norestart', '', SW_HIDE, ewWaitUntilTerminated, Rc) then
+  begin
+    if (Rc <> 0) and (Rc <> 1638) and (Rc <> 3010) and (Rc <> 1641) then
+      Log('vc_redist.x64.exe finished with exit code ' + IntToStr(Rc) + ' (ignored)');
+  end
+  else
+    Log('vc_redist.x64.exe could not be started: ' + SysErrorMessage(Rc) + ' (ignored)');
+end;
+
 { Only the path is remembered (UTF-8 file); the app imports the models on its first start. }
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Dir, StateDir: String;
   Lines: TArrayOfString;
 begin
+  if CurStep = ssPostInstall then InstallVcRedist();
   if CurStep = ssPostInstall then
   begin
     Dir := Trim(ModelsEdit.Text);

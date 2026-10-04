@@ -47,8 +47,13 @@ def list_files(dist: Path) -> List[Path]:
 
 
 def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = None, base_url: str = "",
-          limit_mib: int = DEFAULT_LIMIT_MIB, app_version: str = "") -> Path:
-    """Write the zips and the manifest into ``out``; returns the manifest path."""
+          limit_mib: int = DEFAULT_LIMIT_MIB, app_version: str = "", runtime_site: Optional[Path] = None) -> Path:
+    """Write the zips and the manifest into ``out``; returns the manifest path.
+
+    ``runtime_site`` (THIN installer): the site-packages of the build environment.  ``dist`` is then the thin shell; its parts
+    get ``role: core``, the heavy libraries become the runtime modules (``tools/make_runtime_modules.py``, ``role: runtime``)
+    and a ``modules.json`` (where the app finds the manifest) is added to the shell.  Without it every part is ``core`` and the
+    manifest is exactly as before."""
     dist, out = Path(dist), Path(out)
     if not dist.is_dir():
         raise SystemExit(f"{dist} is not a folder")
@@ -56,6 +61,10 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
     channel = channel or channel_for(tag)
     base = (base_url or f"https://github.com/{repo}/releases/download/{tag}").rstrip("/")
     limit = limit_mib * 1024 * 1024
+    if runtime_site is not None:        # tell the shell where the manifest is (the app's module manager reads it)
+        mj = (dist / "_internal" if (dist / "_internal").is_dir() else dist) / "modules.json"
+        mj.write_text(json.dumps({"schema": 1, "manifest_url": f"{base}/manifest-{channel}.json", "tag": tag}, indent=1),
+                      encoding="utf-8")
     parts: List[dict] = []
     cur: Optional[zipfile.ZipFile] = None
     cur_path: Optional[Path] = None
@@ -89,8 +98,22 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
             raise SystemExit(f"{path.name} is {path.stat().st_size} bytes: over the 2 GiB asset limit, lower --limit-mib")
         comps.append({"id": f"payload-{i:02d}", "file": path.name, "url": f"{base}/{path.name}", "size": path.stat().st_size,
                       "sha256": sha256_of(path), "unpacked_bytes": p["raw"], "markers": p["markers"]})
+    modules: List[dict] = []
+    if runtime_site is not None:
+        for c in comps:
+            c["role"] = "core"
+        try:                                              # only the thin build needs it
+            from tools import make_runtime_modules as rt
+        except ImportError:                               # run as a script: tools/ is sys.path[0]
+            import make_runtime_modules as rt             # type: ignore[no-redef]
+
+        rt_comps, modules = rt.build_modules(Path(runtime_site), out, base, limit_mib)
+        comps += rt_comps
     manifest = {"schema": SCHEMA, "channel": channel, "app_version": app_version or tag.lstrip("vV"), "tag": tag, "repo": repo,
                 "created": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "components": comps}
+    if runtime_site is not None:
+        manifest["thin"] = True
+        manifest["modules"] = modules
     mp = out / f"manifest-{channel}.json"
     mp.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     return mp
@@ -105,8 +128,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--channel", choices=("beta", "stable"))
     ap.add_argument("--base-url", default="")
     ap.add_argument("--limit-mib", type=int, default=DEFAULT_LIMIT_MIB)
+    ap.add_argument("--runtime-site", help="THIN installer: site-packages of the build environment (heavy libraries become runtime modules)")
     a = ap.parse_args(argv)
-    mp = build(Path(a.dist), Path(a.out), a.tag, a.repo, a.channel, a.base_url, a.limit_mib)
+    mp = build(Path(a.dist), Path(a.out), a.tag, a.repo, a.channel, a.base_url, a.limit_mib,
+               runtime_site=Path(a.runtime_site) if a.runtime_site else None)
     m = json.loads(mp.read_text(encoding="utf-8"))
     for c in m["components"]:
         print(f"{c['file']}  {c['size']:>12}  {c['sha256']}")

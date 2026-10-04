@@ -10,7 +10,9 @@ param(
     [string]$BaseUrl = "",          # where the payload zips will be served (default: the release assets of $Tag)
     [string]$ManifestUrl = "",      # baked into the installer (default: the manifest asset of the release $Tag)
     [int]$LimitMib = 1800,          # part size limit: a release asset must be below 2 GiB
-    [string]$Python = ".venv\Scripts\python.exe"
+    [string]$Python = ".venv\Scripts\python.exe",
+    [switch]$Thin,                  # THIN installer: $Dist is the thin shell (build_thin.bat); the heavy libraries become runtime modules
+    [string]$RuntimeSite = ""       # site-packages with those libraries (default: that of $Python's environment)
 )
 $ErrorActionPreference = "Stop"
 function Check([string]$what) { if ($LASTEXITCODE -ne 0) { throw "$what failed (exit code $LASTEXITCODE)" } }
@@ -25,6 +27,10 @@ Check "PyInstaller (voxprint-fetch)"
 $pargs = @("tools\make_online_payload.py", "--dist", $Dist, "--out", "build\online-release", "--tag", $Tag, "--repo", $Repo,
            "--limit-mib", "$LimitMib")
 if ($BaseUrl) { $pargs += @("--base-url", $BaseUrl) }
+if ($Thin) {
+    if (-not $RuntimeSite) { $RuntimeSite = (& $Python -c "import sysconfig; print(sysconfig.get_paths()['purelib'])").Trim() }
+    $pargs += @("--runtime-site", $RuntimeSite)
+}
 & $Python @pargs
 Check "make_online_payload"
 
@@ -35,11 +41,14 @@ if (-not $ManifestUrl) { $ManifestUrl = "https://github.com/$Repo/releases/downl
 
 $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $iscc)) { $iscc = "$env:ProgramFiles\Inno Setup 6\ISCC.exe" }
-& $iscc /DONLINE /DONEDIR "/DManifestUrl=$ManifestUrl" installer\Voxprint.iss
+$setupName = if ($Thin) { "Voxprint-Setup-thin.exe" } else { "Voxprint-Setup-online.exe" }
+$isArgs = @("/DONLINE", "/DONEDIR", "/DManifestUrl=$ManifestUrl")
+if ($Thin) { $isArgs += "/DTHIN" }
+& $iscc @isArgs installer\Voxprint.iss
 Check "Inno Setup (online)"
 
-Move-Item installer\Output\Voxprint-Setup-online.exe build\online-release\Voxprint-Setup-online.exe -Force
-$h = (Get-FileHash build\online-release\Voxprint-Setup-online.exe -Algorithm SHA256).Hash.ToLower()
-"$h  Voxprint-Setup-online.exe" | Out-File -Encoding ascii build\online-release\Voxprint-Setup-online.exe.sha256
+Move-Item "installer\Output\$setupName" "build\online-release\$setupName" -Force
+$h = (Get-FileHash "build\online-release\$setupName" -Algorithm SHA256).Hash.ToLower()
+"$h  $setupName" | Out-File -Encoding ascii "build\online-release\$setupName.sha256"
 Get-ChildItem build\online-release | Format-Table Name, Length
 "manifest: $manifest   installer manifest url: $ManifestUrl"

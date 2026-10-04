@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QHBox
 from core import i18n
 from core.errors import BackupError
 from core.i18n import tr
-from infra import auto_steps, backup, existing_models, netroute
+from infra import auto_steps, backup, existing_models, modules as runtime_modules, netroute
 from workers import backup_runner
 from workers.auto_quality_worker import AutoQualityWorker
 from workers.backup_worker import BackupWorker
@@ -87,8 +87,11 @@ class SettingsDialog(QDialog):
         self.btn_data = QPushButton()
         self.btn_repair = QPushButton()
         self.btn_about = QPushButton()
-        for b in (self.btn_update, self.btn_models, self.btn_data):
+        self.btn_components = QPushButton()          # thin build only: the runtime modules (infra/modules.py)
+        for b in (self.btn_update, self.btn_models, self.btn_data, self.btn_components):
             lay.addWidget(b)
+        self.btn_components.setVisible(runtime_modules.is_thin())
+        self.btn_components.clicked.connect(self.open_components)
 
         # --- Maximum quality (auto) ---
         self.needed_models: Callable[[], list] = auto_steps.needed_models          # injectable (tests)
@@ -191,6 +194,7 @@ class SettingsDialog(QDialog):
         self.lbl_net.setToolTip(tr("ui.net_iface_tip"))
         self._fill_net()
         self.btn_update.setText(tr("ui.btn_update"))
+        self.btn_components.setText(tr("modules.title"))
         self.btn_models.setText(tr("ui.settings_models_folder"))
         self.btn_data.setText(tr("ui.settings_data_folder"))
         self.btn_repair.setText(tr("ui.settings_repair"))
@@ -211,6 +215,16 @@ class SettingsDialog(QDialog):
         self.btn_existing.setText(tr("existing.choose"))
         self.btn_existing_clear.setText(tr("existing.clear"))
         self._render_existing()
+
+    # ------------------------------------------------------------------ runtime modules (thin build)
+    def open_components(self) -> None:
+        """Show the Components window (download / check the runtime modules)."""
+        from ui.modules_dialog import ModulesDialog
+
+        dlg = ModulesDialog(self.styleSheet(), self)
+        self._components = dlg
+        dlg.refresh()
+        dlg.open()
 
     # ------------------------------------------------------------------ network interface
     def _fill_net(self) -> None:

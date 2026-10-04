@@ -18,6 +18,11 @@ on:
         description: "Attach the builds to this existing release tag (empty = artifacts only)"
         required: false
         default: ""
+      smoke_only:
+        description: "Only run the quick smoke jobs (online-smoke, thin-smoke); no full build, nothing is attached to a release"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write      # attach the installer to the release
@@ -92,7 +97,80 @@ jobs:
         run: |
           foreach ($l in "C:\vxsmoke1.log","C:\vxsmoke2.log","C:\vxsmoke3.log","C:\vxsmoke-un.log") { if (Test-Path $l) { "== $l"; Get-Content $l -Tail 25 } }
 
+  # THIN installer (docs/THIN-INSTALLER.md): fake shell + fake site-packages -> build_online.ps1 -Thin -> silent install installs only the
+  # shell -> the app's module manager downloads the runtime modules.  Also checks the Windows adapter enumeration of netroute.
+  thin-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Inno Setup 6
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: PyInstaller
+        shell: pwsh
+        run: python -m pip install --quiet pyinstaller
+      - name: Windows network adapters (infra/netroute.py)
+        shell: pwsh
+        run: |
+          python -c "from infra import netroute as n; a = n.local_addresses(); print([(x.name, x.ip) for x in a]); import sys; sys.exit(0 if a else 1)"
+      - name: A fake thin shell and a fake site-packages
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist\Voxprint\_internal, build\notices | Out-Null
+          Copy-Item "$env:WINDIR\System32\whoami.exe" dist\Voxprint\Voxprint.exe
+          python -c "import os; open('dist/Voxprint/_internal/shell.bin','wb').write(os.urandom(2*1024*1024))"
+          Copy-Item THIRD_PARTY_NOTICES.md build\notices\
+          @'
+          import os, pathlib
+          site = pathlib.Path("build/fake-site"); site.mkdir(parents=True, exist_ok=True)
+          def dist(name, files):
+              di = site / f"{name}-1.0.dist-info"; di.mkdir(exist_ok=True)
+              (di / "METADATA").write_text(f"Metadata-Version: 2.1\nName: {name}\nVersion: 1.0\n")
+              rec = []
+              for rel, n in files.items():
+                  p = site / rel; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(os.urandom(n)); rec.append(rel + ",,")
+              rec += [f"{name}-1.0.dist-info/METADATA,,", f"{name}-1.0.dist-info/RECORD,,"]
+              (di / "RECORD").write_text("\n".join(rec) + "\n")
+          dist("torch", {"torch/__init__.py": 40, "torch/lib/big.dll": 3000000})
+          dist("scipy", {"scipy/__init__.py": 40})
+          dist("transformers", {"transformers/__init__.py": 40})
+          dist("numpy", {"numpy/__init__.py": 40})
+          '@ | python -
+      - name: Build the thin installer (small parts, served from localhost)
+        shell: pwsh
+        run: |
+          ./installer/build_online.ps1 -Thin -RuntimeSite build\fake-site -Tag v0.0.0-beta -BaseUrl http://127.0.0.1:8098 -ManifestUrl http://127.0.0.1:8098/manifest-beta.json -LimitMib 1 -Python python
+          Start-Process python -ArgumentList "-m","http.server","8098","--bind","127.0.0.1","--directory","build\online-release" -WindowStyle Hidden
+          Start-Sleep 3
+      - name: Silent install puts only the shell on the disk; the module manager downloads the rest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $p = Start-Process build\online-release\Voxprint-Setup-thin.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=C:\vxthin","/LOG=C:\vxthin.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content C:\vxthin.log -Tail 60; throw "install exit code $($p.ExitCode)" }
+          if (-not (Test-Path C:\vxthin\Voxprint.exe)) { throw "the shell is missing" }
+          if (-not (Test-Path C:\vxthin\_internal\modules.json)) { throw "modules.json is missing" }
+          if (Test-Path C:\vxthin\_internal\torch) { throw "the thin installer installed a runtime module" }
+          $env:VOXPRINT_MODULES_CONFIG = "C:\vxthin\_internal\modules.json"
+          $env:VOXPRINT_HOME = "C:\vxhome"
+          python main.py --modules-status
+          python main.py --install-modules
+          if ($LASTEXITCODE -ne 0) { throw "--install-modules failed" }
+          if (-not (Test-Path C:\vxhome\runtime\torch\lib\big.dll)) { throw "the torch module was not unpacked into the runtime folder" }
+          python main.py --modules-status
+      - name: Setup log
+        if: always()
+        shell: pwsh
+        run: if (Test-Path C:\vxthin.log) { Get-Content C:\vxthin.log -Tail 40 }
+
   build:
+    if: ${{ !inputs.smoke_only }}
     runs-on: windows-latest
     timeout-minutes: 150
     env:
