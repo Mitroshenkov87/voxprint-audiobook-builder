@@ -57,7 +57,7 @@ def test_parse_narrate_options():
         "--work-dir", "/work",
     ])
     assert args.pauses is True and args.ai_disclosure is True
-    assert args.formats == ["mp3,m4b", "opus"] and str(args.work_dir) == "/work"
+    assert args.formats == ["mp3,m4b", "opus"] and args.work_dir == Path("/work")
     args2 = ap.parse_args(["narrate", "b.txt", "--voice", "v", "--out", "o", "--no-pauses"])
     assert args2.pauses is False
 
