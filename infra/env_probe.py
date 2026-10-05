@@ -34,9 +34,8 @@ import sys
 from dataclasses import dataclass, field
 from importlib import metadata
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
-from packaging.version import InvalidVersion, Version
 
 from infra.version_manager import (ACTION_IGNORE, ACTION_INSTALL, ACTION_OFFER, ACTION_REUSE, ACTION_UPGRADE,
                                    IGNORED_PACKAGES,

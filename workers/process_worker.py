@@ -16,7 +16,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 from PySide6.QtCore import QThread, Signal
 
-from core.errors import CancelledByUser, DatasetMakerError, ModelDownloadError, OutOfMemoryError_
+from core.errors import CancelledByUser, DatasetMakerError, OutOfMemoryError_
 from core.events import CancelToken, Stage, overall_percent
 from workers.pipeline_runner import TaskRequest, plan_for, run_task
 from infra.keep_awake import keep_awake

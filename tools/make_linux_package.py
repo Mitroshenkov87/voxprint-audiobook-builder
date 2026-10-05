@@ -19,7 +19,6 @@ import datetime
 import hashlib
 import io
 import json
-import shutil
 import sys
 import tarfile
 import zipfile

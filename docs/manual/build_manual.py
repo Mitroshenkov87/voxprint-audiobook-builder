@@ -12,7 +12,6 @@ Usage: python docs/manual/build_manual.py [--out DIR] [--theme dark|print|both] 
 """
 from __future__ import annotations
 import argparse, json, re, sys
-from datetime import date
 from pathlib import Path
 import markdown
 from PIL import Image

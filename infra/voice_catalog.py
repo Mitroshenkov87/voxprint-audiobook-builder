@@ -8,7 +8,7 @@ local); a remote voice has the key ``repo:<id>`` and :func:`ensure_local` downlo
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional
+from typing import Callable, List, Optional
 
 from core import consent, voice_info
 from core.voice_library import VoiceLibrary, VoiceRecord

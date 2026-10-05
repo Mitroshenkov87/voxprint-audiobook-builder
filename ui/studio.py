@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from PySide6.QtCore import QTimer, Qt
-from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget)
 
 from core import i18n
 from core.i18n import tr

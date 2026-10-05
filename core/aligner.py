@@ -29,7 +29,7 @@ import numpy as np
 
 from core import audio_utils as au
 from core.errors import AlignmentError, AudioTextMismatchError, OutOfMemoryError_
-from core.text_utils import clean_token, count_clean_chars, is_kept_char, split_clauses
+from core.text_utils import clean_token, count_clean_chars, split_clauses
 from core.types import WordTiming
 
 log = logging.getLogger("voxprint.aligner")
@@ -344,7 +344,6 @@ def align_long(
     if not units:
         raise AlignmentError(tr("err.no_sentences"))
     unit_chars = [max(1, count_clean_chars(u)) for u in units]
-    voiced_total = au.voiced_seconds(audio, sr)
     words_all: List[WordTiming] = []
     t0 = 0.0
     ui = 0  # index of the first clause not yet aligned

@@ -12,7 +12,7 @@ from core.i18n import tr
 import re
 import unicodedata
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Sequence
 
 from core.errors import AlignmentError, TextReadError
 from core.types import WordTiming

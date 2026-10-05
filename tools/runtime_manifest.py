@@ -8,7 +8,6 @@ sdist (seconds) and shipped as a small release asset.
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 import subprocess
 import sys

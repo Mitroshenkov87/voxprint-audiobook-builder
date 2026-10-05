@@ -16,8 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Dict, Optional
 
-from infra.vram_optimizer import (GpuInfo, LORA_ALPHA, LORA_R, TrainPlan, compute_epochs, compute_grad_accum,
-                                  plan_training)
+from infra.vram_optimizer import (GpuInfo, LORA_ALPHA, LORA_R, TrainPlan, compute_epochs, plan_training)
 
 FAST, BALANCED, MAXIMUM, MANUAL = "fast", "balanced", "maximum", "manual"
 PRESETS = (FAST, BALANCED, MAXIMUM, MANUAL)

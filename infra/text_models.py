@@ -15,7 +15,7 @@ import hashlib
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from core.errors import ModelDownloadError
 from core.events import ProgressCallback, noop_progress

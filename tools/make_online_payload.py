@@ -14,7 +14,6 @@ import argparse
 import datetime
 import hashlib
 import json
-import os
 import sys
 import zipfile
 from pathlib import Path

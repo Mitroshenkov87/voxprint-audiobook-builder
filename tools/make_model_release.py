@@ -16,7 +16,6 @@ Needs: Python 3.9+, ``gh`` (logged in) only for ``--upload``.  Standard library 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import shutil

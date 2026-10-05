@@ -78,7 +78,8 @@ def _selftest_imports(argv=()) -> int:
     if "--stdlib-list" in argv:
         i = argv.index("--stdlib-list")
         try:
-            names = [l.strip() for l in open(argv[i + 1], encoding="utf-8") if l.strip()]
+            with open(argv[i + 1], encoding="utf-8") as fh:
+                names = [l.strip() for l in fh if l.strip()]
         except (OSError, IndexError) as exc:
             names, bad = [], bad + 1
             lines.append(f"FAIL  stdlib list unreadable: {exc}")

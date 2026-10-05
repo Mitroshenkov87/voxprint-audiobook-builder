@@ -26,7 +26,7 @@ import sys
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCK = ROOT / "infra" / "runtime_lock.json"

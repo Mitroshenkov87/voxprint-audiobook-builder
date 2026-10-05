@@ -9,7 +9,6 @@ from __future__ import annotations
 from core.i18n import tr
 import math
 import os
-import shutil
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple

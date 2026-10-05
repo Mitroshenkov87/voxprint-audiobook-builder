@@ -27,12 +27,11 @@ import logging
 import os
 import re
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Protocol, Sequence, Tuple
 
 from core.book_parsers import Book, Chapter
-from core.errors import CancelledByUser
 from core.events import CancelToken
 from core.text_utils import split_sentences
 
@@ -150,7 +149,6 @@ def validate(source: str, proposed: str, freq: Counter, stats: Optional[CleanupS
                 stats.rejected += 1
             continue
         if op == "replace" and a and all(_is_word(t) for t in a):
-            tail = [t for t in b if not _is_word(t)]
             head = [t for t in b if _is_word(t)]
             trailing_punct = b[len(head):] if b[:len(head)] == head else None
             if len(head) == len(a) and trailing_punct is not None and all(t in INSERTABLE for t in trailing_punct):

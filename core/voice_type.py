@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Tuple
 
 #: Median F0 (Hz) below which a voice is suggested as male, and from which as female; in between (and above ~300 Hz, which
 #: may be a child or an octave error) nothing is suggested.

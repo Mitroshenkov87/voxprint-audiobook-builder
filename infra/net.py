@@ -9,8 +9,6 @@ interfaces (:mod:`infra.netroute`).
 from __future__ import annotations
 
 import ssl
-import urllib.error
-import urllib.request
 from typing import Optional
 
 _certifi_ctx: Optional[ssl.SSLContext] = None

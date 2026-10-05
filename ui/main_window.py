@@ -30,8 +30,7 @@ from core.events import Stage
 from core.i18n import tr
 from infra import paths, platform_win
 from infra.vram_optimizer import detect_gpu
-from workers.pipeline_runner import (KIND_DATASET, KIND_LORA, KIND_MERGE, KIND_PREVIEW, TaskRequest, last_adapter, plan_for,
-                                     run_task)
+from workers.pipeline_runner import (KIND_DATASET, KIND_LORA, KIND_MERGE, KIND_PREVIEW, TaskRequest, last_adapter, run_task)
 from ui.mini_player import MiniPlayer
 from ui.settings_dialog import SettingsDialog
 from workers.process_worker import PrefetchWorker, ProcessWorker, RepairWorker, StatusWorker, UpdateWorker

@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
-from core.errors import BackupError, CancelledByUser
+from core.errors import BackupError
 from core.events import CancelToken
 from core.i18n import tr
 
@@ -248,7 +248,7 @@ def collect_items(include_voices: bool = True, repos: Iterable[str] = (), models
     ``repos`` are model repositories the app uses; one that is not in Voxprint's own models folder is taken from the
     place ``locate(repo) -> (folder, revision)`` finds (default: the model locator, i.e. caches of other programs).
     Every complete ``Owner--Name`` folder in the own models folder is included whether it is listed or not."""
-    from infra import assets, model_downloader as md, paths
+    from infra import assets, paths
 
     models_root = models_root or paths.models_dir()
     voices_root = voices_root or paths.voices_dir()

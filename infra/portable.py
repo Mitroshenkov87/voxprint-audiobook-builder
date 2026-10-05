@@ -30,7 +30,6 @@ import shutil
 import subprocess
 import sys
 import threading
-import time
 import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
