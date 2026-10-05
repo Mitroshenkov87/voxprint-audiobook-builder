@@ -1,4 +1,4 @@
-"""Multi-connection HTTP Range downloader for large model weight files.
+"""Multi-connection HTTP Range downloader for model weight files (every size by default).
 
 ``huggingface_hub.snapshot_download`` transfers each file on a single connection
 (and with XET off - see :mod:`infra.netroute.disable_xet` - that is the only
@@ -8,9 +8,8 @@ multi-GB ``*.safetensors`` much faster on a typical link.
 
 This module is that fast path, standard library only:
 
-* files below ``PARALLEL_MIN`` bytes use one connection (same resume shape as
-  :func:`infra.model_release.fetch_file`: ``<name>.incomplete`` + HTTP Range);
-* larger files are split into up to ``CONNECTIONS`` equal Ranges; each part is
+* by default every file is split into up to ``CONNECTIONS`` equal Ranges (``PARALLEL_MIN`` defaults to 0);
+  set ``VOXPRINT_DL_PARALLEL_MIN`` higher to keep tiny files on one connection; each part is
   written to ``<name>.incomplete.parts/<i>`` and skipped on resume when the
   size already matches; when every part is complete the parts are concatenated
   into ``<name>.incomplete`` and renamed onto the target;
@@ -24,7 +23,7 @@ Environment:
 
 * ``VOXPRINT_DL_CONNECTIONS`` - max parallel Ranges per file (default 8);
 * ``VOXPRINT_DL_PARALLEL_MIN`` - smallest file that uses more than one connection
-  (default 8 MiB);
+  (default 0 = every file);
 * ``VOXPRINT_NO_PARALLEL_DL=1`` - force the single-stream path everywhere.
 """
 from __future__ import annotations
@@ -44,7 +43,7 @@ log = logging.getLogger("voxprint.models")
 
 CHUNK = 256 * 1024
 DEFAULT_CONNECTIONS = 8
-DEFAULT_PARALLEL_MIN = 8 * 1024 * 1024
+DEFAULT_PARALLEL_MIN = 0
 ENV_DISABLE = "VOXPRINT_NO_PARALLEL_DL"
 ENV_CONNECTIONS = "VOXPRINT_DL_CONNECTIONS"
 ENV_PARALLEL_MIN = "VOXPRINT_DL_PARALLEL_MIN"
@@ -63,7 +62,7 @@ def enabled() -> bool:
 
 
 def connections() -> int:
-    """Max parallel Range requests per large file (at least 1)."""
+    """Max parallel Range requests per file (at least 1)."""
     try:
         n = int(os.environ.get(ENV_CONNECTIONS, str(DEFAULT_CONNECTIONS)) or DEFAULT_CONNECTIONS)
     except ValueError:
