@@ -97,23 +97,35 @@ BACKUP_DIRNAME = "Voxprint-backup"
 #: Sub-folders of a backup a user may pick by mistake (``models`` is what the backup writes; ``model`` / ``voices`` / ``tools``
 #: are accepted so that pointing at any folder inside the backup is still recognised).
 BACKUP_SUBDIRS = ("models", "model", "voices", "tools")
+#: Sub-folders that make a ``Voxprint-backup`` folder without a manifest still count as a backup.
+BACKUP_CONTENT = ("models", "model", "voices")
+
+
+def _looks_like_backup(d: Path) -> bool:
+    """``d`` holds ``voxprint-backup.json``, or it is a ``Voxprint-backup`` folder with ``models`` / ``model`` / ``voices``
+    inside (a backup whose manifest is missing - copied by hand or interrupted - is still no models folder)."""
+    if (d / BACKUP_MANIFEST).is_file():
+        return True
+    return d.name.lower() == BACKUP_DIRNAME.lower() and any((d / s).is_dir() for s in BACKUP_CONTENT)
 
 
 def backup_root_of(folder: Optional[Path]) -> Optional[Path]:
     """The Voxprint backup behind a user-chosen folder, or ``None`` if it is no backup.
 
-    Recognised: the folder holds ``voxprint-backup.json`` itself; it holds ``Voxprint-backup/voxprint-backup.json`` (the
-    user picked the drive / parent folder); or it is a sub-folder (``models`` / ``voices`` ...) of a backup.  A backup is a
-    portable archive and a RESTORE SOURCE - it must never become the live models folder (see :func:`models_dir`)."""
+    Recognised: the folder holds ``voxprint-backup.json`` itself (or is a ``Voxprint-backup`` folder with ``models`` /
+    ``voices`` inside); it holds such a ``Voxprint-backup`` folder (the user picked the drive / parent folder); or it is a
+    sub-folder (``models`` / ``model`` / ``voices`` / ``tools``) of a backup.  A backup is a portable archive and a RESTORE
+    SOURCE - it must never become the live models folder (see :func:`models_dir`).  Mirrored by ``BackupRootOf`` in
+    ``installer/Voxprint.iss``."""
     if folder is None:
         return None
     p = Path(folder)
     try:
-        if (p / BACKUP_MANIFEST).is_file():
+        if _looks_like_backup(p):
             return p
-        if (p / BACKUP_DIRNAME / BACKUP_MANIFEST).is_file():
+        if _looks_like_backup(p / BACKUP_DIRNAME):
             return p / BACKUP_DIRNAME
-        if p.name.lower() in BACKUP_SUBDIRS and (p.parent / BACKUP_MANIFEST).is_file():
+        if p.name.lower() in BACKUP_SUBDIRS and _looks_like_backup(p.parent):
             return p.parent
     except OSError:              # an unplugged drive, no permission ...
         return None

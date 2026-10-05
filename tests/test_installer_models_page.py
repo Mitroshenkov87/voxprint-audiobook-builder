@@ -111,8 +111,13 @@ def test_a_backup_folder_is_a_restore_source_not_the_models_folder():
     """Hybrid rule: an empty / normal folder -> models_dir.txt (download target); a Voxprint backup -> existing_models_dir.txt
     (restored into the default folder by the app) and models_dir.txt is removed.  Same detection as paths.backup_root_of."""
     code = section("Code")
+    looks = code.split("function LooksLikeBackup")[1].split("\nend;")[0]
+    assert f"'{paths.BACKUP_MANIFEST}'" in looks and f"'{paths.BACKUP_DIRNAME}'" in looks
+    for sub in paths.BACKUP_CONTENT:                                                  # a backup without its manifest
+        assert f"'{sub}')" in looks
     body = code.split("function BackupRootOf")[1].split("\nend;")[0]
-    assert f"'{paths.BACKUP_MANIFEST}'" in body and f"'{paths.BACKUP_DIRNAME}\\{paths.BACKUP_MANIFEST}'" in body
+    assert "LooksLikeBackup(D)" in body and f"LooksLikeBackup(AddBackslash(D) + '{paths.BACKUP_DIRNAME}')" in body
+    assert "LooksLikeBackup(ExtractFileDir(D))" in body
     for sub in paths.BACKUP_SUBDIRS:
         assert f"(N = '{sub}')" in body
     nxt = code.split("function NextButtonClick")[1].split("\nend;")[0]

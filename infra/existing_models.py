@@ -251,16 +251,32 @@ def _restore_stamp(root: Path) -> str:
     return f"{where}\n{created}"
 
 
-def restore_pending() -> bool:
-    """True if a backup source exists and this backup (same folder, same manifest stamp) was not restored yet."""
-    root = backup_source()
-    if root is None:
-        return False
+#: Restores that failed in this process (stamps): not retried for every model of the same first run.
+_failed_this_run: set = set()
+#: Remembers a backup whose restore failed for a reason a retry cannot fix (a file with a wrong hash, a broken manifest):
+#: the automatic start-up restore stops asking; Settings -> Restore still works, and an updated backup is tried again.
+FAILED_NAME = "restore_failed.txt"
+_PERMANENT = ("hash", "no_manifest")
+
+
+def _read_state(name: str) -> str:
     try:
-        done = (paths.state_dir() / RESTORED_NAME).read_text(encoding="utf-8").strip()
+        return (paths.state_dir() / name).read_text(encoding="utf-8").strip()
     except OSError:
-        done = ""
-    return done != _restore_stamp(root).strip()
+        return ""
+
+
+def restore_pending() -> bool:
+    """True if a backup source with a manifest exists and this backup (same folder, same manifest stamp) was not restored
+    yet (nor failed for good).  A ``Voxprint-backup`` folder without a manifest is no restore source: its models are still
+    imported one by one (:func:`find` searches ``<backup>/models``)."""
+    root = backup_source()
+    if root is None or not (root / backup.MANIFEST_NAME).is_file():
+        return False
+    stamp = _restore_stamp(root).strip()
+    if stamp in _failed_this_run or stamp == _read_state(FAILED_NAME):
+        return False
+    return stamp != _read_state(RESTORED_NAME)
 
 
 def restore_backup(progress: Callable[[float, str], None] = lambda f, m="": None,
@@ -270,13 +286,31 @@ def restore_backup(progress: Callable[[float, str], None] = lambda f, m="": None
 
     Uses :func:`infra.backup.run_restore`: hash-verified against the manifest, resumable, identical items skipped, a voice
     that exists with other content is never overwritten.  The backup folder itself is only read.  Returns the report, or
-    ``None`` when there is no backup source."""
+    ``None`` when there is no backup source (with a manifest).  A failure is re-raised; it is remembered for this run (and
+    for good when a retry cannot help, see :data:`FAILED_NAME`) so that the start-up restore does not loop on it."""
     root = backup_source()
-    if root is None:
+    if root is None or not (root / backup.MANIFEST_NAME).is_file():
         return None
+    stamp = _restore_stamp(root).strip()
     kw.setdefault("models_root", paths.models_dir())
-    report = backup.run_restore(root, include_voices, progress, cancel, **kw)
-    (paths.state_dir() / RESTORED_NAME).write_text(_restore_stamp(root) + "\n", encoding="utf-8")
+    try:
+        report = backup.run_restore(root, include_voices, progress, cancel, **kw)
+    except BackupError as exc:
+        _failed_this_run.add(stamp)
+        if getattr(exc, "code", "") in _PERMANENT:
+            try:
+                (paths.state_dir() / FAILED_NAME).write_text(stamp + "\n", encoding="utf-8")
+            except OSError:
+                pass
+        log.warning("restoring backup %s failed: %s", root, exc)
+        raise
+    state = paths.state_dir()
+    state.mkdir(parents=True, exist_ok=True)
+    (state / RESTORED_NAME).write_text(stamp + "\n", encoding="utf-8")
+    try:
+        (state / FAILED_NAME).unlink()
+    except OSError:
+        pass
     log.info("restored backup %s: %d files copied, %d skipped, conflicts: %s", root, report.copied_files,
              report.skipped_files, ", ".join(report.conflicts) or "none")
     return report

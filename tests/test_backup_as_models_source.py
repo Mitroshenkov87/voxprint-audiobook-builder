@@ -26,6 +26,13 @@ def add_voice(name=VOICE):
     return d
 
 
+@pytest.fixture(autouse=True)
+def fresh_process():
+    em._failed_this_run.clear()          # module state = "this run"; every test is a fresh start
+    yield
+    em._failed_this_run.clear()
+
+
 @pytest.fixture
 def usb(tmp_path):
     """An external drive with a full backup (model, ffmpeg, one voice); the app's own folders are empty afterwards."""
@@ -131,3 +138,65 @@ def test_existing_folder_accepts_a_singular_model_subfolder(tmp_path):
     assert ("existing", src / "model") in em.roots()
     found = em.find(REPO, SHA)
     assert found is not None and found.path == src / "model" / "Org--Tiny-1.7B"
+
+
+def test_a_backup_folder_without_its_manifest_is_still_no_models_folder(tmp_path):
+    """Copied by hand or interrupted: ``Voxprint-backup/models`` without ``voxprint-backup.json``.  Never the live folder;
+    no whole-backup restore (nothing to verify against), but its models are imported one by one."""
+    drive = tmp_path / "hdd"
+    root = drive / bk.BACKUP_DIRNAME
+    make_model(root / "models" / "Org--Tiny-1.7B")
+    (root / "models" / "Org--Tiny-1.7B" / ".revision").write_text(SHA, encoding="utf-8")
+    for pick in (drive, root, root / "models"):
+        assert paths.backup_root_of(pick) == root
+    plain = tmp_path / "plain" / bk.BACKUP_DIRNAME                 # an empty folder that only has the name is no backup
+    plain.mkdir(parents=True)
+    assert paths.backup_root_of(plain) is None
+    paths.set_models_dir(drive)
+    assert paths.models_dir() == paths.default_models_dir()
+    assert em.adopt_backup_choice() == root and em.configured() == root
+    assert not em.restore_pending() and em.restore_backup() is None
+    assert em.pending([REPO])                                     # the per-model import still finds it
+    got = md.ensure_model(REPO, snapshot_download=no_download, revision=SHA)
+    assert got == paths.default_models_dir() / "Org--Tiny-1.7B" and md.verify_local_model(got)
+    assert not em.pending([REPO])
+
+
+def test_a_broken_backup_is_not_retried_on_every_model_or_every_start(usb, monkeypatch):
+    root = usb / bk.BACKUP_DIRNAME
+    em.set_folder(root)
+    calls = []
+
+    def bad_restore(*a, **k):
+        calls.append(a)
+        raise bk.BackupError("hash mismatch", code="hash")
+
+    monkeypatch.setattr(bk, "run_restore", bad_restore)
+    assert em.restore_pending()
+    with pytest.raises(bk.BackupError):
+        em.restore_backup()
+    assert not em.restore_pending()                                # neither in this run ...
+    em._failed_this_run.clear()
+    assert not em.restore_pending()                                # ... nor on the next start (state/restore_failed.txt)
+    # the per-model import / download path is still taken; the restore is not attempted again
+    md.ensure_model(REPO, snapshot_download=no_download, revision=SHA)
+    assert len(calls) == 1
+    # an updated backup is tried again
+    data = bk.read_manifest(root)
+    data["created"] = "2099-01-01T00:00:00Z"
+    (root / bk.MANIFEST_NAME).write_text(json.dumps(data), encoding="utf-8")
+    assert em.restore_pending()
+
+
+def test_a_transient_failure_is_retried_on_the_next_start_only(usb, monkeypatch):
+    em.set_folder(usb / bk.BACKUP_DIRNAME)
+
+    def no_space(*a, **k):
+        raise bk.BackupError("no space", code="space")
+
+    monkeypatch.setattr(bk, "run_restore", no_space)
+    with pytest.raises(bk.BackupError):
+        em.restore_backup()
+    assert not em.restore_pending()
+    em._failed_this_run.clear()                                    # a new process
+    assert em.restore_pending()

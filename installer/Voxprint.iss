@@ -262,8 +262,18 @@ begin
   if Result then DeleteFile(Probe);
 end;
 
-{ The Voxprint backup behind a chosen folder, '' if it is none (the same rules as infra/paths.py: backup_root_of): the folder holds
-  voxprint-backup.json, or Voxprint-backup\voxprint-backup.json, or it is the models / model / voices / tools folder of a backup.
+{ True if D is a Voxprint backup: it holds voxprint-backup.json, or it is a Voxprint-backup folder with models / model / voices
+  inside (a backup without its manifest is still no models folder).  The same rules as infra/paths.py: _looks_like_backup. }
+function LooksLikeBackup(const D: String): Boolean;
+begin
+  Result := FileExists(AddBackslash(D) + 'voxprint-backup.json');
+  if (not Result) and (CompareText(ExtractFileName(D), 'Voxprint-backup') = 0) then
+    Result := DirExists(AddBackslash(D) + 'models') or DirExists(AddBackslash(D) + 'model') or
+              DirExists(AddBackslash(D) + 'voices');
+end;
+
+{ The Voxprint backup behind a chosen folder, '' if it is none (the same rules as infra/paths.py: backup_root_of): the folder is a
+  backup, or it holds a Voxprint-backup backup, or it is the models / model / voices / tools folder of a backup.
   A backup is a RESTORE SOURCE: it never becomes the models folder (the app restores it into the default folder). }
 function BackupRootOf(const Dir: String): String;
 var
@@ -273,12 +283,11 @@ begin
   D := RemoveBackslash(Trim(Dir));
   if D = '' then Exit;
   N := Lowercase(ExtractFileName(D));
-  if FileExists(AddBackslash(D) + 'voxprint-backup.json') then
+  if LooksLikeBackup(D) then
     Result := D
-  else if FileExists(AddBackslash(D) + 'Voxprint-backup\voxprint-backup.json') then
+  else if LooksLikeBackup(AddBackslash(D) + 'Voxprint-backup') then
     Result := AddBackslash(D) + 'Voxprint-backup'
-  else if ((N = 'models') or (N = 'model') or (N = 'voices') or (N = 'tools')) and
-          FileExists(AddBackslash(ExtractFileDir(D)) + 'voxprint-backup.json') then
+  else if ((N = 'models') or (N = 'model') or (N = 'voices') or (N = 'tools')) and LooksLikeBackup(ExtractFileDir(D)) then
     Result := ExtractFileDir(D);
 end;
 
