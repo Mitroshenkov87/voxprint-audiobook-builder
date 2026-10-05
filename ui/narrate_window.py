@@ -713,7 +713,8 @@ class NarrateWindow(SubWindow):
         usable = ready and lang_ok and not self.busy
         chk.blockSignals(True)
         chk.setEnabled(usable)
-        chk.setChecked(usable and self._spell_wanted)
+        # the tick shows the user's choice; a running job only locks it (it used to clear the tick while busy)
+        chk.setChecked(ready and lang_ok and self._spell_wanted)
         chk.blockSignals(False)
         if not lang_ok:
             msg = tr("prep.model_lang")

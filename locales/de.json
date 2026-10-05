@@ -214,6 +214,7 @@
  "narr.hours": "{h} Std.",
  "narr.idle": "Wählen Sie ein Buch und eine Stimme.",
  "narr.intro": "Wählen Sie ein Buch und eine Stimme und drücken Sie Start. Fertige Teile werden laufend gespeichert – Sie können pausieren, beenden und später fortsetzen.",
+ "narr.synth_batch": "Teile {first}–{last} von {total} werden erzeugt…",
  "narr.loading_model": "Stimmenmodell wird geladen…",
  "narr.mb": "{n} MB",
  "narr.minutes": "{m} Min.",

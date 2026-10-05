@@ -214,6 +214,7 @@
  "narr.hours": "{h} h",
  "narr.idle": "Choose a book and a voice.",
  "narr.intro": "Choose a book and a voice, then press Start. Finished parts are saved on the way, so you can pause, quit and continue later.",
+ "narr.synth_batch": "Generating parts {first}–{last} of {total}…",
  "narr.loading_model": "Loading the voice model…",
  "narr.mb": "{n} MB",
  "narr.minutes": "{m} min",
