@@ -355,8 +355,12 @@ def _train_once(dataset_dir: Path, output_dir: Path, plan: TrainPlan, progress: 
     q = Qwen3TTSModel.from_pretrained(str(models["base"]), device_map=plan.device if on_gpu else None,
                                       dtype=dtype, attn_implementation=plan.attn_implementation)
     hf_model = q.model
-    tokenize = lambda text: q.processor(text=text, return_tensors="pt", padding=True)["input_ids"]  # noqa: E731
-    encode = lambda audio, sr: hf_model.speech_tokenizer.encode(audio, sr=sr).audio_codes[0]  # noqa: E731
+    # Bound as defaults: a later ``del`` in ``finally`` must not make the nested callables look unbound to the linter.
+    def tokenize(text, _q=q):
+        return _q.processor(text=text, return_tensors="pt", padding=True)["input_ids"]
+
+    def encode(audio, sr, _m=hf_model):
+        return _m.speech_tokenizer.encode(audio, sr=sr).audio_codes[0]
     monitor = VramMonitor(interval=10.0).start()
     try:
         return train_on_model(hf_model, tokenize, encode, data, output_dir, plan, plan.base_model,

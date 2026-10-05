@@ -117,7 +117,7 @@ def _text_key(text: str) -> str:
 
 
 def _audio_key(x16: np.ndarray) -> str:
-    return hashlib.sha1((np.clip(x16, -1, 1) * 32767).astype(np.int16).tobytes()).hexdigest()
+    return hashlib.sha1((np.clip(x16, -1, 1) * 32767).astype(np.int16).tobytes(), usedforsecurity=False).hexdigest()
 
 
 def build_from_audio(files: Sequence, out_dir, asr: BaseASR, cfg: Optional[AsrConfig] = None,

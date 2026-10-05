@@ -188,7 +188,7 @@ def _translatable(unit: str) -> bool:
 # --------------------------------------------------------------------------- cache
 def _key(tag: str, text: str) -> str:
     """Cache key of one sentence for one model."""
-    return hashlib.sha1((tag + "\0" + text).encode("utf-8")).hexdigest()[:24]
+    return hashlib.sha1((tag + "\0" + text).encode("utf-8"), usedforsecurity=False).hexdigest()[:24]
 
 
 class TranslationCache:
