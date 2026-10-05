@@ -67,7 +67,7 @@ When a statement ends the recording, up to 60 s of unscripted speech at the end 
 1. **Choose book…**: `.txt` (UTF-8 / cp1251; headings like "Chapter 1", "Глава 2", "Part I" become chapters), `.fb2` / `.fb2.zip`, `.epub`. The book title, author and cover are read when present.
 2. Pick the **voice** (a licence badge is shown; for a personal-use-only voice you are reminded not to publish or sell the narration). No voices yet? The window offers *Train your voice* / *My voices*.
 3. **Prepare the text** (automatic, see [below](#prepare-the-text)): all rule-based steps are on by default; leave them as they are or untick what you do not want.
-4. Pick the **format** (see below) and a **quality** button (*Compact / Standard / High*), then **Start narration**. Rarely needed things are collapsed: *Other formats*, and *Advanced* (exact bitrates per format, the output folder - default `Documents\Voxprint\Audiobooks` - whether chapter titles are read aloud, and a read-only sample of how the first changed paragraph looks after preparation).
+4. Pick the **format** (see below) and a **quality** button (*Compact / Standard / High*), then **Start narration**. Rarely needed things are collapsed: *Other formats*, and *Advanced* (exact bitrates per format, the **working folder** - default `Documents\Voxprint\Audiobooks`, remembered; each book gets its own sub-folder there for everything of the job - whether chapter titles are read aloud, and a read-only sample of how the first changed paragraph looks after preparation).
 5. Progress with the time left; **Pause / Resume** and **Cancel** are always available. A **mini player** appears as soon as the first fragments are ready: *Play / Pause*, a seek slider and the clock work on the finished part while the rest is still being made, and the player follows new fragments (it waits if it catches up with the synthesis). It only checks a few file names every 1.5 s and plays through Qt Multimedia, so it does not slow the narration down; when the job ends the whole result becomes the playlist. Every synthesized fragment is stored (`<output>\<book>\.cache`), so after a cancel, a crash or closing the program
    **Start continues where it stopped**; the cache is deleted after a successful run. Texts are split into chunks at sentence/clause boundaries (reusing the clause splitter of the aligner), chapters get a pause between them.
 
@@ -92,6 +92,8 @@ Changing a bitrate by hand under *Advanced* switches the quality to "Custom" (no
 Pipeline: **rules** (deterministic, instant) -> optional **AI clean-up** (small model, on demand) -> **synthesis**. Nothing is shown for review; the original book is never modified, and chapter titles in the output
 files / metadata / cover come from the original, unprepared book. For debugging, the prepared text is written next to the job cache: `<output>\<book>\.debug\prepared_text.txt` and `prep_report.json`
 (counts per step, skipped steps, model revision). Unlike `.cache` they are **kept** after a successful run, so you can see exactly what was read; delete the `.debug` folder if you do not need it.
+
+**Working folder and clean-up.** On start Voxprint asks whether the book file may be **copied** or **moved** into the book's sub-folder (or left where it is) - nothing is copied without asking. When the audiobook is ready a dialog lets you tick what to keep: the audiobook, the original book file, the prepared / translated text; temporary parts (`.cache`, `.work`) are always removed. *Keep everything* deletes nothing.
 
 | Step (checkbox) | What it does |
 |---|---|

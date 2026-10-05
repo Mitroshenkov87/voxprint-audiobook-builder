@@ -5,6 +5,9 @@ The first pre-release is v0.1.0-beta; everything below is the history of the 0.1
 
 ## [Unreleased]
 
+### Added
+- **Book working folder** (`core/workspace.py`, `ui/job_dialogs.py`): the narration folder is now the *working folder* (remembered in `state/work_folder.txt`); every file of a job (book copy, temporary parts, prepared text, results) lives in `<folder>/<book title>/`. On start the book file is copied or moved there only if the user agrees; after a finished job a clean-up dialog keeps what the user ticks (audiobook, original book, prepared/translated text) and removes the temporary parts. Tests: `tests/test_workspace.py`, `tests/test_workspace_ui.py`.
+
 ### Fixed
 - **The download line "N MB of TOTAL" and the time jumped.** Causes: the total was the sum of the progress bars that Hugging Face opens file by file (it grew while the download ran); for ModelScope and the backup mirror it was guessed as `done / fraction` (a fraction that moves per file); every source switch started a new meter (counter, total, speed from zero); the speed reacted to every burst. Now ONE meter serves the whole model: the total is the sum of file sizes known up front (pinned sizes, release / mirror manifest, Hugging Face API, ModelScope file list; without it only the downloaded size is shown), the counter and the bar never go back, the speed is a moving average, the time left appears after 6 s and is kept steady, and the current source is shown. Tests: `tests/test_download_progress.py`.
 

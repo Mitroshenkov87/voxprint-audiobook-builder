@@ -401,6 +401,24 @@ def assemble_chapters(book: Book, chunks: Sequence[Chunk], engine_tag: str, cach
     return out
 
 
+def _effective_translation(book: Book, options: NarrationOptions) -> Optional[tl.TranslatePlan]:
+    """The translation plan that really applies (``None`` when off or the book is already in the target language)."""
+    tplan = options.translate if (options.translate is not None and options.translate.enabled) else None
+    if tplan is not None and (tplan.source or tl.detect_book_language(book)) == tplan.target:
+        return None
+    return tplan
+
+
+def job_dir_for(book: Book, out_dir: Path, options: Optional[NarrationOptions] = None) -> Path:
+    """The job folder of ``book`` inside the working folder ``out_dir``: ``<title>`` or ``<title> (<lang>)`` when translated
+    (next to, not over, the original).  The UI uses it to offer copying the book there before the job starts."""
+    tplan = _effective_translation(book, options or NarrationOptions())
+    folder = ex.safe_filename(book.title, 100, fallback="audiobook")
+    if tplan is not None:
+        folder = ex.safe_filename(f"{book.title} ({tplan.target})", 100, fallback="audiobook")
+    return Path(out_dir) / folder
+
+
 def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag: str, out_dir: Path,
                  language: str = "", narrator: str = "", options: Optional[NarrationOptions] = None,
                  progress: Optional[ProgressFn] = None, cancel: Optional[CancelToken] = None,
@@ -420,13 +438,8 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
     formats = [f for f in ex.ALL_FORMATS if f in options.formats] or list(ex.DEFAULT_FORMATS)
     if ex.FORMAT_M4B in formats and not options.allow_aac:
         raise NarrationError(tr("err.narration_aac_disabled"))
-    tplan = options.translate if (options.translate is not None and options.translate.enabled) else None
-    if tplan is not None and (tplan.source or tl.detect_book_language(book)) == tplan.target:
-        tplan = None                                          # the book is already in the chosen language
-    folder = ex.safe_filename(book.title, 100, fallback="audiobook")
-    if tplan is not None:
-        folder = ex.safe_filename(f"{book.title} ({tplan.target})", 100, fallback="audiobook")   # next to, not over, the original
-    job_dir = Path(out_dir) / folder
+    tplan = _effective_translation(book, options)
+    job_dir = job_dir_for(book, out_dir, options)
     job_dir.mkdir(parents=True, exist_ok=True)
     if ex.required_encoders(formats):
         if not ffmpeg:

@@ -31,6 +31,7 @@ from core import audiobook_export as ex
 from core import narration as nr
 from core import pauses as pz
 from core import text_prep
+from core import workspace as ws
 from core.book_parsers import SUPPORTED_EXTENSIONS, Book, load_book
 from core.errors import DatasetMakerError
 from core import num_words as nw
@@ -42,6 +43,7 @@ from infra import features, text_models
 from infra import voice_catalog as catalog
 from infra import voice_repository as repo
 from ui.main_window import mark_recommended, open_folder, recommended_text
+from ui import job_dialogs
 from ui.mini_player import MiniPlayer
 from ui.voices_window import make_badge, make_scope_badge
 from ui.window_base import SubWindow, card_frame, fit_to_screen, hint_label
@@ -122,10 +124,13 @@ class NarrateWindow(SubWindow):
                  plan_builder: Callable[..., Any] = text_models.build_plan,
                  translate_plan_builder: Callable[..., Any] = text_models.build_translate_plan,
                  fetch: Callable[..., Any] = repo.fetch_index, download: Callable[..., Any] = repo.download_voice,
-                 auto_refresh: bool = True, player_backend: Any = None) -> None:
+                 auto_refresh: bool = True, player_backend: Any = None,
+                 ask_place: Optional[Callable[[Path, Path], str]] = None,
+                 ask_cleanup: Optional[Callable[[ws.JobFiles], Optional[dict]]] = None) -> None:
         """Build the window.  ``runner``, the file pickers and the text-model hooks (``model_state(model)``,
         ``model_ensure(model, progress)``, ``plan_builder(rule_steps, neural_steps)``) are injectable (tests);
-        ``aac_allowed`` overrides the feature flag."""
+        ``aac_allowed`` overrides the feature flag; ``ask_place(book, job_dir)`` / ``ask_cleanup(files)`` replace the
+        working-folder dialogs (:mod:`ui.job_dialogs`)."""
         super().__init__(with_back=True)
         self.library = library or VoiceLibrary()
         self._fetch, self._download = fetch, download
@@ -136,7 +141,11 @@ class NarrateWindow(SubWindow):
         self._auto_refresh = auto_refresh
         self.runner = runner
         self._pick_book, self._pick_folder = pick_book, pick_folder
-        self.out_dir: Path = Path(out_dir) if out_dir else default_output_dir()
+        # the working folder: every job lives in <folder>/<book title>/ (core/workspace.py); remembered between starts
+        self.out_dir: Path = Path(out_dir) if out_dir else ws.load_folder(default_output_dir())
+        self._ask_place = ask_place or (lambda book, job: job_dialogs.ask_book_place(self, book, job))
+        self._ask_cleanup = ask_cleanup or (lambda files: job_dialogs.ask_cleanup(self, files))
+        self._place_asked: Set[Path] = set()     # books the user already answered for (no second question on a resume)
         self.aac_allowed = features.aac_enabled() if aac_allowed is None else aac_allowed
         self.auto_open_folder = auto_open_folder
         self.model_state, self.model_ensure, self.plan_builder = model_state, model_ensure, plan_builder
@@ -399,7 +408,7 @@ class NarrateWindow(SubWindow):
         self.other_box.setVisible(False)
         v.addWidget(self.other_box)
         self.btn_other.toggled.connect(self._on_other_toggled)
-        # advanced (collapsed): exact bitrates, output folder, chapter titles, text sample
+        # advanced (collapsed): exact bitrates, working folder, chapter titles, text sample
         # pause strength: explicit silence between commas, sentences, paragraphs ... (core/pauses.py)
         self.chk_pauses = QCheckBox()            # opt-in: explicit pauses can make the model swallow short words
         self.chk_pauses.setChecked(pz.load_enabled())
@@ -451,13 +460,15 @@ class NarrateWindow(SubWindow):
         dv.addLayout(brow)
         self.lbl_rates_hint = hint_label()
         dv.addWidget(self.lbl_rates_hint)
-        frow = QHBoxLayout()
+        frow = QHBoxLayout()                      # working folder: every file of a job goes to <folder>/<book title>/
         self.btn_out = QPushButton()
         self.lbl_out = QLabel()
         self.lbl_out.setObjectName("fileLabel")
         frow.addWidget(self.btn_out)
         frow.addWidget(self.lbl_out, 1)
         dv.addLayout(frow)
+        self.lbl_out_hint = hint_label()
+        dv.addWidget(self.lbl_out_hint)
         self.chk_titles = QCheckBox()
         self.chk_titles.setChecked(True)
         dv.addWidget(self.chk_titles)
@@ -578,6 +589,7 @@ class NarrateWindow(SubWindow):
         self.lbl_rates_hint.setText(tr("narr.rates_hint"))
         self.btn_out.setText(tr("narr.choose_folder"))
         self.lbl_out.setText(str(self.out_dir))
+        self.lbl_out_hint.setText(tr("work.folder_hint"))
         self.chk_titles.setText(tr("narr.speak_titles"))
         self.chk_pauses.setText(tr("narr.pauses_enable"))
         self.lbl_pauses.setText(tr("narr.pauses"))
@@ -1032,6 +1044,7 @@ class NarrateWindow(SubWindow):
         if path:
             self.out_dir = Path(path)
             self.lbl_out.setText(str(self.out_dir))
+            ws.save_folder(self.out_dir)
 
     def selected_formats(self) -> Set[str]:
         """Formats checked in the UI (M4B only counts while AAC is allowed)."""
@@ -1089,7 +1102,9 @@ class NarrateWindow(SubWindow):
         rec = self.library.get(key) if key else None
         if not (self.book and rec and self.selected_formats()) or self.busy:
             return False
-        job = NarrationJob(self.book, rec, self.out_dir, self.options())
+        options = self.options()
+        self._offer_book_copy(nr.job_dir_for(self.book, self.out_dir, options))
+        job = NarrationJob(self.book, rec, self.out_dir, options)
         self.result = None
         self.lbl_ready.hide()
         self.btn_open.hide()
@@ -1108,6 +1123,34 @@ class NarrateWindow(SubWindow):
         w.start()
         self._refresh_buttons()
         return True
+
+    def _offer_book_copy(self, job_dir: Path) -> None:
+        """Ask once per book whether its file may be copied/moved into the job folder (never done without asking)."""
+        src = self.book_path
+        if src is None or not src.is_file() or ws.is_inside(src, job_dir) or src in self._place_asked:
+            return
+        mode = self._ask_place(src, job_dir)
+        self._place_asked.add(src)
+        if mode == ws.PLACE_LEAVE:
+            return
+        try:
+            self.book_path = ws.place_book(src, job_dir, mode)
+        except OSError as exc:                           # e.g. the file is open elsewhere: narrate it where it is
+            log.warning("cannot %s the book into %s: %s", mode, job_dir, exc)
+            return
+        self._place_asked.add(self.book_path)
+        self.lbl_book.setText(self.book_path.name)
+
+    def _cleanup_job(self, result: nr.NarrationResult) -> bool:
+        """Finished job: let the user choose what stays in the job folder; returns False if the result audio was removed."""
+        files = ws.scan_job(result.out_dir, result.files, self.book_path)
+        choice = self._ask_cleanup(files)
+        if choice is None:                               # "later": nothing is deleted
+            return True
+        freed = ws.clean_job(files, **choice)
+        if freed:
+            log.info("job folder %s cleaned, %.1f MB freed", result.out_dir, freed / 1024 ** 2)
+        return bool(choice.get("keep_results", True))
 
     # ------------------------------------------------------------------ online voices
     def refresh_remote(self) -> None:
@@ -1201,8 +1244,9 @@ class NarrateWindow(SubWindow):
         self.lbl_status.setText(tr("narr.done_summary", chapters=result.chapters, files=len(result.files)) + reminder)
         self.lbl_ready.show()
         self.btn_open.show()
+        kept = self._cleanup_job(result)
         if self.player.isVisibleTo(self) or self.player.queue.planned:
-            self.player.set_final(result.files[0] if result.files else None)
+            self.player.set_final(result.files[0] if (result.files and kept) else None)
             self.player.show()
         self._refresh_buttons()
         if self.auto_open_folder:

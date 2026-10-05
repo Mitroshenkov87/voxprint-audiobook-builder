@@ -65,10 +65,11 @@ def test_selftest_imports_reports_and_writes_log(capsys):
     log = (paths.logs_dir() / "selftest_imports.txt").read_text(encoding="utf-8")
     assert "SELFTEST_IMPORTS" in out and log.strip() in out        # libraries may print banners to stdout
     assert (rc == 0) == ("SELFTEST_IMPORTS OK" in out)
-    import importlib.util
-    if importlib.util.find_spec("torch") is None:                 # a light dev box without PyTorch: the report itself is checked
-        assert "FAIL  torch" in log
-    else:
+    import subprocess
+    import sys
+    # a clean interpreter: other tests leave stub "torch" modules / fake dist-info behind in this process
+    has_torch = subprocess.run([sys.executable, "-c", "import torch"], capture_output=True).returncode == 0
+    if has_torch:                         # a light dev box without PyTorch: only the report itself is checked above
         assert "OK    torch" in log and "OK    qwen_tts" in log    # core libraries are present in the full dev/test env
 
 
