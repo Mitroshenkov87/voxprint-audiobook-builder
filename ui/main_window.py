@@ -1208,12 +1208,12 @@ class MainWindow(QWidget):
                                  preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None,
                                      **self._consent_kwargs(), **self._task_extras()))
 
-    def start_merge(self) -> bool:
+    def start_merge(self, adapter: Optional[Path] = None) -> bool:
         """"Universal model" button: check free disk space, ask for confirmation, start.  True if started.
 
         Under the offscreen test platform the confirmation box is skipped.
         """
-        adapter = last_adapter()
+        adapter = Path(adapter) if adapter else last_adapter()   # a voice from "My voices" or the last trained one
         if self.busy or adapter is None:
             return False
         try:

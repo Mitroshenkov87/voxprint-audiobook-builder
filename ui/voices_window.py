@@ -15,7 +15,8 @@ import os
 from pathlib import Path
 from typing import Any, Callable, List, Optional
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QComboBox, QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget,
                                QListWidgetItem, QMenu, QMessageBox, QProgressBar, QPushButton, QVBoxLayout, QWidget)
 
@@ -138,6 +139,8 @@ class VoiceCard(QFrame):
     narrate = Signal(str)
     edit = Signal(str)
     delete = Signal(str)
+    export = Signal(str)
+    open_folder = Signal(str)
 
     def __init__(self, rec: VoiceRecord, playing: bool = False) -> None:
         """Build the card for ``rec``; ``playing`` shows the stop symbol on the preview button."""
@@ -178,7 +181,9 @@ class VoiceCard(QFrame):
         self.btn_narrate = QPushButton(tr("voices.narrate"))
         self.btn_edit = QPushButton(tr("voices.edit"))
         self.btn_delete = QPushButton(tr("voices.delete"))
-        for b in (self.btn_preview, self.btn_narrate, self.btn_edit, self.btn_delete):
+        self.btn_export = QPushButton(tr("voices.export"))
+        self.btn_folder = QPushButton(tr("voices.open_folder"))
+        for b in (self.btn_preview, self.btn_narrate, self.btn_edit, self.btn_export, self.btn_folder, self.btn_delete):
             row.addWidget(b)
         row.addStretch(1)
         lay.addLayout(row)
@@ -186,6 +191,8 @@ class VoiceCard(QFrame):
         self.btn_narrate.clicked.connect(lambda: self.narrate.emit(self.voice_id))
         self.btn_edit.clicked.connect(lambda: self.edit.emit(self.voice_id))
         self.btn_delete.clicked.connect(lambda: self.delete.emit(self.voice_id))
+        self.btn_export.clicked.connect(lambda: self.export.emit(self.voice_id))
+        self.btn_folder.clicked.connect(lambda: self.open_folder.emit(self.voice_id))
 
 
 class VoiceEditDialog(QDialog):
@@ -414,6 +421,7 @@ class VoicesWindow(SubWindow):
 
     narrate_with = Signal(str)       # voice id: open the narrator with this voice selected
     library_changed = Signal()
+    full_model_requested = Signal(str)   # adapter folder: build the standalone ~4 GB model (training window's merge)
 
     def __init__(self, library: Optional[VoiceLibrary] = None, previewer: Optional[Previewer] = None,
                  confirm: Optional[Callable[[str, str], bool]] = None,
@@ -522,6 +530,8 @@ class VoicesWindow(SubWindow):
             c.narrate.connect(self.narrate_with.emit)
             c.edit.connect(self.edit_voice)
             c.delete.connect(self.delete_voice)
+            c.export.connect(self.export_voice)
+            c.open_folder.connect(self.open_voice_folder)
             self.cards_box.addWidget(c)
         busy = self._dl_worker is not None and self._dl_worker.isRunning()
         for it in (i for i in items if not i.installed):
@@ -656,6 +666,45 @@ class VoicesWindow(SubWindow):
             return
         self.refresh()
         self.library_changed.emit()
+
+    def export_voice(self, voice_id: str) -> None:
+        """Ask what to export: the small voice file (default) or a full standalone model (~4 GB, built separately)."""
+        rec = self.library.get(voice_id)
+        if rec is None:
+            return
+        mb = max(1, round(self.library.size_bytes(voice_id) / 1024 ** 2))
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle(tr("voices.export_title"))
+        box.setText(tr("voices.export_text", name=rec.name, mb=mb))
+        small = box.addButton(tr("voices.export_small", mb=mb), QMessageBox.ButtonRole.AcceptRole)
+        full = box.addButton(tr("voices.export_full"), QMessageBox.ButtonRole.ActionRole)
+        box.addButton(tr("voices.cancel"), QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(small)
+        box.exec()
+        if box.clickedButton() is full:
+            self.full_model_requested.emit(str(rec.path))
+            return
+        if box.clickedButton() is not small:
+            return
+        default = str(self.library.root / f"{rec.id}.zip")      # the voices folder, not Downloads
+        path, _ = QFileDialog.getSaveFileName(self, tr("voices.export_title"), default, "Voxprint voice (*.zip)")
+        if path:
+            self.do_export(voice_id, Path(path))
+
+    def do_export(self, voice_id: str, dest: Path) -> Optional[Path]:
+        """Write the export (separate from the dialogs so it can be tested)."""
+        try:
+            return self.library.export_zip(voice_id, dest)
+        except (DatasetMakerError, OSError) as exc:
+            self._error(exc) if isinstance(exc, DatasetMakerError) else log.warning("export failed: %s", exc)
+            return None
+
+    def open_voice_folder(self, voice_id: str) -> None:
+        """Show the voice's folder in the file manager."""
+        rec = self.library.get(voice_id)
+        if rec is not None:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(rec.path)))
 
     def delete_voice(self, voice_id: str) -> None:
         """Delete a voice after asking for confirmation."""

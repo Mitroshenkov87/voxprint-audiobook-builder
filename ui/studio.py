@@ -17,6 +17,7 @@ bar so that update checks, repairs and the first-run model download are visible 
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from PySide6.QtCore import QTimer, Qt
@@ -140,6 +141,7 @@ class StudioWindow(SubWindow):
             w.closing.connect(self._on_child_closed)   # type: ignore[attr-defined]
         self.voices_window.narrate_with.connect(self.narrate_with_voice)
         self.voices_window.library_changed.connect(self.refresh)
+        self.voices_window.full_model_requested.connect(self._full_model)
         self.trainer.language_changed.connect(self.retranslate_all)
         self.trainer.lbl_status.changed.connect(self._mirror_status)
         self.trainer.progress.valueChanged.connect(self._mirror_progress)
@@ -223,6 +225,11 @@ class StudioWindow(SubWindow):
         if old is not new:
             old.hide()
         self.refresh()
+
+    def _full_model(self, adapter: str) -> None:
+        """"Export -> full model" in My voices: the training window builds the standalone model of that voice."""
+        self.navigate("train")
+        self.trainer.start_merge(Path(adapter))
 
     def narrate_with_voice(self, voice_id: str) -> None:
         """"Narrate with this voice" on a voice card: open the narrator with that voice selected."""

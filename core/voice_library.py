@@ -277,6 +277,29 @@ class VoiceLibrary:
         if not adapter_complete(dest):
             raise VoiceLibraryError(tr("err.voice_invalid"), details="adapter files missing in the archive")
 
+    # ------------------------------------------------------------------ exporting
+    def export_zip(self, voice_id: str, dest: Path) -> Path:
+        """Pack the voice (LoRA adapter, voice.json, preview/reference/consent clips - megabytes, not the 4 GB base
+        model) into ``dest`` so it can be imported with :meth:`import_zip` on another computer."""
+        rec = self.get(voice_id)
+        if rec is None:
+            raise VoiceLibraryError(tr("err.voice_not_found"), details=voice_id)
+        dest = Path(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dest.with_name(dest.name + ".part")
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
+            for fname in ALLOWED_FILES:
+                if (rec.path / fname).is_file():
+                    z.write(rec.path / fname, fname)
+        tmp.replace(dest)
+        log.info("voice exported: %s -> %s", voice_id, dest)
+        return dest
+
+    def size_bytes(self, voice_id: str) -> int:
+        """Total size of the files an export would contain."""
+        rec = self.get(voice_id)
+        return sum((rec.path / f).stat().st_size for f in ALLOWED_FILES if rec and (rec.path / f).is_file())
+
     # ------------------------------------------------------------------ changing
     def update(self, voice_id: str, **fields: Any) -> VoiceRecord:
         """Change editable details (``name, author, license, license_url, voice_type, description``) and save voice.json."""
