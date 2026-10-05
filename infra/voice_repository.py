@@ -28,6 +28,8 @@ import json
 import logging
 import os
 import tempfile
+import threading
+import time
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -141,15 +143,42 @@ def cache_path() -> Path:
     return paths.state_dir() / "voice_index_cache.json"
 
 
+_cache_lock = threading.Lock()
+
+
 def _save_cache(raw: bytes) -> None:
+    """Atomically replace the cached index.
+
+    Several windows refresh the index in parallel, and on Windows a reader (or an antivirus scan) can hold the target for
+    a moment: a shared ``.tmp`` name then failed with WinError 32.  Each write now uses its own temp file, writers are
+    serialised, and the final rename is retried briefly before giving up (the cache is only a convenience).
+    """
+    tmp: Optional[Path] = None
     try:
         p = cache_path()
         p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(".tmp")
-        tmp.write_bytes(raw)
-        os.replace(tmp, p)
+        with _cache_lock:
+            fd, name = tempfile.mkstemp(prefix=p.stem + ".", suffix=".tmp", dir=p.parent)
+            tmp = Path(name)
+            with os.fdopen(fd, "wb") as f:
+                f.write(raw)
+            for attempt in range(6):
+                try:
+                    os.replace(tmp, p)
+                    tmp = None
+                    return
+                except PermissionError:
+                    if attempt == 5:
+                        raise
+                    time.sleep(0.1 * (attempt + 1))
     except OSError as exc:
         log.warning("cannot cache the voice index: %s", exc)
+    finally:
+        if tmp is not None:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
 
 
 def load_cache() -> List["RepoVoice"]:
