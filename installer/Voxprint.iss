@@ -12,7 +12,7 @@
 ; payload parts listed in the manifest (release assets, each < 2 GiB, verified by SHA-256, resumable, parts that are already
 ; installed are skipped) and unpacks them into {app}.  One UAC prompt (PrivilegesRequired=admin) covers everything; the
 ; user data stays in %LOCALAPPDATA%\Voxprint.  /Manifest=<url or file> overrides the baked-in manifest (tests, mirrors).
-; PORTABLE SETUP FOLDER (online variant, docs/THIN-INSTALLER.md): an optional wizard page "Keep a portable setup folder" (default
+; PORTABLE SETUP FOLDER (online variant + /DPORTABLE, docs/THIN-INSTALLER.md; NOT in the default build yet): an optional wizard page "Keep a portable setup folder" (default
 ; Documents\Voxprint Portable).  When ticked, voxprint-fetch keeps ALL components (and the models this PC needs) in that folder with
 ; manifest.json + SHA256SUMS.txt, installs from it, and the folder is remembered (state\portable_dir.txt).  A later run finds the folder
 ; (/FromFolder=<dir>, the remembered one, Documents\Voxprint Portable, or next to the installer) and installs without internet; with
@@ -181,7 +181,7 @@ Filename: "{app}\{#AppExe}"; Parameters: "--prefetch"; Description: "{cm:RunPref
 var
   ModelsPage: TWizardPage;
   ModelsEdit: TNewEdit;
-#ifdef ONLINE
+#ifdef PORTABLE
   PortablePage: TWizardPage;
   PortableCheck: TNewCheckBox;
   PortableEdit: TNewEdit;
@@ -210,7 +210,7 @@ begin
     ModelsEdit.Text := Dir;
 end;
 
-#ifdef ONLINE
+#ifdef PORTABLE
 { A setup folder made by an earlier run: /FromFolder=<dir>, the one remembered in state\portable_dir.txt, Documents\Voxprint Portable,
   or a folder next to the installer (copied together with it).  A folder counts if it has a manifest.json. }
 function IsSetupFolder(const Dir: String): Boolean;
@@ -368,7 +368,7 @@ begin
   Browse.Height := ModelsEdit.Height + ScaleY(2);
   Browse.Caption := WizardForm.DirBrowseButton.Caption;
   Browse.OnClick := @ModelsBrowseClick;
-#ifdef ONLINE
+#ifdef PORTABLE
   CreatePortablePage();
 #endif
 end;
@@ -387,7 +387,7 @@ begin
       Result := False;
     end;
   end;
-#ifdef ONLINE
+#ifdef PORTABLE
   if CurPageID = PortablePage.ID then
   begin
     Dir := PortableDir();
@@ -445,6 +445,7 @@ begin
   { THIN installer: only the shell (role "core") is installed here; the app downloads the runtime modules itself }
   Params := Params + ' --role core';
 #endif
+#ifdef PORTABLE
   { Portable setup folder: keep ALL components (+ the models this PC needs) there and install from it.  /FromFolder= is strictly
     offline; otherwise the folder is a cache first and the internet only supplies what is missing or newer. }
   Folder := PortableDir();
@@ -460,6 +461,7 @@ begin
     else
       Params := Params + ' --portable ' + AddQuotes(Folder) + ' --portable-all --models ' + ExpandConstant('{param:PortableModels|auto}');
   end;
+#endif
   Page := CreateOutputProgressPage(CustomMessage('OnlineStatus'), '');
   Page.Show;
   Err := '';
@@ -561,7 +563,7 @@ var
   Lines: TArrayOfString;
 begin
   if CurStep = ssPostInstall then InstallVcRedist();
-#ifdef ONLINE
+#ifdef PORTABLE
   if CurStep = ssPostInstall then
   begin
     Dir := PortableDir();

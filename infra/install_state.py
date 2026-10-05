@@ -329,7 +329,7 @@ def repair_install(run: Callable[[List[str]], Tuple[int, str]], which: Callable[
     from infra import env_probe
 
     if getattr(sys, "frozen", False):   # the installer build has no per-user venv to rebuild: report the state instead of failing on 'uv'
-        return (0 if verify_install().ok else 1), tr("health.frozen_repair")
+        return (0 if verify_install(has_module=_has_module).ok else 1), tr("health.frozen_repair")  # looked up now (tests patch it)
     uv = which("uv")
     if not uv:
         return 2, tr("health.no_uv")

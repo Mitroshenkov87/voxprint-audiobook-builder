@@ -35,7 +35,7 @@ def _drop_sox_warning(record: logging.LogRecord) -> bool:
     return not (record.name == "sox" and "SoX could not be found" in record.getMessage())
 
 
-def _selftest_imports() -> int:
+def _selftest_imports(argv=()) -> int:
     """``--selftest-imports``: import all heavy libraries (checks that a PyInstaller build packed everything).
 
     The result is printed and also written to ``<logs>/selftest_imports.txt`` (a windowed build has no console).
@@ -45,9 +45,15 @@ def _selftest_imports() -> int:
     import time
 
     lines, bad = [], 0
-    for name in ("torch", "torchaudio", "transformers", "peft", "accelerate", "safetensors", "qwen_tts", "qwen_asr",
+    try:                                # thin build: the downloaded runtime (PyTorch, transformers, requests ...) lives outside the shell
+        from infra import modules as _m
+
+        _m.activate()
+    except Exception as exc:  # noqa: BLE001
+        lines.append(f"WARN  runtime folder not activated: {type(exc).__name__}: {exc}")
+    for name in ("requests", "urllib3", "tqdm", "yaml", "tokenizers", "torch", "torchaudio", "transformers", "peft", "accelerate", "safetensors", "qwen_tts", "qwen_asr",
                  "bitsandbytes", "soundfile", "librosa", "scipy.signal", "imageio_ffmpeg", "onnxruntime", "huggingface_hub",
-                 "certifi", "PySide6.QtWidgets"):
+                 "certifi", "PySide6.QtWidgets", "http.cookies", "email.mime.text", "xml.dom.minidom", "logging.config"):
         t = time.time()
         try:
             mod = importlib.import_module(name)
@@ -58,6 +64,53 @@ def _selftest_imports() -> int:
                 continue
             bad += 1
             lines.append(f"FAIL  {name}: {type(exc).__name__}: {exc}")
+    for stmt in ("from transformers import AutoModel, AutoTokenizer", "from huggingface_hub import snapshot_download, HfApi",
+                 "from qwen_asr import Qwen3ASRModel", "from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForceAlignProcessor", "from qwen_tts import Qwen3TTSModel", "import requests.compat"):
+        t = time.time()
+        try:
+            exec(stmt, {})
+            lines.append(f"OK    {stmt} ({time.time() - t:.1f}s)")
+        except Exception as exc:  # noqa: BLE001
+            bad += 1
+            lines.append(f"FAIL  {stmt}: {type(exc).__name__}: {exc}")
+    # every standard-library module that imports in the BUILD Python must import in this (frozen) program too
+    if "--stdlib-list" in argv:
+        i = argv.index("--stdlib-list")
+        try:
+            names = [l.strip() for l in open(argv[i + 1], encoding="utf-8") if l.strip()]
+        except (OSError, IndexError) as exc:
+            names, bad = [], bad + 1
+            lines.append(f"FAIL  stdlib list unreadable: {exc}")
+        import warnings
+
+        warnings.simplefilter("ignore")
+        failed = []
+        for n in names:
+            try:
+                importlib.import_module(n)
+            except BaseException as exc:  # noqa: BLE001
+                failed.append(f"{n} ({type(exc).__name__}: {exc})")
+        bad += len(failed)
+        lines.append(f"stdlib: {len(names) - len(failed)} of {len(names)} modules import" + ("" if not failed else "; MISSING: " + ", ".join(failed)))
+    # every package the shell bundles must carry its dist-info (importlib.metadata), see build_thin.bat --copy-metadata
+    try:
+        import json as _json
+        from importlib import metadata as _md
+
+        from infra import paths as _paths
+
+        shell = _json.loads((_paths.resource_dir() / "infra" / "runtime_lock.json").read_text(encoding="utf-8"))["shell"]
+        nometa = []
+        for dist in sorted(shell):
+            try:
+                _md.version(dist)
+            except _md.PackageNotFoundError:
+                nometa.append(dist)
+        bad += len(nometa)
+        lines.append(f"metadata: {len(shell) - len(nometa)} of {len(shell)} shell packages" + (f"; MISSING: {', '.join(nometa)}" if nometa else ""))
+    except Exception as exc:  # noqa: BLE001
+        bad += 1
+        lines.append(f"FAIL  shell metadata check: {type(exc).__name__}: {exc}")
     try:
         import torch
 
@@ -67,10 +120,13 @@ def _selftest_imports() -> int:
         from core import i18n
 
         lines.append(f"app home: {paths.app_home()}; resources: {paths.resource_dir()}; ui language: {i18n.detect_language()}")
-        lines.append(f"ffmpeg: {__import__('core.audio_utils', fromlist=['x']).ensure_ffmpeg()}")
     except Exception as exc:  # noqa: BLE001
         bad += 1
         lines.append(f"FAIL  environment: {type(exc).__name__}: {exc}")
+    try:
+        lines.append(f"ffmpeg: {__import__('core.audio_utils', fromlist=['x']).ensure_ffmpeg()}")
+    except Exception as exc:  # noqa: BLE001 - the runner may have none; the stdlib / library imports above are what this test is for
+        lines.append(f"WARN  ffmpeg: {type(exc).__name__}: {exc}")
     lines.append("SELFTEST_IMPORTS " + ("FAILED" if bad else "OK"))
     text = "\n".join(lines)
     try:
@@ -205,7 +261,7 @@ def main(argv=None) -> int:
             return install_state.cli_repair(run_subprocess, shutil.which, _cli_printer("repair"))
         return install_state.cli_verify(print_fn=_cli_printer("verify_install"))
     if "--selftest-imports" in argv:
-        return _selftest_imports()
+        return _selftest_imports(argv)
     if "--probe-torch" in argv:   # child process of the PyTorch reuse check (infra/runtime_reuse.py): import + compute, print VXTORCH OK
         from infra import modules as _m, runtime_reuse
 

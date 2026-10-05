@@ -174,6 +174,16 @@ def build(py: str, torch_version: str) -> dict:
             "group_titles": titles, "shell": shell, "wheels": libs + torch}
 
 
+def pyinstaller_metadata_args(lock: dict) -> List[str]:
+    """PyInstaller copies a package's code but NOT its ``*.dist-info``; ``importlib.metadata`` then cannot see it and the downloaded
+    libraries' version checks fail (real PC: transformers -> "No package metadata was found for packaging").  One
+    ``--copy-metadata`` per package the shell bundles fixes that."""
+    out: List[str] = []
+    for dist in sorted(lock["shell"]):
+        out += ["--copy-metadata", dist]
+    return out
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--torch", default="2.11.0")
@@ -182,7 +192,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--shell-requirements", action="store_true", help="print the pinned shell packages (for CI) and exit")
     ap.add_argument("--test-requirements", action="store_true",
                     help="like --shell-requirements plus the few pure libraries the unit tests import (CI of the thin build)")
+    ap.add_argument("--pyinstaller-metadata-args", action="store_true",
+                    help="print '--copy-metadata <dist>' for every shell package (build_thin.bat) and exit")
     a = ap.parse_args(argv)
+    if a.pyinstaller_metadata_args:
+        print(" ".join(pyinstaller_metadata_args(json.loads(Path(a.out).read_text(encoding="utf-8")))))
+        return 0
     if a.shell_requirements or a.test_requirements:
         lock = json.loads(Path(a.out).read_text(encoding="utf-8"))
         pins = dict(lock["shell"])

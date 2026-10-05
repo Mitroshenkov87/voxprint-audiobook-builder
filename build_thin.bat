@@ -21,17 +21,23 @@ for %%m in (%HEAVY%) do call set EXCL=%%EXCL%% --exclude-module %%m
 rem  The runtime (PyTorch & co.) is downloaded later and imports the WHOLE standard library (timeit, unittest ...): bundle all of it.
 python tools\gen_stdlib_bundle.py build\stdlib_bundle || (echo [ERROR] stdlib list. & exit /b 1)
 
+rem  PyInstaller drops the *.dist-info of bundled packages; the downloaded libraries look them up (transformers: "No package metadata was
+rem  found for packaging").  Copy the metadata of every shell package listed in infra\runtime_lock.json "shell".
+set META=
+for /f "delims=" %%a in ('python tools\make_runtime_lock.py --pyinstaller-metadata-args') do set META=%%a
+if "%META%"=="" (echo [ERROR] shell metadata list. & exit /b 1)
+
 echo === Build thin shell ===
 pyinstaller --onedir --windowed --noconfirm --clean --name Voxprint --distpath dist\thin --workpath build\thin-work --specpath build\thin-work ^
   --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" ^
   --paths "%CD%" --paths "%CD%\infra" --paths "%CD%\build\stdlib_bundle" --hidden-import _vx_stdlib ^
-  --add-data "%CD%\infra\verified_manifest.json;infra" --add-data "%CD%\infra\assets_manifest.json;infra" --add-data "%CD%\infra\model_mirrors.json;infra" --add-data "%CD%\infra\model_release.json;infra" ^
+  --add-data "%CD%\infra\verified_manifest.json;infra" --add-data "%CD%\infra\assets_manifest.json;infra" --add-data "%CD%\infra\model_mirrors.json;infra" --add-data "%CD%\infra\model_release.json;infra" --add-data "%CD%\infra\runtime_lock.json;infra" ^
   --add-data "%CD%\locales;locales" --add-data "%CD%\credits.json;." --add-data "%CD%\licenses;licenses" ^
   --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^
   --collect-submodules core --collect-submodules infra --collect-submodules ui --collect-submodules workers --collect-submodules tools ^
   --hidden-import netroute --hidden-import soundfile --collect-all certifi ^
   --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
-  %EXCL% main.py
+  %META% %EXCL% main.py
 if errorlevel 1 (echo [ERROR] PyInstaller failed. & exit /b 1)
 echo Thin shell: dist\thin\Voxprint  ^(the packaging step adds _internal\modules.json^)
 endlocal

@@ -2,7 +2,7 @@
 #   1. voxprint-fetch.exe  (tools/online_fetch.py, standard library only)  -> build\online\
 #   2. the payload zips + manifest-<channel>.json                           -> build\online-release\
 #   3. Voxprint-Setup-online.exe (installer\Voxprint.iss /DONLINE) + its .sha256 -> build\online-release\
-# Used by .github/workflows/build-installer.yml (job "build" and the quick "online-smoke" job).
+# Used by .github/workflows/build-installer.yml (job "build-thin" with -RuntimeLock, and the quick smoke jobs with a local -BaseUrl).
 param(
     [string]$Dist = "dist\Voxprint",
     [Parameter(Mandatory = $true)][string]$Tag,
@@ -15,10 +15,18 @@ param(
     [string]$RuntimeSite = "",      # site-packages with those libraries (default: that of $Python's environment)
     [string]$RuntimeLock = "",      # THIN v2: infra\runtime_lock.json - the libraries stay at their upstream sites (PyPI, download.pytorch.org);
                                     #   the release gets only the shell + manifest-thin-<channel>.json; the installer is named Voxprint-Setup-online.exe
-    [string]$MirrorBase = ""        # optional fallback address prefix for the locked files (our mirror)
+    [switch]$Portable,              # compile the wizard page "Keep a portable setup folder" (installer\Voxprint.iss /DPORTABLE; not in the default build yet)
+    [string]$MirrorBase = "",       # optional fallback address prefix for the locked files (our mirror)
+    [switch]$LegacyPayload          # allow the OLD multi-GB payload parts for a real release (deleted on purpose; never needed now)
 )
 $ErrorActionPreference = "Stop"
 function Check([string]$what) { if ($LASTEXITCODE -ne 0) { throw "$what failed (exit code $LASTEXITCODE)" } }
+
+# Guard: without -RuntimeLock this script packs the whole program into multi-GB payload zips.  That is allowed only for local
+# test servers (the smoke jobs use -BaseUrl http://127.0.0.1:...), never for release assets, unless -LegacyPayload is given.
+if (-not $RuntimeLock -and -not $LegacyPayload -and ($BaseUrl -notmatch '^(https?://(127\.0\.0\.1|localhost)[:/]|file:)')) {
+    throw "Refusing to build multi-GB payload parts for a release: use -RuntimeLock infra\runtime_lock.json (the online installer)"
+}
 
 New-Item -ItemType Directory -Force build\online, build\online-release | Out-Null
 Remove-Item build\online-release\* -Force -ErrorAction SilentlyContinue
@@ -62,6 +70,7 @@ $setupName = if ($Thin) { "Voxprint-Setup-thin.exe" } else { "Voxprint-Setup-onl
 $finalName = if ($RuntimeLock) { "Voxprint-Setup-online.exe" } else { $setupName }
 $isArgs = @("/DONLINE", "/DONEDIR", "/DManifestUrl=$ManifestUrl")
 if ($Thin) { $isArgs += "/DTHIN" }
+if ($Portable) { $isArgs += "/DPORTABLE" }
 & $iscc @isArgs installer\Voxprint.iss
 Check "Inno Setup (online)"
 

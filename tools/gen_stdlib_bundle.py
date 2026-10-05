@@ -1,25 +1,76 @@
-"""Write a module that imports the WHOLE Python standard library, for PyInstaller's analysis only (it is never imported at run time).
+"""Write a module that imports the WHOLE Python standard library (every top-level module AND every submodule), for PyInstaller's analysis only.
 
 Why: a PyInstaller build contains only the standard-library modules its own code imports.  The thin shell downloads PyTorch and ~70 other
-libraries afterwards, and those import "everything" (``timeit``, ``unittest``, ``doctest``, ``sched`` ... - found by the CI end-to-end check:
-``No module named 'timeit'``).  ``build_thin.bat`` generates this file with the build's own Python and passes ``--hidden-import _vx_stdlib``.
+libraries afterwards, and those import "everything" (``timeit``, ``unittest``, ``http.cookies`` ... - found by the CI end-to-end check and on
+a real PC: ``No module named 'http.cookies'`` from ``requests``).  ``import http`` does not import ``http.cookies``, and
+``sys.stdlib_module_names`` lists top-level names only, so the packages are walked: no hand-picked list.
 
-Usage: ``python tools/gen_stdlib_bundle.py <output dir>``  ->  ``<output dir>/_vx_stdlib.py``
+``build_thin.bat`` runs this with the build's own Python and passes ``--hidden-import _vx_stdlib``.  It also writes
+``stdlib_modules.txt`` (the names that import in the build Python); the CI check ``Voxprint --selftest-imports --stdlib-list <file>``
+imports every one of them inside the FROZEN shell.
+
+Usage: ``python tools/gen_stdlib_bundle.py <output dir>``  ->  ``<output dir>/_vx_stdlib.py`` and ``<output dir>/stdlib_modules.txt``
 """
 from __future__ import annotations
 
+import importlib
+import os
+import pkgutil
 import sys
+import sysconfig
+import warnings
 from pathlib import Path
+from typing import Iterable, List
 
-#: Not useful in a download-able runtime (GUI toolkits we do not ship, tests, demos, interpreter internals that must not be imported).
-SKIP = {"tkinter", "_tkinter", "idlelib", "turtledemo", "turtle", "test", "antigravity", "this", "__main__", "__hello__",
-        "__phello__", "lib2to3", "ensurepip", "pydoc_data", "msilib", "_pyrepl", "_distutils_hack", "sre_compile", "sre_constants",
-        "sre_parse"}
+#: Not useful in a download-able runtime: GUI toolkits we do not ship, tests, demos, interpreter internals that must not be imported.
+SKIP_TOP = {"tkinter", "_tkinter", "idlelib", "turtledemo", "turtle", "test", "antigravity", "this", "__main__", "__hello__",
+            "__phello__", "lib2to3", "ensurepip", "pydoc_data", "msilib", "_pyrepl", "_distutils_hack", "sre_compile", "sre_constants",
+            "sre_parse", "xxlimited", "xxlimited_35", "xxsubtype", "nt_never"}
 
 
-def modules() -> list:
-    names = sorted(n for n in sys.stdlib_module_names if n not in SKIP and not n.startswith("_test"))
-    return names
+def skipped(name: str) -> bool:
+    parts = name.split(".")
+    if parts[0] in SKIP_TOP or parts[0].startswith(("_test", "_ctypes_test", "_xx")):
+        return True
+    return any(p in ("test", "tests", "__main__", "idle_test", "__phello__") for p in parts[1:]) or "tkinter" in parts
+
+
+def _walk(dirs: Iterable[str], prefix: str) -> Iterable[str]:
+    """Names of the modules below ``dirs`` found by looking at the files (nothing is imported)."""
+    for info in pkgutil.iter_modules(list(dirs)):
+        name = prefix + info.name
+        yield name
+        if info.ispkg:
+            sub = os.path.join(info.module_finder.path, info.name) if hasattr(info.module_finder, "path") else None
+            if sub and os.path.isdir(sub):
+                yield from _walk([sub], name + ".")
+
+
+def modules() -> List[str]:
+    """Every standard-library module and submodule of the running Python (sorted)."""
+    names = set()
+    stdlib = sysconfig.get_paths()["stdlib"]
+    for top in sys.stdlib_module_names:
+        if skipped(top):
+            continue
+        names.add(top)
+        d = os.path.join(stdlib, top)
+        if os.path.isdir(d) and os.path.isfile(os.path.join(d, "__init__.py")):
+            names.update(n for n in _walk([d], top + ".") if not skipped(n))
+    return sorted(names)
+
+
+def importable(names: Iterable[str]) -> List[str]:
+    """The names that really import in this Python (platform-specific ones - ``curses`` on Windows, ``asyncio.unix_events`` ... - do not)."""
+    ok = []
+    warnings.simplefilter("ignore")
+    for n in names:
+        try:
+            importlib.import_module(n)
+            ok.append(n)
+        except BaseException:  # noqa: BLE001 - SystemExit from odd modules included
+            pass
+    return ok
 
 
 def render(names=None) -> str:
@@ -34,8 +85,11 @@ def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     out = Path(argv[0] if argv else "build/stdlib_bundle")
     out.mkdir(parents=True, exist_ok=True)
-    (out / "_vx_stdlib.py").write_text(render(), encoding="utf-8")
-    print(f"{len(modules())} standard-library modules -> {out / '_vx_stdlib.py'}")
+    names = modules()
+    (out / "_vx_stdlib.py").write_text(render(names), encoding="utf-8")
+    ok = importable(names)
+    (out / "stdlib_modules.txt").write_text("\n".join(ok) + "\n", encoding="utf-8")
+    print(f"{len(names)} standard-library modules -> {out / '_vx_stdlib.py'}; {len(ok)} import here -> {out / 'stdlib_modules.txt'}")
     return 0
 
 
