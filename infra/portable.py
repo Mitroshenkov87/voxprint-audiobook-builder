@@ -381,14 +381,16 @@ def fetch_models(folder: Path, repos: List[str], progress: Callable[[float, str]
                 if _c.is_set():
                     raise download_watch.Stalled("download abandoned (no data)")
 
-            def one_file(base: str, rev: str, name: str, meta: Dict[str, Any]) -> None:
+            # Loop variables are bound as defaults: an abandoned (stalled) download thread must keep writing into ITS
+            # model folder, never into the folder of the model the loop moved on to.
+            def one_file(base: str, rev: str, name: str, meta: Dict[str, Any], d: Path = d) -> None:
                 url = f"{modelscope_mirror.hf_endpoint()}/{base}/resolve/{rev}/{urllib.parse.quote(name)}"
                 t = d / Path(*name.split("/"))
                 if not model_release.file_ok(t, meta):
                     t.unlink(missing_ok=True)
                     model_release.fetch_file(url, t, meta, ping, opener or model_release._open, 30.0)
 
-            def fn(src=src, rel=rel, entry=entry, repo=repo) -> None:
+            def fn(src=src, rel=rel, entry=entry, repo=repo, d=d, one_file=one_file) -> None:
                 if src == "gh":
                     model_release.download(rel, d, lambda f: ping(), None, opener)
                 elif src in ("hf", "hfm"):
@@ -407,7 +409,7 @@ def fetch_models(folder: Path, repos: List[str], progress: Callable[[float, str]
 
             try:
                 download_watch.run_watched(fn, root, meter, cancel, on_tick=tick, stall=stall, poll=poll,
-                                           idle_ok=lambda e=entry: _complete(d, e))
+                                           idle_ok=lambda e=entry, d=d: _complete(d, e))
                 done_src = src
                 break
             except Exception as exc:  # noqa: BLE001 - the next source takes over, the partial files stay
