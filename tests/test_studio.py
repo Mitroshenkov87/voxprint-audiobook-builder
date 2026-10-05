@@ -316,7 +316,8 @@ def test_edit_license_changes_the_badge(app, lib, tmp_path):
     assert "allows commercial use" in dlg.lbl_license_note.text()
     dlg.cmb_type.setCurrentIndex(dlg.cmb_type.findData("female"))
     s.voices_window.apply_edit(rec.id, dlg.values())
-    got = lib.get(rec.id)
+    got = lib.get("anna-prime") or lib.get(rec.id)                                # the folder follows the new name
+    assert got is not None and lib.get(rec.id) is None
     assert got.name == "Anna Prime" and got.commercial_use and got.info["voice_type"] == "female"
     card = s.voices_window.cards_box.itemAt(0).widget()
     assert card.badge.property("commercial") == "true"

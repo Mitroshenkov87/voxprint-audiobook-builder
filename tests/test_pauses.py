@@ -88,9 +88,10 @@ def _silence_runs(path, thresh=1e-4):
     return runs
 
 
-def test_narrate_book_cuts_every_sentence_into_its_own_chunk_by_default(tmp_path):
+def test_narrate_book_cuts_every_sentence_into_its_own_chunk_when_pauses_are_on(tmp_path):
     book = Book("B", "A", "en", [Chapter("One", "First sentence is here. Second sentence is here.\n\nNew paragraph starts here.")])
-    res, eng, ff, events = run(tmp_path, engine=FakeEngine(), book=book, options=nr.NarrationOptions(speak_titles=False))
+    res, eng, ff, events = run(tmp_path, engine=FakeEngine(), book=book,
+                               options=nr.NarrationOptions(speak_titles=False, pauses=pz.PauseProfile()))
     assert eng.calls == ["First sentence is here.", "Second sentence is here.", "New paragraph starts here."]
     _res, eng2, *_ = run(tmp_path / "legacy", engine=FakeEngine(), book=book,
                          options=nr.NarrationOptions(speak_titles=False, pauses=None))
@@ -131,6 +132,9 @@ def test_narrate_window_has_the_slider_with_the_default_and_passes_it_to_the_job
     monkeypatch.setattr(paths, "state_dir", lambda: tmp_path)
     i18n.set_language("en")
     n = narrate(lib, tmp_path, [], runner=lambda *a: None)
+    assert not n.chk_pauses.isChecked() and n.pause_profile() is None and not n.sld_pauses.isEnabled()   # opt-in
+    n.chk_pauses.setChecked(True)
+    assert pz.load_enabled() and n.sld_pauses.isEnabled()
     assert n.sld_pauses.value() == pz.DEFAULT_LEVEL and n.pause_profile().level == pz.DEFAULT_LEVEL
     assert n.lbl_pauses.text() == "Pauses" and "normal" in n.lbl_pauses_value.text() and "430 ms" in n.lbl_pauses_value.text()
     n.sld_pauses.setValue(4)
