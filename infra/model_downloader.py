@@ -602,6 +602,9 @@ def _ensure_model(
         if found is not None:
             progress(stage, 1.0, tr("progress.model_reused", short=short, where=str(found.location)))
             return found.path
+    # who asked for this download (the log answers "why is it downloading X?" - e.g. the speech-recognition model is
+    # fetched on first use by the voice check, the A/B comparison, the spoken-consent reading or the audio-only mode)
+    log.info("download of %s requested by %s", repo_id, _caller())
     if partial_dir_has_data(repo_id, root):
         progress(stage, 0.0, tr("progress.model_resume", short=short))
     else:
@@ -813,6 +816,9 @@ def _ensure_model(
         shutil.rmtree(partial, ignore_errors=True)
         raise ModelDownloadError(tr("err.model_partial", short=short),
                                  url=hf_url(repo_id))
+    if ok_source not in ("gh", "hfm"):        # GitHub release and backup mirror already check every file by SHA-256
+        _verify_or_repair(partial, repo_id, sha or revision, mirror_manifest, allow_patterns, short,
+                          funcs["hfm"] if use_hfm else None, meter, cur)
     if sha:
         (partial / ".revision").write_text(sha, encoding="utf-8")
     try:
@@ -822,6 +828,92 @@ def _ensure_model(
         raise ModelDownloadError(tr("err.model_finalize", short=short), url=hf_url(repo_id), details=str(exc)) from exc
     progress(stage, 1.0, tr("progress.model_done", short=short))
     return target
+
+
+def _caller(depth: int = 3) -> str:
+    """``module.function`` of the nearest callers outside the download plumbing (for the log line of a download)."""
+    import inspect
+
+    skip = ("infra.model_downloader", "infra.text_models", "infra.auto_steps")
+    out = []
+    try:
+        for fr in inspect.stack(context=0)[1:]:
+            mod = fr.frame.f_globals.get("__name__", "?")
+            if mod in skip:
+                continue
+            out.append(f"{mod}.{fr.function}")
+            if len(out) >= depth:
+                break
+    except Exception:  # noqa: BLE001 - diagnostics only
+        return "?"
+    return " <- ".join(out) or "?"
+
+
+#: Repository files the hash check after a download ignores: git metadata and pictures / documents.  Hugging Face rewrites
+#: ``.gitattributes`` per repository and ModelScope copies may lack such files; they are never loaded by the program.
+_UNCHECKED_SUFFIXES = (".md", ".jpg", ".jpeg", ".png", ".gif", ".svg", ".pdf")
+
+
+def _not_checked(name: str) -> bool:
+    base = name.rsplit("/", 1)[-1]
+    return base.startswith(".") or base.lower().endswith(_UNCHECKED_SUFFIXES)
+
+
+def manifest_bad_files(folder: Path, repo_id: str, revision: Optional[str], mirror_manifest: Optional[Path] = None,
+                       patterns: Optional[List[str]] = None) -> Optional[List[str]]:
+    """Files of a downloaded model that are missing or differ from the verified manifest (``infra/model_mirrors.json``:
+    size first, then SHA-256).  ``None`` = no verified hashes are known for this repository and revision (nothing to
+    compare; the structural check :func:`verify_local_model` is all there is).  The manifest is read even when the backup
+    mirror is switched off: the hashes are local data."""
+    from core import model_locator
+
+    entry = model_mirrors.load(mirror_manifest).get(repo_id)
+    if entry is None or not revision or entry.source_revision != revision:
+        return None
+    try:
+        files = entry.downloadable(patterns)
+    except model_mirrors.MirrorError:
+        return None
+    bad = []
+    for name, meta in files.items():
+        p = Path(folder) / Path(*name.split("/"))
+        if name in model_locator._OPTIONAL_FILES and not p.exists():
+            continue
+        if _not_checked(name):
+            continue
+        if not model_release.file_ok(p, meta):
+            bad.append(name)
+    return bad
+
+
+def _verify_or_repair(partial: Path, repo_id: str, revision: Optional[str], mirror_manifest: Optional[Path],
+                      patterns: Optional[List[str]], short: str, from_mirror: Optional[Callable[[], None]],
+                      meter: Any, cur: Dict[str, Any]) -> None:
+    """Hash check of a finished download BEFORE it is renamed into place (a model is never marked done unverified).
+
+    Bad files are deleted; the backup mirror (if available) fetches exactly those files, verified; otherwise
+    ``ModelDownloadError`` is raised and the ``.partial`` folder stays, so the next attempt downloads only what is missing."""
+    bad = manifest_bad_files(partial, repo_id, revision, mirror_manifest, patterns)
+    if not bad:
+        if bad is None:
+            log.info("%s: no verified hashes for revision %s - structural check only", repo_id, (revision or "?")[:8])
+        return
+    log.warning("%s: %d file(s) failed the size / SHA-256 check after the download: %s", repo_id, len(bad), ", ".join(bad))
+    for name in bad:
+        try:
+            (partial / Path(*name.split("/"))).unlink()
+        except OSError:
+            pass
+    if from_mirror is not None:
+        try:
+            cur["cancel"] = threading.Event()
+            download_watch.run_watched(from_mirror, partial, meter, cur["cancel"])
+            bad = manifest_bad_files(partial, repo_id, revision, mirror_manifest, patterns) or []
+        except Exception as exc:  # noqa: BLE001 - reported below as a hash failure
+            log.warning("%s: repairing the bad files from the backup mirror failed: %s", repo_id, exc)
+    if bad:
+        raise ModelDownloadError(tr("err.model_hash", short=short), url=hf_url(repo_id),
+                                 details="bad files: " + ", ".join(bad))
 
 
 def ensure_aligner_model(progress: ProgressCallback = noop_progress, **kw: Any) -> Path:

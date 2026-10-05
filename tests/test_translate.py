@@ -238,6 +238,7 @@ def test_ensure_downloads_only_the_needed_files_and_checks_the_sha256(tmp_path, 
         (Path(local_dir) / "pytorch_model.bin").write_bytes(blob)
 
     monkeypatch.setenv("VOXPRINT_NO_MIRROR", "1")
+    monkeypatch.setattr(md, "manifest_bad_files", lambda *a, **k: None)   # fake files: the downloader's hash check is tested elsewhere
     bad = text_models.TextModel(**{**m.__dict__, "sha256": (("pytorch_model.bin", "0" * 64),)})
     with pytest.raises(ModelDownloadError):
         text_models.ensure(bad, snapshot_download=fake_snapshot, get_remote_sha=lambda r: None)

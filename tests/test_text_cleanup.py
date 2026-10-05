@@ -161,6 +161,7 @@ def test_state_and_ensure_with_a_fake_download(tmp_path, monkeypatch):
         (Path(local_dir) / "model.safetensors").write_bytes(b"x")
 
     monkeypatch.setenv("VOXPRINT_NO_MIRROR", "1")
+    monkeypatch.setattr(md, "manifest_bad_files", lambda *a, **k: None)   # fake files: the downloader's hash check is tested elsewhere
     path = tm.ensure(sage, snapshot_download=fake_snapshot, get_remote_sha=lambda r: None)
     assert path == sage.local_dir and calls == [(sage.repo, sage.revision)]
     assert tm.state(sage) == tm.STATE_READY
