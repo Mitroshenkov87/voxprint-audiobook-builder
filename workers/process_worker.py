@@ -19,6 +19,7 @@ from PySide6.QtCore import QThread, Signal
 from core.errors import CancelledByUser, DatasetMakerError, ModelDownloadError, OutOfMemoryError_
 from core.events import CancelToken, Stage, overall_percent
 from workers.pipeline_runner import TaskRequest, plan_for, run_task
+from infra.keep_awake import keep_awake
 
 log = logging.getLogger("voxprint.worker")
 
@@ -68,7 +69,8 @@ class ProcessWorker(QThread):
     def run(self) -> None:  # noqa: D401 - QThread
         """Thread body: run the task and emit exactly one of done / cancelled / failed."""
         try:
-            result = self.runner(self.request, self._on_progress, self.token)
+            with keep_awake():                      # no sleep mid-job (Windows; no-op elsewhere)
+                result = self.runner(self.request, self._on_progress, self.token)
         except CancelledByUser:
             self.cancelled.emit()
             return

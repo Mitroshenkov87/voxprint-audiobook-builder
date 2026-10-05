@@ -13,6 +13,7 @@ from core.i18n import tr
 from infra import voice_repository as repo
 from workers.narration_runner import NarrationJob, run_narration
 from workers.process_worker import classify_exception
+from infra.keep_awake import keep_awake
 
 log = logging.getLogger("voxprint.workers")
 
@@ -52,7 +53,8 @@ class NarrateWorker(QThread):
     def run(self) -> None:  # noqa: D401 - QThread
         """Thread body."""
         try:
-            result = self.runner(self.job, self.progress.emit, self.cancel_token, self.pause_token)
+            with keep_awake():                      # no sleep mid-job (Windows; no-op elsewhere)
+                result = self.runner(self.job, self.progress.emit, self.cancel_token, self.pause_token)
         except CancelledByUser:
             self.cancelled.emit()
         except DatasetMakerError as exc:
