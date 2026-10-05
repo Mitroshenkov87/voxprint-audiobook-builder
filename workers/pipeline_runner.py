@@ -207,13 +207,22 @@ def _register_voice(adapter_dir: Path, info: dict, library=None, typed_id: bool 
 
 
 def _asr_for_check(req: TaskRequest, asr_factory, progress=None):
-    """The recogniser for WER checks, or None (the check then simply has no WER)."""
+    """The recogniser for WER checks, or None (the check then simply has no WER).
+
+    Uses a model already fetched by the first-run / ``--prefetch`` download-all (or present elsewhere on the PC).
+    Never starts a surprise download here - if the model is missing, WER is skipped with a log line.
+    """
     try:
         if asr_factory is not None:
             return asr_factory()
         from core.asr import make_default_asr
 
-        return make_default_asr(str(md.ensure_model(md.ASR_REPO, progress or noop_progress)), "cpu" if req.force_cpu else "auto")
+        path = md.ready_model_path(md.ASR_REPO)
+        if path is None:
+            log.warning("no ASR for the voice check: %s is not downloaded yet "
+                        "(expected from the first-run / --prefetch download-all)", md.ASR_REPO)
+            return None
+        return make_default_asr(str(path), "cpu" if req.force_cpu else "auto")
     except Exception as exc:  # noqa: BLE001 - WER is a bonus, never a reason to fail
         log.warning("no ASR for the voice check: %s", exc)
         return None
@@ -302,8 +311,14 @@ def _consent_block(req: TaskRequest, res: TaskResult, progress: ProgressCallback
 
         files = expand_inputs(req.audio_files) if req.audio_files else [req.audio]
         progress(Stage.TRAIN, 0.0, tr("progress.consent_reading"))
-        asr = asr_factory() if asr_factory is not None else make_default_asr(
-            str(md.ensure_model(md.ASR_REPO, progress)), "cpu" if req.force_cpu else "auto")
+        if asr_factory is not None:
+            asr = asr_factory()
+        else:
+            path = md.ready_model_path(md.ASR_REPO)
+            if path is None:
+                raise RuntimeError(f"{md.ASR_REPO} is not downloaded yet "
+                                   "(expected from the first-run / --prefetch download-all)")
+            asr = make_default_asr(str(path), "cpu" if req.force_cpu else "auto")
         parsed, clip = consent_runner.detect_from_recording(files[-1], asr, req.asr_language)
         cancel.check()
     except DatasetMakerError:
@@ -370,6 +385,7 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
         if asr_factory is not None:
             asr = asr_factory()
         else:
+            # intentional feature: download with visible progress if the first-run prefetch was skipped
             asr = make_default_asr(str(md.ensure_model(md.ASR_REPO, progress)), "cpu" if req.force_cpu else "auto")
         script_text = None
         if req.text:   # an optional script next to the audio: matched tolerantly (stumbles / re-read lines), see core.script_match
@@ -425,11 +441,22 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
 
 
 def required_model_repos() -> List[str]:
-    """Models needed for the full scenario on this computer (the TTS base depends on the available VRAM)."""
+    """Models needed for the full scenario on this computer (the TTS base depends on the available VRAM).
+
+    Includes speech recognition (Qwen3-ASR) and the Russian text clean-up model (SAGE) so the first-run /
+    ``--prefetch`` / installer "download everything needed" pass fetches them once with visible progress.
+    Features that need them later (voice check, A/B, spoken consent, narrate prep) then use the local copy
+    instead of surprise-downloading in the background.
+    """
+    from infra import text_models
     from infra.vram_optimizer import detect_gpu, plan_training
 
     plan = plan_training(detect_gpu(), 100)
-    return [md.ALIGNER_REPO, plan.base_model]   # the ASR model (no-transcript mode) is fetched on first use
+    repos = [md.ALIGNER_REPO, plan.base_model, md.ASR_REPO]
+    sage = text_models.get("sage-ru")
+    if sage.integrated and sage.repo:
+        repos.append(sage.repo)
+    return repos
 
 
 def models_missing(repos: Optional[List[str]] = None) -> List[str]:

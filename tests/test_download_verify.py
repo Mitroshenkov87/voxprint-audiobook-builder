@@ -90,3 +90,27 @@ def test_the_log_names_who_asked_for_a_download(manifest, caplog):
         md.ensure_model(REPO, snapshot_download=_hf(FILES), revision=SHA_A, mirror_manifest=manifest)
     line = next(r.getMessage() for r in caplog.records if "requested by" in r.getMessage())
     assert REPO in line and "test_the_log_names_who_asked_for_a_download" in line
+
+
+def test_ready_model_path_never_downloads(tmp_path, monkeypatch):
+    """Voice check / consent must see a missing model as None, not trigger ensure_model."""
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "h"))
+    calls = []
+    monkeypatch.setattr(md, "ensure_model", lambda *a, **k: calls.append(a) or tmp_path)
+    assert md.ready_model_path(REPO) is None and calls == []
+    d = md.local_dir_for(REPO)
+    d.mkdir(parents=True)
+    (d / "config.json").write_text("{}")
+    (d / "model.safetensors").write_bytes(b"W" * 8)
+    assert md.ready_model_path(REPO) == d and calls == []
+
+
+def test_voice_check_asr_uses_local_copy_only(tmp_path, monkeypatch):
+    from workers import pipeline_runner as pr
+    from workers.pipeline_runner import TaskRequest
+
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "h"))
+    calls = []
+    monkeypatch.setattr(md, "ensure_model", lambda *a, **k: calls.append(a) or (_ for _ in ()).throw(AssertionError("surprise download")))
+    assert pr._asr_for_check(TaskRequest(kind="lora", audio=tmp_path / "a.wav", text=tmp_path / "t.txt"), None) is None
+    assert calls == []

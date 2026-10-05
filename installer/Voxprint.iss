@@ -2,7 +2,7 @@
 ; For the --onedir variant:  ISCC /DONEDIR installer\Voxprint.iss
 ; Windows 11 x64 only. The models are not part of the installer: the app downloads them itself on first start
 ; (after the installation, Voxprint can be started right away with the --prefetch flag).
-; Wizard page "Models folder" (after the install folder): where the voice models (~7 GB) live. Default = the current location
+; Wizard page "Models folder" (after the install folder): where the voice models (~10 GB) live. Default = the current location
 ; %LOCALAPPDATA%\Voxprint\models; the user may pick another folder or drive.  Only paths are REMEMBERED; the installer copies no model.
 ; Two cases (decided 2026-10-05):
 ;  * a normal folder (empty, or with models in place): it becomes the models folder (%LOCALAPPDATA%\Voxprint\state\models_dir.txt,
@@ -81,9 +81,9 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [CustomMessages]
-english.RunPrefetch=Start %1 and set up the models (downloads about 7 GB once, or imports your existing models folder)
-russian.RunPrefetch=Запустить %1 и подготовить модели (однократная загрузка ~7 ГБ или импорт из вашей папки с моделями)
-german.RunPrefetch=%1 starten und die Modelle einrichten (einmaliger Download von ca. 7 GB oder Import aus Ihrem Modellordner)
+english.RunPrefetch=Start %1 and set up the models (downloads about 10 GB once, or imports your existing models folder)
+russian.RunPrefetch=Запустить %1 и подготовить модели (однократная загрузка ~10 ГБ или импорт из вашей папки с моделями)
+german.RunPrefetch=%1 starten und die Modelle einrichten (einmaliger Download von ca. 10 GB oder Import aus Ihrem Modellordner)
 english.VcRedistStatus=Installing Microsoft Visual C++ components...
 russian.VcRedistStatus=Устанавливаю компоненты Microsoft Visual C++…
 german.VcRedistStatus=Microsoft Visual C++-Komponenten werden installiert...
@@ -96,9 +96,9 @@ german.UninstallDataQuestion=Auch die heruntergeladenen Modelle und Protokolle (
 english.ModelsPageCaption=Models folder
 russian.ModelsPageCaption=Папка моделей
 german.ModelsPageCaption=Modellordner
-english.ModelsPageDescription=Where should the voice models (about 7 GB) be stored?
-russian.ModelsPageDescription=Где хранить голосовые модели (около 7 ГБ)?
-german.ModelsPageDescription=Wo sollen die Sprachmodelle (ca. 7 GB) gespeichert werden?
+english.ModelsPageDescription=Where should the voice models (about 10 GB) be stored?
+russian.ModelsPageDescription=Где хранить голосовые модели (около 10 ГБ)?
+german.ModelsPageDescription=Wo sollen die Sprachmodelle (ca. 10 GB) gespeichert werden?
 english.ModelsPageSubCaption=Keep the default or choose another folder or drive. An empty folder becomes the models folder (models are downloaded into it); models it already holds are used. A folder with a Voxprint backup (voxprint-backup.json) is only read: on the first start its models and voices are restored into the default folder. Your voices and settings stay in the user profile.
 russian.ModelsPageSubCaption=Оставьте папку по умолчанию или выберите другую папку или диск. Пустая папка становится папкой моделей (модели скачиваются в неё); уже имеющиеся в ней модели используются. Папка с резервной копией Voxprint (voxprint-backup.json) только читается: при первом запуске модели и голоса восстанавливаются из неё в папку по умолчанию. Ваши голоса и настройки остаются в профиле пользователя.
 german.ModelsPageSubCaption=Behalten Sie den Standard oder wählen Sie einen anderen Ordner oder ein anderes Laufwerk. Ein leerer Ordner wird zum Modellordner (die Modelle werden dorthin geladen); vorhandene Modelle werden verwendet. Ein Ordner mit einer Voxprint-Sicherung (voxprint-backup.json) wird nur gelesen: Beim ersten Start werden Modelle und Stimmen daraus in den Standardordner wiederhergestellt. Ihre Stimmen und Einstellungen bleiben im Benutzerprofil.

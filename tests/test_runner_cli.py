@@ -111,3 +111,24 @@ def test_prefetch_downloads_only_missing(tmp_path, monkeypatch):
     assert models_missing(repos) == repos
     assert prefetch_models(repos=repos, ensure=ensure) == repos
     assert prefetch_models(repos=repos, ensure=ensure) == [] and got == repos
+
+
+def test_required_model_repos_includes_asr_and_sage(monkeypatch):
+    """First-run / --prefetch download-all must request ASR + SAGE in the same pass as aligner + TTS."""
+    from infra import model_downloader as md
+    from infra import text_models
+    from workers import pipeline_runner as pr
+
+    class FakeGpu:
+        vram_gb = 24.0
+        name = "fake"
+
+    class FakePlan:
+        base_model = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+
+    monkeypatch.setattr("infra.vram_optimizer.detect_gpu", lambda: FakeGpu())
+    monkeypatch.setattr("infra.vram_optimizer.plan_training", lambda *a, **k: FakePlan())
+    got = pr.required_model_repos()
+    assert md.ALIGNER_REPO in got and FakePlan.base_model in got
+    assert md.ASR_REPO in got
+    assert text_models.get("sage-ru").repo in got

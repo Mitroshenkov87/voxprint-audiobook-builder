@@ -47,6 +47,7 @@ ENV_DIR = "VOXPRINT_PORTABLE_DIR"
 
 ALIGNER, ASR = "Qwen/Qwen3-ForcedAligner-0.6B", "Qwen/Qwen3-ASR-0.6B"
 TTS_LARGE, TTS_SMALL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base", "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+SAGE = "ai-forever/sage-fredt5-distilled-95m"
 #: The 1.7B base model from this much VRAM on (the planner of the program: >= 10 GB), else the 0.6B one.
 LARGE_MIN_VRAM_MB = 9500
 
@@ -297,12 +298,12 @@ def model_dir(folder: Path, repo: str) -> Path:
 
 def models_for(mode: str, vram_mb: int, entries: Optional[Dict[str, Any]] = None) -> List[str]:
     """Models for the setup folder: ``none``; ``auto`` = what this PC needs (aligner, the TTS base model its VRAM allows, speech
-    recognition); ``all`` = every model with a pinned file list (a folder for other PCs)."""
+    recognition, SAGE text clean-up); ``all`` = every model with a pinned file list (a folder for other PCs)."""
     if mode == "none":
         return []
     if mode == "all":
         return sorted(entries if entries is not None else model_mirrors.load())
-    return [ALIGNER, TTS_LARGE if vram_mb >= LARGE_MIN_VRAM_MB else TTS_SMALL, ASR]
+    return [ALIGNER, TTS_LARGE if vram_mb >= LARGE_MIN_VRAM_MB else TTS_SMALL, ASR, SAGE]
 
 
 _EN = {

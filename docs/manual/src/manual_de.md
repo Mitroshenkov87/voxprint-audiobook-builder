@@ -18,7 +18,7 @@ Es gibt keine Kommandozeile, keinen Browser und kein Benutzerkonto. Aufnahmen, T
 | Betriebssystem | Windows 11 24H2 (Build 26100), 64 Bit | Windows 11 26H2 |
 | Grafikkarte | NVIDIA mit etwa 6 GB Videospeicher (VRAM) | NVIDIA mit 16 GB VRAM oder mehr |
 | Ohne NVIDIA-Karte | Der Datensatz wird trotzdem erstellt; das Training läuft auf dem Prozessor und dauert viele Stunden (das Programm warnt Sie) | – |
-| Speicherplatz | etwa 12 GB (Modelle etwa 7 GB + Programm), plus etwa 4,2 GB für das optionale Universalmodell | eine SSD |
+| Speicherplatz | etwa 12 GB (Modelle etwa 10 GB + Programm), plus etwa 4,2 GB für das optionale Universalmodell | eine SSD |
 | Internet | einmalig, um die Modelle herunterzuladen (etwa 7 GB) | – |
 
 ## So funktioniert es in fünf Schritten
@@ -43,7 +43,7 @@ Stille Installation für Administratoren: `Voxprint-Setup.exe /VERYSILENT /Model
 
 ## Erster Start
 
-Beim ersten Start bereitet sich Voxprint vor: Die Statuszeile zeigt „{{ui.prefetch_start}}“ Es lädt die benötigten Modelle herunter (etwa 7 GB, einmalig). Ist Hugging Face langsam oder nicht erreichbar, wechselt Voxprint automatisch zum ModelScope-Spiegel. Der Download kann unterbrochen werden und läuft an der gleichen Stelle weiter. Modelle, die schon auf dem Computer liegen (zum Beispiel im Hugging-Face-Cache oder bei Alexandria/Pinokio), werden ohne erneuten Download nur lesend weiterverwendet.
+Beim ersten Start bereitet sich Voxprint vor: Die Statuszeile zeigt „{{ui.prefetch_start}}“ Es lädt die benötigten Modelle herunter (etwa 10 GB, einmalig). Ist Hugging Face langsam oder nicht erreichbar, wechselt Voxprint automatisch zum ModelScope-Spiegel. Der Download kann unterbrochen werden und läuft an der gleichen Stelle weiter. Modelle, die schon auf dem Computer liegen (zum Beispiel im Hugging-Face-Cache oder bei Alexandria/Pinokio), werden ohne erneuten Download nur lesend weiterverwendet.
 
 Ist alles fertig, zeigt die Statuszeile „{{ui.prefetch_done}}“ Beim ersten Start erscheint ein Datenschutzhinweis; eine kurze Erinnerung („{{ui.footer_privacy}}“) bleibt am unteren Rand der Fenster.
 

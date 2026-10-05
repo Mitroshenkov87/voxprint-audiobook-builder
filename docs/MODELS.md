@@ -20,6 +20,8 @@ A copy is accepted only if it is **complete** (valid `config.json`, every file o
 (HF snapshot folder name = commit sha; folders without a sha are accepted only when the weight-file sizes equal the verified commit).
 On a mismatch the verified revision is downloaded. The updater never touches reused copies.
 
+**First-run / download-all.** The first start, ``--prefetch`` and the installer's "set up the models" step download (with visible progress, one model after another) everything the full scenario needs on this PC: the forced aligner, the TTS base that fits the available VRAM, speech recognition (Qwen3-ASR) and the Russian text clean-up model (SAGE). After each download the files are checked by size and SHA-256 against `infra/model_mirrors.json` before the model is marked ready. Later features (voice check, A/B, spoken consent, narrate prep) use those local copies; they do not surprise-download in the background if a model was skipped.
+
 **Download order.**
 * **Small models** (whole model up to 500 MB: the four Opus-MT translation models and SAGE, 1.6 GB together) come **first** from the GitHub pre-release [`models-v1`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/models-v1) (one asset per file, SHA-256 pinned in `infra/model_release.json`) -> original Hugging Face repository -> our Hugging Face mirror -> ModelScope. If GitHub stalls (45 s without data) the next source takes over.
 * **Large models** (Qwen3 TTS / ASR / aligner, 1.8-4.5 GB): original Hugging Face repository -> our Hugging Face mirror -> ModelScope; if Hugging Face is slow or unreachable (6 s probe; skipped when you set your own `HF_ENDPOINT`) ModelScope goes first.

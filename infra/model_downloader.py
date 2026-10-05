@@ -28,14 +28,14 @@ netroute.disable_xet()      # plain HTTP: the xet/CAS transfer path stalls on ne
 log = logging.getLogger("voxprint.models")
 
 ALIGNER_REPO = "Qwen/Qwen3-ForcedAligner-0.6B"
-ASR_REPO = "Qwen/Qwen3-ASR-0.6B"   # speech recognition for the no-transcript mode (downloaded on first use)
+ASR_REPO = "Qwen/Qwen3-ASR-0.6B"   # speech recognition (first-run / --prefetch download-all; also voice check, A/B, spoken consent, no-transcript)
 #: Approximate download size in GB (for the free-disk-space check; an estimate, not an exact value).
 APPROX_SIZE_GB = {
     ALIGNER_REPO: 2.0,
     ASR_REPO: 1.9,
     "Qwen/Qwen3-TTS-12Hz-1.7B-Base": 4.5,
     "Qwen/Qwen3-TTS-12Hz-0.6B-Base": 2.5,
-    "ai-forever/sage-fredt5-distilled-95m": 0.5,         # optional text clean-up model (see infra/text_models.py)
+    "ai-forever/sage-fredt5-distilled-95m": 0.5,         # Russian text clean-up (first-run download-all; see infra/text_models.py)
     "Helsinki-NLP/opus-mt-ru-en": 0.4,                    # optional translation models (Opus-MT, one per direction)
     "Helsinki-NLP/opus-mt-en-ru": 0.4,
     "Helsinki-NLP/opus-mt-de-en": 0.4,
@@ -216,6 +216,20 @@ def model_state(repo_id: str) -> str:
 def model_states(repos) -> Dict[str, str]:
     """``{repo_id: state}`` for several repositories (see :func:`model_state`)."""
     return {r: model_state(r) for r in repos}
+
+
+def ready_model_path(repo_id: str) -> Optional[Path]:
+    """Path of a model that is already complete (Voxprint's folder or another program's copy), or ``None``.
+
+    Never downloads.  Features that expect the first-run / ``--prefetch`` download-all to have fetched the model
+    (voice check, A/B, spoken consent) use this instead of :func:`ensure_model`, so a missing model is a clear skip
+    / error rather than a surprise background download.
+    """
+    target = local_dir_for(repo_id)
+    if verify_local_model(target):
+        return target
+    found = external_model(repo_id)
+    return found.path if found is not None else None
 
 
 def local_revision(repo_id: str, root: Optional[Path] = None) -> Optional[str]:

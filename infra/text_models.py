@@ -2,7 +2,8 @@
 
 Only models that are small, permissively licensed (MIT / Apache-2.0 / CC-BY) and testable behind a mockable interface are
 marked ``integrated``; the rest are listed as ``planned`` so the UI can show them greyed ("coming later") and so the
-extension point is visible in one place.  Nothing here is downloaded automatically: the user ticks the option and presses
+extension point is visible in one place.  SAGE (Russian clean-up) is part of the first-run / ``--prefetch`` download-all
+alongside the main HF models; other integrated models (translation) stay on demand: the user ticks the option and presses
 *Download*; :func:`ensure` then fetches the pinned revision into the models folder (HF -> ModelScope fallback, resumable,
 see :mod:`infra.model_downloader`).
 
