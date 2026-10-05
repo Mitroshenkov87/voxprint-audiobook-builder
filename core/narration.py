@@ -110,7 +110,7 @@ class NarrationOptions:
     prep: Optional[PrepPlan] = None
     #: Explicit silence between the pieces (comma, sentence, ellipsis, dash, paragraph, chapter ...), independent of the model's
     #: prosody (:mod:`core.pauses`).  ``None`` = the earlier packed chunks with fixed pauses.
-    pauses: Optional[pz.PauseProfile] = field(default_factory=pz.PauseProfile)
+    pauses: Optional[pz.PauseProfile] = None   # opt-in: explicit pauses can make the model swallow short words
     #: Machine translation of the book before narration (:mod:`core.translate`); ``None`` = narrate the book as it is.
     translate: Optional[tl.TranslatePlan] = None
 

@@ -85,3 +85,27 @@ def save_level(level: int) -> None:
         p.write_text(str(clamp_level(level)), encoding="utf-8")
     except OSError:
         pass
+
+
+# Explicit pauses cut the text at every comma / dash / ellipsis; on short pieces the voice model tends to "bubble" and
+# swallow words, so the feature is opt-in (default OFF) and remembered in a separate small file next to the level.
+def _enabled_file():
+    return _file().with_name(_file().stem + "_enabled.txt")
+
+
+def load_enabled() -> bool:
+    """Whether the user turned explicit pauses on (False when never chosen)."""
+    try:
+        return _enabled_file().read_text(encoding="utf-8").strip() == "1"
+    except OSError:
+        return False
+
+
+def save_enabled(on: bool) -> None:
+    """Remember the explicit-pauses switch (a failure to write is not an error)."""
+    try:
+        p = _enabled_file()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("1" if on else "0", encoding="utf-8")
+    except OSError:
+        pass

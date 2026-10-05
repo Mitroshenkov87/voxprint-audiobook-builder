@@ -608,6 +608,7 @@
  "narr.pauses_4": "länger",
  "narr.pauses_5": "deutlich länger",
  "narr.pauses_value": "{name} (Satz {sentence} ms, Absatz {paragraph} ms)",
+ "narr.pauses_enable": "Exakte Pausen nach Kommas und Sätzen einfügen (die Stimme kann kurze Wörter verschlucken)",
  "narr.pauses_hint": "Nach jedem Komma, Satz, jeder Auslassung, jedem Gedankenstrich, Absatz, Szenenwechsel und Kapitel wird Stille exakter Länge eingefügt, unabhängig davon, wie das Stimmmodell den Text phrasiert, damit die Pausen deutlich hörbar sind. „Normal“ ist etwas länger als die frühere Vertonung. Eine spätere Änderung verwendet bereits gesprochene Textteile weiter.",
  "ui.voice_type_hint": "Der Stimmtyp wird in voice.json und im Ordnernamen der trainierten Stimme gespeichert (zum Beispiel anna_male).",
  "ui.voice_type_suggest": "Aus der Tonhöhe der Aufnahme vorgeschlagen: {type} (etwa {hz} Hz). Ändern Sie es, falls es nicht stimmt.",

@@ -401,6 +401,9 @@ class NarrateWindow(SubWindow):
         self.btn_other.toggled.connect(self._on_other_toggled)
         # advanced (collapsed): exact bitrates, output folder, chapter titles, text sample
         # pause strength: explicit silence between commas, sentences, paragraphs ... (core/pauses.py)
+        self.chk_pauses = QCheckBox()            # opt-in: explicit pauses can make the model swallow short words
+        self.chk_pauses.setChecked(pz.load_enabled())
+        v.addWidget(self.chk_pauses)
         self.lbl_pauses = QLabel()
         self.sld_pauses = QSlider(Qt.Orientation.Horizontal)
         self.sld_pauses.setRange(0, len(pz.LEVELS) - 1)
@@ -419,6 +422,8 @@ class NarrateWindow(SubWindow):
         self.lbl_pauses_hint = hint_label()
         v.addWidget(self.lbl_pauses_hint)
         self.sld_pauses.valueChanged.connect(self._on_pauses_changed)
+        self.chk_pauses.toggled.connect(self._on_pauses_toggled)
+        self._on_pauses_toggled(self.chk_pauses.isChecked(), save=False)
         self.btn_advanced = QToolButton()
         self.btn_advanced.setObjectName("expander")
         self.btn_advanced.setCheckable(True)
@@ -574,6 +579,7 @@ class NarrateWindow(SubWindow):
         self.btn_out.setText(tr("narr.choose_folder"))
         self.lbl_out.setText(str(self.out_dir))
         self.chk_titles.setText(tr("narr.speak_titles"))
+        self.chk_pauses.setText(tr("narr.pauses_enable"))
         self.lbl_pauses.setText(tr("narr.pauses"))
         self.lbl_pauses_hint.setText(tr("narr.pauses_hint"))
         self._on_pauses_changed(self.sld_pauses.value(), save=False)
@@ -597,8 +603,17 @@ class NarrateWindow(SubWindow):
         if save:
             pz.save_level(prof.level)
 
-    def pause_profile(self) -> pz.PauseProfile:
-        """The pause lengths chosen with the slider."""
+    def _on_pauses_toggled(self, on: bool, save: bool = True) -> None:
+        """Explicit pauses on/off: the slider only matters when they are on."""
+        for w in (self.lbl_pauses, self.sld_pauses, self.lbl_pauses_value, self.lbl_pauses_hint):
+            w.setEnabled(on and not getattr(self, "busy", False))
+        if save:
+            pz.save_enabled(on)
+
+    def pause_profile(self) -> "pz.PauseProfile | None":
+        """The pause lengths chosen with the slider, or None (packed chunks, model's own phrasing) when switched off."""
+        if not self.chk_pauses.isChecked():
+            return None
         return pz.PauseProfile(self.sld_pauses.value())
 
     def _on_other_toggled(self, open_: bool) -> None:
@@ -1059,7 +1074,8 @@ class NarrateWindow(SubWindow):
         self.chk_translate.setEnabled(not busy)
         self.cmb_translate.setEnabled(not busy)
         self.cmb_voice.setEnabled(not busy)
-        self.sld_pauses.setEnabled(not busy)
+        self.chk_pauses.setEnabled(not busy)
+        self.sld_pauses.setEnabled(not busy and self.chk_pauses.isChecked())
         self.btn_pause.setVisible(busy)
         self.btn_cancel.setVisible(busy)
 

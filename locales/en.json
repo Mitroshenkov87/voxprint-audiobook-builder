@@ -608,6 +608,7 @@
  "narr.pauses_4": "longer",
  "narr.pauses_5": "much longer",
  "narr.pauses_value": "{name} (sentence {sentence} ms, paragraph {paragraph} ms)",
+ "narr.pauses_enable": "Insert measured pauses after commas and sentences (may make the voice swallow short words)",
  "narr.pauses_hint": "Silence of a measured length is inserted after every comma, sentence, ellipsis, dash, paragraph, scene break and chapter, independent of how the voice model phrases the text, so the pauses are clearly audible. \"Normal\" is a little longer than the earlier narration. Changing it later only re-joins the audio when the text pieces stay the same.",
  "ui.voice_type_hint": "The voice type goes into voice.json and into the name of the trained voice's folder (for example anna_male).",
  "ui.voice_type_suggest": "Suggested from the recording's pitch: {type} (about {hz} Hz). Change it if this is wrong.",
