@@ -3,7 +3,8 @@ overridable with ``VOXPRINT_HOME``).
 
 Layout under :func:`app_home`::
 
-    models/      downloaded Hugging Face / ModelScope snapshots
+    models/      downloaded Hugging Face / ModelScope snapshots (the DEFAULT models folder; the installer's "Models folder" page
+                 or ``VOXPRINT_MODELS_DIR`` may move the download target elsewhere - see :func:`models_dir`)
     packages/    updated Python packages, put on ``sys.path`` at start-up (before heavy imports)
     voices/      the voice library: one folder per voice (adapter + voice.json), see core/voice_library.py
     state/       small settings files (language, privacy acknowledgement, updater state, last adapter ...)
@@ -17,6 +18,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 APP_NAME = "Voxprint"
 
@@ -44,9 +46,60 @@ def _sub(name: str) -> Path:
     return p
 
 
-def models_dir() -> Path:
-    """Directory with downloaded model snapshots."""
+MODELS_DIR_ENV = "VOXPRINT_MODELS_DIR"
+#: One line with the user's models folder (written by the installer's "Models folder" page, UTF-8 with or without BOM).
+MODELS_DIR_FILE = "models_dir.txt"
+
+
+def default_models_dir() -> Path:
+    """The default models folder ``<app home>/models`` (``%LOCALAPPDATA%\\Voxprint\\models`` on Windows)."""
     return _sub("models")
+
+
+def configured_models_dir() -> Optional[Path]:
+    """The models folder chosen by the user (``$VOXPRINT_MODELS_DIR``, else ``state/models_dir.txt``), or ``None``.
+
+    Only absolute paths count (a relative one would depend on the working directory of whoever starts the program)."""
+    text = os.environ.get(MODELS_DIR_ENV, "").strip().strip('"')
+    if not text:
+        try:
+            lines = (app_home() / "state" / MODELS_DIR_FILE).read_text(encoding="utf-8-sig").splitlines()
+        except (OSError, UnicodeDecodeError):
+            lines = []
+        text = next((ln.strip().strip('"') for ln in lines if ln.strip()), "")
+    if not text:
+        return None
+    p = Path(os.path.expandvars(os.path.expanduser(text)))
+    return p if p.is_absolute() else None
+
+
+def set_models_dir(folder: Optional[Path]) -> None:
+    """Remember ``folder`` as the models folder; ``None`` or the default folder forgets the choice."""
+    f = state_dir() / MODELS_DIR_FILE
+    if folder is None or _same(Path(folder), app_home() / "models"):
+        f.unlink(missing_ok=True)
+        return
+    f.write_text(str(folder) + "\n", encoding="utf-8")
+
+
+def _same(a: Path, b: Path) -> bool:
+    try:
+        return os.path.normcase(str(a.resolve())) == os.path.normcase(str(b.resolve()))
+    except OSError:
+        return False
+
+
+def models_dir() -> Path:
+    """Directory where models are downloaded: the user's models folder if one is configured and can be created, else
+    :func:`default_models_dir` (a missing drive must not stop the program; it falls back and downloads there)."""
+    p = configured_models_dir()
+    if p is not None:
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            return p
+        except OSError:
+            pass
+    return default_models_dir()
 
 
 def voices_dir() -> Path:

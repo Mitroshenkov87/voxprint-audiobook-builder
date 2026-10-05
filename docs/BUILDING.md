@@ -3,9 +3,9 @@
 ## Build the installer locally
 `build.bat` produces `installer\Output\Voxprint-Setup.exe` (Inno Setup 6, per-machine install, Windows 11 x64; about 1.8 GB because PyTorch is inside).
 The installer does not contain the models: on first start Voxprint downloads about 7 GB once (internet needed).
-The wizard is available in **English, Russian and German** and has an optional page **"Existing models"** (right after the install folder): *Do you already have downloaded models from a previous install?* - choose the
-folder or leave the field empty to skip. The installer **copies nothing**; it only writes the chosen path to `%LOCALAPPDATA%\Voxprint\state\existing_models_dir.txt` (UTF-8), and on the first start the program imports the
-models from there instead of downloading them (see [Backup, restore and existing models](MODELS.md#backup-restore-and-existing-models)). Silent install: `Voxprint-Setup.exe /VERYSILENT /ModelsDir="D:\old\models"`.
+The wizard is available in **English, Russian and German** and has a page **"Models folder"** (right after the install folder): default = the current location `%LOCALAPPDATA%\Voxprint\models`, or any other folder / drive (Program Files is refused: the app runs without admin rights).
+The installer **copies nothing**; it only writes the chosen path to `%LOCALAPPDATA%\Voxprint\state\models_dir.txt` (UTF-8; removed when the default is kept). The app then keeps using models already complete in the default folder, picks up models the chosen folder already holds
+(Voxprint layout, Hugging Face cache, Voxprint backup) and downloads the rest into the chosen folder ([details](MODELS.md#models-folder)). Voices and settings stay in `%LOCALAPPDATA%\Voxprint`. Silent install: `Voxprint-Setup.exe /VERYSILENT /ModelsFolder="D:\Voxprint models"`; the older `/ModelsDir="D:\old\models"` (a folder to import models from) still works.
 Caveat: the installer runs elevated (per-machine); if the administrator account differs from the account that uses the program, `%LOCALAPPDATA%` is the administrator's - then set the folder in *Settings* instead.
 
 ## Run from source (Windows)

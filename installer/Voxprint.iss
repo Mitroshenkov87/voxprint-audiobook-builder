@@ -2,10 +2,14 @@
 ; For the --onedir variant:  ISCC /DONEDIR installer\Voxprint.iss
 ; Windows 11 x64 only. The models are not part of the installer: the app downloads them itself on first start
 ; (after the installation, Voxprint can be started right away with the --prefetch flag).
-; Optional wizard page "Existing models": the folder with models from a previous install / a Voxprint backup is only
-; REMEMBERED (written to %LOCALAPPDATA%\Voxprint\state\existing_models_dir.txt); the installer copies nothing. On the first start
-; the program imports the models from there (hard link on the same drive, else copy, checked by checksum) before downloading.
-; Silent installs can pass it with /ModelsDir="D:\old\models". Wizard languages: English, Russian, German.
+; Wizard page "Models folder" (after the install folder): where the voice models (~7 GB) live. Default = the current location
+; %LOCALAPPDATA%\Voxprint\models; the user may pick another folder or drive.  Only the path is REMEMBERED
+; (%LOCALAPPDATA%\Voxprint\state\models_dir.txt, read by infra/paths.py: models_dir); the installer copies no model.  The app then
+; (1) keeps using models that are already complete in the default Local folder, (2) picks up models the chosen folder already holds
+; (Voxprint layout, Hugging Face cache, Voxprint backup), (3) downloads everything missing INTO the chosen folder.  Voices and
+; settings stay in %LOCALAPPDATA%\Voxprint.  Program Files is refused (the app runs without admin rights and could not write there).
+; Silent: /ModelsFolder="D:\Voxprint models".  The older /ModelsDir="D:\old\models" (a folder to IMPORT models from, written to
+; state\existing_models_dir.txt) still works.  Wizard languages: English, Russian, German.
 ;
 ; ONLINE variant:  ISCC /DONLINE /DONEDIR /DManifestUrl=<https://.../manifest-beta.json> installer\Voxprint.iss  ->  Output\Voxprint-Setup-online.exe
 ; A small installer (a few MB + vc_redist): it embeds build\online\voxprint-fetch.exe (tools/online_fetch.py), which downloads the
@@ -82,21 +86,24 @@ german.WinBuildWarning=%1 ist für Windows 11 ausgelegt (Build 26100 und neuer).
 english.UninstallDataQuestion=Also delete the downloaded models and logs (%1)? They take several gigabytes.
 russian.UninstallDataQuestion=Удалить также скачанные модели и журналы (%1)? Они занимают несколько гигабайт.
 german.UninstallDataQuestion=Auch die heruntergeladenen Modelle und Protokolle (%1) löschen? Sie belegen mehrere Gigabyte.
-english.ModelsPageCaption=Existing models (optional)
-russian.ModelsPageCaption=Готовые модели (необязательно)
-german.ModelsPageCaption=Vorhandene Modelle (optional)
-english.ModelsPageDescription=Do you already have downloaded models from a previous install?
-russian.ModelsPageDescription=Есть ли у вас уже скачанные модели от прошлой установки?
-german.ModelsPageDescription=Haben Sie bereits heruntergeladene Modelle einer früheren Installation?
-english.ModelsPageSubCaption=If so, choose the folder that holds them (for example the old Voxprint models folder or a Voxprint backup). The setup copies nothing: on the first start the program imports the models from there (linked on the same drive, copied otherwise, checked by checksum) instead of downloading them. Leave the field empty to skip this step.
-russian.ModelsPageSubCaption=Если да, выберите папку с ними (например, старую папку models от Voxprint или резервную копию Voxprint). Установщик ничего не копирует: при первом запуске программа сама импортирует модели оттуда (ссылкой на том же диске, иначе копированием, с проверкой контрольной суммы) вместо загрузки. Оставьте поле пустым, чтобы пропустить этот шаг.
-german.ModelsPageSubCaption=Wenn ja, wählen Sie den Ordner mit den Modellen (z. B. den alten Voxprint-Modellordner oder eine Voxprint-Sicherung). Das Setup kopiert nichts: Beim ersten Start importiert das Programm die Modelle von dort (auf demselben Laufwerk verknüpft, sonst kopiert, per Prüfsumme kontrolliert) statt sie herunterzuladen. Lassen Sie das Feld leer, um diesen Schritt zu überspringen.
-english.ModelsPagePrompt=Folder with models:
-russian.ModelsPagePrompt=Папка с моделями:
-german.ModelsPagePrompt=Ordner mit Modellen:
-english.ModelsPageBadFolder=The folder %1 does not exist. Choose an existing folder or clear the field to skip this step.
-russian.ModelsPageBadFolder=Папка %1 не существует. Выберите существующую папку или очистите поле, чтобы пропустить этот шаг.
-german.ModelsPageBadFolder=Der Ordner %1 existiert nicht. Wählen Sie einen vorhandenen Ordner oder leeren Sie das Feld, um diesen Schritt zu überspringen.
+english.ModelsPageCaption=Models folder
+russian.ModelsPageCaption=Папка моделей
+german.ModelsPageCaption=Modellordner
+english.ModelsPageDescription=Where should the voice models (about 7 GB) be stored?
+russian.ModelsPageDescription=Где хранить голосовые модели (около 7 ГБ)?
+german.ModelsPageDescription=Wo sollen die Sprachmodelle (ca. 7 GB) gespeichert werden?
+english.ModelsPageSubCaption=Keep the default or choose another folder or drive. Models already downloaded to the default folder are used as they are; if the chosen folder already holds models (for example from a previous install or a Voxprint backup), they are picked up; anything missing is downloaded into the chosen folder. Your voices and settings stay in the user profile.
+russian.ModelsPageSubCaption=Оставьте папку по умолчанию или выберите другую папку или диск. Модели, уже скачанные в папку по умолчанию, используются как есть; если в выбранной папке уже есть модели (например, от прошлой установки или резервной копии Voxprint), они будут подхвачены; недостающие скачиваются в выбранную папку. Ваши голоса и настройки остаются в профиле пользователя.
+german.ModelsPageSubCaption=Behalten Sie den Standard oder wählen Sie einen anderen Ordner oder ein anderes Laufwerk. Bereits in den Standardordner geladene Modelle werden weiter verwendet; enthält der gewählte Ordner schon Modelle (z. B. von einer früheren Installation oder einer Voxprint-Sicherung), werden sie übernommen; Fehlendes wird in den gewählten Ordner geladen. Ihre Stimmen und Einstellungen bleiben im Benutzerprofil.
+english.ModelsPagePrompt=Models folder:
+russian.ModelsPagePrompt=Папка моделей:
+german.ModelsPagePrompt=Modellordner:
+english.ModelsPageBadFolder=The folder %1 cannot be created or is not writable. Choose another folder.
+russian.ModelsPageBadFolder=Папку %1 не удаётся создать или в неё нельзя записывать. Выберите другую папку.
+german.ModelsPageBadFolder=Der Ordner %1 kann nicht angelegt werden oder ist nicht beschreibbar. Wählen Sie einen anderen Ordner.
+english.ModelsPageProtected=The folder %1 is inside Program Files: the program runs without administrator rights and could not download models there. Choose another folder.
+russian.ModelsPageProtected=Папка %1 находится в Program Files: программа работает без прав администратора и не сможет скачивать туда модели. Выберите другую папку.
+german.ModelsPageProtected=Der Ordner %1 liegt in Program Files: Das Programm läuft ohne Administratorrechte und könnte dort keine Modelle speichern. Wählen Sie einen anderen Ordner.
 
 english.OnlineStatus=Downloading and unpacking the Voxprint components (the download can be resumed if it is interrupted)...
 russian.OnlineStatus=Загрузка и распаковка компонентов Voxprint (при обрыве загрузку можно продолжить)...
@@ -200,14 +207,59 @@ begin
       mbConfirmation, MB_YESNO) = IDYES;
 end;
 
-{ Callback of the Browse button on the models page. }
+{ Callback of the Browse button on the models page (True = the dialog may create a new folder). }
 procedure ModelsBrowseClick(Sender: TObject);
 var
   Dir: String;
 begin
   Dir := ModelsEdit.Text;
-  if BrowseForFolder(CustomMessage('ModelsPagePrompt'), Dir, False) then
+  if BrowseForFolder(CustomMessage('ModelsPagePrompt'), Dir, True) then
     ModelsEdit.Text := Dir;
+end;
+
+{ The default models folder of the app (infra/paths.py: default_models_dir). }
+function DefaultModelsDir(): String;
+begin
+  Result := ExpandConstant('{localappdata}\Voxprint\models');
+end;
+
+{ What the page shows first: /ModelsFolder=, else the folder remembered by an earlier install, else the default. }
+function InitialModelsDir(): String;
+var
+  S: String;
+  Lines: TArrayOfString;
+begin
+  Result := RemoveBackslash(Trim(ExpandConstant('{param:ModelsFolder|}')));
+  if Result <> '' then Exit;
+  S := ExpandConstant('{localappdata}\Voxprint\state\models_dir.txt');
+  if FileExists(S) and LoadStringsFromFile(S, Lines) and (GetArrayLength(Lines) > 0) then
+  begin
+    Result := RemoveBackslash(Trim(Lines[0]));
+    if Result <> '' then Exit;
+  end;
+  Result := DefaultModelsDir();
+end;
+
+{ The folder must be creatable and writable (a read-only USB stick, a typo ...). }
+function FolderUsable(const Dir: String): Boolean;
+var
+  Probe: String;
+begin
+  Result := False;
+  if (Dir = '') or (not ForceDirectories(Dir)) then Exit;
+  Probe := AddBackslash(Dir) + '.voxprint-write-test';
+  Result := SaveStringToFile(Probe, 'x', False);
+  if Result then DeleteFile(Probe);
+end;
+
+{ True for a folder below Program Files (the setup runs as admin, the app does not: it could not write there). }
+function InProgramFiles(const Dir: String): Boolean;
+var
+  D: String;
+begin
+  D := Lowercase(AddBackslash(Dir));
+  Result := (Pos(Lowercase(AddBackslash(ExpandConstant('{commonpf64}'))), D) = 1) or
+            (Pos(Lowercase(AddBackslash(ExpandConstant('{commonpf32}'))), D) = 1);
 end;
 
 #ifdef PORTABLE
@@ -318,22 +370,10 @@ begin
   PortableCheckClick(nil);
 end;
 
-{ The checked folder must be creatable and writable (a read-only USB stick, a typo ...). }
-function PortableFolderUsable(const Dir: String): Boolean;
-var
-  Probe: String;
-begin
-  Result := False;
-  if (Dir = '') or (not ForceDirectories(Dir)) then Exit;
-  Probe := AddBackslash(Dir) + '.voxprint-write-test';
-  Result := SaveStringToFile(Probe, 'x', False);
-  if Result then DeleteFile(Probe);
-end;
 #endif
 
-{ Optional page after the install folder: a folder with models from a previous install. Nothing is copied here.
-  A plain custom page, NOT CreateInputDirPage: that one refuses an empty field ("You must enter a full path"), which broke
-  both the silent install without /ModelsDir and "leave the field empty to skip" (found in the final installer test). }
+{ Page after the install folder: the models folder (default = the current Local location).  Nothing is copied here.
+  A plain custom page, NOT CreateInputDirPage (that one behaved badly in silent installs; found in the final installer test). }
 procedure InitializeWizard();
 var
   Info, Prompt: TNewStaticText;
@@ -359,7 +399,7 @@ begin
   ModelsEdit.Left := 0;
   ModelsEdit.Top := ScaleY(116);
   ModelsEdit.Width := ModelsPage.SurfaceWidth - ScaleX(96);
-  ModelsEdit.Text := ExpandConstant('{param:ModelsDir|}');
+  ModelsEdit.Text := InitialModelsDir();
   Browse := TNewButton.Create(ModelsPage);
   Browse.Parent := ModelsPage.Surface;
   Browse.Left := ModelsEdit.Width + ScaleX(8);
@@ -380,8 +420,18 @@ begin
   Result := True;
   if CurPageID = ModelsPage.ID then
   begin
-    Dir := Trim(ModelsEdit.Text);
-    if (Dir <> '') and not DirExists(Dir) then
+    Dir := RemoveBackslash(Trim(ModelsEdit.Text));
+    if Dir = '' then
+    begin
+      Dir := DefaultModelsDir();                  { an emptied field means "the default" }
+      ModelsEdit.Text := Dir;
+    end;
+    if InProgramFiles(Dir) then
+    begin
+      MsgBox(FmtMessage(CustomMessage('ModelsPageProtected'), [Dir]), mbError, MB_OK);
+      Result := False;
+    end
+    else if not FolderUsable(Dir) then
     begin
       MsgBox(FmtMessage(CustomMessage('ModelsPageBadFolder'), [Dir]), mbError, MB_OK);
       Result := False;
@@ -391,7 +441,7 @@ begin
   if CurPageID = PortablePage.ID then
   begin
     Dir := PortableDir();
-    if (Dir <> '') and (Trim(ExpandConstant('{param:FromFolder|}')) = '') and not PortableFolderUsable(Dir) then
+    if (Dir <> '') and (Trim(ExpandConstant('{param:FromFolder|}')) = '') and not FolderUsable(Dir) then
     begin
       MsgBox(FmtMessage(CustomMessage('PortableBadFolder'), [Dir]), mbError, MB_OK);
       Result := False;
@@ -556,7 +606,8 @@ begin
     Log('vc_redist.x64.exe could not be started: ' + SysErrorMessage(Rc) + ' (ignored)');
 end;
 
-{ Only the path is remembered (UTF-8 file); the app imports the models on its first start. }
+{ Only paths are remembered (UTF-8 files in state\); no model is copied.  models_dir.txt = the models folder (deleted when it is the
+  default, so the app follows its own default); existing_models_dir.txt = an optional folder to import models from (/ModelsDir=). }
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Dir, StateDir: String;
@@ -575,7 +626,7 @@ begin
       SetArrayLength(Lines, 1);
       Lines[0] := Dir;
       SaveStringsToUTF8File(StateDir + '\portable_dir.txt', Lines, False);
-      if (Trim(ModelsEdit.Text) = '') and DirExists(AddBackslash(Dir) + 'models') then
+      if (Trim(ExpandConstant('{param:ModelsDir|}')) = '') and DirExists(AddBackslash(Dir) + 'models') then
       begin
         Lines[0] := Dir;
         SaveStringsToUTF8File(StateDir + '\existing_models_dir.txt', Lines, False);
@@ -585,12 +636,20 @@ begin
 #endif
   if CurStep = ssPostInstall then
   begin
-    Dir := Trim(ModelsEdit.Text);
+    StateDir := ExpandConstant('{localappdata}\Voxprint\state');
+    ForceDirectories(StateDir);
+    SetArrayLength(Lines, 1);
+    Dir := RemoveBackslash(Trim(ModelsEdit.Text));
+    if (Dir = '') or (CompareText(Dir, DefaultModelsDir()) = 0) then
+      DeleteFile(StateDir + '\models_dir.txt')
+    else
+    begin
+      Lines[0] := Dir;
+      SaveStringsToUTF8File(StateDir + '\models_dir.txt', Lines, False);
+    end;
+    Dir := Trim(ExpandConstant('{param:ModelsDir|}'));
     if Dir <> '' then
     begin
-      StateDir := ExpandConstant('{localappdata}\Voxprint\state');
-      ForceDirectories(StateDir);
-      SetArrayLength(Lines, 1);
       Lines[0] := Dir;
       SaveStringsToUTF8File(StateDir + '\existing_models_dir.txt', Lines, False);
     end;

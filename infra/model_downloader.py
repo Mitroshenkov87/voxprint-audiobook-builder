@@ -49,8 +49,20 @@ def hf_url(repo_id: str) -> str:
 
 
 def local_dir_for(repo_id: str, root: Optional[Path] = None) -> Path:
-    """Folder of a model inside the models directory: ``Qwen/X`` -> ``Qwen--X``."""
-    return (root or paths.models_dir()) / repo_id.replace("/", "--")
+    """Folder of a model inside the models directory: ``Qwen/X`` -> ``Qwen--X``.
+
+    With the user's own models folder (installer page "Models folder", :func:`infra.paths.models_dir`) a model that is
+    complete only in the DEFAULT folder (``%LOCALAPPDATA%\\Voxprint\\models``, an earlier install) is used from there - it is
+    not downloaded again; everything new goes to the chosen folder."""
+    name = repo_id.replace("/", "--")
+    if root is not None:
+        return Path(root) / name
+    target = paths.models_dir() / name
+    if not verify_local_model(target):
+        default = paths.default_models_dir() / name
+        if default != target and verify_local_model(default):
+            return default
+    return target
 
 
 def verify_local_model(path: Path) -> bool:
@@ -112,8 +124,16 @@ def external_model(repo_id: str, revision: Optional[str] = None):
     """
     from core import model_locator
 
+    rev = revision if revision else pinned_revision(repo_id)
     try:
-        return model_locator.find_model(repo_id, revision if revision else pinned_revision(repo_id))
+        found = model_locator.find_model(repo_id, rev)
+        if found is None and paths.configured_models_dir() is not None:
+            # the folder the user CHOSE as models folder may hold models in another layout (Hugging Face cache, a
+            # Voxprint backup ...): they are picked up in place; an explicit choice is not "guessing" (ignore_disabled)
+            own = paths.models_dir()
+            roots = [("folder", r) for r in (own, own / "Voxprint-backup" / "models") if r.is_dir()]
+            found = model_locator.find_model(repo_id, rev, roots, ignore_disabled=True)
+        return found
     except Exception as exc:  # noqa: BLE001 - looking for foreign copies must never break a normal download
         log.warning("external model search failed for %s: %s", repo_id, exc)
         return None

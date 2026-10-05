@@ -5,7 +5,7 @@ the contract with the app (the file the page writes is the file ``infra.existing
 import re
 from pathlib import Path
 
-from infra import existing_models
+from infra import existing_models, paths
 
 ISS = Path(__file__).resolve().parents[1] / "installer" / "Voxprint.iss"
 LANGS = ("english", "russian", "german")
@@ -45,7 +45,7 @@ def test_every_custom_message_exists_in_all_languages_and_every_use_is_defined()
     builtin = set()
     used = set(re.findall(r"\{cm:(\w+)", text())) | set(re.findall(r"CustomMessage\('(\w+)'\)", text()))
     assert used - builtin <= defined["english"], used - builtin - defined["english"]
-    assert {"ModelsPageCaption", "ModelsPageDescription", "ModelsPageSubCaption", "ModelsPagePrompt", "ModelsPageBadFolder"} <= used
+    assert {"ModelsPageCaption", "ModelsPageDescription", "ModelsPageSubCaption", "ModelsPagePrompt", "ModelsPageBadFolder", "ModelsPageProtected"} <= used
     # the %1/%2 placeholders agree between the languages
     for name in defined["english"]:
         ph = {l: sorted(set(re.findall(r"%\d", next(x for x in section("CustomMessages").splitlines() if x.startswith(f"{l}.{name}=")))))
@@ -69,15 +69,17 @@ def test_pascal_blocks_are_balanced():
     assert code.lower().count("procedure ") + code.lower().count("function ") >= 5
 
 
-def test_models_page_is_optional_skippable_and_only_remembers_the_path():
+def test_models_folder_page_defaults_to_local_validates_and_only_remembers_the_path():
     code = section("Code")
-    assert "CreateCustomPage(wpSelectDir" in code and "CreateInputDirPage(wpSelectDir" not in code.split("InitializeWizard")[1].split("end;")[0]   # right after the install folder; a custom page, because the input-dir page rejects an empty field
-    assert "{param:ModelsDir|}" in code                                    # silent installs: /ModelsDir="D:\models"
-    assert "Trim(ModelsEdit.Text)" in code and "Dir <> ''" in code     # empty = skipped
-    assert "not DirExists(Dir)" in code                                    # a typo is caught before installing
-    assert "ssPostInstall" in code and "SaveStringsToUTF8File" in code
-    assert f"\\state" in code and existing_models.CONFIG_NAME in code
-    assert "{localappdata}\\Voxprint\\state" in code
+    assert "CreateCustomPage(wpSelectDir" in code and "CreateInputDirPage(wpSelectDir" not in code.split("InitializeWizard")[1].split("end;")[0]   # right after the install folder
+    assert "{localappdata}\\Voxprint\\models" in code                       # default = the app's default_models_dir
+    assert "ModelsEdit.Text := InitialModelsDir()" in code and "{param:ModelsFolder|}" in code   # silent: /ModelsFolder=
+    assert "models_dir.txt" in code and paths.MODELS_DIR_FILE == "models_dir.txt"
+    assert "InProgramFiles(Dir)" in code and "{commonpf64}" in code             # the app could not write there
+    assert "FolderUsable(Dir)" in code and ".voxprint-write-test" in code       # creatable and writable
+    assert "DeleteFile(StateDir + '\\models_dir.txt')" in code                  # the default: the app follows its own default
+    assert "{param:ModelsDir|}" in code and existing_models.CONFIG_NAME in code # the older import folder still works silently
+    assert "ssPostInstall" in code and "SaveStringsToUTF8File" in code and "{localappdata}\\Voxprint\\state" in code
     # the installer must not copy gigabytes: no model files / folders in [Files], no copy helpers in [Code]
     files = section("Files")
     assert "models" not in files.lower() and ".safetensors" not in files.lower()
@@ -90,6 +92,9 @@ def test_what_the_page_writes_is_what_the_app_reads(tmp_path):
     # the installer writes a UTF-8 file (SaveStringsToUTF8File: BOM, CRLF) with one line
     existing_models.config_file().write_bytes(b"\xef\xbb\xbf" + str(folder).encode("utf-8") + b"\r\n")
     assert existing_models.configured() == folder
+    chosen = tmp_path / "D" / "Voxprint models"
+    (paths.state_dir() / paths.MODELS_DIR_FILE).write_bytes(b"\xef\xbb\xbf" + str(chosen).encode("utf-8") + b"\r\n")
+    assert paths.models_dir() == chosen and chosen.is_dir()
 
 
 def test_no_desktop_shortcut_only_start_menu_and_upgrades_remove_the_old_one():

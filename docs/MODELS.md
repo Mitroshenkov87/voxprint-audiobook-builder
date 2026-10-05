@@ -37,6 +37,10 @@ ffmpeg: a system one is used only if `ffmpeg -version` works, otherwise a pinned
 **Unsloth is deliberately not used**: as of 2026-10-03 it has no Qwen3-TTS fine-tuning support and its dependency pins conflict with the verified set;
 Voxprint trains with its own LoRA loop.
 
+## Models folder
+Models are downloaded to `%LOCALAPPDATA%\Voxprint\models` (Linux: `~/.local/share/voxprint/models`) unless another folder was chosen on the installer page **"Models folder"** (stored in `state\models_dir.txt`; override: `VOXPRINT_MODELS_DIR`; code: `infra/paths.py: models_dir`).
+With a chosen folder: a model already complete in the default folder is used from there (not downloaded again), models the chosen folder already holds are picked up in place (Voxprint `Owner--Name` folders, a Hugging Face cache, `Voxprint-backup/models`), and everything missing is downloaded into the chosen folder. If the folder cannot be created (a removed drive), the default folder is used. Uninstalling does not delete a chosen folder outside the user profile.
+
 ## Backup, restore and existing models
 **Settings (gear) -> Models and voices.**
 * **Back up models and voices...** - pick any folder or drive (external disk, NAS share). Voxprint copies to `<folder>\Voxprint-backup\`: every complete model it uses (its own models folder plus complete copies from the Hugging Face cache of other
