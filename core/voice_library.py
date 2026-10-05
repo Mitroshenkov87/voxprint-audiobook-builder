@@ -289,10 +289,24 @@ class VoiceLibrary:
                 info[key] = fields[key]
         if "license" in fields and "license_url" not in fields:
             info["license_url"] = ""                                   # re-derived for the new licence
+        # Per-language names/descriptions (downloaded voices) are shown *instead of* name/description, so an edit
+        # looked lost; the user's own text now replaces them.
+        if fields.get("name") is not None and fields["name"] != rec.info.get("name"):
+            info.pop("names", None)
+        if fields.get("description") is not None and fields["description"] != rec.info.get("description"):
+            info.pop("descriptions", None)
         info = voice_info.normalize_info(info, fallback_id=voice_id)
-        info["id"] = voice_id
-        voice_info.write_voice_json(rec.path, info)
-        return VoiceRecord(voice_id, rec.path, info)
+        new_id, path = voice_id, rec.path
+        if fields.get("name") and slugify(info["name"]) != slugify(str(rec.info.get("name") or "")):
+            cand = self.unique_id(info["name"])
+            try:                                           # the folder follows the new name; if Windows holds a file
+                rec.path.rename(self.root / cand)          # open (voice in use), keep the old folder - the name still changes
+                new_id, path = cand, self.root / cand
+            except OSError as exc:
+                log.warning("cannot rename voice folder %s -> %s: %s", voice_id, cand, exc)
+        info["id"] = new_id
+        voice_info.write_voice_json(path, info)
+        return VoiceRecord(new_id, path, info)
 
     def confirm_consent(self, voice_id: str, scope: str, name: Optional[str] = None) -> VoiceRecord:
         """The user's one-click confirmation (or change) of the detected usage scope: marks the consent confirmed and maps the

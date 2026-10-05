@@ -471,6 +471,7 @@
  "ui.tip_lora": "Everything at once: aligning the recording, slicing and training the voice",
  "ui.tip_merge": "Merges your trained voice into a standalone model folder",
  "ui.tip_merge_disabled": "Create a voice first (LoRA) - then this button becomes available.",
+ "ui.voice_name_placeholder": "Voice name (e.g. Anna); empty = from the recording",
  "ui.voice_desc_placeholder": "Optional description of the voice (saved in voice.json)",
  "ui.voice_registered": "The voice was added to “My voices”.",
  "ui.voice_type_child": "Child voice",

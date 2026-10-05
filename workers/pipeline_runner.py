@@ -56,6 +56,7 @@ class TaskRequest:
     out_root: Optional[Path] = None
     force_cpu: bool = False
     adapter_dir: Optional[Path] = None   # KIND_MERGE only: folder of the trained adapter
+    voice_display_name: str = ""         # optional, typed by the user: voice name, library folder and result folder
     voice_type: str = ""                 # optional, goes to voice.json: male / female / child / other
     voice_description: str = ""          # optional free text, goes to voice.json
     no_transcript: bool = False          # audio only: the app recognises the speech itself (see core.asr_dataset)
@@ -72,6 +73,8 @@ class TaskRequest:
 
     def voice_name(self) -> str:
         """Voice name = the recording's file name (or the adapter folder's name); also the result folder name in ``output/``."""
+        if self.voice_display_name.strip():
+            return safe_name(self.voice_display_name.strip())
         if self.audio:
             return safe_name(Path(self.audio).stem)
         if self.audio_files:
@@ -85,6 +88,8 @@ class TaskRequest:
         """Name of the folder with the trained voice: the voice name plus its type (``anna_male``, ``anna_unspecified``)."""
         from core import voice_info
 
+        if self.voice_display_name.strip():
+            return self.voice_name()                       # the user's own name, no type suffix
         return safe_name(voice_info.with_type_suffix(self.voice_name(), self.voice_type))
 
     def resolved_root(self) -> Path:
@@ -181,7 +186,7 @@ def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech
 
         extra = dict(license=consent_mod.license_for_scope(consent_block["scope"]), consent=consent_block,
                      author=consent_block.get("name", ""))
-    info = voice_info.build_voice_info(req.voice_name(), language, speech_seconds, epochs, base_model,
+    info = voice_info.build_voice_info(req.voice_display_name.strip() or req.voice_name(), language, speech_seconds, epochs, base_model,
                                        req.voice_type, req.voice_description, **extra)
     try:
         voice_info.write_voice_json(adapter_dir, info)
@@ -190,12 +195,12 @@ def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech
     return info
 
 
-def _register_voice(adapter_dir: Path, info: dict, library=None) -> str:
+def _register_voice(adapter_dir: Path, info: dict, library=None, typed_id: bool = True) -> str:
     """Add the freshly trained adapter to the voice library; returns the voice id ("" if that failed)."""
     from core.voice_library import VoiceLibrary
 
     try:
-        return (library or VoiceLibrary()).add_from_adapter(adapter_dir, info, typed_id=True).id
+        return (library or VoiceLibrary()).add_from_adapter(adapter_dir, info, typed_id=typed_id).id
     except Exception as exc:  # noqa: BLE001 - the adapter itself is already saved; never fail the run for the library
         log.warning("cannot register the voice in the library: %s", exc)
         return ""
@@ -407,7 +412,8 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
         remember_adapter(res.adapter_path, req.voice_name())
         cblock = _consent_block(req, res, progress, cancel, asr_factory)
         info = _write_voice_json(req, res.adapter_path, build.language, build.total_seconds, cblock)
-        res.voice_id = _register_voice(res.adapter_path, info, voice_library)
+        res.voice_id = _register_voice(res.adapter_path, info, voice_library,
+                                       typed_id=not req.voice_display_name.strip())   # a typed name is used as is
         if not res.voice_id:
             res.warnings.append(tr("warn.voice_not_registered"))
         if req.quality_check:

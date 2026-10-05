@@ -549,6 +549,9 @@ class MainWindow(QWidget):
 
         # Two optional fields; they only end up in voice.json next to the adapter.
         vrow = QHBoxLayout()
+        self.edt_voice_name = QLineEdit()           # voice name -> library folder and file names (empty = from the recording)
+        self.edt_voice_name.setMaxLength(80)
+        vrow.addWidget(self.edt_voice_name, 1)
         self.cmb_voice_type = QComboBox()
         self.cmb_voice_type.addItem("", "")
         for code in voice_info.VOICE_TYPES:
@@ -709,6 +712,7 @@ class MainWindow(QWidget):
         for i in range(self.cmb_voice_type.count()):
             self.cmb_voice_type.setItemText(i, type_labels[self.cmb_voice_type.itemData(i)])
         self.edt_voice_desc.setPlaceholderText(tr("ui.voice_desc_placeholder"))
+        self.edt_voice_name.setPlaceholderText(tr("ui.voice_name_placeholder"))
         if not self.lbl_voice_type_hint.text():
             self.lbl_voice_type_hint.setText(tr("ui.voice_type_hint"))
         if self._settings is not None:
@@ -1154,6 +1158,7 @@ class MainWindow(QWidget):
         self.btn_settings.setEnabled(True)
         self.cmb_voice_type.setEnabled(not busy)
         self.edt_voice_desc.setEnabled(not busy)
+        self.edt_voice_name.setEnabled(not busy)
         has_adapter = last_adapter() is not None
         self.btn_merge.setEnabled(not busy and has_adapter)
         self.btn_merge.setToolTip(tr("ui.tip_merge") if has_adapter else tr("ui.tip_merge_disabled"))
@@ -1190,6 +1195,7 @@ class MainWindow(QWidget):
                                      text=self.text,      # optional script: the recognised pieces are matched to it (core.script_match)
                                      voice_type=str(self.cmb_voice_type.currentData() or ""),
                                      voice_description=self.edt_voice_desc.text().strip(),
+                                 voice_display_name=self.edt_voice_name.text().strip(),
                                      preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None,
                                      **self._consent_kwargs(), **self._task_extras()))
             return
@@ -1198,6 +1204,7 @@ class MainWindow(QWidget):
         self._launch(TaskRequest(kind=kind, audio=self.audio, text=self.text, force_cpu=force_cpu,
                                  voice_type=str(self.cmb_voice_type.currentData() or ""),
                                  voice_description=self.edt_voice_desc.text().strip(),
+                                 voice_display_name=self.edt_voice_name.text().strip(),
                                  preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None,
                                      **self._consent_kwargs(), **self._task_extras()))
 

@@ -127,9 +127,9 @@ def test_update_changes_details_and_rederives_commercial_flag(tmp_path):
     rec = lib.add_from_adapter(make_adapter(tmp_path / "src"))
     upd = lib.update(rec.id, name="Anna K", author="Anna", license="CC0-1.0", voice_type="female", description=" nice\nvoice ")
     assert upd.name == "Anna K" and upd.commercial_use is True and upd.info["license_url"].endswith("zero/1.0/")
-    again = lib.get(rec.id)
-    assert again.info["description"] == "nice voice" and again.info["voice_type"] == "female" and again.id == rec.id
-    back = lib.update(rec.id, license="CC-BY-NC-4.0")
+    again = lib.get(upd.id)                    # a new name renames the folder (the id follows it)
+    assert again.info["description"] == "nice voice" and again.info["voice_type"] == "female" and again.id == "anna-k"
+    back = lib.update(upd.id, license="CC-BY-NC-4.0")
     assert back.commercial_use is False
     with pytest.raises(VoiceLibraryError):
         lib.update("nope", name="x")

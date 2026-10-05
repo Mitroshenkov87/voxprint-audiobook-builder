@@ -471,6 +471,7 @@
  "ui.tip_lora": "Alles auf einmal: Aufnahme ausrichten, zerschneiden und die Stimme trainieren",
  "ui.tip_merge": "Fügt Ihre trainierte Stimme zu einem eigenständigen Modellordner zusammen",
  "ui.tip_merge_disabled": "Erstellen Sie zuerst eine Stimme (LoRA) - dann wird diese Schaltfläche verfügbar.",
+ "ui.voice_name_placeholder": "Name der Stimme (z. B. Anna); leer = nach der Aufnahme",
  "ui.voice_desc_placeholder": "Optionale Beschreibung der Stimme (wird in voice.json gespeichert)",
  "ui.voice_registered": "Die Stimme wurde zu „Meine Stimmen“ hinzugefügt.",
  "ui.voice_type_child": "Kinderstimme",
