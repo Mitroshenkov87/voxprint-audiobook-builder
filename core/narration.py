@@ -228,6 +228,7 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
     try:
         queue = list(pending)
         batch_limit = 0                                      # 0 = not known yet (the engine is created lazily)
+        eta: Optional[float] = None                          # last estimate, repeated in the "batch starts" message
         while queue:
             pause.wait(cancel)
             cancel.check()
@@ -241,7 +242,7 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
             first, last = done + 1, done + len(group)
             log.info("Synthesizing chunks %d-%d of %d (%d chars)", first, last, total,
                      sum(len(texts[c.index]) for c in group))
-            progress(NarrationProgress(done, total, None, tr("narr.synth_batch", first=first, last=last, total=total)))
+            progress(NarrationProgress(done, total, eta, tr("narr.synth_batch", first=first, last=last, total=total)))
             t0 = time.monotonic()
             audios, batch_limit = _synth_group(engine, [texts[c.index] for c in group], [c.index for c in group], batch_limit)
             spent += time.monotonic() - t0
