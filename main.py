@@ -6,6 +6,7 @@ Flags: ``--prefetch`` (force-download the models; used by the installer), ``--se
 ``--verify-install`` (install check with reason codes; also written to logs/verify_install.txt),
 ``--repair`` (rebuild only Voxprint's own environment; logs/repair.txt),
 ``--auto-repair`` (check every component and model by hash, fetch missing / broken parts; logs/auto_repair.txt).
+User CLI subcommands (see ``cli.py`` / docs/CLI.md): ``narrate``, ``train``, ``voices``.
 """
 from __future__ import annotations
 
@@ -254,6 +255,15 @@ def main(argv=None) -> int:
             logging.getLogger("voxprint").info("adopted settings from a previous install: %s", adopted)
     except Exception:  # noqa: BLE001
         pass
+    # User-facing headless CLI: narrate / train / voices (see cli.py, docs/CLI.md). Keep before the GUI and
+    # the maintenance flags so `python main.py narrate ...` and a packaged exe work the same way.
+    try:
+        from cli import is_user_cli, main as user_cli_main
+    except ImportError:
+        user_cli_main = None  # type: ignore[assignment]
+        is_user_cli = lambda _a: False  # noqa: E731
+    if user_cli_main is not None and is_user_cli(argv):
+        return user_cli_main(argv[1:])
     if "--auto-repair" in argv:          # same job as Settings -> Auto-repair (infra/auto_repair.py)
         from infra import auto_repair
 
