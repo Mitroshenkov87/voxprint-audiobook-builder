@@ -3,15 +3,16 @@
 **In short:** pick your language, read the text for about 15 minutes (plus 2-3 optional minutes), record it, and give the recording and the TXT file to the *Train your voice* window. The consent sentence for the voice owner is at the end of every script. No profanity.
 
 Ready-made texts to read aloud when you record a voice for Voxprint (the Train window takes the TXT file as the "text"; see the
-[manual](../manual/), chapter *Train your voice*). Version 5, written natively in each language - they are **not** translations of each other:
+[manual](../manual/), chapter *Train your voice*). Version 6, written natively in each language - they are **not** translations of each other.
+Speech is written as natural storytelling for the model to learn the person's voice (not as stacked short "dictation drill" lines):
 
 | Language | Text | PDF dark (screen) | PDF light (print) |
 |---|---|---|---|
-| Russian | [TXT](Voxprint-RecordingScript-v5-ru.txt) | [PDF](Voxprint-RecordingScript-v5-ru.pdf) | [PDF](Voxprint-RecordingScript-v5-ru-print.pdf) |
-| English | [TXT](Voxprint-RecordingScript-v5-en.txt) | [PDF](Voxprint-RecordingScript-v5-en.pdf) | [PDF](Voxprint-RecordingScript-v5-en-print.pdf) |
-| Deutsch | [TXT](Voxprint-RecordingScript-v5-de.txt) | [PDF](Voxprint-RecordingScript-v5-de.pdf) | [PDF](Voxprint-RecordingScript-v5-de-print.pdf) |
+| Russian | [TXT](Voxprint-RecordingScript-v6-ru.txt) | [PDF](Voxprint-RecordingScript-v6-ru.pdf) | [PDF](Voxprint-RecordingScript-v6-ru-print.pdf) |
+| English | [TXT](Voxprint-RecordingScript-v6-en.txt) | [PDF](Voxprint-RecordingScript-v6-en.pdf) | [PDF](Voxprint-RecordingScript-v6-en-print.pdf) |
+| Deutsch | [TXT](Voxprint-RecordingScript-v6-de.txt) | [PDF](Voxprint-RecordingScript-v6-de.pdf) | [PDF](Voxprint-RecordingScript-v6-de-print.pdf) |
 
-Earlier version 4 files remain in this folder for reference.
+Earlier version 5 and version 4 files remain in this folder for reference.
 
 * **A recording aid, not a product text:** 17 blocks - greeting, the story of the idea, numbers and dates, smooth sentences for the sounds of the language,
   neutral / calm / joy / sadness / irritation / surprise / whisper and loud reading, three short computer stories, an optional "bad day" story with
@@ -25,6 +26,7 @@ Earlier version 4 files remain in this folder for reference.
   name and the date; read it only if the voice is yours or you have the voice owner's permission. It is a record of what was said, not legal advice. The
   parser (`core/script_match.py`) stops at the consent block, so it is never used as training text.
 * **Format:** one line = one sentence; `[text in square brackets]` and `=== headers ===` are hints and are not read aloud.
+* **PDFs:** cover uses the real app logo (installer/linux/voxprint-256.png (same mark as assets/voxprint.png)); page headers/footers have no logo marks; body type is sized for comfortable ~15+ min reading.
 
 The PDFs are built from the TXT files with `python build_script_pdf.py` (needs `markdown`, `weasyprint`, `pillow`, poppler-utils); the layout is tuned
 until `../manual/check_pagination.py` passes.

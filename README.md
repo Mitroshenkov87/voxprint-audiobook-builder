@@ -13,7 +13,7 @@
 >
 > | English | Русский | Deutsch |
 > |---|---|---|
-> | [TXT](docs/recording-scripts/Voxprint-RecordingScript-v5-en.txt) · [PDF](docs/recording-scripts/Voxprint-RecordingScript-v5-en.pdf) · [print](docs/recording-scripts/Voxprint-RecordingScript-v5-en-print.pdf) | [TXT](docs/recording-scripts/Voxprint-RecordingScript-v5-ru.txt) · [PDF](docs/recording-scripts/Voxprint-RecordingScript-v5-ru.pdf) · [print](docs/recording-scripts/Voxprint-RecordingScript-v5-ru-print.pdf) | [TXT](docs/recording-scripts/Voxprint-RecordingScript-v5-de.txt) · [PDF](docs/recording-scripts/Voxprint-RecordingScript-v5-de.pdf) · [print](docs/recording-scripts/Voxprint-RecordingScript-v5-de-print.pdf) |
+> | [TXT](docs/recording-scripts/Voxprint-RecordingScript-v6-en.txt) · [PDF](docs/recording-scripts/Voxprint-RecordingScript-v6-en.pdf) · [print](docs/recording-scripts/Voxprint-RecordingScript-v6-en-print.pdf) | [TXT](docs/recording-scripts/Voxprint-RecordingScript-v6-ru.txt) · [PDF](docs/recording-scripts/Voxprint-RecordingScript-v6-ru.pdf) · [print](docs/recording-scripts/Voxprint-RecordingScript-v6-ru-print.pdf) | [TXT](docs/recording-scripts/Voxprint-RecordingScript-v6-de.txt) · [PDF](docs/recording-scripts/Voxprint-RecordingScript-v6-de.pdf) · [print](docs/recording-scripts/Voxprint-RecordingScript-v6-de-print.pdf) |
 >
 > Only record your own voice, or one whose owner agreed. More: [about the scripts](docs/recording-scripts/README.md).
 
