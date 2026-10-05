@@ -55,3 +55,14 @@ Source code: **Apache License 2.0** ([`LICENSE`](LICENSE), [`NOTICE`](NOTICE)). 
 Use voices only with the owner's permission.
 
 Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) (for AI coding agents).
+
+## ☕ Support the Project
+
+If you find this project useful and would like to support its development, you can buy me a coffee!
+
+- **Network:** TRON (TRC-20)
+- **Accepted:** USDT or TRX
+- **Address:** `TYveZBXaSpM4FEHa6iGrc7A6zuLfS4z3x6`
+
+> ⚠️ **Important:** Please ensure you are sending funds **only** via the TRON (TRC-20) network. 
+> Sending assets from other networks (such as Ethereum ERC-20, BSC BEP-20, etc.) to this address will result in **permanent loss of funds**.
