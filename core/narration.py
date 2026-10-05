@@ -24,6 +24,7 @@ multi-voice role markup (all chunks currently use the job's voice).
 """
 from __future__ import annotations
 
+import datetime
 import hashlib
 from concurrent.futures import Future, ThreadPoolExecutor
 import logging
@@ -44,6 +45,7 @@ from core.book_parsers import Book
 from core.book_prep import PrepPlan, run_preparation
 from core import translate as tl
 from core import pauses as pz
+from core import ai_disclosure
 from core.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_book
 from core.errors import CancelledByUser, DatasetMakerError, NarrationError
 from core.events import CancelToken
@@ -113,6 +115,9 @@ class NarrationOptions:
     pauses: Optional[pz.PauseProfile] = None   # opt-in: explicit pauses can make the model swallow short words
     #: Machine translation of the book before narration (:mod:`core.translate`); ``None`` = narrate the book as it is.
     translate: Optional[tl.TranslatePlan] = None
+    #: Spoken AI disclosure as the first chunk (:mod:`core.ai_disclosure`); opt-in, the user decides.
+    ai_disclosure: bool = False
+    disclosure_date: Optional["datetime.date"] = None        # month/year said in the disclosure (None = today; tests)
 
 
 @dataclass
@@ -465,6 +470,9 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
     chunk_list = chunk_book(book, options.max_chars, chapters, options.speak_titles, options.pauses)
     if not chunk_list:
         raise NarrationError(tr("err.book_empty"))
+    if options.ai_disclosure:              # in the narrated language (the translation target when translating)
+        chunk_list = ai_disclosure.prepend(chunk_list, ai_disclosure.phrase(
+            language or book.language, narrator, options.disclosure_date))
     normalizer = None if (plan is not None and plan.spells_out_numbers) else default_normalizer(language)
     texts = {c.index: prepare_text(c.text, options, normalizer) for c in chunk_list}
     cache = ChunkCache(job_dir / ".cache")

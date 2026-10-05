@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (QSlider, QCheckBox, QComboBox, QFileDialog, QFram
 from core import audiobook_export as ex
 from core import narration as nr
 from core import pauses as pz
+from core import ai_disclosure
 from core import text_prep
 from core import workspace as ws
 from core.book_parsers import SUPPORTED_EXTENSIONS, Book, load_book
@@ -246,6 +247,10 @@ class NarrateWindow(SubWindow):
         v.addLayout(vrow)
         self.lbl_voice_info = hint_label()
         v.addWidget(self.lbl_voice_info)
+        self.chk_disclosure = QCheckBox()        # spoken AI disclosure at the start (core/ai_disclosure.py), opt-in
+        self.chk_disclosure.setChecked(ai_disclosure.load_enabled())
+        self.chk_disclosure.toggled.connect(ai_disclosure.save_enabled)
+        v.addWidget(self.chk_disclosure)
         self.no_voice = QWidget()
         nv = QVBoxLayout(self.no_voice)
         nv.setContentsMargins(0, 0, 0, 0)
@@ -592,6 +597,8 @@ class NarrateWindow(SubWindow):
         self.lbl_out_hint.setText(tr("work.folder_hint"))
         self.chk_titles.setText(tr("narr.speak_titles"))
         self.chk_pauses.setText(tr("narr.pauses_enable"))
+        self.chk_disclosure.setText(tr("narr.ai_disclosure"))
+        self.chk_disclosure.setToolTip(tr("narr.ai_disclosure_tip"))
         self.lbl_pauses.setText(tr("narr.pauses"))
         self.lbl_pauses_hint.setText(tr("narr.pauses_hint"))
         self._on_pauses_changed(self.sld_pauses.value(), save=False)
@@ -1059,7 +1066,7 @@ class NarrateWindow(SubWindow):
             formats=self.selected_formats(), bitrates=self.bitrates(),
             speak_titles=self.chk_titles.isChecked(), allow_aac=self.aac_allowed, pauses=self.pause_profile(),
             prep=self.plan_builder(self.selected_rule_steps(), self.selected_neural_steps()),
-            translate=self.translate_plan())
+            translate=self.translate_plan(), ai_disclosure=self.chk_disclosure.isChecked())
 
     # ------------------------------------------------------------------ state
     @property
@@ -1088,6 +1095,7 @@ class NarrateWindow(SubWindow):
         self.chk_translate.setEnabled(not busy)
         self.cmb_translate.setEnabled(not busy)
         self.cmb_voice.setEnabled(not busy)
+        self.chk_disclosure.setEnabled(not busy)
         self.chk_pauses.setEnabled(not busy)
         self.sld_pauses.setEnabled(not busy and self.chk_pauses.isChecked())
         self.btn_pause.setVisible(busy)

@@ -93,6 +93,8 @@ Pipeline: **rules** (deterministic, instant) -> optional **AI clean-up** (small 
 files / metadata / cover come from the original, unprepared book. For debugging, the prepared text is written next to the job cache: `<output>\<book>\.debug\prepared_text.txt` and `prep_report.json`
 (counts per step, skipped steps, model revision). Unlike `.cache` they are **kept** after a successful run, so you can see exactly what was read; delete the `.debug` folder if you do not need it.
 
+**AI disclosure.** The check box under the voice (off by default) makes the audiobook begin with a short spoken note in the book's language, in the chosen voice - e.g. *"This book was narrated with the help of artificial intelligence, voice Anna, October 2026"* (month and year only). It helps with labelling duties for AI-generated content such as the EU AI Act.
+
 **Working folder and clean-up.** On start Voxprint asks whether the book file may be **copied** or **moved** into the book's sub-folder (or left where it is) - nothing is copied without asking. When the audiobook is ready a dialog lets you tick what to keep: the audiobook, the original book file, the prepared / translated text; temporary parts (`.cache`, `.work`) are always removed. *Keep everything* deletes nothing.
 
 | Step (checkbox) | What it does |

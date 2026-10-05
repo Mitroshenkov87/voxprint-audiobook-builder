@@ -6,6 +6,7 @@ The first pre-release is v0.1.0-beta; everything below is the history of the 0.1
 ## [Unreleased]
 
 ### Added
+- **Spoken AI disclosure (opt-in, default off)** (`core/ai_disclosure.py`): a check box under the voice; when on, the audiobook starts with a short sentence in the narrated language, in the chosen voice: "This book was narrated with the help of artificial intelligence, voice <name>, <month> <year>" (ru/en/de, month and year only, numbers in words). The tooltip explains it helps with AI-content labelling duties (EU AI Act). Tests: `tests/test_ai_disclosure.py`.
 - **Book working folder** (`core/workspace.py`, `ui/job_dialogs.py`): the narration folder is now the *working folder* (remembered in `state/work_folder.txt`); every file of a job (book copy, temporary parts, prepared text, results) lives in `<folder>/<book title>/`. On start the book file is copied or moved there only if the user agrees; after a finished job a clean-up dialog keeps what the user ticks (audiobook, original book, prepared/translated text) and removes the temporary parts. Tests: `tests/test_workspace.py`, `tests/test_workspace_ui.py`.
 
 ### Fixed

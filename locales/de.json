@@ -651,5 +651,7 @@
  "work.keep_original": "Die ursprüngliche Buchdatei ({mb} MB)",
  "work.keep_prepared": "Der aufbereitete / übersetzte Text ({mb} MB)",
  "work.clean_ok": "Aufräumen",
- "work.clean_later": "Alles behalten"
+ "work.clean_later": "Alles behalten",
+ "narr.ai_disclosure": "Zu Beginn ansagen, dass das Buch von KI vertont wurde (Stimmenname, Monat und Jahr)",
+ "narr.ai_disclosure_tip": "Das Hörbuch beginnt mit einem kurzen Satz in der Sprache des Buches, z. B. „Dieses Buch wurde mit Hilfe künstlicher Intelligenz vertont, Stimme Anna, Oktober 2026“, mit der gewählten Stimme. Das hilft, die Kennzeichnungspflichten für KI-generierte Inhalte (EU AI Act) zu erfüllen."
 }
