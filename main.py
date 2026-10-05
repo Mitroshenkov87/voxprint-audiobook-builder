@@ -329,6 +329,13 @@ def main(argv=None) -> int:
         thin_wait = (not selftest) and _mods.is_thin() and not _mods.installed_without_network()
     except Exception:  # noqa: BLE001
         thin_wait = False
+    if not selftest:
+        try:   # a "models folder" that is really a Voxprint backup becomes a restore source (never the live folder)
+            from infra import existing_models as _existing
+
+            _existing.adopt_backup_choice()
+        except Exception:  # noqa: BLE001 - never get in the way of starting up
+            pass
     first_run = False
     if not selftest:
         try:

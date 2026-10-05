@@ -3,11 +3,18 @@
 ; Windows 11 x64 only. The models are not part of the installer: the app downloads them itself on first start
 ; (after the installation, Voxprint can be started right away with the --prefetch flag).
 ; Wizard page "Models folder" (after the install folder): where the voice models (~7 GB) live. Default = the current location
-; %LOCALAPPDATA%\Voxprint\models; the user may pick another folder or drive.  Only the path is REMEMBERED
-; (%LOCALAPPDATA%\Voxprint\state\models_dir.txt, read by infra/paths.py: models_dir); the installer copies no model.  The app then
-; (1) keeps using models that are already complete in the default Local folder, (2) picks up models the chosen folder already holds
-; (Voxprint layout, Hugging Face cache, Voxprint backup), (3) downloads everything missing INTO the chosen folder.  Voices and
-; settings stay in %LOCALAPPDATA%\Voxprint.  Program Files is refused (the app runs without admin rights and could not write there).
+; %LOCALAPPDATA%\Voxprint\models; the user may pick another folder or drive.  Only paths are REMEMBERED; the installer copies no model.
+; Two cases (decided 2026-10-05):
+;  * a normal folder (empty, or with models in place): it becomes the models folder (%LOCALAPPDATA%\Voxprint\state\models_dir.txt,
+;    read by infra/paths.py: models_dir).  The app (1) keeps using models already complete in the default Local folder, (2) picks
+;    up models the chosen folder already holds (Voxprint layout, Hugging Face cache), (3) downloads everything missing INTO it.
+;    Program Files is refused (the app runs without admin rights and could not write there).
+;  * a Voxprint BACKUP (the folder holds voxprint-backup.json, or Voxprint-backup\voxprint-backup.json, or it is the models\ /
+;    voices\ folder of a backup; BackupRootOf = infra/paths.py: backup_root_of): it is a RESTORE SOURCE, never the models folder.
+;    models_dir.txt is removed (the default Local folder stays the live store) and the backup root goes to
+;    state\existing_models_dir.txt; on the first start the app restores models, voices and ffmpeg from it into the normal folders
+;    (infra/existing_models.py: restore_backup).  The backup (often on an external drive) is only read.
+; Voices and settings stay in %LOCALAPPDATA%\Voxprint.
 ; Silent: /ModelsFolder="D:\Voxprint models".  The older /ModelsDir="D:\old\models" (a folder to IMPORT models from, written to
 ; state\existing_models_dir.txt) still works.  Wizard languages: English, Russian, German.
 ;
@@ -92,9 +99,9 @@ german.ModelsPageCaption=Modellordner
 english.ModelsPageDescription=Where should the voice models (about 7 GB) be stored?
 russian.ModelsPageDescription=Где хранить голосовые модели (около 7 ГБ)?
 german.ModelsPageDescription=Wo sollen die Sprachmodelle (ca. 7 GB) gespeichert werden?
-english.ModelsPageSubCaption=Keep the default or choose another folder or drive. Models already downloaded to the default folder are used as they are; if the chosen folder already holds models (for example from a previous install or a Voxprint backup), they are picked up; anything missing is downloaded into the chosen folder. Your voices and settings stay in the user profile.
-russian.ModelsPageSubCaption=Оставьте папку по умолчанию или выберите другую папку или диск. Модели, уже скачанные в папку по умолчанию, используются как есть; если в выбранной папке уже есть модели (например, от прошлой установки или резервной копии Voxprint), они будут подхвачены; недостающие скачиваются в выбранную папку. Ваши голоса и настройки остаются в профиле пользователя.
-german.ModelsPageSubCaption=Behalten Sie den Standard oder wählen Sie einen anderen Ordner oder ein anderes Laufwerk. Bereits in den Standardordner geladene Modelle werden weiter verwendet; enthält der gewählte Ordner schon Modelle (z. B. von einer früheren Installation oder einer Voxprint-Sicherung), werden sie übernommen; Fehlendes wird in den gewählten Ordner geladen. Ihre Stimmen und Einstellungen bleiben im Benutzerprofil.
+english.ModelsPageSubCaption=Keep the default or choose another folder or drive. An empty folder becomes the models folder (models are downloaded into it); models it already holds are used. A folder with a Voxprint backup (voxprint-backup.json) is only read: on the first start its models and voices are restored into the default folder. Your voices and settings stay in the user profile.
+russian.ModelsPageSubCaption=Оставьте папку по умолчанию или выберите другую папку или диск. Пустая папка становится папкой моделей (модели скачиваются в неё); уже имеющиеся в ней модели используются. Папка с резервной копией Voxprint (voxprint-backup.json) только читается: при первом запуске модели и голоса восстанавливаются из неё в папку по умолчанию. Ваши голоса и настройки остаются в профиле пользователя.
+german.ModelsPageSubCaption=Behalten Sie den Standard oder wählen Sie einen anderen Ordner oder ein anderes Laufwerk. Ein leerer Ordner wird zum Modellordner (die Modelle werden dorthin geladen); vorhandene Modelle werden verwendet. Ein Ordner mit einer Voxprint-Sicherung (voxprint-backup.json) wird nur gelesen: Beim ersten Start werden Modelle und Stimmen daraus in den Standardordner wiederhergestellt. Ihre Stimmen und Einstellungen bleiben im Benutzerprofil.
 english.ModelsPagePrompt=Models folder:
 russian.ModelsPagePrompt=Папка моделей:
 german.ModelsPagePrompt=Modellordner:
@@ -104,6 +111,9 @@ german.ModelsPageBadFolder=Der Ordner %1 kann nicht angelegt werden oder ist nic
 english.ModelsPageProtected=The folder %1 is inside Program Files: the program runs without administrator rights and could not download models there. Choose another folder.
 russian.ModelsPageProtected=Папка %1 находится в Program Files: программа работает без прав администратора и не сможет скачивать туда модели. Выберите другую папку.
 german.ModelsPageProtected=Der Ordner %1 liegt in Program Files: Das Programm läuft ohne Administratorrechte und könnte dort keine Modelle speichern. Wählen Sie einen anderen Ordner.
+english.ModelsPageBackupFound=The folder %1 contains a Voxprint backup. It will not be used as the models folder: on the first start its models and voices are copied into %2 (the backup itself is only read).
+russian.ModelsPageBackupFound=В папке %1 найдена резервная копия Voxprint. Она не станет папкой моделей: при первом запуске модели и голоса будут скопированы из неё в %2 (сама копия только читается).
+german.ModelsPageBackupFound=Der Ordner %1 enthält eine Voxprint-Sicherung. Er wird nicht als Modellordner verwendet: Beim ersten Start werden Modelle und Stimmen nach %2 kopiert (die Sicherung selbst wird nur gelesen).
 
 english.OnlineStatus=Downloading and unpacking the Voxprint components (the download can be resumed if it is interrupted)...
 russian.OnlineStatus=Загрузка и распаковка компонентов Voxprint (при обрыве загрузку можно продолжить)...
@@ -252,6 +262,26 @@ begin
   if Result then DeleteFile(Probe);
 end;
 
+{ The Voxprint backup behind a chosen folder, '' if it is none (the same rules as infra/paths.py: backup_root_of): the folder holds
+  voxprint-backup.json, or Voxprint-backup\voxprint-backup.json, or it is the models / model / voices / tools folder of a backup.
+  A backup is a RESTORE SOURCE: it never becomes the models folder (the app restores it into the default folder). }
+function BackupRootOf(const Dir: String): String;
+var
+  D, N: String;
+begin
+  Result := '';
+  D := RemoveBackslash(Trim(Dir));
+  if D = '' then Exit;
+  N := Lowercase(ExtractFileName(D));
+  if FileExists(AddBackslash(D) + 'voxprint-backup.json') then
+    Result := D
+  else if FileExists(AddBackslash(D) + 'Voxprint-backup\voxprint-backup.json') then
+    Result := AddBackslash(D) + 'Voxprint-backup'
+  else if ((N = 'models') or (N = 'model') or (N = 'voices') or (N = 'tools')) and
+          FileExists(AddBackslash(ExtractFileDir(D)) + 'voxprint-backup.json') then
+    Result := ExtractFileDir(D);
+end;
+
 { True for a folder below Program Files (the setup runs as admin, the app does not: it could not write there). }
 function InProgramFiles(const Dir: String): Boolean;
 var
@@ -387,17 +417,17 @@ begin
   Info.Left := 0;
   Info.Top := 0;
   Info.Width := ModelsPage.SurfaceWidth;
-  Info.Height := ScaleY(90);
+  Info.Height := ScaleY(110);              { room for six lines of the Russian text }
   Info.Caption := CustomMessage('ModelsPageSubCaption');
   Prompt := TNewStaticText.Create(ModelsPage);
   Prompt.Parent := ModelsPage.Surface;
   Prompt.Left := 0;
-  Prompt.Top := ScaleY(98);
+  Prompt.Top := ScaleY(118);
   Prompt.Caption := CustomMessage('ModelsPagePrompt');
   ModelsEdit := TNewEdit.Create(ModelsPage);
   ModelsEdit.Parent := ModelsPage.Surface;
   ModelsEdit.Left := 0;
-  ModelsEdit.Top := ScaleY(116);
+  ModelsEdit.Top := ScaleY(136);
   ModelsEdit.Width := ModelsPage.SurfaceWidth - ScaleX(96);
   ModelsEdit.Text := InitialModelsDir();
   Browse := TNewButton.Create(ModelsPage);
@@ -415,7 +445,7 @@ end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
-  Dir: String;
+  Dir, Backup: String;
 begin
   Result := True;
   if CurPageID = ModelsPage.ID then
@@ -426,7 +456,11 @@ begin
       Dir := DefaultModelsDir();                  { an emptied field means "the default" }
       ModelsEdit.Text := Dir;
     end;
-    if InProgramFiles(Dir) then
+    Backup := BackupRootOf(Dir);
+    if Backup <> '' then
+      { a backup is only read (it may sit on a read-only or external drive): no write test, just say what will happen }
+      SuppressibleMsgBox(FmtMessage(CustomMessage('ModelsPageBackupFound'), [Backup, DefaultModelsDir()]), mbInformation, MB_OK, IDOK)
+    else if InProgramFiles(Dir) then
     begin
       MsgBox(FmtMessage(CustomMessage('ModelsPageProtected'), [Dir]), mbError, MB_OK);
       Result := False;
@@ -607,10 +641,12 @@ begin
 end;
 
 { Only paths are remembered (UTF-8 files in state\); no model is copied.  models_dir.txt = the models folder (deleted when it is the
-  default, so the app follows its own default); existing_models_dir.txt = an optional folder to import models from (/ModelsDir=). }
+  default, so the app follows its own default); existing_models_dir.txt = an optional folder to import models from (/ModelsDir=).
+  A chosen folder with a Voxprint backup is NOT written to models_dir.txt: its root goes to existing_models_dir.txt and the app
+  restores it into the default folder on the first start (infra/existing_models.py). }
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  Dir, StateDir: String;
+  Dir, StateDir, Backup: String;
   Lines: TArrayOfString;
 begin
   if CurStep = ssPostInstall then InstallVcRedist();
@@ -640,7 +676,14 @@ begin
     ForceDirectories(StateDir);
     SetArrayLength(Lines, 1);
     Dir := RemoveBackslash(Trim(ModelsEdit.Text));
-    if (Dir = '') or (CompareText(Dir, DefaultModelsDir()) = 0) then
+    Backup := BackupRootOf(Dir);
+    if Backup <> '' then
+    begin
+      DeleteFile(StateDir + '\models_dir.txt');          { the live models stay in the default folder }
+      Lines[0] := Backup;
+      SaveStringsToUTF8File(StateDir + '\existing_models_dir.txt', Lines, False);
+    end
+    else if (Dir = '') or (CompareText(Dir, DefaultModelsDir()) = 0) then
       DeleteFile(StateDir + '\models_dir.txt')
     else
     begin

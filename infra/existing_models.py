@@ -14,8 +14,15 @@ rules of :mod:`core.model_locator` apply) and **imports** a complete copy into V
 
 Where the path is stored: ``<app home>/state/existing_models_dir.txt`` (UTF-8, one line; the installer writes it, the
 Settings dialog edits it).  ``VOXPRINT_EXISTING_MODELS`` overrides the file.  Accepted layouts below the folder: the folder
-itself, ``models/``, ``Voxprint-backup/models/`` (folders named ``Owner--Name``), or any Hugging Face / ModelScope cache
-layout the model locator understands.
+itself, ``models/`` (or ``model/``), ``Voxprint-backup/models/`` (folders named ``Owner--Name``), or any Hugging Face /
+ModelScope cache layout the model locator understands.
+
+Backup as a source (installer page "Models folder")
+---------------------------------------------------
+A folder that holds a Voxprint backup (``voxprint-backup.json``) is a portable archive, not a models folder.  When the user
+picks one as the models folder, :func:`adopt_backup_choice` (called at start-up) makes it the existing-models folder and
+resets the models folder to the default; :func:`restore_backup` (first-run model step, :func:`pending` triggers it) then
+restores models, voices and ffmpeg from it into the normal folders.  The live models folder never points at a backup.
 """
 from __future__ import annotations
 
@@ -88,7 +95,8 @@ def roots() -> List[Tuple[str, Path]]:
     if e is None:
         return []
     out, seen = [], set()
-    for p in (e, e / "models", e / backup.BACKUP_DIRNAME / "models", e / backup.BACKUP_DIRNAME):
+    for p in (e, e / "models", e / "model", e / backup.BACKUP_DIRNAME / "models", e / backup.BACKUP_DIRNAME / "model",
+              e / backup.BACKUP_DIRNAME):
         try:
             if p.is_dir() and p.resolve() not in seen:
                 seen.add(p.resolve())
@@ -195,10 +203,95 @@ def import_model(found, progress: Callable[[float, str], None] = lambda f, m="":
     return dest
 
 
-def pending(repos: Iterable[str]) -> bool:
-    """True if a folder is configured, it holds a usable copy of a required model and that model is not imported yet.
+# ----------------------------------------------------------------------------------------------------- backup as a source
+#: Remembers which backup was restored last (``<backup root>`` and the manifest's ``created`` stamp, one per line), so the
+#: first-run restore happens once per backup and not on every start.
+RESTORED_NAME = "restored_backup.txt"
 
-    The start-up code then runs the first-run model step, which imports it."""
+
+def adopt_backup_choice() -> Optional[Path]:
+    """Turn a models folder that is really a Voxprint backup into a RESTORE SOURCE.
+
+    The installer page "Models folder" (and older installers) store the chosen folder in ``state/models_dir.txt``.  An empty
+    folder or a folder with models in place stays the live models folder.  A folder with ``voxprint-backup.json`` (see
+    :func:`infra.paths.backup_root_of`) must not: the backup root becomes the existing-models folder (restored on the first
+    run by :func:`restore_backup`) and the models folder goes back to the default.  Returns the backup root, or ``None``
+    when nothing had to change.  ``VOXPRINT_MODELS_DIR`` is left alone (not ours to rewrite; :func:`infra.paths.models_dir`
+    ignores a backup there anyway and :func:`backup_source` still finds it)."""
+    if os.environ.get(paths.MODELS_DIR_ENV, "").strip():
+        return None
+    root = paths.backup_root_of(paths.configured_models_dir())
+    if root is None:
+        return None
+    set_folder(root)
+    paths.set_models_dir(None)
+    log.info("the chosen models folder is a Voxprint backup (%s): it is restored into %s, not used in place",
+             root, paths.models_dir())
+    return root
+
+
+def backup_source() -> Optional[Path]:
+    """Root of the Voxprint backup to restore from: the existing-models folder if it is (or holds) a backup, else a
+    configured models folder that is a backup (not adopted yet, or set by ``VOXPRINT_MODELS_DIR``); ``None`` otherwise."""
+    root = paths.backup_root_of(configured())
+    if root is None:
+        root = paths.backup_root_of(paths.configured_models_dir())
+    return root
+
+
+def _restore_stamp(root: Path) -> str:
+    try:
+        created = str(backup.read_manifest(root).get("created", ""))
+    except BackupError:
+        created = ""
+    try:
+        where = str(Path(root).resolve())
+    except OSError:
+        where = str(root)
+    return f"{where}\n{created}"
+
+
+def restore_pending() -> bool:
+    """True if a backup source exists and this backup (same folder, same manifest stamp) was not restored yet."""
+    root = backup_source()
+    if root is None:
+        return False
+    try:
+        done = (paths.state_dir() / RESTORED_NAME).read_text(encoding="utf-8").strip()
+    except OSError:
+        done = ""
+    return done != _restore_stamp(root).strip()
+
+
+def restore_backup(progress: Callable[[float, str], None] = lambda f, m="": None,
+                   cancel: Optional[CancelToken] = None, include_voices: bool = True, **kw) -> Optional["backup.Report"]:
+    """Restore the backup source (:func:`backup_source`) INTO the live folders: models -> :func:`infra.paths.models_dir`
+    (the default unless a normal models folder was chosen), voices -> the voice library, ffmpeg -> the tools folder.
+
+    Uses :func:`infra.backup.run_restore`: hash-verified against the manifest, resumable, identical items skipped, a voice
+    that exists with other content is never overwritten.  The backup folder itself is only read.  Returns the report, or
+    ``None`` when there is no backup source."""
+    root = backup_source()
+    if root is None:
+        return None
+    kw.setdefault("models_root", paths.models_dir())
+    report = backup.run_restore(root, include_voices, progress, cancel, **kw)
+    (paths.state_dir() / RESTORED_NAME).write_text(_restore_stamp(root) + "\n", encoding="utf-8")
+    log.info("restored backup %s: %d files copied, %d skipped, conflicts: %s", root, report.copied_files,
+             report.skipped_files, ", ".join(report.conflicts) or "none")
+    return report
+
+
+def pending(repos: Iterable[str]) -> bool:
+    """True if a folder is configured, it holds a usable copy of a required model and that model is not imported yet, or
+    it is a Voxprint backup that was not restored yet.
+
+    The start-up code then runs the first-run model step, which restores / imports it."""
+    try:
+        if restore_pending():
+            return True
+    except Exception as exc:  # noqa: BLE001 - never block start-up
+        log.warning("backup restore check failed: %s", exc)
     if configured() is None:
         return False
     from infra import model_downloader as md

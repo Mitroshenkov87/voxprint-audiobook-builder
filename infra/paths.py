@@ -4,7 +4,8 @@ overridable with ``VOXPRINT_HOME``).
 Layout under :func:`app_home`::
 
     models/      downloaded Hugging Face / ModelScope snapshots (the DEFAULT models folder; the installer's "Models folder" page
-                 or ``VOXPRINT_MODELS_DIR`` may move the download target elsewhere - see :func:`models_dir`)
+                 or ``VOXPRINT_MODELS_DIR`` may move the download target elsewhere - see :func:`models_dir`; a folder that
+                 holds a Voxprint backup is never used as the models folder, it is restored into this one)
     packages/    updated Python packages, put on ``sys.path`` at start-up (before heavy imports)
     voices/      the voice library: one folder per voice (adapter + voice.json), see core/voice_library.py
     state/       small settings files (language, privacy acknowledgement, updater state, last adapter ...)
@@ -89,10 +90,46 @@ def _same(a: Path, b: Path) -> bool:
         return False
 
 
+#: Marker file and folder name of a Voxprint backup (the same values as ``infra.backup.MANIFEST_NAME`` / ``BACKUP_DIRNAME``;
+#: repeated here because this module must stay import-light - a test keeps them equal).
+BACKUP_MANIFEST = "voxprint-backup.json"
+BACKUP_DIRNAME = "Voxprint-backup"
+#: Sub-folders of a backup a user may pick by mistake (``models`` is what the backup writes; ``model`` / ``voices`` / ``tools``
+#: are accepted so that pointing at any folder inside the backup is still recognised).
+BACKUP_SUBDIRS = ("models", "model", "voices", "tools")
+
+
+def backup_root_of(folder: Optional[Path]) -> Optional[Path]:
+    """The Voxprint backup behind a user-chosen folder, or ``None`` if it is no backup.
+
+    Recognised: the folder holds ``voxprint-backup.json`` itself; it holds ``Voxprint-backup/voxprint-backup.json`` (the
+    user picked the drive / parent folder); or it is a sub-folder (``models`` / ``voices`` ...) of a backup.  A backup is a
+    portable archive and a RESTORE SOURCE - it must never become the live models folder (see :func:`models_dir`)."""
+    if folder is None:
+        return None
+    p = Path(folder)
+    try:
+        if (p / BACKUP_MANIFEST).is_file():
+            return p
+        if (p / BACKUP_DIRNAME / BACKUP_MANIFEST).is_file():
+            return p / BACKUP_DIRNAME
+        if p.name.lower() in BACKUP_SUBDIRS and (p.parent / BACKUP_MANIFEST).is_file():
+            return p.parent
+    except OSError:              # an unplugged drive, no permission ...
+        return None
+    return None
+
+
 def models_dir() -> Path:
     """Directory where models are downloaded: the user's models folder if one is configured and can be created, else
-    :func:`default_models_dir` (a missing drive must not stop the program; it falls back and downloads there)."""
+    :func:`default_models_dir` (a missing drive must not stop the program; it falls back and downloads there).
+
+    A configured folder that is a Voxprint backup (:func:`backup_root_of`) is NOT used as the models folder: a backup is
+    restored INTO the default folder (``infra.existing_models.adopt_backup_choice`` / ``restore_backup``), it is never the
+    place the program downloads to or loads from."""
     p = configured_models_dir()
+    if p is not None and backup_root_of(p) is not None:
+        p = None
     if p is not None:
         try:
             p.mkdir(parents=True, exist_ok=True)

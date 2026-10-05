@@ -105,3 +105,20 @@ def test_no_desktop_shortcut_only_start_menu_and_upgrades_remove_the_old_one():
     assert "{group}\\{#AppDisplayName}" in icons and "desktop" not in icons.lower()
     deletes = section("InstallDelete")
     assert "{commondesktop}\\{#AppDisplayName}.lnk" in deletes and "{userdesktop}\\{#AppDisplayName}.lnk" in deletes
+
+
+def test_a_backup_folder_is_a_restore_source_not_the_models_folder():
+    """Hybrid rule: an empty / normal folder -> models_dir.txt (download target); a Voxprint backup -> existing_models_dir.txt
+    (restored into the default folder by the app) and models_dir.txt is removed.  Same detection as paths.backup_root_of."""
+    code = section("Code")
+    body = code.split("function BackupRootOf")[1].split("\nend;")[0]
+    assert f"'{paths.BACKUP_MANIFEST}'" in body and f"'{paths.BACKUP_DIRNAME}\\{paths.BACKUP_MANIFEST}'" in body
+    for sub in paths.BACKUP_SUBDIRS:
+        assert f"(N = '{sub}')" in body
+    nxt = code.split("function NextButtonClick")[1].split("\nend;")[0]
+    assert "BackupRootOf(Dir)" in nxt and "CustomMessage('ModelsPageBackupFound')" in nxt
+    assert nxt.index("BackupRootOf(Dir)") < nxt.index("InProgramFiles(Dir)")          # a backup is only read: no write test
+    post = code.split("procedure CurStepChanged")[1].split("\nend;")[0]
+    backup_branch = post.split("if Backup <> '' then")[1].split("else if")[0]
+    assert "DeleteFile(StateDir + '\\models_dir.txt')" in backup_branch
+    assert f"'\\{existing_models.CONFIG_NAME}'" in backup_branch and "Lines[0] := Backup" in backup_branch

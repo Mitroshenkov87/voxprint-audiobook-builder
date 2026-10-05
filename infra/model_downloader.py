@@ -128,10 +128,11 @@ def external_model(repo_id: str, revision: Optional[str] = None):
     try:
         found = model_locator.find_model(repo_id, rev)
         if found is None and paths.configured_models_dir() is not None:
-            # the folder the user CHOSE as models folder may hold models in another layout (Hugging Face cache, a
-            # Voxprint backup ...): they are picked up in place; an explicit choice is not "guessing" (ignore_disabled)
+            # the folder the user CHOSE as models folder may hold models in another layout (a Hugging Face cache ...):
+            # they are picked up in place; an explicit choice is not "guessing" (ignore_disabled).  A Voxprint BACKUP is
+            # never used in place: paths.models_dir() refuses it and infra.existing_models restores it into the live folder.
             own = paths.models_dir()
-            roots = [("folder", r) for r in (own, own / "Voxprint-backup" / "models") if r.is_dir()]
+            roots = [("folder", own)] if own.is_dir() else []
             found = model_locator.find_model(repo_id, rev, roots, ignore_disabled=True)
         return found
     except Exception as exc:  # noqa: BLE001 - looking for foreign copies must never break a normal download
@@ -147,6 +148,18 @@ def _import_existing(repo_id: str, revision: Optional[str], progress: ProgressCa
     from core.errors import CancelledByUser
     from infra import existing_models
 
+    try:   # a Voxprint backup chosen as the source is restored as a whole (once) - models, voices, ffmpeg
+        existing_models.adopt_backup_choice()
+        if existing_models.restore_pending():
+            existing_models.restore_backup(lambda f, m="": progress(stage, f, m))
+            restored = local_dir_for(repo_id)
+            if verify_local_model(restored):
+                progress(stage, 1.0, tr("progress.model_imported", short=short))
+                return restored
+    except CancelledByUser:
+        raise
+    except Exception as exc:  # noqa: BLE001 - a failed restore must never block the per-model import / download
+        log.warning("restoring the backup source failed: %s", exc)
     try:
         found = existing_models.find(repo_id, revision if revision else pinned_revision(repo_id))
         if found is None:

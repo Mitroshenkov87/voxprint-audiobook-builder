@@ -439,11 +439,29 @@ def models_missing(repos: Optional[List[str]] = None) -> List[str]:
             if not md.verify_local_model(md.local_dir_for(r)) and md.external_model(r) is None]
 
 
+def _restore_backup_source(progress: ProgressCallback) -> None:
+    """First run after the user pointed the installer (or Settings) at a Voxprint backup: restore it into the live folders
+    BEFORE anything is looked up or downloaded (:mod:`infra.existing_models`).  Best effort: a failed restore is logged and
+    the normal path (per-model import, then download) follows."""
+    from core.errors import CancelledByUser
+    from infra import existing_models
+
+    try:
+        existing_models.adopt_backup_choice()
+        if existing_models.restore_pending():
+            existing_models.restore_backup(lambda f, m="": progress(Stage.MODEL, f, m))
+    except CancelledByUser:
+        raise
+    except Exception as exc:  # noqa: BLE001 - never block the first-run model step
+        log.warning("restoring the backup source failed: %s", exc)
+
+
 def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[List[str]] = None,
                     ensure=None) -> List[str]:
     """First run: download all required models automatically.  Returns the list of repositories that were downloaded."""
     ensure = ensure or md.ensure_model
     repos = repos if repos is not None else required_model_repos()
+    _restore_backup_source(progress)
     todo = models_missing(repos)
     for repo in repos:   # copies of other programs: instant, only the "found, using it" message is shown
         if repo not in todo and not md.verify_local_model(md.local_dir_for(repo)):
