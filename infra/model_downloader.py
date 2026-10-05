@@ -1,9 +1,12 @@
 """Automatic download of the models from Hugging Face (with a ModelScope fallback) into the app's model folder.
 
 A download goes into ``<name>.partial``; only after verification is the folder renamed, so a partially downloaded
-model is never considered ready, and the next run resumes from the ``.partial`` data.  The commit sha of the
-downloaded revision is stored in the ``.revision`` file.  Copies that other programs already downloaded (HF cache,
-Pinokio/Alexandria, ModelScope ...) are reused in place, read-only - see :mod:`core.model_locator`.
+model is never considered ready, and the next run resumes from the ``.partial`` data.  Heavy weight files use the
+multi-connection Range path (:mod:`infra.parallel_download`); ``huggingface_hub.snapshot_download`` remains the
+fallback for listing failures and small / unknown trees.  After the transfer the UI shows a distinct
+"verifying checksum" status (not "downloading") while size + SHA-256 are checked against ``model_mirrors.json``.
+The commit sha of the downloaded revision is stored in the ``.revision`` file.  Copies that other programs already
+downloaded (HF cache, Pinokio/Alexandria, ModelScope ...) are reused in place, read-only - see :mod:`core.model_locator`.
 """
 from __future__ import annotations
 
@@ -21,7 +24,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from core.errors import ModelDownloadError
 from core.events import ProgressCallback, Stage, noop_progress
-from infra import download_watch, model_mirrors, model_release, modelscope_mirror, netroute, paths
+from infra import download_watch, model_mirrors, model_release, modelscope_mirror, netroute, parallel_download, paths
 
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 netroute.disable_xet()      # plain HTTP: the xet/CAS transfer path stalls on networks that block its host (VOXPRINT_ALLOW_XET=1 keeps it)
@@ -656,21 +659,58 @@ def _ensure_model(
     state = {"sha": sha}
 
     def _download(rev: Optional[str]) -> None:
-        """One ``snapshot_download`` call into the ``.partial`` folder (``rev`` None = latest)."""
-        sd = snapshot_download
-        if sd is None:
+        """Fetch the repository into the ``.partial`` folder (``rev`` None = latest).
+
+        Prefer the multi-connection Range path (:mod:`infra.parallel_download`) for listed
+        files; fall back to ``huggingface_hub.snapshot_download`` when sizes are unknown,
+        parallel downloads are disabled, or the fast path fails.  An injected
+        ``snapshot_download`` (tests) always wins so existing fakes keep working.
+        """
+        if snapshot_download is not None:
+            kwargs: Dict[str, Any] = {"repo_id": repo_id, "local_dir": str(partial)}
+            if rev:
+                kwargs["revision"] = rev
+            if allow_patterns:
+                kwargs["allow_patterns"] = list(allow_patterns)
             try:
-                from huggingface_hub import snapshot_download as sd  # type: ignore[no-redef]
-            except ImportError as exc:
-                raise ModelDownloadError(tr("err.hub_missing"), url=hf_url(repo_id), details=str(exc)) from exc
-        kwargs: Dict[str, Any] = {"repo_id": repo_id, "local_dir": str(partial)}
+                snapshot_download(tqdm_class=tracker.make_tqdm_class(), **kwargs)
+            except TypeError:
+                snapshot_download(**kwargs)
+            return
+        sizes = None
+        if get_remote_sizes is not None or modelscope_mirror.hf_verdict() is not False:
+            try:
+                sizes = (get_remote_sizes or _hf_sizes)(repo_id, rev, allow_patterns)
+            except Exception as exc:  # noqa: BLE001 - listing is optional; hub path remains
+                log.debug("HF file list of %s unavailable: %s", repo_id, exc)
+        if not sizes:
+            sizes = _expected_sizes(repo_id, rev, mirror_manifest, allow_patterns)
+        if sizes and parallel_download.enabled():
+            def url_for(name: str, _rev=rev) -> str:
+                return parallel_download.hf_file_url(repo_id, name, _rev)
+
+            try:
+                parallel_download.download_listed(
+                    sizes, partial, url_for, progress=report, cancel=cur["cancel"],
+                    patterns=allow_patterns)
+                return
+            except download_watch.Stalled:
+                raise
+            except parallel_download.ParallelError as exc:
+                log.warning("parallel HF download of %s failed (%s) - falling back to huggingface_hub",
+                            repo_id, exc)
+        try:
+            from huggingface_hub import snapshot_download as sd
+        except ImportError as exc:
+            raise ModelDownloadError(tr("err.hub_missing"), url=hf_url(repo_id), details=str(exc)) from exc
+        kwargs = {"repo_id": repo_id, "local_dir": str(partial)}
         if rev:
             kwargs["revision"] = rev
         if allow_patterns:
             kwargs["allow_patterns"] = list(allow_patterns)
         try:
             sd(tqdm_class=tracker.make_tqdm_class(), **kwargs)
-        except TypeError:  # some huggingface_hub versions have no tqdm_class parameter
+        except TypeError:
             sd(**kwargs)
 
     def _from_hf() -> None:
@@ -830,6 +870,8 @@ def _ensure_model(
         shutil.rmtree(partial, ignore_errors=True)
         raise ModelDownloadError(tr("err.model_partial", short=short),
                                  url=hf_url(repo_id))
+    # Distinct post-download status: the UI must not keep looking like a transfer.
+    progress(stage, max(cur["f"], 0.99), tr("progress.model_verifying", short=short))
     if ok_source not in ("gh", "hfm"):        # GitHub release and backup mirror already check every file by SHA-256
         _verify_or_repair(partial, repo_id, sha or revision, mirror_manifest, allow_patterns, short,
                           funcs["hfm"] if use_hfm else None, meter, cur)

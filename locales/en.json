@@ -361,6 +361,7 @@
  "progress.model_ready": "Model ready",
  "progress.model_resume": "Resuming the interrupted download of {short}…",
  "progress.model_reused": "Found the model {short} from another app ({where}) - reusing it as is, no download needed.",
+ "progress.model_verifying": "Checking the SHA-256 checksum of {short}…",
  "progress.oom_retry": "Not enough video memory - trying again with a lighter load…",
  "progress.pieces": "Fragments obtained: {n}",
  "progress.plan": "Settings chosen automatically ({device}, epochs: {epochs})",

@@ -361,6 +361,7 @@
  "progress.model_ready": "Modell bereit",
  "progress.model_resume": "Der unterbrochene Download von {short} wird fortgesetzt…",
  "progress.model_reused": "Modell {short} von einer anderen App gefunden ({where}) - es wird unverändert mitgenutzt, kein Download nötig.",
+ "progress.model_verifying": "SHA-256-Prüfsumme von {short} wird geprüft…",
  "progress.oom_retry": "Nicht genug Grafikspeicher - neuer Versuch mit geringerer Last…",
  "progress.pieces": "Erhaltene Fragmente: {n}",
  "progress.plan": "Einstellungen automatisch gewählt ({device}, Epochen: {epochs})",

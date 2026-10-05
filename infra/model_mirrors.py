@@ -114,9 +114,10 @@ def file_ok(path: Path, meta: Dict[str, Any]) -> bool:
         return False
 
 
-def _default_fetch(mirror_repo: str, filename: str, revision: str, local_dir: Path) -> Any:
-    """Download one file of the mirror repository with huggingface_hub (resumable)."""
-    from huggingface_hub import hf_hub_download
+def _default_fetch(mirror_repo: str, filename: str, revision: str, local_dir: Path,
+                   size: int = 0, on_bytes=None, cancel=None) -> Any:
+    """Download one file of the mirror repository (multi-connection Range when large; else hub)."""
+    from infra import parallel_download
 
     try:
         from infra import netroute
@@ -124,6 +125,13 @@ def _default_fetch(mirror_repo: str, filename: str, revision: str, local_dir: Pa
         netroute.prepare_hf()
     except Exception:  # noqa: BLE001 - never block the download
         pass
+    target = Path(local_dir).joinpath(*filename.split("/"))
+    if size > 0 and parallel_download.enabled() and size >= parallel_download.parallel_min():
+        url = parallel_download.hf_file_url(mirror_repo, filename, revision)
+        parallel_download.download_file(url, target, size, on_bytes=on_bytes or (lambda n: None), cancel=cancel)
+        return str(target)
+    from huggingface_hub import hf_hub_download
+
     return hf_hub_download(repo_id=mirror_repo, filename=filename, revision=revision, local_dir=str(local_dir))
 
 
@@ -147,7 +155,18 @@ def download(entry: MirrorEntry, dest: Path, progress: Callable[[float], None] =
                 if target.exists():
                     target.unlink()
                 target.parent.mkdir(parents=True, exist_ok=True)
-                fetch(entry.mirror_repo, name, entry.mirror_revision, dest)
+                size = int(meta["size"])
+                base = done
+
+                def on_bytes(n: int, _b=[0]) -> None:  # noqa: B006
+                    _b[0] += n
+                    progress(min(1.0, (base + _b[0]) / total))
+
+                if fetch is _default_fetch or fetch is None:
+                    _default_fetch(entry.mirror_repo, name, entry.mirror_revision, dest,
+                                   size=size, on_bytes=on_bytes)
+                else:
+                    fetch(entry.mirror_repo, name, entry.mirror_revision, dest)
             except Exception as exc:  # noqa: BLE001 - network / auth / missing file: the caller falls back or reports
                 raise MirrorError(f"{entry.mirror_repo}: {name}: {type(exc).__name__}: {exc}") from exc
             if not file_ok(target, meta):

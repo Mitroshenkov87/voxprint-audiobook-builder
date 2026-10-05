@@ -69,7 +69,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `assets.py` | pinned non-pip assets (ffmpeg): download -> sha256 -> staging -> smoke test -> atomic swap -> rollback; ownership marker `.voxprint-owned` |
 | `env_probe.py` | read-only probe of Python/torch/CUDA/packages/models and the reuse / upgrade / offer / install decision per component |
 | `install_state.py` | completion manifest, health check with stable reason codes (`--verify-install`), uv-based venv plan for `--repair` |
-| `model_downloader.py`, `modelscope_mirror.py` | model download from Hugging Face with a ModelScope fallback |
+| `model_downloader.py`, `modelscope_mirror.py`, `parallel_download.py` | model download from Hugging Face (multi-connection Range for large weights) with ModelScope / own-mirror fallbacks; post-download SHA-256 status |
 | `version_manager.py`, `verified_manifest.py` | PyPI/HF version queries and comparison; the "verified by Voxprint" manifest (`verified_manifest.json`) with update channels |
 | `updater.py` | check -> install into `.staging/` -> smoke test -> swap, rollback on failure |
 | `vram_optimizer.py` | chooses LoRA training parameters (batch, accumulation, 8-bit optimizer, checkpointing) from the available VRAM |

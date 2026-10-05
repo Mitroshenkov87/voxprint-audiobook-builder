@@ -361,6 +361,7 @@
  "progress.model_ready": "Модель готова",
  "progress.model_resume": "Продолжаю прерванную загрузку {short}…",
  "progress.model_reused": "Найдена модель {short} из другой программы ({where}) - использую её как есть, скачивать не нужно.",
+ "progress.model_verifying": "Проверка контрольной суммы SHA-256 модели {short}…",
  "progress.oom_retry": "Не хватило видеопамяти — пробую с меньшей нагрузкой…",
  "progress.pieces": "Получилось фрагментов: {n}",
  "progress.plan": "Параметры подобраны автоматически ({device}, эпох: {epochs})",

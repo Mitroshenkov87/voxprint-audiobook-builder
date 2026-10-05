@@ -155,6 +155,21 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
         if have < size:
             url = f"{BASE_URL}/api/v1/models/{repo_id}/repo?" + urllib.parse.urlencode(
                 {"Revision": REVISION, "FilePath": rel})
+            from infra import parallel_download
+            if (parallel_download.enabled() and size >= parallel_download.parallel_min()
+                    and have == 0 and opener is _open):
+                # multi-connection Range into ``target`` directly (parts dir beside it)
+                try:
+                    def on_bytes(n: int, _b=[0]) -> None:  # noqa: B006
+                        _b[0] += n
+                        progress(min(1.0, (done + _b[0]) / total))
+                    parallel_download.download_file(url, target, size, opener=opener, on_bytes=on_bytes,
+                                                    timeout=timeout)
+                    done += size
+                    progress(min(1.0, done / total))
+                    continue
+                except parallel_download.ParallelError as exc:
+                    log.info("ModelScope parallel download of %s failed (%s) - single stream", rel, exc)
             headers = {"User-Agent": "Voxprint"}
             if have:
                 headers["Range"] = f"bytes={have}-"
