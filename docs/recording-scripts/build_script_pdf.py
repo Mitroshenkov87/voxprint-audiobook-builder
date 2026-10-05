@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Recording-script PDFs (dark + print) from Voxprint-RecordingScript-v4-<lang>.txt, styled like the Voxprint manuals.
+"""Recording-script PDFs (dark + print) from Voxprint-RecordingScript-v5-<lang>.txt, styled like the Voxprint manuals.
 
 Reuses the theme, logo and page rules of ../manual/build_manual.py; the layout is tuned until ../manual/check_pagination.py
 passes (no page below 70 % filled, no stub lines).  Needs: pip install markdown weasyprint pillow (+ poppler-utils for the check).
@@ -17,10 +17,10 @@ WPM = 130          # reading speed, words per minute (unhurried)
 PAUSE = 1.0        # seconds of silence after every line
 
 L = {
- "ru": dict(title="Текст для записи голоса", sub="Версия 4 · русский", opt="необязательно", guide="Памятка по чтению",
+ "ru": dict(title="Текст для записи голоса", sub="Версия 5 · русский", opt="необязательно", guide="Памятка по чтению",
             rules="Правила", tempo_h="Темп и паузы", emo_h="Эмоции", brk_h="Перерывы", dur_h="Сколько времени займёт запись",
             blocks_h="Блоки и примерное время", col=("№", "Блок", "≈ мин"), brk="Здесь можно сделать перерыв на 2–3 минуты: глоток воды, пара шагов по комнате.",
-            header="Запись голоса · версия 4", foot="Личная памятка для записи · не для публикации", mins="мин",
+            header="Запись голоса · версия 5", foot="Личная памятка для записи · не для публикации", mins="мин",
             tempo=["Читайте неспешно, примерно 130 слов в минуту, чуть медленнее обычного разговора, как будто рассказываете что-то знакомому.",
                    "После каждой строки — вдох и около секунды тишины. После запятой — короткая остановка, после точки — полная.",
                    "Перед тихим и перед громким блоком и после них оставляйте 3 секунды тишины.",
@@ -31,10 +31,10 @@ L = {
             emo_note="Играть не нужно: достаточно слегка изменить голос. Не получается — читайте обычным голосом.",
             brk_txt="Перерыв нужен примерно каждые 4–5 минут чтения: он отмечен в тексте значком ☕. Пейте тёплую воду, не холодную; держите микрофон на одном расстоянии.",
             dur="Основной текст (блоки 1–14): около {main} мин. Необязательные блоки 15–16: ещё около {opt} мин. Фраза согласия в конце: около 0,5 мин. С паузами, перерывами и повторами планируйте {plan} мин."),
- "en": dict(title="Voice Recording Script", sub="Version 4 · English", opt="optional", guide="Reading guide",
+ "en": dict(title="Voice Recording Script", sub="Version 5 · English", opt="optional", guide="Reading guide",
             rules="Rules", tempo_h="Tempo and pauses", emo_h="Emotions", brk_h="Breaks", dur_h="How long the recording takes",
             blocks_h="Blocks and approximate time", col=("No.", "Block", "≈ min"), brk="A good moment for a 2–3 minute break: a sip of water, a few steps around the room.",
-            header="Voice recording · version 4", foot="Personal recording aid · not for publication", mins="min",
+            header="Voice recording · version 5", foot="Personal recording aid · not for publication", mins="min",
             tempo=["Read unhurriedly, at roughly 130 words per minute, a little slower than everyday conversation, as if telling something to a friend.",
                    "After every line take a breath and leave about a second of silence. A comma is a short stop, a full stop is a full pause.",
                    "Leave 3 seconds of silence before and after the whisper and loud passages.",
@@ -45,10 +45,10 @@ L = {
             emo_note="You do not have to act: a slight change of voice is enough. If it does not come, use your normal voice.",
             brk_txt="Take a break roughly every 4–5 minutes of reading; the suggested places are marked ☕ in the text. Drink warm water, not cold, and keep the microphone at the same distance.",
             dur="Main text (blocks 1–14): about {main} min. Optional blocks 15–16: about {opt} more min. The consent sentence at the end: about 0.5 min. With pauses, breaks and retakes plan for {plan} min."),
- "de": dict(title="Aufnahmetext für die Stimme", sub="Version 4 · Deutsch", opt="optional", guide="Lesehinweise",
+ "de": dict(title="Aufnahmetext für die Stimme", sub="Version 5 · Deutsch", opt="optional", guide="Lesehinweise",
             rules="Regeln", tempo_h="Tempo und Pausen", emo_h="Gefühle", brk_h="Pausen zum Ausruhen", dur_h="Wie lange die Aufnahme dauert",
             blocks_h="Blöcke und ungefähre Zeit", col=("Nr.", "Block", "≈ Min."), brk="Hier passt eine Pause von 2–3 Minuten: ein Schluck Wasser, ein paar Schritte durch das Zimmer.",
-            header="Stimmaufnahme · Version 4", foot="Persönliche Aufnahmehilfe · nicht zur Veröffentlichung", mins="Min.",
+            header="Stimmaufnahme · Version 5", foot="Persönliche Aufnahmehilfe · nicht zur Veröffentlichung", mins="Min.",
             tempo=["Lesen Sie gemächlich, etwa 130 Wörter pro Minute, etwas langsamer als im Alltagsgespräch, so als würden Sie einem Bekannten etwas erzählen.",
                    "Nach jeder Zeile atmen Sie durch und lassen etwa eine Sekunde Stille. Ein Komma ist ein kurzes Innehalten, ein Punkt eine volle Pause.",
                    "Vor und nach den Flüster- und Lautstellen lassen Sie 3 Sekunden Stille.",
@@ -129,7 +129,7 @@ def esc(s):
 
 def build(lang, theme, outdir, gap=1.0):
     t = L[lang]
-    doc, rules, blocks = parse(HERE / f"Voxprint-RecordingScript-v4-{lang}.txt")
+    doc, rules, blocks = parse(HERE / f"Voxprint-RecordingScript-v5-{lang}.txt")
     consent = blocks[-1]; body_blocks = blocks[:-1]
     main = sum(minutes(b) for b in body_blocks if not b["title"].upper().startswith(("НЕОБЯЗАТЕЛЬНО", "OPTIONAL")))
     opt = sum(minutes(b) for b in body_blocks if b["title"].upper().startswith(("НЕОБЯЗАТЕЛЬНО", "OPTIONAL")))
@@ -182,7 +182,7 @@ def build(lang, theme, outdir, gap=1.0):
     css = bm.page_css(theme).replace('"AI Audiobook Builder"', '"%s"' % t["header"]) + (bm.HERE / "manual.css").read_text(encoding="utf-8") + EXTRA_CSS + (f"p.line{{margin-bottom:{9 * gap:.1f}pt}} p.term{{margin-bottom:{4 * gap:.1f}pt}} .sec h2{{margin-top:{22 * gap:.1f}pt}} "
                                                                                        f"p.tag{{margin-top:{12 * gap:.1f}pt}} p.hint{{margin-bottom:{10 * gap:.1f}pt}}")
     htm = f'<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><title>{html.escape(t["title"])}</title><style>{css}</style></head><body>{"".join(parts)}</body></html>'
-    out = outdir / f"Voxprint-RecordingScript-v4-{lang}{bm.SUFFIX[theme]}.pdf"
+    out = outdir / f"Voxprint-RecordingScript-v5-{lang}{bm.SUFFIX[theme]}.pdf"
     HTML(string=htm, base_url=str(HERE)).write_pdf(str(out))
     return out, main, opt
 

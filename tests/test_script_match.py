@@ -136,3 +136,34 @@ def test_v4_scripts_contain_only_their_own_consent_templates(lang):
         if other != lang:
             for tpl in TEMPLATES[other].values():
                 assert " ".join(tpl.split("{name}")[0].split()) not in flat
+
+
+# ------------------------------------------------------------------ recording scripts v5 (docs/recording-scripts/)
+V5_LANGS = ("ru", "en", "de")
+
+
+def _v5(lang):
+    return (ROOT / "docs" / "recording-scripts" / f"Voxprint-RecordingScript-v5-{lang}.txt").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("lang", V5_LANGS)
+def test_v5_scripts_have_no_profanity_and_parse_with_consent_at_the_end(lang):
+    text = _v5(lang)
+    words = re.findall(r"[\wёÄÖÜäöüß]+", text)
+    assert not [w for w in words if _PROFANE.match(w)]
+    lines = parse_script_lines(text)
+    assert 100 <= len(lines) <= 220
+    assert all("[" not in s and "===" not in s for s in lines)
+    assert not any(k in " ".join(lines).lower() for k in ("разрешаю", "give permission", "erlaube heute"))
+
+
+@pytest.mark.parametrize("lang", V5_LANGS)
+def test_v5_scripts_contain_only_their_own_consent_templates(lang):
+    flat = " ".join(_v5(lang).split())
+    for scope, tpl in TEMPLATES[lang].items():
+        assert " ".join(tpl.split("{name}")[0].split()) in flat
+        assert " ".join(tpl.split("{date}")[1].split())[:40] in flat
+    for other in V5_LANGS:
+        if other != lang:
+            for tpl in TEMPLATES[other].values():
+                assert " ".join(tpl.split("{name}")[0].split()) not in flat
