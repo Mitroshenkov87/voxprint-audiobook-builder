@@ -5,7 +5,8 @@ The main window only keeps "choose audio / choose text / create voice".  Service
 * interface language,
 * "Check for updates",
 * shortcuts to the models folder and the data/log folder,
-* "Repair installation",
+* "Repair installation" and "Auto-repair" (every component and model checked by hash, missing / broken parts fetched
+  again: :mod:`infra.auto_repair`),
 * "Maximum quality (auto)": re-selects every recommended automatic step in the windows and downloads the models they need
   (:mod:`infra.auto_steps`),
 * backup / restore of the models and voices to any folder or drive, and the "existing models folder" that is imported
@@ -30,6 +31,7 @@ from core.i18n import tr
 from infra import auto_steps, backup, existing_models, modules as runtime_modules, netroute
 from workers import backup_runner
 from workers.auto_quality_worker import AutoQualityWorker
+from workers.auto_repair_worker import AutoRepairWorker
 from workers.backup_worker import BackupWorker
 
 log = logging.getLogger("voxprint.ui.settings")
@@ -158,8 +160,21 @@ class SettingsDialog(QDialog):
         erow.addWidget(self.btn_existing_clear)
         lay.addLayout(erow)
 
-        for b in (self.btn_repair, self.btn_about):
-            lay.addWidget(b)
+        rrow = QHBoxLayout()                      # Repair (environment only) | Auto-repair (everything, by hash)
+        self.btn_autorepair = QPushButton()
+        rrow.addWidget(self.btn_repair)
+        rrow.addWidget(self.btn_autorepair)
+        lay.addLayout(rrow)
+        self.autorepair_job: Optional[Callable[..., Any]] = None          # injectable (tests); None = infra.auto_repair.run
+        self.autorepair_worker: Optional[AutoRepairWorker] = None
+        self.bar_autorepair = QProgressBar()
+        self.bar_autorepair.setRange(0, 100)
+        self.bar_autorepair.setVisible(False)
+        self.lbl_autorepair_status = QLabel()
+        self.lbl_autorepair_status.setWordWrap(True)
+        lay.addWidget(self.bar_autorepair)
+        lay.addWidget(self.lbl_autorepair_status)
+        lay.addWidget(self.btn_about)
         lay.addStretch(1)
         self.btn_close = QPushButton()
         close_row = QHBoxLayout()
@@ -173,6 +188,7 @@ class SettingsDialog(QDialog):
         self.btn_models.clicked.connect(window.open_models_folder)
         self.btn_data.clicked.connect(window.open_data_folder)
         self.btn_repair.clicked.connect(window.start_repair)
+        self.btn_autorepair.clicked.connect(self.toggle_autorepair)
         self.btn_about.clicked.connect(window.open_about)
         self.btn_backup.clicked.connect(self.start_backup)
         self.btn_restore.clicked.connect(self.start_restore)
@@ -199,6 +215,8 @@ class SettingsDialog(QDialog):
         self.btn_data.setText(tr("ui.settings_data_folder"))
         self.btn_repair.setText(tr("ui.settings_repair"))
         self.btn_repair.setToolTip(tr("ui.settings_repair_tip"))
+        self.btn_autorepair.setText(tr("autorepair.stop") if self.autorepair_running else tr("autorepair.button"))
+        self.btn_autorepair.setToolTip(tr("autorepair.tip"))
         self.btn_about.setText(tr("ui.about"))
         self.btn_about.setToolTip(tr("ui.about_tip"))
         self.btn_close.setText(tr("about.btn_close"))
@@ -318,6 +336,51 @@ class SettingsDialog(QDialog):
 
     def _on_max_failed(self, message: str) -> None:
         self._max_finished(tr("auto.failed", error=message))
+
+    # ------------------------------------------------------------------ Auto-repair
+    @property
+    def autorepair_running(self) -> bool:
+        """True while the auto-repair runs."""
+        return bool(self.autorepair_worker and self.autorepair_worker.isRunning())
+
+    def toggle_autorepair(self) -> bool:
+        """Start the auto-repair (or stop the running one).  Returns True when a run was started."""
+        if self.autorepair_running:
+            self.autorepair_worker.cancel()
+            self.lbl_autorepair_status.setText(tr("ui.stopping"))
+            return False
+        if self._win.busy or self._win.repairing:
+            return False
+        w = AutoRepairWorker(self.autorepair_job, parent=self)
+        w.progress.connect(self._on_autorepair_progress)
+        w.done.connect(self._on_autorepair_done)
+        w.failed.connect(lambda m: self._autorepair_finished(tr("autorepair.error", error=m)))
+        w.cancelled.connect(lambda: self._autorepair_finished(tr("autorepair.cancelled")))
+        self.autorepair_worker = w
+        self.bar_autorepair.setValue(0)
+        self.bar_autorepair.setVisible(True)
+        self.lbl_autorepair_status.setText(tr("autorepair.running"))
+        w.start()
+        self.btn_autorepair.setText(tr("autorepair.stop"))
+        self.refresh()
+        return True
+
+    def _on_autorepair_progress(self, fraction: float, message: str) -> None:
+        self.bar_autorepair.setValue(int(max(0.0, min(1.0, fraction)) * 100))
+        if message:
+            self.lbl_autorepair_status.setText(message)
+
+    def _on_autorepair_done(self, report) -> None:
+        self.bar_autorepair.setValue(100)
+        self._autorepair_finished(report.summary())
+
+    def _autorepair_finished(self, text: str) -> None:
+        if self.autorepair_worker:
+            self.autorepair_worker.wait(2000)
+        self.bar_autorepair.setVisible(False)
+        self.lbl_autorepair_status.setText(text)
+        self.btn_autorepair.setText(tr("autorepair.button"))
+        self.refresh()
 
     # ------------------------------------------------------------------ backup / restore
     def _default_pick_folder(self, title: str) -> str:
@@ -471,7 +534,8 @@ class SettingsDialog(QDialog):
         busy = self._win.busy
         self.cmb_lang.setEnabled(not busy)           # switching language mid-task would relabel a running job
         self.btn_update.setEnabled(not busy and not self._win.updating)
-        self.btn_repair.setEnabled(not busy and not self._win.repairing)
+        self.btn_repair.setEnabled(not busy and not self._win.repairing and not self.autorepair_running)
+        self.btn_autorepair.setEnabled(self.autorepair_running or (not busy and not self._win.repairing))
         self.btn_max.setEnabled(not busy and not self.max_running)
         idle = not busy and not self.backing_up
         for b in (self.btn_backup, self.btn_restore, self.btn_existing, self.chk_voices):

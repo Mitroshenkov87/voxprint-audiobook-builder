@@ -14,7 +14,7 @@ Use **← Studio** in any window to come back; the gear (top right) opens Settin
    the merged model works in any app that runs Qwen3-TTS. Voxprint checks the free disk space and asks for confirmation first; the big model is never built automatically.
 5. When training finishes the voice is **registered in the library** automatically (status line "voice registered"; if that fails you get a warning, the adapter folder is still there).
 6. The **gear** button opens **Settings**: language, *Check for updates* (also checked weekly in the background), open the models / data & log folders,
-   *Repair the installation*, and *About* (help, authors, open-source components with their licences, third-party notices).
+   *Repair the installation*, *Auto-repair* (checks every component and model file by checksum, downloads what is missing and replaces only damaged files; also `Voxprint --auto-repair`), and *About* (help, authors, open-source components with their licences, third-party notices).
 
 Use voices responsibly: only with the voice owner's permission, in line with the voice's licence (see [Privacy](PRIVACY.md)).
 

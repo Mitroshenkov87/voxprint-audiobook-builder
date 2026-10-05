@@ -4,7 +4,8 @@ Flags: ``--prefetch`` (force-download the models; used by the installer), ``--se
 ``--selftest-imports`` (import every heavy library - checks that a PyInstaller build is complete),
 ``--selftest-narrate [voice]`` (narrate two sentences headless; writes logs/selftest_narrate.txt),
 ``--verify-install`` (install check with reason codes; also written to logs/verify_install.txt),
-``--repair`` (rebuild only Voxprint's own environment; logs/repair.txt).
+``--repair`` (rebuild only Voxprint's own environment; logs/repair.txt),
+``--auto-repair`` (check every component and model by hash, fetch missing / broken parts; logs/auto_repair.txt).
 """
 from __future__ import annotations
 
@@ -252,6 +253,14 @@ def main(argv=None) -> int:
             logging.getLogger("voxprint").info("adopted settings from a previous install: %s", adopted)
     except Exception:  # noqa: BLE001
         pass
+    if "--auto-repair" in argv:          # same job as Settings -> Auto-repair (infra/auto_repair.py)
+        from infra import auto_repair
+
+        out = _cli_printer("auto_repair")
+        rep = auto_repair.run(lambda f, m: out(f"  [{int(f * 100):3d}%] {m}"))
+        for it in rep.items:
+            out(f"{it.status.upper():10s} {it.kind}: {it.name}" + (f" - {it.detail}" if it.detail else ""))
+        return 0 if rep.ok else 1
     if "--verify-install" in argv or "--repair" in argv:
         import shutil
         from infra import install_state
