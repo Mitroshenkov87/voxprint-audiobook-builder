@@ -623,28 +623,51 @@ class ModelLock:
         self._fh: Any = None
 
     def try_acquire(self) -> bool:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        fh = open(self.path, "a+b")
-        try:
-            if os.name == "nt":
-                import msvcrt
+        for _ in range(5):
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            fh = open(self.path, "a+b")
+            try:
+                if os.name == "nt":
+                    import msvcrt
 
-                fh.seek(0)
-                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
+                    fh.seek(0)
+                    msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
 
-                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            fh.close()
-            return False
-        self._fh = fh
-        return True
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    # the holder before us may have deleted the file right after its release (``release(remove=True)``):
+                    # a lock on the unlinked file excludes nobody, so try again on the file that is at the path now
+                    st = os.fstat(fh.fileno())
+                    try:
+                        cur = os.stat(self.path)
+                        same = (cur.st_ino, cur.st_dev) == (st.st_ino, st.st_dev)
+                    except OSError:
+                        same = False
+                    if not same:
+                        fh.close()
+                        continue
+            except OSError:
+                fh.close()
+                return False
+            self._fh = fh
+            return True
+        return False
 
-    def release(self) -> None:
+    def release(self, remove: bool = False) -> None:
+        """Give the lock up; ``remove`` also deletes the (empty) lock file so a finished model leaves nothing behind.
+
+        On Linux the file is deleted while still locked (a waiter re-checks the path, see :meth:`try_acquire`); on Windows
+        it can only go after closing, and the delete simply fails while another process has the file open - it then
+        stays until that process (or Check & repair, :func:`sweep_stale_locks`) removes it."""
         fh, self._fh = self._fh, None
         if fh is None:
             return
+        if remove and os.name != "nt":
+            try:
+                self.path.unlink()
+            except OSError:
+                pass
         try:
             if os.name == "nt":
                 import msvcrt
@@ -659,6 +682,11 @@ class ModelLock:
             pass
         finally:
             fh.close()
+        if remove and os.name == "nt":
+            try:
+                self.path.unlink()
+            except OSError:                    # another process opened it meanwhile (it waits for the model): keep it
+                pass
 
     def acquire(self, on_wait: Callable[[float], None], poll: float = 0.5) -> None:
         t0 = time.monotonic()
@@ -692,10 +720,40 @@ def ensure_model(*args: Any, **kwargs: Any) -> Path:
         progress(stage, 0.0, tr("progress.model_wait", short=short))
 
     lock.acquire(waiting)
+    done = False
     try:
-        return _ensure_model(*args, **kwargs)              # re-checks: the other process may have finished the model
+        path = _ensure_model(*args, **kwargs)              # re-checks: the other process may have finished the model
+        done = True
+        return path
     finally:
-        lock.release()
+        lock.release(remove=done)                          # a finished model leaves no empty ``.<name>.lock`` behind
+
+
+def sweep_stale_locks(root: Optional[Path] = None) -> int:
+    """Delete the empty ``.<model>.lock`` files no process holds any more (left by build 667 and older, or a crash).
+
+    A lock that is held right now (a download in progress) is skipped.  Returns how many files were removed."""
+    folder = Path(root) if root is not None else paths.models_dir()
+    try:
+        candidates = [p for p in folder.glob(".*.lock") if p.is_file()]
+    except OSError:
+        return 0
+    removed = 0
+    for p in candidates:
+        try:
+            if p.stat().st_size:
+                continue                                   # not one of ours (ours are always empty)
+        except OSError:
+            continue
+        lock = ModelLock(p)
+        if not lock.try_acquire():
+            continue                                       # a download of that model is running
+        lock.release(remove=True)
+        if not p.exists():
+            removed += 1
+    if removed:
+        log.info("removed %d stale model lock file(s) in %s", removed, folder)
+    return removed
 
 
 

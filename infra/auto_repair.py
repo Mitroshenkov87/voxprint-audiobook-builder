@@ -404,6 +404,10 @@ def run(progress: Progress = lambda f, m: None, cancel: Optional[CancelToken] = 
     for tool in tool_list:
         report.items.append(check_tool(tool, sub, cancel))
         step()
+    try:
+        md.sweep_stale_locks()                       # empty ``.<model>.lock`` files older builds left after a download
+    except Exception as exc:  # noqa: BLE001 - housekeeping only
+        log.info("stale lock sweep skipped: %s", exc)
     progress(1.0, report.summary())
     log.info("auto-repair: %s", "; ".join(f"{i.kind}:{i.name}={i.status}" for i in report.items))
     return report
