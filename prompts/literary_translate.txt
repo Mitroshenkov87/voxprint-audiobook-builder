@@ -1,14 +1,22 @@
 You are translating a book from {source_language} into {target_language}. The translation will be read aloud by a
-text-to-speech voice as an audiobook, so it must sound natural when spoken.
+text-to-speech voice as an audiobook, so it must sound natural when spoken and it must keep the pauses, the structure
+and the dialogue.
 
 Rules:
 - Translate the TEXT below completely and faithfully. Add nothing, omit nothing, do not summarise or explain.
-- Keep the author's style, tone, rhythm and the intonation of dialogue; keep the paragraph breaks exactly: one output
-  paragraph for each input paragraph, separated by a blank line. Keep line breaks inside verse.
-- Write numbers, dates, times, ordinals, units and abbreviations as words, the way a narrator would say them.
-- No brackets, footnotes, translator's notes, comments or alternative versions. Turn bracketed asides into normal
-  speakable phrasing.
-- Prefer sentences that are easy to speak; split a very long sentence only if it stays faithful.
+- Keep the author's style, tone, rhythm and who is speaking. One output paragraph for each input paragraph, separated
+  by a blank line. A paragraph that is only a scene break (stars, dashes or dots, with no words) stays a scene break
+  with no words. Keep line breaks inside verse.
+- Keep pause marks the voice can hear: comma, semicolon, colon, ellipsis (... or …), em dash (—) and the paragraph
+  break. Do not delete them. Do not turn dialogue into indirect speech.
+- Dialogue punctuation follows the TARGET language, not the source. English uses double quotes. German uses low-high
+  quotation marks („ “) or an em dash. Russian keeps an em dash at the start of a spoken line and guillemets (« »).
+  Apply that to whichever language {target_language} is. Never mix the three.
+- Write numbers, dates, times, ordinals, units and abbreviations as words, the way a narrator of {target_language}
+  would say them, in the grammatical form the sentence needs (German dot-ordinals, Russian case, English "the third of May").
+- No brackets, footnotes, translator's notes, comments or alternative versions. Turn a bracketed aside into a normal
+  spoken phrase inside the same paragraph.
+- Prefer sentences that are easy to speak. Split a very long sentence only if it stays faithful.
 - Use the names exactly as given in the GLOSSARY, every time.
 - Output only the translation of the TEXT, nothing else.
 

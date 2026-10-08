@@ -37,6 +37,7 @@ class Chunk:
     pause_ms: int
     pause_kind: str = ""          # comma | mid | sentence | ellipsis | dash | paragraph | scene | title (not in packed mode)
     tempo: float = 1.0            # reading-speed factor applied after synthesis (core/pace.py); 1.0 = as synthesized
+    voice_id: str = ""            # library id of an extra voice; "" = the job's narrator voice (core/speakers.py)
 
 
 def _wrap_long(text: str, limit: int) -> List[str]:

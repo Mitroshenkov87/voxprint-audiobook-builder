@@ -1,6 +1,6 @@
 {
  "offset": 629,
- "offset_note": "631 up to build 665 (run 34); 630 from run 36 on, because run 35 failed in CI before it published anything; 629 from run 38 on, because run 37 was cancelled before it published anything (codename change) (run 38 = build 667)",
- "codename": "Menuchah",
- "codename_meaning": "rest, calm (Biblical Hebrew, Genesis 49:15 'he saw that rest was good') - pauses that follow the text, downloads that settle without WinError 5, retries instead of failures, two open voices at rest in the library"
+ "offset_note": "631 up to build 665 (run 34); 630 from run 36 on, because run 35 failed in CI before it published anything; 629 from run 38 on, because run 37 was cancelled before it published anything (run 38 = build 667). The next build-installer run is run 39, and 39 + 629 = 668, so the offset stays 629 (codename Kolot).",
+ "codename": "Kolot",
+ "codename_meaning": "voices (Biblical Hebrew qolot, plural of qol 'voice'; Exodus 19:16 also 'thunder') - one Prepare text switch, speaker marks the user can edit, and narration that speaks narrator, male and female voices"
 }

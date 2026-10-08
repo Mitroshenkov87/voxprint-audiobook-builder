@@ -210,6 +210,8 @@ QFrame#card[recommended="true"] {{{{ border: 2px solid {accent}; }}}}
 QPushButton[recommended="true"] {{{{ border: 2px solid {accent}; font-weight: 600; }}}}
 QCheckBox::indicator {{{{ width: 16px; height: 16px; border: 1px solid {accent}; border-radius: 4px; background: {control}; }}}}
 QCheckBox::indicator:checked {{{{ background: {strong}; border-color: {soft}; {check_image} }}}}
+QCheckBox::indicator:disabled {{{{ border: 1px solid {disabled}; background: transparent; }}}}
+QCheckBox::indicator:checked:disabled {{{{ background: {disabled}; border-color: {disabled}; {check_image} }}}}
 QToolButton#expander {{{{ background: transparent; border: none; color: {soft}; font-weight: 600; padding: 4px 2px; }}}}
 QPushButton#preset {{{{ padding: 6px 16px; }}}}
 QPushButton#preset:checked {{{{ background: {strong}; border-color: {soft}; color: #ffffff; font-weight: 600; }}}}

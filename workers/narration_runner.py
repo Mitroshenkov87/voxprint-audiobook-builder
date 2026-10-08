@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional, Sequence
+from typing import Callable, Dict, Optional, Sequence
 
 from core import languages, tts_engine
 from core import narration as nr
@@ -27,6 +27,7 @@ class NarrationJob:
     options: nr.NarrationOptions = field(default_factory=nr.NarrationOptions)
     chapters: Sequence[int] = ()          # empty = all chapters
     on_plan: Optional[Callable[[list], None]] = None     # receives the ordered chunk files (live player)
+    extra_voices: Dict[str, VoiceRecord] = field(default_factory=dict)   # voice id -> record, besides the narrator
 
 
 def run_narration(job: NarrationJob, progress: Callable[[nr.NarrationProgress], None], cancel: CancelToken,
@@ -39,6 +40,8 @@ def run_narration(job: NarrationJob, progress: Callable[[nr.NarrationProgress], 
     # English book must get "English".  Decided once per book (core.languages.narration_language).
     language = languages.narration_language(job.book, job.voice.language, target)
     factory = tts_engine.make_engine_factory(job.voice, language)
+    extra = {vid: (tts_engine.make_engine_factory(rec, language), tts_engine.engine_tag(rec, language))
+             for vid, rec in job.extra_voices.items()}
     checker = None
     if job.options.check_chunks:      # per-chunk ASR check + regeneration (core/chunk_check.py); None if no recogniser installed
         from core import chunk_check
@@ -51,7 +54,7 @@ def run_narration(job: NarrationJob, progress: Callable[[nr.NarrationProgress], 
                            language="" if language == languages.AUTO else language,
                            narrator=job.voice.name, options=job.options, progress=progress, cancel=cancel,
                            pause=pause, ffmpeg=ensure_ffmpeg(), chapters=job.chapters, on_plan=job.on_plan,
-                           checker=checker)
+                           checker=checker, extra_engines=extra or None)
 
 
 def default_output_dir() -> Path:

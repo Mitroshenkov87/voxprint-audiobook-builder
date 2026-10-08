@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from PySide6.QtCore import QEvent, QObject, QRect, Qt
+from PySide6.QtCore import QEvent, QObject, QRect, QSize, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -114,6 +114,31 @@ class ElidedCombo(QComboBox):
         p.drawComplexControl(QStyle.ComplexControl.CC_ComboBox, opt)
         opt.currentText = self.elided_text()
         p.drawControl(QStyle.ControlElement.CE_ComboBoxLabel, opt)
+
+
+class BoundLabel(QLabel):
+    """A word-wrapped label whose minimum width stays small.
+
+    A plain word-wrapped ``QLabel`` reports the full line as its width, so a long Check & repair status squeezes the
+    other column until buttons paint on top of each other. This label wraps inside the width it is given.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWordWrap(True)
+        self.setMinimumWidth(140)
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802 - Qt naming
+        return True
+
+    def heightForWidth(self, width: int) -> int:  # noqa: N802 - Qt naming
+        return self.fontMetrics().boundingRect(0, 0, max(width, 1), 10000, int(Qt.TextFlag.TextWordWrap), self.text()).height() + 4
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 - Qt naming
+        return QSize(140, max(self.heightForWidth(140), 1))
+
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt naming
+        return QSize(220, max(self.heightForWidth(220), self.minimumSizeHint().height()))
 
 
 class _ToggleLabel(QLabel):

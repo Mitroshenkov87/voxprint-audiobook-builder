@@ -71,6 +71,7 @@ writes number, codename and commit into `credits.json` before PyInstaller runs; 
 `Voxprint-Setup-online-<version>-build<N>.exe` (the plain `Voxprint-Setup-online.exe` stays for stable links), and the components
 manifest records `build`, so the Components window offers a same-version build only when its number is higher. Local builds are build 0.
 To keep the numbering after failed runs, lower `offset` so the next successful build gets the intended number.
+The offset stays **629** for 0.1.4: the latest *build-installer* run is 38 (build 667), so the next run is 39 and 39 + 629 = 668, codename **Kolot**. Do not lower the offset for that run.
 
 ### Versions: "verified by Voxprint"
 `infra/verified_manifest.json` pins the package versions and model revisions (HF commit shas) Voxprint was tested with. The updater installs exactly those

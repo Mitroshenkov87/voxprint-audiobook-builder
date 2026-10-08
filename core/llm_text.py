@@ -29,6 +29,9 @@ MAX_GLOSSARY = 40
 NAMES = {"en": "English", "ru": "Russian", "de": "German"}
 _REFUSAL = re.compile(r"\b(I can(?:no|')t|I'm sorry|I am sorry|As an AI|I'm unable|Извините|К сожалению, я не|"
                       r"Я не могу|Es tut mir leid|Ich kann (?:diesen|das|nicht))", re.I)
+#: Dialogue the pause chunker can hear: quotes, guillemets, German low-high quotes, or a line that opens with a dash.
+_DIALOGUE = re.compile(r"[\"«»„“”]|^\s*[—–]\s+\S|^\s*-\s+\S", re.MULTILINE)
+_WORD = re.compile(r"[^\W\d_]", re.UNICODE)
 
 
 class ChatModel(Protocol):
@@ -99,6 +102,19 @@ def check(src: str, out: str, language: str, lo: float, hi: float) -> bool:
     return found in ("", language) or (language == "ru" and found == "uk")
 
 
+def keeps_spoken_shape(src: str, out: str) -> bool:
+    """True when a narration rewrite still has the pauses and the dialogue the chunker reads.
+
+    A scene-break paragraph (no words) must stay a scene break. A paragraph that shows speech with quotes or with a
+    leading dash must still show speech. Wording may change; the shape may not.
+    """
+    if bool(_WORD.search(src)) != bool(_WORD.search(out)):
+        return False
+    if _DIALOGUE.search(src) and not _DIALOGUE.search(out):
+        return False
+    return True
+
+
 def _blocks(idx: Sequence[int], paras: Sequence[str]) -> List[List[int]]:
     out: List[List[int]] = []
     cur: List[int] = []
@@ -142,7 +158,8 @@ class _Session:
 
 def run_paragraphs(paras: Sequence[str], template: str, values: Dict[str, str], language: str, plan: LLMPlan, cache,
                    ratio: tuple, progress: Optional[Callable[[float], None]] = None,
-                   cancel: Optional[CancelToken] = None, session: Optional[_Session] = None) -> Dict[int, str]:
+                   cancel: Optional[CancelToken] = None, session: Optional[_Session] = None,
+                   shape: bool = False) -> Dict[int, str]:
     """``{paragraph index: accepted output}`` for the paragraphs with letters; the others / rejected ones are missing.
     ``cache`` is a :class:`core.translate.TranslationCache`; its key includes the model tag and the prompt."""
     cancel = cancel or CancelToken()
@@ -164,7 +181,7 @@ def run_paragraphs(paras: Sequence[str], template: str, values: Dict[str, str], 
             parts = _split_answer(answer or "")
             if len(parts) == len(block):              # each paragraph is judged on its own; a failed one falls back
                 for i, o in zip(block, parts):
-                    if check(paras[i], o, language, *ratio):
+                    if check(paras[i], o, language, *ratio) and (not shape or keeps_spoken_shape(paras[i], o)):
                         out[i] = o
                         cache.put(tag, paras[i], o)
             rejected += sum(1 for i in block if i not in out) if answer is not None else 0
@@ -223,7 +240,7 @@ def prepare_paragraphs(paras: Sequence[str], language: str, plan: LLMPlan, cache
         gl = glossary(find_names(paras), language, language, plan, session, glossary_file)
         values = {"language": NAMES.get(language, language), "glossary": gl or "-"}
         return run_paragraphs(paras, load_prompt("prepare_narration"), values, language, plan, cache, (0.75, 1.9),
-                              progress, cancel, session)
+                              progress, cancel, session, shape=True)
     finally:
         session.close()
 

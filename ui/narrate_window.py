@@ -11,20 +11,20 @@ can be hidden completely (:mod:`infra.features`).  The quality is chosen with th
 High, see :data:`core.audiobook_export.QUALITY_PRESETS`); exact bitrates, the output folder, the chapter-title option and a
 sample of the prepared text sit in the collapsed "Advanced" section, the rarely needed formats in "Other formats".
 
-"Prepare the text" is fully automatic (no editor, no review): the rule-based steps of :mod:`core.text_prep` are check
-boxes (all on by default), the optional AI clean-up of :mod:`core.text_cleanup` needs a one-time model download (button in
-the row, :class:`workers.narrate_worker.TextModelDownloadWorker`) and works for Russian books only.  Steps that do not exist
-yet (punctuation model, stress marks, translation, speaker roles) are shown greyed out in a collapsed "coming later" list.
+"Prepare the text" is one switch, on by default: the rule-based steps of :mod:`core.text_prep`, plus the Russian typo
+model of :mod:`core.text_cleanup` when that model is already downloaded.  Translation stays its own card and is off
+until the user turns it on.  The AI text model (Gemma) is a separate card: literary translation, a narration rewrite,
+and speaker marks.  Those boxes are clickable when the model is downloaded and look disabled when it is not.
 """
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QSlider, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QProgressBar,
-                               QPushButton, QSpinBox, QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QSlider, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel,
+                               QProgressBar, QPushButton, QSpinBox, QToolButton, QVBoxLayout, QWidget)
 
 from core import audiobook_export as ex
 from core import narration as nr
@@ -38,6 +38,7 @@ from core.book_parsers import SUPPORTED_EXTENSIONS, Book, load_book
 from core.errors import DatasetMakerError
 from core import num_words as nw
 from core import translate as tl
+from core import speakers as spk
 from core import voice_info
 from core.i18n import tr
 from core.languages import language_name
@@ -48,6 +49,7 @@ from infra import voice_repository as repo
 from ui.main_window import mark_recommended, open_folder, recommended_text
 from ui import job_dialogs
 from ui.mini_player import MiniPlayer
+from ui.speaker_dialog import SpeakerDialog
 from ui.voices_window import make_badge, make_scope_badge
 from ui.window_base import ColumnFlow, SubWindow, card_frame, fit_to_screen, hint_label
 from workers.narrate_worker import NarrateWorker, RepoDownloadWorker, RepoIndexWorker, TextModelDownloadWorker, TextModelsDownloadWorker
@@ -60,41 +62,16 @@ MAIN_FORMATS: Tuple[str, ...] = (ex.FORMAT_OPUS_SINGLE, ex.FORMAT_MP3_CHAPTERS)
 OTHER_FORMATS: Tuple[str, ...] = (ex.FORMAT_M4B_OPUS, ex.FORMAT_OPUS_CHAPTERS, ex.FORMAT_MP3_SINGLE,
                                   ex.FORMAT_FLAC_CHAPTERS, ex.FORMAT_WAV_CHAPTERS)
 CHARS_PER_SECOND = 14.0         # rough speaking rate used for the "about N hours" estimate
-#: Rule-based preparation steps shown as check boxes (all on by default), in display order.
+#: Rule-based preparation steps behind the one "Prepare text" switch (on by default).
 RULE_STEPS: Tuple[str, ...] = (text_prep.STEP_LAYOUT, text_prep.STEP_NOISE, text_prep.STEP_QUOTES, text_prep.STEP_LINKS,
                                text_prep.STEP_HEADINGS, text_prep.STEP_NUMBERS, text_prep.STEP_ABBREV)
-#: Steps that are only announced (no code yet): greyed out in the collapsed "coming later" list.
-LATER_STEPS: Tuple[str, ...] = (text_models.STEP_PUNCT, text_models.STEP_STRESS, text_models.STEP_ROLES)
-SPELLFIX_MODEL = "sage-ru"      # registry key of the model behind the "fix typos" step
+SPELLFIX_MODEL = "sage-ru"      # registry key of the Russian typo model included in "Prepare text" when it is downloaded
 SAMPLE_CHARS = 420              # length of the prepared-text sample
-
-
-def prep_texts() -> Dict[str, Tuple[str, str]]:
-    """``{step: (name, one-line description)}`` of the preparation steps in the current language."""
-    return {
-        text_prep.STEP_LAYOUT: (tr("prep.layout"), tr("prep.layout_d")),
-        text_prep.STEP_NOISE: (tr("prep.noise"), tr("prep.noise_d")),
-        text_prep.STEP_QUOTES: (tr("prep.quotes"), tr("prep.quotes_d")),
-        text_prep.STEP_LINKS: (tr("prep.links"), tr("prep.links_d")),
-        text_prep.STEP_HEADINGS: (tr("prep.headings"), tr("prep.headings_d")),
-        text_prep.STEP_NUMBERS: (tr("prep.numbers"), tr("prep.numbers_d")),
-        text_prep.STEP_ABBREV: (tr("prep.abbrev"), tr("prep.abbrev_d")),
-        text_models.STEP_SPELLFIX: (tr("prep.spellfix"), tr("prep.spellfix_d")),
-    }
 
 
 def language_names() -> Dict[str, str]:
     """``{code: name}`` of the translation languages in the UI language."""
     return {"en": tr("narr.translate_lang_en"), "ru": tr("narr.translate_lang_ru"), "de": tr("narr.translate_lang_de")}
-
-
-def later_texts() -> Dict[str, str]:
-    """``{step: name}`` of the announced (not yet available) steps."""
-    return {
-        text_models.STEP_PUNCT: tr("prep.later_punct"),
-        text_models.STEP_STRESS: tr("prep.later_stress"),
-        text_models.STEP_ROLES: tr("prep.later_roles"),
-    }
 
 
 def format_texts() -> Dict[str, Tuple[str, str]]:
@@ -169,13 +146,13 @@ class NarrateWindow(SubWindow):
         self.format_checks: Dict[str, QCheckBox] = {}
         self.format_desc: Dict[str, QLabel] = {}
         self.format_names: Dict[str, QLabel] = {}
-        self.prep_checks: Dict[str, QCheckBox] = {}
-        self.prep_desc: Dict[str, QLabel] = {}
-        self.later_checks: Dict[str, QCheckBox] = {}
         self.preset_buttons: Dict[str, QPushButton] = {}
         self.model_worker: Optional[TextModelDownloadWorker] = None
         self._model_msg = ""                    # last download message ("" = show the state text)
-        self._spell_wanted = True               # the user's wish for the AI step (default on once it is available)
+        self.speaker_lines: Optional[List[spk.SpeakerLine]] = None
+        self._speaker_preview: Optional[SpeakerDialog] = None
+        self._spk_touched = {"male": False, "female": False}
+        self._choice_status = True              # the idle / ready line, until a job writes its own status
         self._build()
         self.retranslate()
         self._sync_preset()
@@ -193,19 +170,6 @@ class NarrateWindow(SubWindow):
         parent_layout.addWidget(desc)
         self.format_checks[fmt], self.format_desc[fmt] = chk, desc
         chk.toggled.connect(lambda _c: self._refresh_buttons())
-        return chk
-
-    def _prep_row(self, key: str, parent_layout: QVBoxLayout, checked: bool) -> QCheckBox:
-        """A preparation check box with its one-line description below."""
-        chk = QCheckBox()
-        chk.setChecked(checked)
-        desc = hint_label()
-        desc.setContentsMargins(26, 0, 0, 0)
-        parent_layout.addWidget(chk)
-        parent_layout.addWidget(desc)
-        self.prep_checks[key], self.prep_desc[key] = chk, desc
-        mark_recommended(chk)
-        chk.toggled.connect(lambda c, k=key: self._on_prep_toggled(k, c))
         return chk
 
     def wide_width(self) -> int:
@@ -281,7 +245,7 @@ class NarrateWindow(SubWindow):
         v.addWidget(self.no_voice)
         self.flow.add(c)
 
-        # --- prepare the text (automatic: rules, then the optional AI clean-up) ---
+        # --- prepare the text: one switch (rules, and the Russian typo model when it is already downloaded) ---
         c = card_frame()
         v = QVBoxLayout(c)
         v.setContentsMargins(14, 10, 14, 10)
@@ -291,35 +255,23 @@ class NarrateWindow(SubWindow):
         v.addWidget(self.lbl_prep_title)
         self.lbl_prep_hint = hint_label()
         v.addWidget(self.lbl_prep_hint)
-        for key in RULE_STEPS:
-            self._prep_row(key, v, checked=True)
-        self._prep_row(text_models.STEP_SPELLFIX, v, checked=False)
+        self.chk_prepare = QCheckBox()
+        self.chk_prepare.setChecked(True)
+        mark_recommended(self.chk_prepare)
+        v.addWidget(self.chk_prepare)
+        self.lbl_prep_desc = hint_label()
+        self.lbl_prep_desc.setContentsMargins(26, 0, 0, 0)
+        v.addWidget(self.lbl_prep_desc)
         mrow = QHBoxLayout()
         mrow.setContentsMargins(26, 0, 0, 0)
         self.lbl_model_state = QLabel()
         self.lbl_model_state.setObjectName("cardnote")
+        self.lbl_model_state.setWordWrap(True)
         self.btn_model_download = QPushButton()
         mrow.addWidget(self.lbl_model_state, 1)
         mrow.addWidget(self.btn_model_download)
         v.addLayout(mrow)
-        self.btn_more_prep = QToolButton()
-        self.btn_more_prep.setObjectName("expander")
-        self.btn_more_prep.setCheckable(True)
-        v.addWidget(self.btn_more_prep)
-        self.more_prep_box = QWidget()
-        mv = QVBoxLayout(self.more_prep_box)
-        mv.setContentsMargins(0, 0, 0, 0)
-        mv.setSpacing(4)
-        for key in LATER_STEPS:
-            chk = QCheckBox()
-            chk.setEnabled(False)
-            mv.addWidget(chk)
-            self.later_checks[key] = chk
-        self.lbl_later_note = hint_label()
-        mv.addWidget(self.lbl_later_note)
-        self.more_prep_box.setVisible(False)
-        v.addWidget(self.more_prep_box)
-        self.btn_more_prep.toggled.connect(self._on_more_prep_toggled)
+        self.chk_prepare.toggled.connect(self._on_prepare_toggled)
         self.flow.add(c)
 
         # --- translate the book (optional) ---
@@ -379,8 +331,28 @@ class NarrateWindow(SubWindow):
         v.addLayout(lrow)
         self.chk_literary = QCheckBox()
         self.chk_llm_prepare = QCheckBox()
+        self.chk_speakers = QCheckBox()
         v.addWidget(self.chk_literary)
         v.addWidget(self.chk_llm_prepare)
+        v.addWidget(self.chk_speakers)
+        self.spk_box = QWidget()
+        sv = QVBoxLayout(self.spk_box)
+        sv.setContentsMargins(26, 0, 0, 0)
+        sv.setSpacing(4)
+        self.lbl_spk_narrator = hint_label()
+        sv.addWidget(self.lbl_spk_narrator)
+        for attr, combo_name in (("lbl_spk_male", "cmb_spk_male"), ("lbl_spk_female", "cmb_spk_female")):
+            row = QHBoxLayout()
+            label, combo = QLabel(), QComboBox()
+            setattr(self, attr, label)
+            setattr(self, combo_name, combo)
+            row.addWidget(label)
+            row.addWidget(combo, 1)
+            sv.addLayout(row)
+        self.btn_spk_preview = QPushButton()
+        sv.addWidget(self.btn_spk_preview)
+        self.spk_box.setVisible(False)
+        v.addWidget(self.spk_box)
         prow = QHBoxLayout()
         self.lbl_llm_note = hint_label()
         self.btn_llm_prompts = QPushButton()
@@ -392,6 +364,10 @@ class NarrateWindow(SubWindow):
         self.btn_llm_prompts.clicked.connect(self.edit_prompts)
         self.chk_literary.toggled.connect(lambda _c: self._refresh_buttons())
         self.chk_llm_prepare.toggled.connect(lambda _c: self._refresh_buttons())
+        self.chk_speakers.toggled.connect(lambda _c: self._refresh_buttons())
+        self.cmb_spk_male.currentIndexChanged.connect(lambda _i: self._on_spk_combo("male"))
+        self.cmb_spk_female.currentIndexChanged.connect(lambda _i: self._on_spk_combo("female"))
+        self.btn_spk_preview.clicked.connect(self.preview_speakers)
         self.flow.add(c)
 
         # --- output format and quality ---
@@ -606,15 +582,9 @@ class NarrateWindow(SubWindow):
         self.btn_to_voices.setText(tr("studio.voices_title"))
         self.lbl_prep_title.setText(tr("narr.prep_title"))
         self.lbl_prep_hint.setText(tr("narr.prep_hint"))
-        for key, (name, desc) in prep_texts().items():
-            self.prep_checks[key].setText(recommended_text(name))
-            self.prep_desc[key].setText(desc)
+        self.chk_prepare.setText(recommended_text(tr("prep.one")))
+        self.lbl_prep_desc.setText(tr("prep.one_d"))
         self.btn_model_download.setText(tr("prep.model_download"))
-        later = later_texts()
-        for key, chk in self.later_checks.items():
-            chk.setText(f"{later[key]}  \u00b7  {tr('prep.later_tag')}")
-        self.lbl_later_note.setText(tr("prep.later_note"))
-        self._on_more_prep_toggled(self.btn_more_prep.isChecked())
         self._refresh_model_row()
         self.lbl_tr_title.setText(tr("narr.translate_title"))
         self.chk_translate.setText(tr("narr.translate_check"))
@@ -626,6 +596,10 @@ class NarrateWindow(SubWindow):
         self.btn_llm_download.setText(tr("prep.model_download"))
         self.chk_literary.setText(tr("llm.literary"))
         self.chk_llm_prepare.setText(tr("llm.prepare"))
+        self.chk_speakers.setText(tr("spk.check"))
+        self.lbl_spk_male.setText(tr("spk.male"))
+        self.lbl_spk_female.setText(tr("spk.female"))
+        self.btn_spk_preview.setText(tr("spk.preview"))
         self.lbl_llm_note.setText(tr("llm.note"))
         self.btn_llm_prompts.setText(tr("llm.prompts"))
         self.btn_llm_prompts.setToolTip(tr("llm.prompts_tip"))
@@ -668,8 +642,7 @@ class NarrateWindow(SubWindow):
         self.lbl_ready.setText(tr("ui.ready"))
         self.btn_open.setText(tr("ui.open_folder"))
         self.lbl_footer.setText(tr("narr.footer"))
-        if not self.busy and not self.lbl_status.text():
-            self.lbl_status.setText(tr("narr.idle"))
+        self._sync_choice_status()
         self._render_voice_info()
         self._refresh_buttons()
 
@@ -706,11 +679,6 @@ class NarrateWindow(SubWindow):
         self.btn_advanced.setText(("\u25be " if open_ else "\u25b8 ") + tr("narr.advanced"))
         if open_:
             self._update_sample()
-
-    def _on_more_prep_toggled(self, open_: bool) -> None:
-        """Expand / collapse the greyed-out "coming later" steps."""
-        self.more_prep_box.setVisible(open_)
-        self.btn_more_prep.setText(("\u25be " if open_ else "\u25b8 ") + tr("prep.more"))
 
     # ------------------------------------------------------------------ quality presets
     def apply_preset(self, name: str) -> None:
@@ -755,19 +723,25 @@ class NarrateWindow(SubWindow):
 
     # ------------------------------------------------------------------ text preparation
     def selected_rule_steps(self) -> Set[str]:
-        """Rule-based preparation steps that are checked."""
-        return {k for k in RULE_STEPS if self.prep_checks[k].isChecked()}
+        """Rule-based preparation steps. The one switch turns them all on or all off."""
+        return set(RULE_STEPS) if self.chk_prepare.isChecked() else set()
+
+    def _spellfix_applies(self) -> bool:
+        """True when Prepare text is on and the Russian typo model is downloaded for this book."""
+        if not self.chk_prepare.isChecked():
+            return False
+        model = text_models.get(SPELLFIX_MODEL)
+        lang = self.book_language()
+        lang_ok = not lang or lang in model.languages
+        return lang_ok and self.model_state(model) == text_models.STATE_READY
 
     def selected_neural_steps(self) -> Set[str]:
-        """Neural steps that are checked and usable (the clean-up model must be downloaded)."""
-        chk = self.prep_checks[text_models.STEP_SPELLFIX]
-        return {text_models.STEP_SPELLFIX} if chk.isChecked() and chk.isEnabled() else set()
+        """The Russian typo step, when Prepare text is on and that model is already downloaded."""
+        return {text_models.STEP_SPELLFIX} if self._spellfix_applies() else set()
 
     def reload_auto_steps(self) -> None:
-        """Select every recommended preparation step again (the AI step once its model is there)."""
-        for key in RULE_STEPS:
-            self.prep_checks[key].setChecked(True)
-        self._spell_wanted = True
+        """Turn Prepare text on again (the recommended choice)."""
+        self.chk_prepare.setChecked(True)
         self._refresh_model_row()
         self._refresh_buttons()
 
@@ -775,27 +749,18 @@ class NarrateWindow(SubWindow):
         """Language code of the loaded book (``""`` = unknown / no book)."""
         return text_prep.resolve_language(self.book) if self.book else ""
 
-    def _on_prep_toggled(self, key: str, checked: bool) -> None:
-        """A preparation check box was clicked."""
-        if key == text_models.STEP_SPELLFIX and self.prep_checks[key].isEnabled():
-            self._spell_wanted = checked
+    def _on_prepare_toggled(self, _checked: bool) -> None:
+        """The Prepare text switch was clicked."""
         self._update_sample()
         self._refresh_buttons()
 
     def _refresh_model_row(self) -> None:
-        """State of the AI clean-up row: ready / needs a download / downloading / wrong language."""
+        """State of the Russian typo model: ready / needs a download / downloading / wrong language."""
         model = text_models.get(SPELLFIX_MODEL)
         lang = self.book_language()
         lang_ok = not lang or lang in model.languages
         ready = self.model_state(model) == text_models.STATE_READY
         downloading = bool(self.model_worker and self.model_worker.isRunning())
-        chk = self.prep_checks[text_models.STEP_SPELLFIX]
-        usable = ready and lang_ok and not self.busy
-        chk.blockSignals(True)
-        chk.setEnabled(usable)
-        # the tick shows the user's choice; a running job only locks it (it used to clear the tick while busy)
-        chk.setChecked(ready and lang_ok and self._spell_wanted)
-        chk.blockSignals(False)
         if not lang_ok:
             msg = tr("prep.model_lang")
         elif self._model_msg:
@@ -832,7 +797,6 @@ class NarrateWindow(SubWindow):
     def _on_model_done(self, _key: str) -> None:
         """The model is on disk: the step becomes available (and is switched on by default)."""
         self._model_msg = ""
-        self._spell_wanted = True
         self._refresh_model_row()
         self._refresh_buttons()
 
@@ -892,7 +856,7 @@ class NarrateWindow(SubWindow):
 
     # ------------------------------------------------------------------ the AI text model
     def _refresh_llm_row(self) -> None:
-        """State text, Download button and the two (greyed until usable) options of the AI text model card."""
+        """State text, Download button and the text-model options. Each box is clickable when the model is ready."""
         st = self.llm_status()
         downloading = bool(self.llm_worker and self.llm_worker.isRunning())
         msgs = {"ready": tr("llm.ready"), "needs_download": tr("llm.needs", size=round(llm_tool.download_mb() / 1000, 1)),
@@ -901,14 +865,85 @@ class NarrateWindow(SubWindow):
         self.btn_llm_download.setVisible(st == "needs_download")
         self.btn_llm_download.setEnabled(not downloading and not self.busy)
         usable = st == "ready" and not self.busy
-        self.chk_literary.setEnabled(usable and self._translate_status() == "ready")
-        self.chk_llm_prepare.setEnabled(usable)
+        for chk in (self.chk_literary, self.chk_llm_prepare, self.chk_speakers):
+            chk.setEnabled(usable)
+            chk.setToolTip("" if usable else tr("llm.need_model"))
+        if usable:
+            self.chk_literary.setToolTip(tr("llm.literary_when"))
+        self.spk_box.setVisible(self.chk_speakers.isChecked())
+        self.spk_box.setEnabled(usable)
+        self._fill_speaker_combos()
 
     def llm_prepare_plan(self):
         """The ``LLMPlan`` for "Prepare text for narration", or ``None`` when off / not usable."""
         if self.chk_llm_prepare.isChecked() and self.chk_llm_prepare.isEnabled():
             return self.llm_plan()
         return None
+
+    def _on_spk_combo(self, which: str) -> None:
+        """The user picked a male or female voice (including None). Later refreshes keep that pick."""
+        self._spk_touched[which] = True
+
+    def _fill_speaker_combos(self) -> None:
+        """Library voices in the male and female lists. A still-valid choice is kept; otherwise the first matching gender."""
+        voices = list(self.library.list_voices())
+        for which, combo, gender in (("male", self.cmb_spk_male, "male"), ("female", self.cmb_spk_female, "female")):
+            current = str(combo.currentData() or "")
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem(tr("spk.none"), "")
+            pick = 0
+            for i, rec in enumerate(voices, start=1):
+                combo.addItem(rec.name, rec.id)
+                if pick == 0 and str(rec.info.get("gender") or "") == gender:
+                    pick = i
+            idx = combo.findData(current) if current else 0
+            if self._spk_touched[which]:
+                combo.setCurrentIndex(idx if idx >= 0 else 0)
+            else:
+                combo.setCurrentIndex(pick if pick else 0)
+            combo.blockSignals(False)
+        rec = self.library.get(self.selected_voice_id()) if self.selected_voice_id() else None
+        self.lbl_spk_narrator.setText(tr("spk.narrator", name=rec.name if rec is not None else tr("spk.none")))
+
+    def speaker_cast(self) -> Optional[spk.SpeakerCast]:
+        """Marks and extra voices when Mark speakers is on and at least one extra voice differs from the narrator."""
+        if not (self.chk_speakers.isChecked() and self.chk_speakers.isEnabled()):
+            return None
+        male, female = str(self.cmb_spk_male.currentData() or ""), str(self.cmb_spk_female.currentData() or "")
+        narr = self.selected_voice_id()
+        cast = spk.SpeakerCast(lines=self.speaker_lines, male_id=male, female_id=female,
+                               tagger=None if self.speaker_lines is not None else self.llm_plan(), narrator_id=narr)
+        return cast if cast.uses_several(narr) else None
+
+    def preview_speakers(self) -> bool:
+        """Tag the loaded book (unless the user already edited the marks) and open the preview. No modal on offscreen."""
+        if self.book is None or not self.chk_speakers.isEnabled():
+            return False
+        paras = [text for _ci, text in spk.paragraphs(self.book)]
+        lines = self.speaker_lines
+        if lines is None or len(lines) != len(paras):
+            plan = self.llm_plan()
+            if plan is None:
+                return False
+            lines = spk.tag_paragraphs(paras, self.book_language() or "en", plan)
+        dlg = SpeakerDialog(lines, paras, self)
+        self._speaker_preview = dlg
+        dlg.accepted.connect(lambda: setattr(self, "speaker_lines", dlg.lines()))
+        if QApplication.platformName() == "offscreen":
+            dlg.show()
+            return True
+        dlg.exec()
+        return True
+
+    def _sync_choice_status(self) -> None:
+        """Idle until a book and a voice are chosen, then a line that says they are. A running or finished job keeps its own text."""
+        if self.busy or self.result is not None or not self._choice_status:
+            return
+        if self.book is not None and self.selected_voice_id():
+            self.lbl_status.setText(tr("narr.ready"))
+        else:
+            self.lbl_status.setText(tr("narr.idle"))
 
     def download_llm(self) -> bool:
         """Download llama.cpp + the model (one optional download, ~7 GB); False if nothing was started."""
@@ -1065,6 +1100,8 @@ class NarrateWindow(SubWindow):
         self.lbl_book.setText(self.book_path.name)
         self.lbl_book_error.setText("")
         self.result = None
+        self.speaker_lines = None
+        self._choice_status = True
         self.lbl_ready.hide()
         self.btn_open.hide()
         self._render_book_info()
@@ -1186,6 +1223,7 @@ class NarrateWindow(SubWindow):
             prep=self.plan_builder(self.selected_rule_steps(), self.selected_neural_steps()),
             translate=self.translate_plan(), ai_disclosure=self.chk_disclosure.isChecked(),
             check_chunks=self.chk_check_chunks.isChecked(), llm_prepare=self.llm_prepare_plan(),
+            speakers=self.speaker_cast(),
             ordinals=ordinals.load_enabled())                    # Settings: ordinal numbers by context
 
     # ------------------------------------------------------------------ state
@@ -1206,9 +1244,7 @@ class NarrateWindow(SubWindow):
         self.btn_start.setEnabled(ready)
         self.btn_book.setEnabled(not busy)
         self.btn_out.setEnabled(not busy)
-        for chk in self.prep_checks.values():
-            if chk is not self.prep_checks[text_models.STEP_SPELLFIX]:
-                chk.setEnabled(not busy)
+        self.chk_prepare.setEnabled(not busy)
         self._refresh_model_row()
         self._refresh_translate_row()
         self._refresh_llm_row()
@@ -1222,6 +1258,7 @@ class NarrateWindow(SubWindow):
         self.sld_pauses.setEnabled(not busy and self.chk_pauses.isChecked())
         self.btn_pause.setVisible(busy)
         self.btn_cancel.setVisible(busy)
+        self._sync_choice_status()
 
     # ------------------------------------------------------------------ run
     def start(self) -> bool:
@@ -1234,8 +1271,15 @@ class NarrateWindow(SubWindow):
             return False
         options = self.options()
         self._offer_book_copy(nr.job_dir_for(self.book, self.out_dir, options))
-        job = NarrationJob(self.book, rec, self.out_dir, options)
+        extra = {}
+        if options.speakers is not None:
+            for vid in options.speakers.extra_ids(rec.id):
+                other = self.library.get(vid)
+                if other is not None:
+                    extra[vid] = other
+        job = NarrationJob(self.book, rec, self.out_dir, options, extra_voices=extra)
         self.result = None
+        self._choice_status = False
         self.lbl_ready.hide()
         self.btn_open.hide()
         self.progress.setValue(0)
@@ -1310,6 +1354,7 @@ class NarrateWindow(SubWindow):
         if entry is None or not (self.book and self.selected_formats()) or self.busy or (
                 self._dl_worker is not None and self._dl_worker.isRunning()):
             return False
+        self._choice_status = False          # keep the download line; do not replace it with "book and voice are chosen"
         self.lbl_status.setText(tr("narr.voice_downloading", name=entry.display_name, p=0))
         self.btn_start.setEnabled(False)
         w = RepoDownloadWorker([entry], self.library, download=self._download, parent=self)
