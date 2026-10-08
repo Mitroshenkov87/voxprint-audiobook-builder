@@ -1,9 +1,9 @@
 """Localization: plain JSON catalogs ``locales/<code>.json`` with flat keys such as ``"ui.btn_lora"`` and
 ``{name}``-style parameters.
 
-Languages: ``en`` (default), ``de``, ``ru``.  To add a language, copy ``locales/en.json`` to ``locales/<code>.json``,
-translate the values, add the code to ``LANGS`` and its native name to ``LANG_NAMES`` (the tests check that every
-catalog has exactly the same keys and placeholders as English).
+Languages: ``en`` (default), ``de``, ``ru``, ``uk``, ``lv``.  To add a language, copy ``locales/en.json`` to
+``locales/<code>.json``, translate the values, add the code to ``LANGS`` and its native name to ``LANG_NAMES``
+(the tests check that every catalog has exactly the same keys and placeholders as English).
 
 The UI language is chosen in this order:
 
@@ -26,10 +26,10 @@ from typing import Dict, Optional
 
 log = logging.getLogger("voxprint.i18n")
 
-LANGS = ("en", "de", "ru")
+LANGS = ("en", "de", "ru", "uk", "lv")
 DEFAULT_LANG = "en"
 #: Language names are shown in their own language (in the language selector).
-LANG_NAMES = {"en": "English", "de": "Deutsch", "ru": "Русский"}
+LANG_NAMES = {"en": "English", "de": "Deutsch", "ru": "Русский", "uk": "Українська", "lv": "Latviešu"}
 
 _catalogs: Dict[str, Dict[str, str]] = {}
 _current: Optional[str] = None
@@ -56,7 +56,7 @@ def load_catalog(lang: str) -> Dict[str, str]:
 
 
 def normalize_code(value: Optional[str]) -> Optional[str]:
-    """'ru-RU' / 'de_AT.UTF-8' / 'EN' -> 'ru' / 'de' / 'en'; an unsupported language (incl. uk, be) -> None."""
+    """'ru-RU' / 'de_AT.UTF-8' / 'EN' / 'uk_UA' / 'lv_LV' -> 'ru' / 'de' / 'en' / 'uk' / 'lv'; an unsupported language (incl. be) -> None."""
     if not value:
         return None
     code = value.strip().lower().replace("_", "-").split(".")[0].split("@")[0].split("-")[0]

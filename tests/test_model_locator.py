@@ -387,7 +387,7 @@ def test_reuse_message_in_all_locales():
             t = i18n.tr(key, short="Qwen3-TTS-12Hz-1.7B-Base", where="C:\\x")
             assert t != key and "{" not in t and "Qwen3-TTS-12Hz-1.7B-Base" in t
         texts.add(i18n.tr("progress.model_reused", short="S", where="W"))
-    assert len(texts) == len(i18n.LANGS) == 3
+    assert len(texts) == len(i18n.LANGS)
 
 
 # ------------------------------------------------------------------------------------- ModelScope mirror

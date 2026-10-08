@@ -29,7 +29,7 @@ def test_every_rule_step_is_a_checked_box_with_a_description_in_every_language(a
     n = s.narrate_window
     n.show()
     assert set(n.prep_checks) == set(nw.RULE_STEPS) | {"spellfix"}
-    for lang in ("en", "ru", "de"):
+    for lang in i18n.LANGS:
         i18n.set_language(lang)
         n.retranslate()
         texts = nw.prep_texts()
@@ -169,7 +169,7 @@ def test_size_hint_follows_preset_and_formats(app, lib):
     assert "AAC 29 MB" in n.lbl_preset_info.text()
     n.apply_preset("compact")
     assert "Opus 11 MB" in n.lbl_preset_info.text() and "Smallest" in n.lbl_preset_info.text()
-    for lang in ("ru", "de"):
+    for lang in ("ru", "de", "uk", "lv"):
         i18n.set_language(lang)
         n.retranslate()
         assert "MB" in n.lbl_preset_info.text() or "МБ" in n.lbl_preset_info.text()

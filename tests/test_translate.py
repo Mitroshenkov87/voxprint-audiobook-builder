@@ -332,14 +332,15 @@ def test_translate_card_is_localized_in_en_ru_de(app, lib, tmp_path):
     n.show()
     seen = set()
     for lang, word, right in (("en", "Translate the book", "right to translate"), ("ru", "Перевод книги", "отвечаете за наличие прав"),
-                              ("de", "Buch übersetzen", "verantwortlich")):
+                              ("de", "Buch übersetzen", "verantwortlich"), ("uk", "Переклад книги", "прав на переклад"),
+                              ("lv", "Tulkot grāmatu", "tiesībām")):
         i18n.set_language(lang)
         n.retranslate()
         assert word in n.lbl_tr_title.text() and right in n.lbl_tr_note.text()
         names = [n.cmb_translate.itemText(i) for i in range(n.cmb_translate.count())]
         assert len(set(names)) == 3
         seen.add(tuple(names))
-    assert len(seen) == 3
+    assert len(seen) == 5
     i18n.set_language("en")
 
 

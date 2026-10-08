@@ -22,7 +22,9 @@
    "purpose": {
     "en": "Base text-to-speech models that your voice is trained on",
     "de": "Basis-Sprachsynthesemodelle, auf denen Ihre Stimme trainiert wird",
-    "ru": "Базовые модели синтеза речи, на которых обучается ваш голос"
+    "ru": "Базовые модели синтеза речи, на которых обучается ваш голос",
+    "uk": "Базові моделі синтезу мовлення, на яких навчається ваш голос",
+    "lv": "Bāzes runas sintēzes modeļi, uz kuriem tiek apmācīta jūsu balss"
    }
   },
   {
@@ -38,7 +40,9 @@
    "purpose": {
     "en": "Neural forced aligner: matches every word of the text to a moment in the recording",
     "de": "Neuronaler Forced Aligner: ordnet jedes Wort des Textes einem Zeitpunkt der Aufnahme zu",
-    "ru": "Нейросетевой выравниватель: сопоставляет каждое слово текста с моментом записи"
+    "ru": "Нейросетевой выравниватель: сопоставляет каждое слово текста с моментом записи",
+    "uk": "Нейромережевий вирівнювач: зіставляє кожне слово тексту з моментом запису",
+    "lv": "Neironu piespiedu līdzinātājs: katru teksta vārdu sasaista ar brīdi ierakstā"
    }
   },
   {
@@ -54,7 +58,9 @@
    "purpose": {
     "en": "Speech recognition: transcribes recordings without a text and checks recordings, samples and the spoken consent (1.7B on GPUs with 8 GB of video memory or more, else 0.6B)",
     "de": "Spracherkennung: transkribiert Aufnahmen ohne Text und prüft Aufnahmen, Proben und die gesprochene Einwilligung (1.7B auf Grafikkarten ab 8 GB Grafikspeicher, sonst 0.6B)",
-    "ru": "Распознавание речи: расшифровывает записи без текста и проверяет записи, образцы и устное согласие (1.7B на видеокартах от 8 ГБ видеопамяти, иначе 0.6B)"
+    "ru": "Распознавание речи: расшифровывает записи без текста и проверяет записи, образцы и устное согласие (1.7B на видеокартах от 8 ГБ видеопамяти, иначе 0.6B)",
+    "uk": "Розпізнавання мовлення: розшифровує записи без тексту і перевіряє записи, зразки та усну згоду (1.7B на відеокартах від 8 ГБ відеопам'яті, інакше 0.6B)",
+    "lv": "Runas atpazīšana: transkribē ierakstus bez teksta un pārbauda ierakstus, paraugus un runāto piekrišanu (1.7B uz videokartēm ar 8 GB videatmiņas vai vairāk, citādi 0.6B)"
    }
   },
   {
@@ -70,7 +76,9 @@
    "purpose": {
     "en": "Optional backup aligner model (only if the optional ctc-forced-aligner package is installed). NON-COMMERCIAL licence!",
     "de": "Optionales Ersatz-Ausrichtungsmodell (nur mit dem optionalen Paket ctc-forced-aligner). NICHT-KOMMERZIELLE Lizenz!",
-    "ru": "Необязательная запасная модель выравнивания (только при установленном пакете ctc-forced-aligner). Лицензия НЕКОММЕРЧЕСКАЯ!"
+    "ru": "Необязательная запасная модель выравнивания (только при установленном пакете ctc-forced-aligner). Лицензия НЕКОММЕРЧЕСКАЯ!",
+    "uk": "Необов'язкова запасна модель вирівнювання (лише за встановленого пакета ctc-forced-aligner). Ліцензія НЕКОМЕРЦІЙНА!",
+    "lv": "Neobligāts rezerves līdzināšanas modelis (tikai ja ir instalēta neobligātā pakotne ctc-forced-aligner). NEKOMERCIĀLA licence!"
    }
   },
   {
@@ -86,7 +94,9 @@
    "purpose": {
     "en": "Optional Russian spelling and punctuation proposer for book preparation (downloaded on request, about 365 MB; every proposal is checked by a validator)",
     "de": "Optionaler russischer Rechtschreib- und Zeichensetzungs-Vorschlagsgeber für die Buchvorbereitung (auf Wunsch geladen, ca. 365 MB; jeder Vorschlag wird von einem Prüfer kontrolliert)",
-    "ru": "Необязательная модель для исправления опечаток и пунктуации в русских книгах (загружается по запросу, около 365 МБ; каждое предложение проверяется валидатором)"
+    "ru": "Необязательная модель для исправления опечаток и пунктуации в русских книгах (загружается по запросу, около 365 МБ; каждое предложение проверяется валидатором)",
+    "uk": "Необов'язкова модель для виправлення друкарських помилок і пунктуації в російських книгах (завантажується на запит, близько 365 МБ; кожна пропозиція перевіряється валідатором)",
+    "lv": "Neobligāts krievu pareizrakstības un pieturzīmju ieteicējs grāmatas sagatavošanai (lejupielādē pēc pieprasījuma, apmēram 365 MB; katru ieteikumu pārbauda validators)"
    }
   },
   {
@@ -103,7 +113,9 @@
    "purpose": {
     "en": "Predicts the perceived quality (MOS) of a voice sample for the automatic voice check (about 1.2 MB, runs on the CPU). Credit: Reddy, Gopal, Cutler, \"DNSMOS P.835\", ICASSP 2022, Microsoft; used unmodified",
     "de": "Sagt die wahrgenommene Qualität (MOS) eines Stimmbeispiels für die automatische Stimmprüfung voraus (ca. 1,2 MB, läuft auf der CPU). Quelle: Reddy, Gopal, Cutler, \"DNSMOS P.835\", ICASSP 2022, Microsoft; unverändert verwendet",
-    "ru": "Предсказывает воспринимаемое качество (MOS) образца голоса для автоматической проверки голоса (около 1,2 МБ, работает на процессоре). Авторы: Reddy, Gopal, Cutler, «DNSMOS P.835», ICASSP 2022, Microsoft; используется без изменений"
+    "ru": "Предсказывает воспринимаемое качество (MOS) образца голоса для автоматической проверки голоса (около 1,2 МБ, работает на процессоре). Авторы: Reddy, Gopal, Cutler, «DNSMOS P.835», ICASSP 2022, Microsoft; используется без изменений",
+    "uk": "Передбачає сприйняту якість (MOS) зразка голосу для автоматичної перевірки голосу (близько 1,2 МБ, працює на процесорі). Автори: Reddy, Gopal, Cutler, «DNSMOS P.835», ICASSP 2022, Microsoft; використовується без змін",
+    "lv": "Paredz balss parauga uztverto kvalitāti (MOS) automātiskajai balss pārbaudei (apmēram 1,2 MB, darbojas uz procesora). Autori: Reddy, Gopal, Cutler, \"DNSMOS P.835\", ICASSP 2022, Microsoft; lietots nemainīts"
    }
   },
   {
@@ -119,7 +131,9 @@
    "purpose": {
     "en": "Optional noise clean-up of a noisy training recording (downloaded on request from the Train window, about 27 MB, runs on the CPU; the program embeds the DeepFilterNet3 model). Credit: Schröter, Rosenkranz, Escalante-B., Maier, \"DeepFilterNet: Perceptually Motivated Real-Time Speech Enhancement\", INTERSPEECH 2023; used unmodified",
     "de": "Optionale Rauschunterdrückung einer verrauschten Trainingsaufnahme (auf Wunsch im Trainingsfenster geladen, ca. 27 MB, läuft auf der CPU; das Programm enthält das Modell DeepFilterNet3). Quelle: Schröter, Rosenkranz, Escalante-B., Maier, \"DeepFilterNet: Perceptually Motivated Real-Time Speech Enhancement\", INTERSPEECH 2023; unverändert verwendet",
-    "ru": "Необязательное шумоподавление шумной записи для обучения (скачивается по запросу в окне обучения, около 27 МБ, работает на процессоре; программа содержит модель DeepFilterNet3). Авторы: Schröter, Rosenkranz, Escalante-B., Maier, «DeepFilterNet: Perceptually Motivated Real-Time Speech Enhancement», INTERSPEECH 2023; используется без изменений"
+    "ru": "Необязательное шумоподавление шумной записи для обучения (скачивается по запросу в окне обучения, около 27 МБ, работает на процессоре; программа содержит модель DeepFilterNet3). Авторы: Schröter, Rosenkranz, Escalante-B., Maier, «DeepFilterNet: Perceptually Motivated Real-Time Speech Enhancement», INTERSPEECH 2023; используется без изменений",
+    "uk": "Необов'язкове шумозаглушення шумного запису для навчання (завантажується на запит у вікні навчання, близько 27 МБ, працює на процесорі; програма містить модель DeepFilterNet3). Автори: Schröter, Rosenkranz, Escalante-B., Maier, «DeepFilterNet: Perceptually Motivated Real-Time Speech Enhancement», INTERSPEECH 2023; використовується без змін",
+    "lv": "Neobligāta trokšņaina apmācības ieraksta tīrīšana (lejupielādē pēc pieprasījuma Apmācības logā, apmēram 27 MB, darbojas uz procesora; programma satur DeepFilterNet3 modeli). Autori: Schröter, Rosenkranz, Escalante-B., Maier, \"DeepFilterNet: Perceptually Motivated Real-Time Speech Enhancement\", INTERSPEECH 2023; lietots nemainīts"
    }
   },
   {
@@ -135,7 +149,9 @@
    "purpose": {
     "en": "Optional AI text model for literary translation and preparing the text for narration (downloaded on request from the Narrate window, about 7.1 GB, needs about 10 GB of video memory). Gemma 4 by Google DeepMind; quantized GGUF by Unsloth; used unmodified",
     "de": "Optionales KI-Textmodell für literarische Übersetzung und die Vorbereitung des Texts fürs Vorlesen (auf Wunsch im Vorlese-Fenster geladen, ca. 7,1 GB, benötigt ca. 10 GB Grafikspeicher). Gemma 4 von Google DeepMind; quantisiertes GGUF von Unsloth; unverändert verwendet",
-    "ru": "Необязательная ИИ-модель для литературного перевода и подготовки текста к озвучиванию (загружается по запросу в окне озвучивания, около 7,1 ГБ, нужно около 10 ГБ видеопамяти). Gemma 4 от Google DeepMind; квантованный GGUF от Unsloth; используется без изменений"
+    "ru": "Необязательная ИИ-модель для литературного перевода и подготовки текста к озвучиванию (загружается по запросу в окне озвучивания, около 7,1 ГБ, нужно около 10 ГБ видеопамяти). Gemma 4 от Google DeepMind; квантованный GGUF от Unsloth; используется без изменений",
+    "uk": "Необов'язкова ШІ-модель для літературного перекладу і підготовки тексту до озвучення (завантажується на запит у вікні озвучення, близько 7,1 ГБ, потрібно близько 10 ГБ відеопам'яті). Gemma 4 від Google DeepMind; квантований GGUF від Unsloth; використовується без змін",
+    "lv": "Neobligāts MI teksta modelis literāram tulkojumam un teksta sagatavošanai ierunāšanai (lejupielādē pēc pieprasījuma Ierunāšanas logā, apmēram 7,1 GB, vajag apmēram 10 GB videatmiņas). Gemma 4 no Google DeepMind; kvantizēts GGUF no Unsloth; lietots nemainīts"
    }
   },
   {
@@ -151,7 +167,9 @@
    "purpose": {
     "en": "Runs the optional AI text model (pre-built llama-server program, downloaded together with it, about 33 MB)",
     "de": "Führt das optionale KI-Textmodell aus (vorkompiliertes Programm llama-server, wird mit ihm geladen, ca. 33 MB)",
-    "ru": "Запускает необязательную ИИ-модель для текста (готовая программа llama-server, загружается вместе с ней, около 33 МБ)"
+    "ru": "Запускает необязательную ИИ-модель для текста (готовая программа llama-server, загружается вместе с ней, около 33 МБ)",
+    "uk": "Запускає необов'язкову ШІ-модель для тексту (готова програма llama-server, завантажується разом із нею, близько 33 МБ)",
+    "lv": "Palaiž neobligāto MI teksta modeli (gatava programma llama-server, lejupielādēta kopā ar to, apmēram 33 MB)"
    }
   },
   {
@@ -168,7 +186,9 @@
    "purpose": {
     "en": "Offline machine translation of a book before narration (English, Russian, German; Russian <-> German directly). Opus-MT tc-big models, CC-BY-4.0, about 480 MB per direction; the 2020 Opus-MT models (about 300 MB) for English <-> German and as a fallback. Credit: OPUS-MT, University of Helsinki / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: \"Democratizing neural machine translation with OPUS-MT\", Language Resources and Evaluation 58 (2024); Tiedemann and Thottingal (2020). Machine translation quality varies.",
     "de": "Offline-Maschinenübersetzung eines Buchs vor dem Vorlesen (Englisch, Russisch, Deutsch; Russisch <-> Deutsch direkt). Opus-MT-tc-big-Modelle, CC-BY-4.0, ca. 480 MB je Richtung; die Opus-MT-Modelle von 2020 (ca. 300 MB) für Englisch <-> Deutsch und als Rückfall. Quelle: OPUS-MT, Universität Helsinki / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: \"Democratizing neural machine translation with OPUS-MT\", Language Resources and Evaluation 58 (2024); Tiedemann und Thottingal (2020). Die Qualität maschineller Übersetzung schwankt.",
-    "ru": "Офлайн-машинный перевод книги перед озвучиванием (английский, русский, немецкий; русский <-> немецкий напрямую). Модели Opus-MT tc-big, CC-BY-4.0, около 480 МБ на направление; модели Opus-MT 2020 года (около 300 МБ) для английского <-> немецкого и как запасной вариант. Авторы: OPUS-MT, Хельсинкский университет / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: \"Democratizing neural machine translation with OPUS-MT\", Language Resources and Evaluation 58 (2024); Tiedemann и Thottingal (2020). Качество машинного перевода бывает разным."
+    "ru": "Офлайн-машинный перевод книги перед озвучиванием (английский, русский, немецкий; русский <-> немецкий напрямую). Модели Opus-MT tc-big, CC-BY-4.0, около 480 МБ на направление; модели Opus-MT 2020 года (около 300 МБ) для английского <-> немецкого и как запасной вариант. Авторы: OPUS-MT, Хельсинкский университет / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: \"Democratizing neural machine translation with OPUS-MT\", Language Resources and Evaluation 58 (2024); Tiedemann и Thottingal (2020). Качество машинного перевода бывает разным.",
+    "uk": "Офлайн-машинний переклад книги перед озвученням (англійська, російська, німецька; російська <-> німецька напряму). Моделі Opus-MT tc-big, CC-BY-4.0, близько 480 МБ на напрям; моделі Opus-MT 2020 року (близько 300 МБ) для англійської <-> німецької і як запасний варіант. Автори: OPUS-MT, Гельсінський університет / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: \"Democratizing neural machine translation with OPUS-MT\", Language Resources and Evaluation 58 (2024); Tiedemann і Thottingal (2020). Якість машинного перекладу буває різною.",
+    "lv": "Bezsaistes mašīntulkojums grāmatai pirms ierunāšanas (angļu, krievu, vācu; krievu <-> vācu tieši). Opus-MT tc-big modeļi, CC-BY-4.0, apmēram 480 MB virzienā; 2020. gada Opus-MT modeļi (apmēram 300 MB) angļu <-> vācu un kā rezerve. Autori: OPUS-MT, Helsinku universitāte / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: \"Democratizing neural machine translation with OPUS-MT\", Language Resources and Evaluation 58 (2024); Tiedemann un Thottingal (2020). Mašīntulkojuma kvalitāte svārstās."
    }
   },
   {
@@ -184,7 +204,9 @@
    "purpose": {
     "en": "Text tokenizer of the Opus-MT translation models",
     "de": "Text-Tokenisierer der Opus-MT-Übersetzungsmodelle",
-    "ru": "Токенизатор текста для моделей перевода Opus-MT"
+    "ru": "Токенизатор текста для моделей перевода Opus-MT",
+    "uk": "Токенізатор тексту для моделей перекладу Opus-MT",
+    "lv": "Opus-MT tulkošanas modeļu teksta tokenizators"
    }
   },
   {
@@ -200,7 +222,9 @@
    "purpose": {
     "en": "Qwen3-TTS model code (speech synthesis and the audio tokenizer)",
     "de": "Qwen3-TTS-Modellcode (Sprachsynthese und Audio-Tokenizer)",
-    "ru": "Код моделей Qwen3-TTS (синтез речи и аудио-токенизатор)"
+    "ru": "Код моделей Qwen3-TTS (синтез речи и аудио-токенизатор)",
+    "uk": "Код моделей Qwen3-TTS (синтез мовлення й аудіотокенізатор)",
+    "lv": "Qwen3-TTS modeļa kods (runas sintēze un audio tokenizators)"
    }
   },
   {
@@ -216,7 +240,9 @@
    "purpose": {
     "en": "Runs the Qwen3 forced aligner and Qwen3-ASR speech recognition",
     "de": "Führt den Qwen3-Forced-Aligner und die Qwen3-ASR-Spracherkennung aus",
-    "ru": "Запуск выравнивателя Qwen3 и распознавания речи Qwen3-ASR"
+    "ru": "Запуск выравнивателя Qwen3 и распознавания речи Qwen3-ASR",
+    "uk": "Запускає вирівнювач Qwen3 і розпізнавання мовлення Qwen3-ASR",
+    "lv": "Palaiž Qwen3 piespiedu līdzinātāju un Qwen3-ASR runas atpazīšanu"
    }
   },
   {
@@ -232,7 +258,9 @@
    "purpose": {
     "en": "Audio/media helpers required by qwen-asr",
     "de": "Audio-/Medien-Hilfsfunktionen für qwen-asr",
-    "ru": "Вспомогательные функции аудио/медиа для qwen-asr"
+    "ru": "Вспомогательные функции аудио/медиа для qwen-asr",
+    "uk": "Допоміжні функції аудіо/медіа для qwen-asr",
+    "lv": "Audio un multivides palīgi, kas vajadzīgi qwen-asr"
    }
   },
   {
@@ -248,7 +276,9 @@
    "purpose": {
     "en": "Neural-network engine",
     "de": "Engine für neuronale Netze",
-    "ru": "Движок нейросетей"
+    "ru": "Движок нейросетей",
+    "uk": "Рушій нейромереж",
+    "lv": "Neironu tīklu dzinējs"
    }
   },
   {
@@ -264,7 +294,9 @@
    "purpose": {
     "en": "Audio processing for PyTorch",
     "de": "Audioverarbeitung für PyTorch",
-    "ru": "Обработка звука для PyTorch"
+    "ru": "Обработка звука для PyTorch",
+    "uk": "Обробка звуку для PyTorch",
+    "lv": "Audio apstrāde PyTorch"
    }
   },
   {
@@ -280,7 +312,9 @@
    "purpose": {
     "en": "Loads and runs the models",
     "de": "Lädt und führt die Modelle aus",
-    "ru": "Загрузка и запуск моделей"
+    "ru": "Загрузка и запуск моделей",
+    "uk": "Завантаження й запуск моделей",
+    "lv": "Ielādē un palaiž modeļus"
    }
   },
   {
@@ -296,7 +330,9 @@
    "purpose": {
     "en": "LoRA voice adapters: training, saving and merging",
     "de": "LoRA-Stimmadapter: Training, Speichern und Zusammenführen",
-    "ru": "Голосовые адаптеры LoRA: обучение, сохранение и слияние"
+    "ru": "Голосовые адаптеры LoRA: обучение, сохранение и слияние",
+    "uk": "Голосові адаптери LoRA: навчання, збереження й злиття",
+    "lv": "LoRA balss adapteri: apmācība, saglabāšana un sapludināšana"
    }
   },
   {
@@ -312,7 +348,9 @@
    "purpose": {
     "en": "Device and memory management",
     "de": "Geräte- und Speicherverwaltung",
-    "ru": "Управление устройствами и памятью"
+    "ru": "Управление устройствами и памятью",
+    "uk": "Керування пристроями й пам'яттю",
+    "lv": "Ierīču un atmiņas pārvaldība"
    }
   },
   {
@@ -328,7 +366,9 @@
    "purpose": {
     "en": "Downloads the models",
     "de": "Lädt die Modelle herunter",
-    "ru": "Скачивание моделей"
+    "ru": "Скачивание моделей",
+    "uk": "Завантаження моделей",
+    "lv": "Lejupielādē modeļus"
    }
   },
   {
@@ -344,7 +384,9 @@
    "purpose": {
     "en": "Safe model weight files",
     "de": "Sichere Modellgewichts-Dateien",
-    "ru": "Безопасные файлы весов моделей"
+    "ru": "Безопасные файлы весов моделей",
+    "uk": "Безпечні файли ваг моделей",
+    "lv": "Droši modeļa svaru faili"
    }
   },
   {
@@ -360,7 +402,9 @@
    "purpose": {
     "en": "8-bit optimizer that saves video memory",
     "de": "8-Bit-Optimierer, der Grafikspeicher spart",
-    "ru": "8-битный оптимизатор, экономящий видеопамять"
+    "ru": "8-битный оптимизатор, экономящий видеопамять",
+    "uk": "8-бітний оптимізатор, що заощаджує відеопам'ять",
+    "lv": "8 bitu optimizētājs, kas taupa videatmiņu"
    }
   },
   {
@@ -377,12 +421,16 @@
    "purpose": {
     "en": "The window and all interface elements",
     "de": "Das Fenster und alle Oberflächenelemente",
-    "ru": "Окно и все элементы интерфейса"
+    "ru": "Окно и все элементы интерфейса",
+    "uk": "Вікно й усі елементи інтерфейсу",
+    "lv": "Logs un visi saskarnes elementi"
    },
    "note": {
     "en": "Used unmodified and dynamically linked. Prefer the folder-type build (build.bat onedir) so the Qt/PySide6 libraries can be replaced. Source: https://code.qt.io and https://pyside.org.",
     "de": "Unverändert und dynamisch gelinkt verwendet. Bevorzugen Sie den Ordner-Build (build.bat onedir), damit die Qt/PySide6-Bibliotheken ersetzt werden können. Quellcode: https://code.qt.io und https://pyside.org.",
-    "ru": "Используется без изменений, с динамической компоновкой. Лучше собирать «папкой» (build.bat onedir), чтобы библиотеки Qt/PySide6 можно было заменить. Исходный код: https://code.qt.io и https://pyside.org."
+    "ru": "Используется без изменений, с динамической компоновкой. Лучше собирать «папкой» (build.bat onedir), чтобы библиотеки Qt/PySide6 можно было заменить. Исходный код: https://code.qt.io и https://pyside.org.",
+    "uk": "Використовується без змін, з динамічним компонуванням. Краще збирати «текою» (build.bat onedir), щоб бібліотеки Qt/PySide6 можна було замінити. Вихідний код: https://code.qt.io та https://pyside.org.",
+    "lv": "Lietots nemainīts un dinamiski sasaistīts. Dodiet priekšroku mapes tipa būvējumam (build.bat onedir), lai Qt/PySide6 bibliotēkas var aizstāt. Avots: https://code.qt.io un https://pyside.org."
    }
   },
   {
@@ -398,7 +446,9 @@
    "purpose": {
     "en": "Numerical arrays",
     "de": "Numerische Arrays",
-    "ru": "Числовые массивы"
+    "ru": "Числовые массивы",
+    "uk": "Числові масиви",
+    "lv": "Skaitliskie masīvi"
    }
   },
   {
@@ -414,7 +464,9 @@
    "purpose": {
     "en": "Signal processing (filtering, resampling)",
     "de": "Signalverarbeitung (Filter, Resampling)",
-    "ru": "Обработка сигналов (фильтры, ресемплинг)"
+    "ru": "Обработка сигналов (фильтры, ресемплинг)",
+    "uk": "Обробка сигналів (фільтри, ресемплінг)",
+    "lv": "Signālu apstrāde (filtri, pārdiskretizācija)"
    }
   },
   {
@@ -430,7 +482,9 @@
    "purpose": {
     "en": "Audio analysis",
     "de": "Audioanalyse",
-    "ru": "Анализ звука"
+    "ru": "Анализ звука",
+    "uk": "Аналіз звуку",
+    "lv": "Audio analīze"
    }
   },
   {
@@ -446,7 +500,9 @@
    "purpose": {
     "en": "Reading and writing WAV/FLAC files (uses libsndfile, LGPL, shipped in the wheel)",
     "de": "Lesen und Schreiben von WAV/FLAC-Dateien (nutzt libsndfile, LGPL, im Wheel enthalten)",
-    "ru": "Чтение и запись WAV/FLAC (использует libsndfile, LGPL, входит в пакет)"
+    "ru": "Чтение и запись WAV/FLAC (использует libsndfile, LGPL, входит в пакет)",
+    "uk": "Читання й запис WAV/FLAC (використовує libsndfile, LGPL, входить до пакета)",
+    "lv": "WAV/FLAC failu lasīšana un rakstīšana (lieto libsndfile, LGPL, iekļauts paketē)"
    }
   },
   {
@@ -462,7 +518,9 @@
    "purpose": {
     "en": "Opening MP3 and other audio formats",
     "de": "Öffnen von MP3 und anderen Audioformaten",
-    "ru": "Открытие MP3 и других аудиоформатов"
+    "ru": "Открытие MP3 и других аудиоформатов",
+    "uk": "Відкриття MP3 та інших аудіоформатів",
+    "lv": "MP3 un citu audio formātu atvēršana"
    }
   },
   {
@@ -478,7 +536,9 @@
    "purpose": {
     "en": "Provides the ffmpeg program used to decode audio formats",
     "de": "Stellt das Programm ffmpeg zum Dekodieren von Audioformaten bereit",
-    "ru": "Поставляет программу ffmpeg для декодирования аудиоформатов"
+    "ru": "Поставляет программу ffmpeg для декодирования аудиоформатов",
+    "uk": "Постачає програму ffmpeg для декодування аудіоформатів",
+    "lv": "Nodrošina programmu ffmpeg audio formātu atkodēšanai"
    }
   },
   {
@@ -494,12 +554,16 @@
    "purpose": {
     "en": "Audio decoding (separate program, run as a subprocess)",
     "de": "Audio-Dekodierung (eigenständiges Programm, als Unterprozess gestartet)",
-    "ru": "Декодирование звука (отдельная программа, запускается как подпроцесс)"
+    "ru": "Декодирование звука (отдельная программа, запускается как подпроцесс)",
+    "uk": "Декодування звуку (окрема програма, запускається як підпроцес)",
+    "lv": "Audio atkodēšana (atsevišķa programma, palaista kā apakšprocess)"
    },
    "note": {
     "en": "Separate executable, not linked into Voxprint. Source code: https://ffmpeg.org/download.html#get-sources (build scripts of the binary: https://github.com/imageio/imageio-binaries). The GPL text is in licenses/gpl-3.0.txt.",
     "de": "Eigenständige ausführbare Datei, nicht in Voxprint eingebunden. Quellcode: https://ffmpeg.org/download.html#get-sources (Build-Skripte der Binärdatei: https://github.com/imageio/imageio-binaries). Der GPL-Text steht in licenses/gpl-3.0.txt.",
-    "ru": "Отдельный исполняемый файл, не скомпонован с Voxprint. Исходный код: https://ffmpeg.org/download.html#get-sources (скрипты сборки бинарника: https://github.com/imageio/imageio-binaries). Текст GPL: licenses/gpl-3.0.txt."
+    "ru": "Отдельный исполняемый файл, не скомпонован с Voxprint. Исходный код: https://ffmpeg.org/download.html#get-sources (скрипты сборки бинарника: https://github.com/imageio/imageio-binaries). Текст GPL: licenses/gpl-3.0.txt.",
+    "uk": "Окремий виконуваний файл, не скомпонований із Voxprint. Вихідний код: https://ffmpeg.org/download.html#get-sources (скрипти збирання бінарника: https://github.com/imageio/imageio-binaries). Текст GPL: licenses/gpl-3.0.txt.",
+    "lv": "Atsevišķs izpildfails, nav sasaistīts ar Voxprint. Pirmkods: https://ffmpeg.org/download.html#get-sources (binārā faila būvēšanas skripti: https://github.com/imageio/imageio-binaries). GPL teksts ir licenses/gpl-3.0.txt."
    }
   },
   {
@@ -515,7 +579,9 @@
    "purpose": {
     "en": "Tensor reshaping used by the models",
     "de": "Tensor-Umformung, die von den Modellen genutzt wird",
-    "ru": "Преобразование тензоров в моделях"
+    "ru": "Преобразование тензоров в моделях",
+    "uk": "Перетворення тензорів у моделях",
+    "lv": "Tenzoru pārveidošana, ko lieto modeļi"
    }
   },
   {
@@ -531,7 +597,9 @@
    "purpose": {
     "en": "Neural-network runtime required by qwen-tts",
     "de": "Laufzeit für neuronale Netze, von qwen-tts benötigt",
-    "ru": "Среда выполнения нейросетей, нужная qwen-tts"
+    "ru": "Среда выполнения нейросетей, нужная qwen-tts",
+    "uk": "Середовище виконання нейромереж, потрібне qwen-tts",
+    "lv": "Neironu tīklu izpildvide, kas vajadzīga qwen-tts"
    }
   },
   {
@@ -547,7 +615,9 @@
    "purpose": {
     "en": "Japanese word segmentation required by qwen-asr",
     "de": "Japanische Wortsegmentierung, von qwen-asr benötigt",
-    "ru": "Разбиение японского текста на слова (нужно qwen-asr)"
+    "ru": "Разбиение японского текста на слова (нужно qwen-asr)",
+    "uk": "Розбиття японського тексту на слова (потрібне qwen-asr)",
+    "lv": "Japāņu vārdu segmentēšana, kas vajadzīga qwen-asr"
    }
   },
   {
@@ -563,7 +633,9 @@
    "purpose": {
     "en": "Python wrapper required by qwen-tts (the SoX program itself is not shipped)",
     "de": "Python-Wrapper, von qwen-tts benötigt (das Programm SoX selbst wird nicht mitgeliefert)",
-    "ru": "Python-обёртка, нужная qwen-tts (сама программа SoX не поставляется)"
+    "ru": "Python-обёртка, нужная qwen-tts (сама программа SoX не поставляется)",
+    "uk": "Python-обгортка, потрібна qwen-tts (сама програма SoX не постачається)",
+    "lv": "Python apvalks, kas vajadzīgs qwen-tts (pati programma SoX netiek piegādāta)"
    }
   },
   {
@@ -579,7 +651,9 @@
    "purpose": {
     "en": "Spelling out Russian numbers and abbreviations",
     "de": "Ausschreiben russischer Zahlen und Abkürzungen",
-    "ru": "Раскрытие русских чисел и сокращений"
+    "ru": "Раскрытие русских чисел и сокращений",
+    "uk": "Розкриття російських чисел і скорочень",
+    "lv": "Krievu skaitļu un saīsinājumu izvēršana vārdos"
    }
   },
   {
@@ -595,7 +669,9 @@
    "purpose": {
     "en": "Backup Russian text normalization",
     "de": "Russische Ersatz-Textnormalisierung",
-    "ru": "Запасная нормализация русского текста"
+    "ru": "Запасная нормализация русского текста",
+    "uk": "Запасна нормалізація російського тексту",
+    "lv": "Rezerves krievu teksta normalizācija"
    }
   },
   {
@@ -612,7 +688,9 @@
    "purpose": {
     "en": "Russian morphology (word forms)",
     "de": "Russische Morphologie (Wortformen)",
-    "ru": "Русская морфология (формы слов)"
+    "ru": "Русская морфология (формы слов)",
+    "uk": "Російська морфологія (форми слів)",
+    "lv": "Krievu morfoloģija (vārdu formas)"
    }
   },
   {
@@ -628,12 +706,16 @@
    "purpose": {
     "en": "Numbers to words",
     "de": "Zahlen in Worte",
-    "ru": "Числа словами"
+    "ru": "Числа словами",
+    "uk": "Числа словами",
+    "lv": "Skaitļi vārdos"
    },
    "note": {
     "en": "Pure-Python library used unmodified; the LGPL allows replacing it with another version (it is a normal Python package).",
     "de": "Reine Python-Bibliothek, unverändert verwendet; die LGPL erlaubt den Austausch gegen eine andere Version (normales Python-Paket).",
-    "ru": "Чисто питоновская библиотека, используется без изменений; LGPL позволяет заменить её другой версией (обычный Python-пакет)."
+    "ru": "Чисто питоновская библиотека, используется без изменений; LGPL позволяет заменить её другой версией (обычный Python-пакет).",
+    "uk": "Суто питонівська бібліотека, використовується без змін; LGPL дозволяє замінити її іншою версією (звичайний Python-пакет).",
+    "lv": "Tīra Python bibliotēka, lietota nemainīta; LGPL ļauj aizstāt to ar citu versiju (tā ir parasta Python pakotne)."
    }
   },
   {
@@ -649,7 +731,9 @@
    "purpose": {
     "en": "Roman numerals",
     "de": "Römische Zahlen",
-    "ru": "Римские цифры"
+    "ru": "Римские цифры",
+    "uk": "Римські цифри",
+    "lv": "Romiešu cipari"
    }
   },
   {
@@ -665,7 +749,9 @@
    "purpose": {
     "en": "English words in Russian text",
     "de": "Englische Wörter im russischen Text",
-    "ru": "Английские слова в русском тексте"
+    "ru": "Английские слова в русском тексте",
+    "uk": "Англійські слова в російському тексті",
+    "lv": "Angļu vārdi krievu tekstā"
    }
   },
   {
@@ -682,7 +768,9 @@
    "purpose": {
     "en": "Version comparison for updates",
     "de": "Versionsvergleich für Updates",
-    "ru": "Сравнение версий для обновлений"
+    "ru": "Сравнение версий для обновлений",
+    "uk": "Порівняння версій для оновлень",
+    "lv": "Versiju salīdzināšana atjauninājumiem"
    }
   },
   {
@@ -699,7 +787,9 @@
    "purpose": {
     "en": "Progress bars",
     "de": "Fortschrittsbalken",
-    "ru": "Индикаторы прогресса"
+    "ru": "Индикаторы прогресса",
+    "uk": "Індикатори прогресу",
+    "lv": "Progresa joslas"
    }
   },
   {
@@ -715,12 +805,16 @@
    "purpose": {
     "en": "Optional backup aligner; not bundled, installed by the user on request",
     "de": "Optionaler Ersatz-Aligner; nicht enthalten, auf Wunsch vom Benutzer installiert",
-    "ru": "Необязательный запасной выравниватель; не входит в поставку, ставится пользователем по желанию"
+    "ru": "Необязательный запасной выравниватель; не входит в поставку, ставится пользователем по желанию",
+    "uk": "Необов'язковий запасний вирівнювач; не входить до поставки, встановлюється користувачем за бажанням",
+    "lv": "Neobligāts rezerves līdzinātājs; nav iekļauts, lietotājs to instalē pēc pieprasījuma"
    },
    "note": {
     "en": "The PyPI package of this name is published from a fork whose licence metadata is empty; check it before installing.",
     "de": "Das PyPI-Paket dieses Namens stammt aus einem Fork ohne Lizenzangabe; prüfen Sie dies vor der Installation.",
-    "ru": "Пакет с таким именем на PyPI опубликован из форка без сведений о лицензии; проверьте это перед установкой."
+    "ru": "Пакет с таким именем на PyPI опубликован из форка без сведений о лицензии; проверьте это перед установкой.",
+    "uk": "Пакет із такою назвою на PyPI опубліковано з форку без відомостей про ліцензію; перевірте це перед встановленням.",
+    "lv": "PyPI pakotne ar šo nosaukumu ir publicēta no atzara, kura licences metadati ir tukši; pārbaudiet to pirms instalēšanas."
    }
   },
   {
@@ -736,12 +830,16 @@
    "purpose": {
     "en": "Audio decoding. Used only if no working ffmpeg is installed on the computer; downloaded once and checked by a pinned checksum",
     "de": "Audio-Dekodierung. Nur genutzt, wenn auf dem Computer kein funktionierendes ffmpeg installiert ist; einmalig geladen und per fester Prüfsumme geprüft",
-    "ru": "Декодирование звука. Используется, только если на компьютере нет рабочего ffmpeg; скачивается один раз и проверяется по закреплённой контрольной сумме"
+    "ru": "Декодирование звука. Используется, только если на компьютере нет рабочего ffmpeg; скачивается один раз и проверяется по закреплённой контрольной сумме",
+    "uk": "Декодування звуку. Використовується, лише якщо на комп'ютері немає робочого ffmpeg; завантажується один раз і перевіряється за закріпленою контрольною сумою",
+    "lv": "Audio atkodēšana. Tiek lietots tikai tad, ja datorā nav strādājoša ffmpeg; lejupielādē vienreiz un pārbauda ar fiksētu kontrolsummu"
    },
    "note": {
     "en": "Separate executable, not linked into Voxprint. Source code: https://ffmpeg.org/download.html#get-sources (build scripts: https://github.com/BtbN/FFmpeg-Builds).",
     "de": "Eigenständige ausführbare Datei, nicht in Voxprint eingebunden. Quellcode: https://ffmpeg.org/download.html#get-sources (Build-Skripte: https://github.com/BtbN/FFmpeg-Builds).",
-    "ru": "Отдельный исполняемый файл, не скомпонован с Voxprint. Исходный код: https://ffmpeg.org/download.html#get-sources (скрипты сборки: https://github.com/BtbN/FFmpeg-Builds)."
+    "ru": "Отдельный исполняемый файл, не скомпонован с Voxprint. Исходный код: https://ffmpeg.org/download.html#get-sources (скрипты сборки: https://github.com/BtbN/FFmpeg-Builds).",
+    "uk": "Окремий виконуваний файл, не скомпонований із Voxprint. Вихідний код: https://ffmpeg.org/download.html#get-sources (скрипти збирання: https://github.com/BtbN/FFmpeg-Builds).",
+    "lv": "Atsevišķs izpildfails, nav sasaistīts ar Voxprint. Pirmkods: https://ffmpeg.org/download.html#get-sources (būvēšanas skripti: https://github.com/BtbN/FFmpeg-Builds)."
    }
   },
   {
@@ -758,7 +856,9 @@
    "purpose": {
     "en": "Installs packages when building (not shipped)",
     "de": "Installiert Pakete beim Erstellen (nicht enthalten)",
-    "ru": "Устанавливает пакеты при сборке (не поставляется)"
+    "ru": "Устанавливает пакеты при сборке (не поставляется)",
+    "uk": "Встановлює пакети під час збирання (не постачається)",
+    "lv": "Instalē pakotnes būvēšanas laikā (netiek piegādāts)"
    }
   },
   {
@@ -774,7 +874,9 @@
    "purpose": {
     "en": "Packs the program into an application (its bootloader is embedded; the exception allows distribution under any licence)",
     "de": "Verpackt das Programm zu einer Anwendung (der Bootloader ist eingebettet; die Ausnahme erlaubt die Verbreitung unter beliebiger Lizenz)",
-    "ru": "Упаковывает программу в приложение (загрузчик встроен; исключение разрешает распространение под любой лицензией)"
+    "ru": "Упаковывает программу в приложение (загрузчик встроен; исключение разрешает распространение под любой лицензией)",
+    "uk": "Пакує програму в застосунок (завантажувач вбудовано; виняток дозволяє розповсюдження під будь-якою ліцензією)",
+    "lv": "Iepako programmu lietotnē (tā sāknētājs ir iegults; izņēmums ļauj izplatīt ar jebkuru licenci)"
    }
   },
   {
@@ -790,7 +892,9 @@
    "purpose": {
     "en": "Creates the installer",
     "de": "Erstellt das Installationsprogramm",
-    "ru": "Создаёт установщик"
+    "ru": "Создаёт установщик",
+    "uk": "Створює інсталятор",
+    "lv": "Izveido instalatoru"
    }
   },
   {
@@ -806,7 +910,9 @@
    "purpose": {
     "en": "The fingerprint icon of the application (modified)",
     "de": "Das Fingerabdruck-Symbol der Anwendung (angepasst)",
-    "ru": "Значок-отпечаток приложения (изменён)"
+    "ru": "Значок-отпечаток приложения (изменён)",
+    "uk": "Значок-відбиток застосунку (змінено)",
+    "lv": "Lietotnes pirksta nospieduma ikona (pārveidota)"
    }
   },
   {
@@ -822,7 +928,9 @@
    "purpose": {
     "en": "Training speech of the optional fully open example voice (not part of the program; the voice is downloaded separately)",
     "de": "Trainingssprache der optionalen vollständig offenen Beispielstimme (nicht Teil des Programms; die Stimme wird separat geladen)",
-    "ru": "Обучающая речь необязательного полностью открытого голоса-примера (не входит в программу; голос скачивается отдельно)"
+    "ru": "Обучающая речь необязательного полностью открытого голоса-примера (не входит в программу; голос скачивается отдельно)",
+    "uk": "Навчальне мовлення необов'язкового повністю відкритого голосу-зразка (не входить до програми; голос завантажується окремо)",
+    "lv": "Neobligātās, pilnībā atvērtās parauga balss apmācības runa (nav programmas daļa; balss tiek lejupielādēta atsevišķi)"
    }
   }
  ]

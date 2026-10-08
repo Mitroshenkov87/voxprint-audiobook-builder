@@ -46,7 +46,7 @@ def finished(d):
 
 
 def test_section_texts_in_every_language(dlg):
-    for lang in ("en", "ru", "de"):
+    for lang in i18n.LANGS:
         i18n.set_language(lang)
         dlg.retranslate()
         for w in (dlg.lbl_backup_title, dlg.chk_voices, dlg.btn_backup, dlg.btn_restore, dlg.lbl_existing_title,

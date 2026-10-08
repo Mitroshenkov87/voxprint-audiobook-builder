@@ -209,7 +209,7 @@ def test_train_window_preview_flow(app, tmp_path):
 def test_preview_and_check_texts_in_every_language():
     from core import i18n
     from core.i18n import tr
-    for lang in ("en", "ru", "de"):
+    for lang in i18n.LANGS:
         i18n.set_language(lang, persist=False)
         for k in ("preview.button", "preview.estimate", "preview.row", "check.checkbox", "check.sugg_no_stop", "check.verdict_bad"):
             assert tr(k) != k

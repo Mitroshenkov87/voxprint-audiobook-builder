@@ -192,7 +192,7 @@ def test_train_window_no_transcript_flow(app, tmp_path):
 
 def test_asr_texts_exist_in_every_language():
     from core import i18n
-    for lang in ("en", "ru", "de"):
+    for lang in i18n.LANGS:
         i18n.set_language(lang, persist=False)
         for k in ("asr.checkbox", "asr.warning", "asr.confirm", "asr.report", "asr.choose_script", "asr.script_none", "err.asr_nothing_kept", "warn.asr_unverified"):
             assert tr(k) != k

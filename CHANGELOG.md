@@ -5,6 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Added
+- **Ukrainian and Latvian interface** (`locales/uk.json`, `locales/lv.json`): Settings -> Language lists Українська and Latviešu next to English, Deutsch and Русский. Every UI string is translated; a system locale `uk` or `lv` is picked up the same way as `en` / `de` / `ru`.
+
 ### Fixed
 - **False component update after installing build 665**: the Components window offered "Libraries ... (about 268 MB; 0.1.0-beta -> 0.1.1-beta)" although every package version was the same (only the wheels built from sdists - docopt, eng-to-ipa, sox - differed byte for byte). A wheel is now identified by its package name and version (`tools/online_fetch.installed_ok`), not by the bytes of the file or the app version; an update lists only the packages whose version really changed and shows only their size. Tests: `tests/test_component_updates.py`.
 - **An update installed itself at start-up**: the first-start Components window (and Check & repair, and `install()` without module names) fetched updates without a click. Only what is missing is fetched automatically; an update is announced and waits for Download. A module with an update counts as present, so it no longer holds back the start-up.

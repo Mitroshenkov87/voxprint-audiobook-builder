@@ -277,7 +277,7 @@ def test_settings_dialog_holds_service_items(app, monkeypatch):
     w.open_settings()
     dlg = w.settings_dialog()
     assert dlg.isVisible() and w.settings_dialog() is dlg          # one reused instance
-    assert dlg.cmb_lang.count() == 3 and dlg.cmb_lang.currentData() == "ru"
+    assert dlg.cmb_lang.count() == len(i18n.LANGS) and dlg.cmb_lang.currentData() == "ru"
     assert dlg.btn_update.text() == "Проверить обновления"
     dlg.cmb_lang.setCurrentIndex(dlg.cmb_lang.findData("en"))
     assert i18n.get_language() == "en" and w.btn_lora.text() == "Create voice (LoRA)"
