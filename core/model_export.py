@@ -70,8 +70,21 @@ def check_disk_space(out_parent: Path, need_gb: float) -> None:
         raise ExportError(tr("err.export_disk", need=f"{need_gb:.1f}", free=f"{free:.1f}"))
 
 
-def merge_adapter_into_model(hf_model: Any, adapter_dir: Path, spk_id: int = SPK_ID):
-    """Merge the adapter into the talker.
+def adapter_scale_of(adapter_dir: Path) -> float:
+    """Strength the voice speaks with (``adapter_scale`` in the folder's voice.json; 1.0 if there is none)."""
+    from core import adapter_strength
+
+    try:
+        info = json.loads((Path(adapter_dir) / "voice.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        info = {}
+    return adapter_strength.clamp(info.get("adapter_scale") if isinstance(info, dict) else None,
+                                  adapter_strength.LEGACY_SCALE)
+
+
+def merge_adapter_into_model(hf_model: Any, adapter_dir: Path, spk_id: int = SPK_ID, adapter_scale: Optional[float] = None):
+    """Merge the adapter into the talker at ``adapter_scale`` (default: the voice's own strength, see :func:`adapter_scale_of`),
+    so the universal model sounds like the voice in Voxprint.
 
     Returns ``(state_dict without speaker_encoder, speaker_embedding [1, D])``; the embedding is already stored in the
     state dict at row ``spk_id`` of ``codec_embedding``.  Tensors sharing memory are cloned because safetensors rejects them.
@@ -83,7 +96,11 @@ def merge_adapter_into_model(hf_model: Any, adapter_dir: Path, spk_id: int = SPK
 
     adapter_dir = Path(adapter_dir)
     hf_model.eval()
+    from core import adapter_strength
+
     peft_talker = PeftModel.from_pretrained(hf_model.talker, str(adapter_dir))
+    scale = adapter_scale_of(adapter_dir) if adapter_scale is None else adapter_strength.clamp(adapter_scale, 1.0)
+    adapter_strength.apply(peft_talker, scale)            # merge_and_unload bakes in the current scaling
     hf_model.talker = peft_talker.merge_and_unload()
     dtype = next(hf_model.talker.parameters()).dtype
     spk = speaker_embedding_from_ref(hf_model, str(adapter_dir / "ref_sample.wav"), torch.device("cpu"), dtype)
@@ -166,7 +183,8 @@ def export_merged_model(adapter_dir, out_dir, base_dir=None, progress: ProgressC
 
     name = speaker_name(voice_name or adapter_dir.name)
     progress(Stage.SAVE, 0.1, tr("progress.merging"))
-    state, spk = merge_adapter_into_model(hf_model, adapter_dir, spk_id)
+    scale = adapter_scale_of(adapter_dir)
+    state, spk = merge_adapter_into_model(hf_model, adapter_dir, spk_id, scale)
     del hf_model
     cancel.check()
 
@@ -191,7 +209,8 @@ def export_merged_model(adapter_dir, out_dir, base_dir=None, progress: ProgressC
         (partial / "voxprint_voice.json").write_text(json.dumps({
             "app": "Voxprint", "speaker": name, "spk_id": spk_id, "base_model": repo, "language": language,
             "ref_sample": "ref_sample.wav", "ref_text": meta.get("ref_sample_text", ""),
-            "merged_dtype": "bfloat16", "tts_model_type": "custom_voice"}, ensure_ascii=False, indent=2),
+            "merged_dtype": "bfloat16", "tts_model_type": "custom_voice", "adapter_scale": scale},
+            ensure_ascii=False, indent=2),
             encoding="utf-8")
         (partial / "USAGE.txt").write_text(USAGE.format(speaker=name, language=language.capitalize()), encoding="utf-8")
         cancel.check()

@@ -17,7 +17,7 @@ from typing import Callable, List, Optional, Sequence
 
 import numpy as np
 
-from core import cpu_budget, model_cache
+from core import adapter_strength, cpu_budget, model_cache
 from core.errors import NarrationError
 from core.events import ProgressCallback, Stage, noop_progress
 from core.i18n import tr
@@ -68,9 +68,9 @@ def _attn_candidates(attn: str, use_cuda: bool) -> List[str]:
     return out + ["sdpa", "eager"]
 
 
-def engine_tag(voice: VoiceRecord, language: str = "") -> str:
-    """Identity of voice + adapter weights + base model (+ language token): a retrained or replaced adapter, or a different
-    language token, invalidates cached audio."""
+def engine_tag(voice: VoiceRecord, language: str = "", scale: Optional[float] = None) -> str:
+    """Identity of voice + adapter weights + base model (+ language token, adapter strength): a retrained or replaced adapter,
+    a different language token or another strength invalidates cached audio.  ``scale`` defaults to the voice's own."""
     adapter = voice.path / "adapter_model.safetensors"
     try:
         st = adapter.stat()
@@ -83,19 +83,28 @@ def engine_tag(voice: VoiceRecord, language: str = "") -> str:
     token = qwen_language(language)
     if token and token != (qwen_language(voice.language) or AUTO):
         raw += f"|lang={token}"
+    strength = voice.adapter_scale if scale is None else adapter_strength.clamp(scale, 1.0)
+    if not adapter_strength.is_full(strength):           # 1.0 adds nothing: caches of older voices stay valid
+        raw += f"|scale={strength:.2f}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 class Qwen3AdapterEngine:
     """Synthesizes with a LoRA voice.  Create it lazily (loading takes a while and ~4-7 GB of VRAM)."""
 
-    def __init__(self, voice: VoiceRecord, base_dir: Path, language: str = "", device: str = "auto", attn: str = "auto") -> None:
-        """Load the model, apply the adapter and prepare the voice-clone prompt."""
+    def __init__(self, voice: VoiceRecord, base_dir: Path, language: str = "", device: str = "auto", attn: str = "auto",
+                 adapter_scale: Optional[float] = None, merge: bool = True) -> None:
+        """Load the model, apply the adapter and prepare the voice-clone prompt.
+
+        ``adapter_scale`` overrides the voice's strength (:mod:`core.adapter_strength`).  ``merge=False`` keeps the adapter
+        separate (a little slower) so :meth:`set_adapter_scale` / :meth:`switch_adapter` can change it without reloading the
+        base model - used by the quick preview and the automatic checkpoint pick."""
         import torch
         from peft import PeftModel
         from qwen_tts import Qwen3TTSModel  # type: ignore
 
-        self.tag = engine_tag(voice, language)
+        self.adapter_scale = voice.adapter_scale if adapter_scale is None else adapter_strength.clamp(adapter_scale, 1.0)
+        self.tag = engine_tag(voice, language, self.adapter_scale)
         # Exact Qwen3-TTS name ("English", "Russian" ... or "Auto"): voice.json stores codes like "ru" since schema 3
         self.language = qwen_language(language) or qwen_language(voice.language) or AUTO
         use_cuda = device == "cuda" or (device == "auto" and torch.cuda.is_available())
@@ -132,11 +141,15 @@ class Qwen3AdapterEngine:
                 self._q = None
         if self._q is None:
             raise NarrationError(tr("err.voice_invalid"), details="the model could not be loaded")
-        talker = PeftModel.from_pretrained(self._q.model.talker, str(voice.path))
-        try:
-            talker = talker.merge_and_unload()          # faster inference; fall back to the unmerged adapter
-        except Exception:  # noqa: BLE001
-            log.warning("adapter merge failed; using the unmerged adapter", exc_info=True)
+        peft_talker = PeftModel.from_pretrained(self._q.model.talker, str(voice.path))
+        if not adapter_strength.is_full(self.adapter_scale):       # 1.0 = as loaded; older voices take exactly the old path
+            adapter_strength.apply(peft_talker, self.adapter_scale)  # before the merge: the merged delta carries the scale
+        talker, self._peft, self._adapter_no = peft_talker, peft_talker, 0
+        if merge:
+            try:
+                talker, self._peft = peft_talker.merge_and_unload(), None   # faster inference; fall back to the unmerged adapter
+            except Exception:  # noqa: BLE001
+                log.warning("adapter merge failed; using the unmerged adapter", exc_info=True)
         self._q.model.talker = talker
         self._q.model.eval()
         ref_audio = voice.path / "ref_sample.wav"
@@ -144,6 +157,38 @@ class Qwen3AdapterEngine:
             raise NarrationError(tr("err.voice_invalid"), details="reference clip or its text is missing")
         self._prompt = self._q.create_voice_clone_prompt(ref_audio=str(ref_audio), ref_text=voice.ref_text)
         self.sample_rate = 24000
+
+    def set_adapter_scale(self, scale: float) -> None:
+        """Change the adapter strength (only for an engine created with ``merge=False``)."""
+        if self._peft is None:
+            raise RuntimeError("the adapter is merged; create the engine with merge=False")
+        self.adapter_scale = adapter_strength.clamp(scale, 1.0)
+        adapter_strength.apply(self._peft, self.adapter_scale)
+
+    def switch_adapter(self, folder: Path) -> None:
+        """Replace the adapter weights by another checkpoint of the same voice (``merge=False`` engines); keeps the strength."""
+        if self._peft is None:
+            raise RuntimeError("the adapter is merged; create the engine with merge=False")
+        old = self._peft.active_adapter
+        self._adapter_no += 1
+        name = f"candidate_{self._adapter_no}"
+        self._peft.load_adapter(str(folder), adapter_name=name)
+        self._peft.set_adapter(name)
+        self._peft.delete_adapter(old)            # only one candidate in memory at a time
+        adapter_strength.apply(self._peft, self.adapter_scale)
+
+    def speaker_embedding(self, audio: np.ndarray, sr: int) -> np.ndarray:
+        """Embedding of ``audio`` by the model's own speaker encoder (used for the voice-similarity check)."""
+        import torch
+
+        from core.audio_utils import resample
+
+        x = np.asarray(audio, dtype=np.float32).reshape(-1)
+        if sr != 24000:
+            x = resample(x, sr, 24000)
+        with torch.inference_mode():
+            emb = self._q.model.extract_speaker_embedding(audio=x, sr=24000)
+        return emb.detach().float().cpu().numpy().reshape(-1)
 
     def synthesize(self, text: str) -> np.ndarray:
         """Mono float32 samples for ``text``."""
@@ -184,6 +229,7 @@ class Qwen3AdapterEngine:
     def close(self) -> None:
         """Free the model and the GPU cache; give torch its CPU threads back."""
         self._q = None
+        self._peft = None
         try:
             import torch
 
@@ -195,7 +241,7 @@ class Qwen3AdapterEngine:
 
 
 def make_engine_factory(voice: VoiceRecord, language: str = "", progress: ProgressCallback = noop_progress,
-                        ensure_model: Optional[Callable[..., Path]] = None) -> Callable[[], Qwen3AdapterEngine]:
+                        ensure_model: Optional[Callable[..., Path]] = None, **engine_kw) -> Callable[[], Qwen3AdapterEngine]:
     """A factory the narrator calls when the first chunk needs synthesis: finds/downloads the base model, then loads."""
     def factory() -> Qwen3AdapterEngine:
         from infra import model_downloader as md
@@ -206,5 +252,5 @@ def make_engine_factory(voice: VoiceRecord, language: str = "", progress: Progre
 
             repo = plan_training(detect_gpu(), 100).base_model
         base = (ensure_model or md.ensure_model)(repo, lambda s, f, m: progress(Stage.MODEL, f, m))
-        return Qwen3AdapterEngine(voice, Path(base), language)
+        return Qwen3AdapterEngine(voice, Path(base), language, **engine_kw)
     return factory

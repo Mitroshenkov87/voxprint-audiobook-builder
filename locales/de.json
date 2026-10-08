@@ -705,5 +705,11 @@
  "autorepair.summary": "Automatische Reparatur beendet: {checked} geprüft, {fixed} repariert oder geladen, {failed} fehlgeschlagen.",
  "autorepair.failed_list": "Nicht repariert: {names}",
  "autorepair.error": "Automatische Reparatur abgebrochen: {error}",
- "autorepair.cancelled": "Automatische Reparatur angehalten. Fertige Teile bleiben erhalten; erneut starten, um fortzusetzen."
+ "autorepair.cancelled": "Automatische Reparatur angehalten. Fertige Teile bleiben erhalten; erneut starten, um fortzusetzen.",
+ "preview.strength": "Stimmstärke:",
+ "preview.strength_tip": "Wie stark der trainierte Adapter die Stimme prägt. 1.00 ist genau wie trainiert; kleinere Werte klingen oft ruhiger und natürlicher. Jeder Wert hat ein eigenes Beispiel und eigene Prüfungen.",
+ "preview.strength_full": "{scale} (wie trainiert)",
+ "preview.chosen_scale": "Variante {v} mit Stimmstärke {scale} gewählt: Ihre Einstellungen stehen jetzt unter „Manuell“, und die Stärke wird mit der Stimme gespeichert. Drücken Sie die Trainingsschaltfläche für den vollständigen Lauf.",
+ "voices.field_strength": "Stimmstärke",
+ "voices.strength_note": "Stimmstärke (0,10–1,00): wie stark der trainierte Adapter die Stimme beim Vorlesen prägt. 1.00 ist genau wie trainiert (Stimmen, die vor dieser Einstellung trainiert wurden, nutzen 1.00); kleinere Werte klingen oft ruhiger und natürlicher. Nach einer Änderung werden Kapitel mit der neuen Stärke neu synthetisiert."
 }

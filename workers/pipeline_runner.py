@@ -76,6 +76,7 @@ class TaskRequest:
     quality_check: bool = False          # LoRA: synthesize a sample after training and judge it (core/voice_check.py)
     preset: str = "balanced"             # training preset: fast / balanced / maximum / manual (core.train_presets)
     manual: Optional[object] = None      # core.train_presets.Manual for the "manual" preset
+    adapter_scale: Optional[float] = None  # LoRA strength chosen in the preview (None = automatic, core/adapter_strength.py)
 
     def voice_name(self) -> str:
         """Voice name = the recording's file name (or the adapter folder's name); also the result folder name in ``output/``."""
@@ -184,9 +185,11 @@ def last_adapter() -> Optional[Path]:
 
 
 def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech_seconds: float,
-                      consent_block: Optional[dict] = None) -> dict:
-    """Write voice.json next to the adapter and return its content. A failure here must not fail a finished training run."""
-    from core import voice_info
+                      consent_block: Optional[dict] = None, picked_scale: Optional[float] = None) -> dict:
+    """Write voice.json next to the adapter and return its content. A failure here must not fail a finished training run.
+
+    Adapter strength: the one the user chose in the preview, else the automatic checkpoint pick's, else the default."""
+    from core import adapter_strength, voice_info
 
     epochs, base_model = 0, ""
     try:   # epochs and base model are recorded by the trainer in training_meta.json
@@ -204,6 +207,8 @@ def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech
                                        req.voice_type, req.voice_description, gender=req.gender, age_group=req.age_group,
                                        speaker=req.speaker, prepared_by=req.prepared_by, organization=req.organization,
                                        project_url=req.project_url, **extra)
+    scale = next((v for v in (req.adapter_scale, picked_scale) if v is not None), adapter_strength.DEFAULT_SCALE)
+    info["adapter_scale"] = adapter_strength.clamp(scale, adapter_strength.DEFAULT_SCALE)
     try:
         voice_info.write_voice_json(adapter_dir, info)
     except OSError as exc:
@@ -277,7 +282,8 @@ def _quality_check(req, res, build, asr_factory, deps, cancel) -> None:
         adapter = Path(res.adapter_path)
         lang = build.training_language
         text = preview_runner.SAMPLE_TEXT.get(lang, preview_runner.SAMPLE_TEXT["english"])
-        eng = deps["engine_factory"](adapter, lang) if deps.get("engine_factory") else preview_runner._default_engine(adapter, lang)
+        eng = (deps["engine_factory"](adapter, lang) if deps.get("engine_factory")
+               else preview_runner._default_engine(adapter, lang, merge=True))
         try:
             audio = np.asarray(eng.synthesize(text), dtype=np.float32).reshape(-1)
             sr = int(getattr(eng, "sample_rate", 24000))

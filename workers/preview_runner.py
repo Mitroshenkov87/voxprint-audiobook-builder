@@ -29,6 +29,9 @@ MIN_CLIPS = 4
 MAX_EPOCHS = 4
 SYNTH_CHECK_SEC = 25.0       # measured on an RTX 4090: engine load + ~7 s sample + pitch/WER per variant (~31 s wall minus the trainer's own load)
 ASR_LOAD_SEC = 10.0          # measured: 8 s for Qwen3-ASR-0.6B
+#: Each extra adapter strength of a variant (core.adapter_strength.PREVIEW_SCALES): one more ~7 s sample with checks on the
+#: unmerged adapter.  An estimate, not measured yet (NEEDS GPU VALIDATION).
+EXTRA_SCALE_SEC = 9.0
 MAX_SECONDS = 180.0           # time cap of one quick training (estimated)
 #: The ~10 s phrase of the quick preview and of the automatic voice check, per language (the engine needs the language of the voice).
 #: Technical, developer-blog style about Voxprint itself, gender-neutral (no first-person past tense in Russian / German).
@@ -66,6 +69,17 @@ class PreviewItem:
     train_seconds: float
     check: dict = field(default_factory=dict)
     clips: int = 0
+    #: Adapter strength of ``wav`` / ``check`` (``None``: the engine could not change it, i.e. full strength).
+    scale: Optional[float] = None
+    #: Every strength that was synthesized: ``[{"scale", "wav", "seconds", "check"}]`` (one entry per value).
+    scales: List[dict] = field(default_factory=list)
+
+    def use_scale(self, scale: float) -> None:
+        """Make the sample at ``scale`` the shown one (the UI's strength selector)."""
+        for e in self.scales:
+            if abs(e["scale"] - scale) < 1e-6:
+                self.scale, self.wav, self.seconds, self.check = e["scale"], e["wav"], e["seconds"], e["check"]
+                return
 
 
 def make_variants(base: TrainPlan, compare: bool) -> List[Variant]:
@@ -118,6 +132,18 @@ def best_wer_gap(a: float, b: float) -> float:
     return 0.0 if abs(a - b) <= 0.03 else a - b
 
 
+def best_scale(entries: List[dict]) -> Optional[float]:
+    """The strength to pre-select among ``entries`` (``{"scale", "check"}``): the :func:`recommend` criteria, ties going to
+    the default strength (then to the weaker one - the research found lower values less "over-dry")."""
+    from core import adapter_strength
+
+    if not entries:
+        return None
+    order = sorted(entries, key=lambda e: (abs(e["scale"] - adapter_strength.DEFAULT_SCALE), e["scale"]))
+    pseudo = [PreviewItem(str(i), "", 0, 0, 0, 0.0, 0, Path(), 0.0, 0.0, e["check"]) for i, e in enumerate(order)]
+    return order[int(recommend(pseudo))]["scale"]
+
+
 def subset(dataset_dir: Path, out: Path, n_max: int = MAX_CLIPS) -> int:
     """Copy up to ``n_max`` evenly spaced clips (and ref.wav / ref_text.txt) into ``out``; returns the count."""
     rows = read_metadata_jsonl(Path(dataset_dir) / "metadata.jsonl")
@@ -153,10 +179,13 @@ def run_previews(dataset_dir, out_dir, base_plan: TrainPlan, *, compare: bool, l
 
     ``train_fn(dataset, out, progress, cancel, force_cpu, plan=..., language=...) -> adapter folder`` defaults to
     :func:`core.lora_trainer.train_lora_from_dataset`; ``engine_factory(adapter_dir, language)`` returns an object with
-    ``synthesize(text) -> samples`` and ``sample_rate`` (and ``close()``), defaulting to the real Qwen3 engine.
+    ``synthesize(text) -> samples`` and ``sample_rate`` (and ``close()``), defaulting to the real Qwen3 engine.  When the
+    engine also has ``set_adapter_scale(scale)``, every variant is synthesized at each of
+    :data:`core.adapter_strength.PREVIEW_SCALES` and the best-checking strength is pre-selected (the user can switch).
     """
     import time
 
+    from core import adapter_strength
     from core.tts_engine import max_tokens_for, FRAMES_PER_SECOND
 
     cancel = cancel or CancelToken()
@@ -182,26 +211,41 @@ def run_previews(dataset_dir, out_dir, base_plan: TrainPlan, *, compare: bool, l
         cancel.check()
         progress(Stage.TRAIN, base_f + 0.9 / len(variants), tr("preview.synthesizing", v=v.key))
         eng = engine_factory(adapter, language) if engine_factory else _default_engine(adapter, language)
+        entries: List[dict] = []
         try:
-            audio = np.asarray(eng.synthesize(text), dtype=np.float32).reshape(-1)
-            sr = int(getattr(eng, "sample_rate", 24000))
+            scalable = callable(getattr(eng, "set_adapter_scale", None))
+            for scale in (adapter_strength.PREVIEW_SCALES if scalable else (None,)):
+                cancel.check()
+                if scale is not None:
+                    eng.set_adapter_scale(scale)
+                audio = np.asarray(eng.synthesize(text), dtype=np.float32).reshape(-1)
+                sr = int(getattr(eng, "sample_rate", 24000))
+                wav = out_dir / (f"preview_{v.key}.wav" if scale is None else f"preview_{v.key}_s{int(round(scale * 100)):03d}.wav")
+                au.write_wav(wav, audio, sr)
+                chk = voice_check.check_sample(audio, sr, text, ref, ref_sr, asr=asr,
+                                               language=(language or "").capitalize() or None,
+                                               max_seconds=max_tokens_for(text) / FRAMES_PER_SECOND)
+                entries.append({"scale": scale, "wav": wav, "seconds": len(audio) / sr, "check": chk.as_dict()})
         finally:
             try:
                 eng.close()
             except Exception:  # noqa: BLE001
                 pass
-        wav = out_dir / f"preview_{v.key}.wav"
-        au.write_wav(wav, audio, sr)
-        chk = voice_check.check_sample(audio, sr, text, ref, ref_sr, asr=asr, language=(language or "").capitalize() or None,
-                                       max_seconds=max_tokens_for(text) / FRAMES_PER_SECOND)
-        items.append(PreviewItem(v.key, v.label or v.key, v.plan.epochs, v.plan.lora_r, v.plan.lora_alpha, v.plan.lr,
-                                 v.plan.grad_accum, wav, len(audio) / sr, t_train, chk.as_dict(), n))
+        first = entries[0]
+        item = PreviewItem(v.key, v.label or v.key, v.plan.epochs, v.plan.lora_r, v.plan.lora_alpha, v.plan.lr,
+                           v.plan.grad_accum, first["wav"], first["seconds"], t_train, first["check"], n,
+                           scales=entries if first["scale"] is not None else [])
+        if item.scales:
+            item.use_scale(best_scale(item.scales))
+        items.append(item)
     progress(Stage.TRAIN, 1.0, tr("preview.done"))
     return items
 
 
-def _default_engine(adapter: Path, language: str):
-    """The real engine on a temporary voice record made from the quick adapter."""
+def _default_engine(adapter: Path, language: str, merge: bool = False):
+    """The real engine on a temporary voice record made from the adapter folder (its voice.json strength, if any).
+
+    Unmerged by default: the strength can then be changed between the samples without reloading the model."""
     import json
 
     from core import voice_info
@@ -213,5 +257,12 @@ def _default_engine(adapter: Path, language: str):
         meta = json.loads((adapter / "training_meta.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         pass
-    info = voice_info.normalize_info({"name": "preview", "language": language, "base_model": meta.get("model_name", "")}, "preview")
-    return make_engine_factory(VoiceRecord("preview", adapter, info), language)()
+    raw = {"name": "preview", "language": language, "base_model": meta.get("model_name", "")}
+    try:     # after a full training voice.json is already written: check the voice at the strength it will speak with
+        stored = json.loads((adapter / "voice.json").read_text(encoding="utf-8"))
+        if isinstance(stored, dict) and stored.get("adapter_scale") is not None:
+            raw["adapter_scale"] = stored["adapter_scale"]
+    except (OSError, ValueError):
+        pass
+    info = voice_info.normalize_info(raw, "preview")
+    return make_engine_factory(VoiceRecord("preview", adapter, info), language, merge=merge)()

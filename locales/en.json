@@ -705,5 +705,11 @@
  "autorepair.summary": "Auto-repair finished: {checked} checked, {fixed} repaired or downloaded, {failed} failed.",
  "autorepair.failed_list": "Not repaired: {names}",
  "autorepair.error": "Auto-repair stopped: {error}",
- "autorepair.cancelled": "Auto-repair stopped. Finished parts are kept; run it again to continue."
+ "autorepair.cancelled": "Auto-repair stopped. Finished parts are kept; run it again to continue.",
+ "preview.strength": "Voice strength:",
+ "preview.strength_tip": "How strongly the trained adapter shapes the voice. 1.00 is exactly as trained; lower values often sound calmer and more natural. Each value has its own sample and checks.",
+ "preview.strength_full": "{scale} (as trained)",
+ "preview.chosen_scale": "Variant {v} chosen with voice strength {scale}: its settings are now in Manual, and the strength will be saved with the voice. Press the training button for the full run.",
+ "voices.field_strength": "Voice strength",
+ "voices.strength_note": "Voice strength (0.10-1.00): how strongly the trained adapter shapes the voice when reading. 1.00 is exactly as trained (voices trained before this setting use 1.00); lower values often sound calmer and more natural. After a change, chapters are synthesized again with the new strength."
 }

@@ -22,6 +22,9 @@ Fields (all always present)::
 * ``voice_type`` (``male | female | child | other`` or empty) is kept for older readers and the folder-name suffix, but is
   **derived** from ``gender`` / ``age_group`` (:func:`derive_voice_type`); ``description`` is free text (<= 500 characters).
 
+Optional fields: ``adapter_scale`` - the strength of the LoRA adapter at inference (0.1-1.0, see :mod:`core.adapter_strength`);
+missing means 1.0 (voices trained before the setting existed sound as before).
+
 Older files are still read: :func:`normalize_info` upgrades schema 1 (``voice_name``/``speech_seconds``, no licence) and
 schema 2 (``voice_type`` only, language as a name like ``Russian``): ``male``/``female`` -> ``gender``, ``child`` ->
 ``age_group``, language names -> codes.
@@ -34,6 +37,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from core import adapter_strength
 from core.languages import language_code
 
 #: File name of the description, stored next to ``adapter_model.safetensors``.
@@ -210,7 +214,7 @@ def build_voice_info(name: str, language: str, duration: float, epochs: int, bas
                      license: str = DEFAULT_LICENSE, license_url: str = "",  # noqa: A002
                      consent: Optional[Dict[str, Any]] = None, gender: str = "", age_group: str = "",
                      speaker: str = "", prepared_by: str = "", organization: str = "",
-                     project_url: str = "") -> Dict[str, Any]:
+                     project_url: str = "", adapter_scale: Optional[float] = None) -> Dict[str, Any]:
     """Assemble the ``voice.json`` dictionary.
 
     ``language`` is the language of the recording (any form; stored as a BCP-47 code), ``duration`` the amount of cleaned
@@ -242,6 +246,9 @@ def build_voice_info(name: str, language: str, duration: float, epochs: int, bas
         "description": clean_description(description),
         "commercial_use": license_allows_commercial(lic),
     }
+    scale = adapter_strength.clamp(adapter_scale)
+    if scale is not None:
+        info["adapter_scale"] = scale
     cons = _clean_consent(consent)
     if cons:
         info["consent"] = cons
@@ -290,6 +297,9 @@ def normalize_info(data: Dict[str, Any], fallback_id: str = "") -> Dict[str, Any
         "description": clean_description(str(data.get("description") or "")),
         "commercial_use": license_allows_commercial(lic),
     }
+    scale = adapter_strength.clamp(data.get("adapter_scale"))
+    if scale is not None:
+        out["adapter_scale"] = scale      # LoRA strength at inference; missing = 1.0 (core/adapter_strength.py)
     if data.get("repo_id"):
         out["repo_id"] = clean_line(str(data["repo_id"]))   # id in the online voices index: the voice was downloaded from there
     names = clean_names(data.get("names"))

@@ -17,10 +17,10 @@ from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (QComboBox, QDialog, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QMenu, QMessageBox, QProgressBar, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QComboBox, QDialog, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QLabel,
+                               QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox, QProgressBar, QPushButton, QVBoxLayout, QWidget)
 
-from core import voice_info
+from core import adapter_strength, voice_info
 from core.errors import DatasetMakerError
 from core.i18n import tr
 from core.languages import language_name
@@ -264,6 +264,12 @@ class VoiceEditDialog(QDialog):
             w.setPlaceholderText(tr("voices.author_placeholder"))
         self.edt_desc = QLineEdit(str(rec.info.get("description", "")))
         self.edt_desc.setMaxLength(voice_info.MAX_DESCRIPTION_CHARS)
+        self.sp_strength = QDoubleSpinBox()          # LoRA strength at narration (core/adapter_strength.py)
+        self.sp_strength.setRange(adapter_strength.MIN_SCALE, adapter_strength.MAX_SCALE)
+        self.sp_strength.setSingleStep(0.05)
+        self.sp_strength.setDecimals(2)
+        self.sp_strength.setValue(rec.adapter_scale)
+        self.sp_strength.setToolTip(tr("voices.strength_note"))
         form = QFormLayout()
         form.setSpacing(8)
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
@@ -271,10 +277,14 @@ class VoiceEditDialog(QDialog):
                          (tr("voices.field_gender_age"), ga), (tr("voices.field_author"), self.edt_author),
                          (tr("voices.field_prepared_by"), self.edt_prepared),
                          (tr("voices.field_organization"), self.edt_org), (tr("voices.field_project_url"), self.edt_url),
-                         (tr("voices.field_description"), self.edt_desc), (tr("voices.field_license"), self.cmb_license)):
+                         (tr("voices.field_description"), self.edt_desc), (tr("voices.field_license"), self.cmb_license),
+                         (tr("voices.field_strength"), self.sp_strength)):
             form.addRow(label, w)
         lay.addLayout(form)
         lay.addWidget(self.lbl_license_note)      # outside the form: a wrapped label in a form row gets cut off
+        self.lbl_strength_note = hint_label()
+        self.lbl_strength_note.setText(tr("voices.strength_note"))
+        lay.addWidget(self.lbl_strength_note)
         self.lbl_rights = hint_label()
         self.lbl_rights.setText(tr("voices.rights_note"))
         lay.addWidget(self.lbl_rights)
@@ -306,7 +316,7 @@ class VoiceEditDialog(QDialog):
                 "prepared_by": self.edt_prepared.text(), "organization": self.edt_org.text(),
                 "project_url": self.edt_url.text(), "license": str(self.cmb_license.currentData()),
                 "gender": str(self.cmb_gender.currentData() or ""), "age_group": str(self.cmb_age.currentData() or ""),
-                "description": self.edt_desc.text()}
+                "description": self.edt_desc.text(), "adapter_scale": round(self.sp_strength.value(), 2)}
 
 
 class RepoDialog(QDialog):

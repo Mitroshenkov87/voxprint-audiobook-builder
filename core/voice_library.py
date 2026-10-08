@@ -121,6 +121,13 @@ class VoiceRecord:
         return str(self.info.get("base_model", ""))
 
     @property
+    def adapter_scale(self) -> float:
+        """LoRA strength at inference (``voice.json`` ``adapter_scale``; 1.0 for voices trained before the setting)."""
+        from core import adapter_strength
+
+        return adapter_strength.clamp(self.info.get("adapter_scale"), adapter_strength.LEGACY_SCALE)
+
+    @property
     def ref_text(self) -> str:
         """Text spoken in ``ref_sample.wav`` (from ``training_meta.json``); needed to clone the voice at synthesis time."""
         import json
@@ -303,13 +310,13 @@ class VoiceLibrary:
     # ------------------------------------------------------------------ changing
     def update(self, voice_id: str, **fields: Any) -> VoiceRecord:
         """Change editable details (``name, author, speaker, prepared_by, organization, project_url, license, license_url,
-        gender, age_group, voice_type, description``) and save voice.json."""
+        gender, age_group, voice_type, description, adapter_scale``) and save voice.json."""
         rec = self.get(voice_id)
         if rec is None:
             raise VoiceLibraryError(tr("err.voice_not_found"), details=voice_id)
         info = dict(rec.info)
         for key in ("name", "author", "speaker", "prepared_by", "organization", "project_url", "license", "license_url",
-                    "gender", "age_group", "voice_type", "description", "consent"):
+                    "gender", "age_group", "voice_type", "description", "consent", "adapter_scale"):
             if key in fields and fields[key] is not None:
                 info[key] = fields[key]
         if fields.get("voice_type") is not None and fields.get("gender") is None and fields.get("age_group") is None:

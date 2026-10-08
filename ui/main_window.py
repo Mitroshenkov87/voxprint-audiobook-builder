@@ -23,7 +23,7 @@ from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QSpinBox, QToolButton, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
-from core import consent as consent_mod, i18n, model_export, train_presets, voice_info
+from core import adapter_strength, consent as consent_mod, i18n, model_export, train_presets, voice_info
 from core.appinfo import APP_DISPLAY_NAME
 from core.errors import DatasetMakerError
 from core.events import Stage
@@ -829,6 +829,7 @@ class MainWindow(QWidget):
     def set_audio(self, path: Path) -> None:
         """Remember the chosen recording and update the label and button states."""
         self.audio = Path(path)
+        self.preview_scale = None               # a strength picked in a preview belongs to the previous recording
         self.lbl_audio.setText(self.audio.name)
         self.lbl_audio.setToolTip(str(self.audio))
         self._on_preset()
@@ -911,23 +912,29 @@ class MainWindow(QWidget):
                 badge = QLabel(recommended_text(tr("preview.best")))
                 badge.setObjectName("sectiontitle")
                 rl.addWidget(badge)
-            chk = item.check or {}
-            wer = chk.get("wer")
-            st = chk.get("semitones")
-            lbl = QLabel(tr("preview.row", v=item.key, epochs=item.epochs, rank=item.lora_r, secs=f"{item.seconds:.0f}",
-                            wer="-" if wer is None else f"{round(100 * wer)} %",
-                            pitch="-" if st is None else f"{st:+.1f}", verdict=tr("check.verdict_" + chk.get("verdict", "good"))
-                            if chk.get("verdict", "good") != "good" else tr("check.verdict_good")))
+            lbl = QLabel()
             lbl.setWordWrap(True)
             rl.addWidget(lbl)
-            if chk.get("issues"):
-                hint = QLabel(" ".join(tr("check.sugg_" + c) for c in chk["issues"] if c != "no_pitch"))
-                hint.setObjectName("hint")
-                hint.setWordWrap(True)
-                rl.addWidget(hint)
+            hint = QLabel()
+            hint.setObjectName("hint")
+            hint.setWordWrap(True)
+            rl.addWidget(hint)
+            self._fill_preview_texts(item, lbl, hint)
             btns = QHBoxLayout()
+            if item.scales:        # one sample per adapter strength: the selector switches what Play and the checks show
+                strength = QComboBox()
+                strength.setToolTip(tr("preview.strength_tip"))
+                for e in item.scales:
+                    text = f"{e['scale']:.2f}"
+                    strength.addItem(tr("preview.strength_full", scale=text) if adapter_strength.is_full(e["scale"]) else text,
+                                     e["scale"])
+                strength.setCurrentIndex(max(0, strength.findData(item.scale)))
+                strength.currentIndexChanged.connect(
+                    lambda _i, it=item, c=strength, a=lbl, b=hint: (it.use_scale(c.currentData()), self._fill_preview_texts(it, a, b)))
+                btns.addWidget(QLabel(tr("preview.strength")))
+                btns.addWidget(strength)
             play = QPushButton(tr("preview.play"))
-            play.clicked.connect(lambda _c=False, p=item.wav: self.play_preview(p))
+            play.clicked.connect(lambda _c=False, it=item: self.play_preview(it.wav))
             use = QPushButton(tr("preview.use"))
             if best and item.key == best and len(items) > 1:
                 mark_recommended(use)
@@ -942,6 +949,19 @@ class MainWindow(QWidget):
         if wavs:
             self.preview_player.set_files(wavs)
             self.preview_player.show()
+
+    @staticmethod
+    def _fill_preview_texts(item, lbl: QLabel, hint: QLabel) -> None:
+        """Settings and automatic checks of a preview row (for the currently selected adapter strength)."""
+        chk = item.check or {}
+        wer = chk.get("wer")
+        st = chk.get("semitones")
+        lbl.setText(tr("preview.row", v=item.key, epochs=item.epochs, rank=item.lora_r, secs=f"{item.seconds:.0f}",
+                       wer="-" if wer is None else f"{round(100 * wer)} %",
+                       pitch="-" if st is None else f"{st:+.1f}", verdict=tr("check.verdict_" + chk.get("verdict", "good"))
+                       if chk.get("verdict", "good") != "good" else tr("check.verdict_good")))
+        hint.setText(" ".join(tr("check.sugg_" + c) for c in chk.get("issues", []) if c != "no_pitch"))
+        hint.setVisible(bool(hint.text()))
 
     def _stop_previewer(self) -> None:
         """The mini player started: stop the single-file previewer."""
@@ -968,7 +988,11 @@ class MainWindow(QWidget):
         self.sp_accum.setValue(item.grad_accum)
         self.sp_lr.setValue(item.lr)
         self.sp_epochs.setValue(full.epochs if item.key == "A" else int(round(full.epochs * 1.5)))   # B = 50 % more passes
-        self.lbl_status.setText(tr("preview.chosen", v=item.key))
+        self.preview_scale = getattr(item, "scale", None)      # goes to the trained voice's voice.json
+        if self.preview_scale is None:
+            self.lbl_status.setText(tr("preview.chosen", v=item.key))
+        else:
+            self.lbl_status.setText(tr("preview.chosen_scale", v=item.key, scale=f"{self.preview_scale:.2f}"))
 
     # ------------------------------------------------------------------ voice-owner consent
     @property
@@ -982,7 +1006,8 @@ class MainWindow(QWidget):
         self.lbl_consent_hint.setText(tr("consent.hint_" + mode))
 
     def _task_extras(self) -> dict:
-        return dict(compare=self.chk_compare.isChecked(), quality_check=self.chk_check.isChecked())
+        return dict(compare=self.chk_compare.isChecked(), quality_check=self.chk_check.isChecked(),
+                    adapter_scale=getattr(self, "preview_scale", None))
 
     def _consent_kwargs(self) -> dict:
         return dict(consent_mode=self.consent_mode, consent_scope=str(self.cmb_consent_scope.currentData()),
@@ -1078,7 +1103,8 @@ class MainWindow(QWidget):
         from workers import preview_runner
 
         vs = preview_runner.make_variants(plan, self.chk_compare.isChecked())
-        quick = sum(train_presets.estimate_seconds(v.plan, min(preview_runner.MAX_CLIPS, n), gpu) + preview_runner.SYNTH_CHECK_SEC for v in vs) + preview_runner.ASR_LOAD_SEC
+        per_variant = preview_runner.SYNTH_CHECK_SEC + preview_runner.EXTRA_SCALE_SEC * (len(adapter_strength.PREVIEW_SCALES) - 1)
+        quick = sum(train_presets.estimate_seconds(v.plan, min(preview_runner.MAX_CLIPS, n), gpu) + per_variant for v in vs) + preview_runner.ASR_LOAD_SEC
         self.lbl_preview_estimate.setText(tr("preview.estimate", time=train_presets.format_duration(
             quick, tr("preset.unit_min"), tr("preset.unit_sec"), tr("preset.unit_hour")), n=len(vs)))
         fmt = dict(time=dur, epochs=plan.epochs, rank=plan.lora_r, n=n, gpu=where)
@@ -1114,6 +1140,7 @@ class MainWindow(QWidget):
         from core.asr_dataset import expand_inputs
 
         self.audio_files = [Path(p) for p in paths]
+        self.preview_scale = None
         self._audio_count = len(expand_inputs(self.audio_files))
         self._show_audio_label()
         self._on_preset()
