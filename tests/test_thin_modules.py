@@ -322,7 +322,7 @@ def test_a_newer_pinned_set_is_offered_as_an_update_in_the_components_window(thi
     man = mods.load_manifest()
     audio = next(m for m in mods.modules(man) if m.id == "audio")
     assert audio.update and not audio.installed and audio in mods.pending(mods.modules(man))
-    assert mods.versions(man) == ("0.0.9", man["app_version"])
+    assert mods.versions(man) == ("0.0.9", mods.label(man["app_version"], man.get("build", "")))
     dlg = ModulesDialog()
     dlg.refresh()
     assert wait_for(lambda: dlg.modules and not dlg.busy, 20)
@@ -343,3 +343,26 @@ def test_a_newer_pinned_set_is_offered_as_an_update_in_the_components_window(thi
     assert not (rd / "old_only.py").exists() and not (rd / "gone_part.py").exists()
     assert all(m.installed for m in mods.modules(mods.load_manifest()) if m.id == "audio")
     assert "rt-audio-99" not in json.loads((rd / of.FILES_INDEX).read_text(encoding="utf-8"))
+
+
+def test_a_rebuild_of_the_same_version_is_not_an_update(thin, app):     # noqa: F811
+    """Real PC: 'update 0.1.0-beta -> 0.1.0-beta' was offered because the release was rebuilt (other wheel hashes)."""
+    mods.install(["audio"])
+    st = mods.runtime_dir() / of.STATE_FILE
+    d = json.loads(st.read_text(encoding="utf-8"))
+    cid = next(c for c in d["components"] if c.startswith("rt-audio-"))
+    d["components"][cid], d["build"] = "f" * 64, "deadbeef"                # same app_version, another build
+    st.write_text(json.dumps(d), encoding="utf-8")
+    man = mods.load_manifest()
+    audio = next(m for m in mods.modules(man) if m.id == "audio")
+    assert audio.installed and not audio.update and audio not in mods.pending(mods.modules(man))
+    assert mods.versions(man)[0] == f"{man['app_version']} \u00b7 build deadbeef"
+
+
+def test_version_order():
+    assert mods.is_newer("0.1.1-beta", "0.1.0-beta") and mods.is_newer("0.1.0", "0.1.0-beta")
+    assert not mods.is_newer("0.1.0-beta", "0.1.0-beta") and not mods.is_newer("0.1.0-beta", "0.1.1-beta")
+    assert mods.is_newer("v0.2.0", "0.1.9") and mods.is_newer("0.1.0-beta", "") and not mods.is_newer("", "0.1.0")
+    # build numbers: a same-version rebuild with a higher number is an update, the same / an unknown number is not
+    assert mods.is_newer("0.1.1-beta", "0.1.1-beta", 666, "665") and not mods.is_newer("0.1.1-beta", "0.1.1-beta", 665, "665")
+    assert not mods.is_newer("0.1.1-beta", "0.1.1-beta", 666, "") and not mods.is_newer("0.1.0-beta", "0.1.1-beta", 900, "665")

@@ -157,7 +157,7 @@ def test_settings_button_runs_and_shows_the_summary(app, lib):
     d = s.settings_dialog()
     rep = ar.Report([ar.Item("model", "Base", ar.REPAIRED)])
     d.autorepair_job = lambda progress, cancel: (progress(0.5, "Checking Base"), rep)[1]
-    assert d.btn_autorepair.text() == "Auto-repair" and "checksum" in d.btn_autorepair.toolTip()
+    assert d.btn_autorepair.text() == "Check && repair" and "checksum" in d.btn_autorepair.toolTip() and d.btn_repair is d.btn_autorepair
     assert d.toggle_autorepair()
     assert wait_for(lambda: not d.autorepair_running) and d.autorepair_worker.wait(3000)
     for _ in range(5):

@@ -94,3 +94,30 @@ def apply_backdrop(hwnd: int, dark: bool = True) -> str:
         return "acrylic" if hr == 0 else "plain"
     except Exception:  # noqa: BLE001
         return "plain"
+
+
+def documents_folder() -> Optional[str]:
+    """The user's real Documents folder from the Known Folder API (``SHGetKnownFolderPath(FOLDERID_Documents)``): follows a
+    redirect to OneDrive or another drive.  None off Windows or on any error."""
+    if not IS_WINDOWS:
+        return None
+    try:
+        import ctypes
+        import uuid
+        from ctypes import wintypes
+
+        class GUID(ctypes.Structure):
+            _fields_ = [("Data1", wintypes.DWORD), ("Data2", wintypes.WORD), ("Data3", wintypes.WORD),
+                        ("Data4", ctypes.c_ubyte * 8)]
+
+        u = uuid.UUID("{FDD39AD0-238F-46AF-ADB4-6C85480369C7}")       # FOLDERID_Documents
+        g = GUID(u.fields[0], u.fields[1], u.fields[2], (ctypes.c_ubyte * 8)(*u.bytes[8:]))
+        out = ctypes.c_wchar_p()
+        shell32 = ctypes.windll.shell32  # type: ignore[attr-defined]
+        hr = shell32.SHGetKnownFolderPath(ctypes.byref(g), 0, None, ctypes.byref(out))
+        try:
+            return out.value if hr == 0 and out.value else None
+        finally:
+            ctypes.windll.ole32.CoTaskMemFree(out)  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001
+        return None

@@ -21,19 +21,26 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from PySide6.QtCore import QTimer, Qt
-from PySide6.QtWidgets import (QApplication, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QProgressBar,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from core import i18n
 from core.i18n import tr
 from core.voice_library import VoiceLibrary
 from infra import hard_exit, preload
+from ui import screen_fit
 from ui.main_window import APP_TITLE, MainWindow, apply_look
 from ui.narrate_window import NarrateWindow
 from ui.revoice_window import RevoiceWindow
 from ui.settings_dialog import SettingsDialog
 from ui.voices_window import VoicesWindow
-from ui import screen_fit
 from ui.window_base import SubWindow, fit_to_screen
 
 PAGES = ("studio", "train", "voices", "narrate", "revoice")
@@ -72,6 +79,8 @@ class ActionCard(QPushButton):
         self.lbl_desc.setText(desc)
         self.lbl_note.setText(note)
         self.lbl_note.setVisible(bool(note))
+        self.setAccessibleName(title)                         # screen readers: the card is one button with these texts
+        self.setAccessibleDescription(" ".join(t for t in (desc, note) if t))
 
 
 class StudioWindow(SubWindow):
@@ -94,6 +103,7 @@ class StudioWindow(SubWindow):
         self._settings: Optional[SettingsDialog] = None
         self._about = None
         self._shutting_down = False
+        self._normal_size = None                   # window size before a widened page (Narrate's two columns)
         # Optional "Preload models into memory at startup" (Settings, off by default): ticked by the timer below.
         self.preloader = preload.Preloader(self._preload_voice)
         self._build()
@@ -242,8 +252,14 @@ class StudioWindow(SubWindow):
         elif page == "narrate":
             self.narrate_window.refresh_voices()
         if old is not new:
-            new.resize(old.size())
-            new.move(old.pos())
+            size = old.size()
+            if getattr(old, "wide_width", lambda: 0)() and self._normal_size is not None:
+                size = self._normal_size              # back from the widened Narrate window: the size the user had before
+            elif not getattr(old, "wide_width", lambda: 0)():
+                self._normal_size = old.size()
+            centre = old.frameGeometry().center()
+            new.resize(size)
+            new.move(old.pos() if size == old.size() else centre - new.rect().center())
             want = getattr(new, "wide_width", lambda: 0)()
             if want > new.width():                 # e.g. the two Narrate columns: wider, capped to the screen, centred
                 screen_fit.fit(new, want, new.height())

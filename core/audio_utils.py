@@ -6,7 +6,6 @@ importing this module stays cheap.
 """
 from __future__ import annotations
 
-from core.i18n import tr
 import math
 import os
 import sys
@@ -16,6 +15,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 from core.errors import AudioReadError
+from core.i18n import tr
 
 _FFMPEG_READY = False
 
@@ -62,8 +62,15 @@ def ensure_ffmpeg() -> Optional[str]:
         except Exception:  # noqa: BLE001
             path = None
     if path:
+        folder = str(Path(path).parent)       # libraries that look for ffmpeg on PATH (pydub's own probe) find it too
+        if folder not in os.environ.get("PATH", "").split(os.pathsep):
+            os.environ["PATH"] = folder + os.pathsep + os.environ.get("PATH", "")
         try:
-            from pydub import AudioSegment
+            import warnings
+
+            with warnings.catch_warnings():   # pydub warns at import when PATH had no ffmpeg; it is set right below
+                warnings.simplefilter("ignore", RuntimeWarning)
+                from pydub import AudioSegment
 
             AudioSegment.converter = path
             # pydub looks for ffprobe separately; it is only needed for mediainfo, so we do not require it

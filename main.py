@@ -21,6 +21,7 @@ def _setup_logging() -> None:
     from infra import diagnostics
 
     diagnostics.setup_logging(filters=(_drop_sox_warning,))
+    diagnostics.quiet_known_warnings()
 
 
 def _drop_sox_warning(record: logging.LogRecord) -> bool:
@@ -111,8 +112,8 @@ def _selftest_imports(argv=()) -> int:
 
         lines.append(f"cuda available: {torch.cuda.is_available()}"
                      + (f" ({torch.cuda.get_device_name(0)})" if torch.cuda.is_available() else ""))
-        from infra import paths
         from core import i18n
+        from infra import paths
 
         lines.append(f"app home: {paths.app_home()}; resources: {paths.resource_dir()}; ui language: {i18n.detect_language()}")
     except Exception as exc:  # noqa: BLE001
@@ -254,7 +255,8 @@ def main(argv=None) -> int:
     # User-facing headless CLI: narrate / train / voices (see cli.py, docs/CLI.md). Keep before the GUI and
     # the maintenance flags so `python main.py narrate ...` and a packaged exe work the same way.
     try:
-        from cli import is_user_cli, main as user_cli_main
+        from cli import is_user_cli
+        from cli import main as user_cli_main
     except ImportError:
         user_cli_main = None  # type: ignore[assignment]
         is_user_cli = lambda _a: False  # noqa: E731
@@ -273,6 +275,7 @@ def main(argv=None) -> int:
         return 0 if rep.ok else 1
     if "--verify-install" in argv or "--repair" in argv:
         import shutil
+
         from infra import install_state
         from infra.updater import run_subprocess
 
@@ -282,7 +285,8 @@ def main(argv=None) -> int:
     if "--selftest-imports" in argv:
         return _selftest_imports(argv)
     if "--probe-torch" in argv:   # child process of the PyTorch reuse check (infra/runtime_reuse.py): import + compute, print VXTORCH OK
-        from infra import modules as _m, runtime_reuse
+        from infra import modules as _m
+        from infra import runtime_reuse
 
         _m.activate()
         return runtime_reuse.probe_torch_main()
@@ -333,9 +337,8 @@ def main(argv=None) -> int:
             app.setWindowIcon(QIcon(str(ico)))
     except Exception:  # noqa: BLE001 - the icon is optional
         pass
-    from workers.pipeline_runner import models_missing
-
     from infra import modules as _mods
+    from workers.pipeline_runner import models_missing
 
     splash.checking()
     thin_wait = False        # thin build, runtime modules missing: the model download waits until they are installed
@@ -378,6 +381,10 @@ def main(argv=None) -> int:
         hard_exit.arm()          # closing the main window kills every helper process at once (docs/BUILDING.md)
     win.show_studio()
     splash.finish(win)                    # closes once the Studio window is on screen
+    if not selftest:   # "Voxprint Projects" shortcut in the real Documents folder (infra/projects.py); never blocks the start
+        from infra import projects
+
+        threading.Thread(target=projects.ensure_shortcut, name="projects-shortcut", daemon=True).start()
     if thin_wait:
         _offer_components(win, app, want_prefetch)
     if selftest:

@@ -20,20 +20,53 @@ from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QSpinBox, QToolButton, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSpinBox,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 
-from core import adapter_strength, consent as consent_mod, i18n, model_export, train_presets, voice_info
+from core import adapter_strength, i18n, model_export, train_presets, voice_info
+from core import consent as consent_mod
 from core.appinfo import APP_DISPLAY_NAME
 from core.errors import DatasetMakerError
 from core.events import Stage
 from core.i18n import tr
 from infra import paths, platform_win, ui_prefs
 from infra.vram_optimizer import detect_gpu
-from workers.pipeline_runner import (KIND_DATASET, KIND_LORA, KIND_MERGE, KIND_PREVIEW, TaskRequest, last_adapter, run_task)
 from ui.mini_player import MiniPlayer
 from ui.settings_dialog import SettingsDialog
-from workers.process_worker import PrefetchWorker, ProcessWorker, RepairWorker, StatusWorker, UpdateWorker
+from workers.pipeline_runner import (
+    KIND_DATASET,
+    KIND_LORA,
+    KIND_MERGE,
+    KIND_PREVIEW,
+    TaskRequest,
+    last_adapter,
+    run_task,
+)
+from workers.process_worker import (
+    PrefetchWorker,
+    ProcessWorker,
+    RepairWorker,
+    StatusWorker,
+    UpdateWorker,
+)
 
 log = logging.getLogger("voxprint.ui")
 
@@ -246,6 +279,11 @@ def apply_look(win: QWidget) -> None:
     level = ui_prefs.transparency()
     if sys.platform == "win32" and level != "off" and win.isVisible() and not getattr(win, "_backdrop_tried", False):
         win._backdrop_tried = True  # type: ignore[attr-defined]
+        if not os.environ.get("VOXPRINT_NO_FADE_IN"):
+            # the first frame of a new window is painted grey by Windows before the backdrop and the stylesheet arrive:
+            # show it fully transparent and fade it in once the first real frame is ready
+            win.setWindowOpacity(0.0)
+            QTimer.singleShot(90, lambda w=win: w.setWindowOpacity(1.0))
         win.backdrop = platform_win.apply_backdrop(int(win.winId()))  # type: ignore[attr-defined]
         if win.backdrop != "acrylic":  # type: ignore[attr-defined]
             win.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
@@ -1239,7 +1277,9 @@ class MainWindow(QWidget):
         self.lbl_consent_hint.setText(tr("consent.hint_" + mode))
 
     def _task_extras(self) -> dict:
-        return dict(compare=self.chk_compare.isChecked(), quality_check=self.chk_check.isChecked(),
+        from infra import projects
+
+        return dict(projects_root=projects.sub(projects.VOICES), compare=self.chk_compare.isChecked(), quality_check=self.chk_check.isChecked(),
                     auto_pick=self.chk_pick.isChecked(), adapter_scale=getattr(self, "preview_scale", None),
                     clip_max_cer=self.sp_clipcer.value() / 100.0 if self.chk_clipcheck.isChecked() else 0.0,
                     max_clip_s=float(self.sp_clipmax.value()),

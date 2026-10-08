@@ -5,8 +5,8 @@ The main window only keeps "choose audio / choose text / create voice".  Service
 * interface language and window transparency (:mod:`infra.ui_prefs`),
 * "Check for updates",
 * shortcuts to the models folder and the data/log folder,
-* "Repair installation" and "Auto-repair" (every component and model checked by hash, missing / broken parts fetched
-  again: :mod:`infra.auto_repair`),
+* "Check & repair" (the program, every component and model checked by hash, missing / broken parts fetched again:
+  :mod:`infra.auto_repair`),
 * backup / restore of the models and voices to any folder or drive, and the "existing models folder" that is imported
   before anything is downloaded (:mod:`infra.backup`, :mod:`infra.existing_models`),
 * "Preload models into memory at startup" (:mod:`infra.preload`; off by default, offered only with enough RAM),
@@ -22,14 +22,39 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel, QMessageBox,
-                               QProgressBar, QPushButton, QScrollArea, QVBoxLayout, QWidget)
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from core import i18n
 from core.errors import BackupError
 from core.i18n import tr
-from infra import asr_choice, backup, existing_models, modules as runtime_modules, netroute, preload, sysinfo, ui_prefs
+from infra import (
+    asr_choice,
+    backup,
+    existing_models,
+    netroute,
+    preload,
+    sysinfo,
+    ui_prefs,
+)
+from infra import modules as runtime_modules
 from ui import screen_fit
+from ui.glass import GlassDialog
 from workers import backup_runner
 from workers.auto_repair_worker import AutoRepairWorker
 from workers.backup_worker import BackupWorker
@@ -40,7 +65,7 @@ if TYPE_CHECKING:  # pragma: no cover - import only for type checkers (avoids a 
     from ui.main_window import MainWindow
 
 
-class SettingsDialog(QDialog):
+class SettingsDialog(GlassDialog):
     """Non-blocking-friendly settings window; one instance is kept by the main window and re-shown on demand."""
 
     def __init__(self, window: "MainWindow", parent: Optional[QWidget] = None) -> None:
@@ -59,7 +84,9 @@ class SettingsDialog(QDialog):
         self.lbl_title.setObjectName("title")
         lay.addWidget(self.lbl_title)
 
-        from ui.window_base import ColumnFlow       # local: ui.main_window imports this module (circular at load time)
+        from ui.window_base import (
+            ColumnFlow,  # local: ui.main_window imports this module (circular at load time)
+        )
 
         # two columns that fold into one on a narrow dialog, inside a scroll area: the dialog never grows past the screen
         left_w, right_w = QWidget(), QWidget()
@@ -75,40 +102,42 @@ class SettingsDialog(QDialog):
         scroll.setWidget(flow)
         lay.addWidget(scroll, 1)
 
+        # --- the four choices (language, transparency, network, speech recognition): one aligned grid, label | combo; the
+        # combos share the column, grow with the dialog and never cut their text (they are as wide as the longest entry)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(8)
+        grid.setColumnStretch(1, 1)
+        left.addLayout(grid)
+
+        def add_row(label: QLabel, combo: QComboBox) -> None:
+            combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+            combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            r = grid.rowCount()
+            grid.addWidget(label, r, 0, Qt.AlignmentFlag.AlignVCenter)
+            grid.addWidget(combo, r, 1)
+
         # --- language ---
-        row = QHBoxLayout()
         self.lbl_language = QLabel()
         self.cmb_lang = QComboBox()
         for code in i18n.LANGS:
             self.cmb_lang.addItem(i18n.LANG_NAMES[code], code)
         self.cmb_lang.setCurrentIndex(max(0, self.cmb_lang.findData(i18n.get_language())))
-        row.addWidget(self.lbl_language)
-        row.addStretch(1)
-        row.addWidget(self.cmb_lang)
-        left.addLayout(row)
+        add_row(self.lbl_language, self.cmb_lang)
 
         # --- window transparency (infra/ui_prefs.py): default / more / off ---
-        trow = QHBoxLayout()
         self.lbl_transparency = QLabel()
         self.cmb_transparency = QComboBox()
         for level in ui_prefs.TRANSPARENCY_LEVELS:
             self.cmb_transparency.addItem("", level)
         self.cmb_transparency.setCurrentIndex(max(0, self.cmb_transparency.findData(ui_prefs.transparency())))
-        trow.addWidget(self.lbl_transparency)
-        trow.addStretch(1)
-        trow.addWidget(self.cmb_transparency)
-        left.addLayout(trow)
+        add_row(self.lbl_transparency, self.cmb_transparency)
         self.cmb_transparency.currentIndexChanged.connect(self._on_transparency_changed)
 
         # --- network interface (infra/netroute.py): Auto / system default / a specific adapter ---
-        nrow = QHBoxLayout()
         self.lbl_net = QLabel()
         self.cmb_net = QComboBox()
-        self.cmb_net.setMinimumWidth(220)
-        nrow.addWidget(self.lbl_net)
-        nrow.addStretch(1)
-        nrow.addWidget(self.cmb_net)
-        left.addLayout(nrow)
+        add_row(self.lbl_net, self.cmb_net)
         self._fill_net()
         self.cmb_net.currentIndexChanged.connect(self._on_net_changed)
 
@@ -128,15 +157,11 @@ class SettingsDialog(QDialog):
         # --- speech recognition model (infra/asr_choice.py): automatic by VRAM / 0.6B / 1.7B / both downloaded ---
         self.asr_resolve: Callable[[str], str] = lambda choice: asr_choice.preferred_repo(choice)   # injectable (tests)
         self.asr_missing: Callable[[], list] = self._default_asr_missing                            # injectable (tests)
-        arow = QHBoxLayout()
         self.lbl_asr = QLabel()
         self.cmb_asr = QComboBox()
         for choice in asr_choice.CHOICES:
             self.cmb_asr.addItem("", choice)
-        arow.addWidget(self.lbl_asr)
-        arow.addStretch(1)
-        arow.addWidget(self.cmb_asr)
-        left.addLayout(arow)
+        add_row(self.lbl_asr, self.cmb_asr)
         self.lbl_asr_note = QLabel()
         self.lbl_asr_note.setObjectName("cardnote")
         self.lbl_asr_note.setWordWrap(True)
@@ -147,7 +172,6 @@ class SettingsDialog(QDialog):
         self.btn_update = QPushButton()
         self.btn_models = QPushButton()
         self.btn_data = QPushButton()
-        self.btn_repair = QPushButton()
         self.btn_about = QPushButton()
         self.btn_components = QPushButton()          # thin build only: the runtime modules (infra/modules.py)
         self.btn_diag = QPushButton()                # logs + system information as one zip (infra/diagnostics.py)
@@ -169,6 +193,29 @@ class SettingsDialog(QDialog):
         self.import_job: Callable[..., Any] = backup_runner.run_import_job
         self.collect_items: Callable[[bool], list] = backup_runner.collect
         self.backup_worker: Optional[BackupWorker] = None
+        # --- projects folder (infra/projects.py): local, not synced; a shortcut in Documents ---
+        self.lbl_projects_title = QLabel()
+        self.lbl_projects_title.setObjectName("sectiontitle")
+        right.addWidget(self.lbl_projects_title)
+        self.lbl_projects = QLabel()
+        self.lbl_projects.setWordWrap(True)
+        self.lbl_projects.setObjectName("cardnote")
+        right.addWidget(self.lbl_projects)
+        self.lbl_projects_warn = QLabel()
+        self.lbl_projects_warn.setWordWrap(True)
+        self.lbl_projects_warn.setObjectName("warn")
+        right.addWidget(self.lbl_projects_warn)
+        prj = QHBoxLayout()
+        self.btn_projects_open = QPushButton()
+        self.btn_projects_change = QPushButton()
+        self.btn_projects_default = QPushButton()
+        for b in (self.btn_projects_open, self.btn_projects_change, self.btn_projects_default):
+            prj.addWidget(b)
+        right.addLayout(prj)
+        self.btn_projects_open.clicked.connect(self.open_projects_folder)
+        self.btn_projects_change.clicked.connect(self.choose_projects_folder)
+        self.btn_projects_default.clicked.connect(lambda: self.set_projects_folder(None))
+
         self.lbl_backup_title = QLabel()
         self.lbl_backup_title.setObjectName("sectiontitle")
         right.addWidget(self.lbl_backup_title)
@@ -208,11 +255,18 @@ class SettingsDialog(QDialog):
         erow.addWidget(self.btn_existing_clear)
         right.addLayout(erow)
 
-        rrow = QHBoxLayout()                      # Repair (environment only) | Auto-repair (everything, by hash)
+        # ONE "Check & repair" button (was "Repair installation" + "Auto-repair"): program, components and models checked by
+        # hash, missing / broken parts downloaded again (infra/auto_repair.py); a description and a live per-step line
+        self.lbl_repair_title = QLabel()
+        self.lbl_repair_title.setObjectName("sectiontitle")
+        right.addWidget(self.lbl_repair_title)
+        self.lbl_repair_desc = QLabel()
+        self.lbl_repair_desc.setObjectName("cardnote")
+        self.lbl_repair_desc.setWordWrap(True)
+        right.addWidget(self.lbl_repair_desc)
         self.btn_autorepair = QPushButton()
-        rrow.addWidget(self.btn_repair)
-        rrow.addWidget(self.btn_autorepair)
-        right.addLayout(rrow)
+        self.btn_repair = self.btn_autorepair        # old name kept for callers
+        right.addWidget(self.btn_autorepair)
         self.autorepair_job: Optional[Callable[..., Any]] = None          # injectable (tests); None = infra.auto_repair.run
         self.autorepair_worker: Optional[AutoRepairWorker] = None
         self.bar_autorepair = QProgressBar()
@@ -227,6 +281,12 @@ class SettingsDialog(QDialog):
         flow.add(right_w)
         self.btn_close = QPushButton()
         close_row = QHBoxLayout()
+        from core import appinfo
+
+        self.lbl_version = QLabel(f"{appinfo.APP_DISPLAY_NAME} {appinfo.version_label()}")   # 0.1.1-beta · build 665 "Tikkun"
+        self.lbl_version.setObjectName("hint")
+        self.lbl_version.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        close_row.addWidget(self.lbl_version)
         close_row.addStretch(1)
         close_row.addWidget(self.btn_close)
         lay.addLayout(close_row)
@@ -235,7 +295,6 @@ class SettingsDialog(QDialog):
         self.btn_update.clicked.connect(window.check_updates)
         self.btn_models.clicked.connect(window.open_models_folder)
         self.btn_data.clicked.connect(window.open_data_folder)
-        self.btn_repair.clicked.connect(window.start_repair)
         self.btn_autorepair.clicked.connect(self.toggle_autorepair)
         self.btn_about.clicked.connect(window.open_about)
         self.btn_backup.clicked.connect(self.start_backup)
@@ -251,7 +310,7 @@ class SettingsDialog(QDialog):
 
     def _on_transparency_changed(self, _i: int = 0) -> None:
         """Store the level and restyle the open windows (the Studio refreshes all its pages) and this dialog."""
-        from ui.main_window import apply_look       # local: circular at load time
+        from ui.main_window import apply_look  # local: circular at load time
 
         ui_prefs.set_transparency(self.cmb_transparency.currentData())
         refresh = getattr(self._win, "apply_look_all", None)
@@ -259,7 +318,7 @@ class SettingsDialog(QDialog):
             refresh()
         else:
             apply_look(self._win)
-        self.setStyleSheet(self._win.styleSheet())
+        apply_look(self)
 
     # ------------------------------------------------------------------ texts and state
     def retranslate(self) -> None:
@@ -280,13 +339,19 @@ class SettingsDialog(QDialog):
         self.btn_data.setText(tr("ui.settings_data_folder"))
         self.btn_diag.setText(tr("diag.button"))
         self.btn_diag.setToolTip(tr("diag.tip"))
-        self.btn_repair.setText(tr("ui.settings_repair"))
-        self.btn_repair.setToolTip(tr("ui.settings_repair_tip"))
+        self.lbl_repair_title.setText(tr("autorepair.title"))
+        self.lbl_repair_desc.setText(tr("autorepair.desc"))
         self.btn_autorepair.setText(tr("autorepair.stop") if self.autorepair_running else tr("autorepair.button"))
         self.btn_autorepair.setToolTip(tr("autorepair.tip"))
         self.btn_about.setText(tr("ui.about"))
         self.btn_about.setToolTip(tr("ui.about_tip"))
         self.btn_close.setText(tr("about.btn_close"))
+        self.lbl_projects_title.setText(tr("projects.title"))
+        self.btn_projects_open.setText(tr("projects.open"))
+        self.btn_projects_change.setText(tr("projects.change"))
+        self.btn_projects_default.setText(tr("projects.default"))
+        self.btn_projects_change.setToolTip(tr("projects.tip"))
+        self.render_projects()
         self.lbl_backup_title.setText(tr("backup.title"))
         self.chk_voices.setText(tr("backup.include_voices"))
         self.btn_backup.setText(tr("backup.btn_backup"))
@@ -305,6 +370,40 @@ class SettingsDialog(QDialog):
         self.cmb_asr.setToolTip(tr("asrmodel.tip"))
         self.lbl_asr.setToolTip(tr("asrmodel.tip"))
         self.refresh_asr()
+
+    # ------------------------------------------------------------------ projects folder
+    def render_projects(self) -> None:
+        """Path of the projects folder and the OneDrive warning."""
+        from infra import projects
+
+        folder = projects.projects_dir()
+        self.lbl_projects.setText(tr("projects.current", folder=str(folder)))
+        warn = projects.in_onedrive(folder)
+        self.lbl_projects_warn.setText(tr("projects.onedrive_warn") if warn else "")
+        self.lbl_projects_warn.setVisible(warn)
+        self.btn_projects_default.setEnabled(projects.configured_projects_dir() is not None)
+
+    def open_projects_folder(self) -> None:
+        from infra import projects
+        from ui.main_window import open_folder  # local: circular at load time
+
+        open_folder(projects.projects_dir())
+
+    def choose_projects_folder(self) -> None:
+        folder = self.pick_folder(tr("projects.choose"))
+        if folder:
+            self.set_projects_folder(Path(folder))
+
+    def set_projects_folder(self, folder: Optional[Path]) -> None:
+        """Use ``folder`` (None = the default) for new projects; existing projects stay where they are.  The Documents
+        shortcut is re-pointed in the background."""
+        import threading
+
+        from infra import projects
+
+        used = projects.set_projects_dir(folder)
+        threading.Thread(target=projects.ensure_shortcut, args=(used,), name="projects-shortcut", daemon=True).start()
+        self.render_projects()
 
     # ------------------------------------------------------------------ preload models at startup
     def preload_availability(self) -> preload.Availability:
@@ -655,7 +754,6 @@ class SettingsDialog(QDialog):
         self.cmb_lang.setEnabled(not busy)           # switching language mid-task would relabel a running job
         self.cmb_asr.setEnabled(not busy)            # a running task keeps the recogniser it started with
         self.btn_update.setEnabled(not busy and not self._win.updating)
-        self.btn_repair.setEnabled(not busy and not self._win.repairing and not self.autorepair_running)
         self.btn_autorepair.setEnabled(self.autorepair_running or (not busy and not self._win.repairing))
         idle = not busy and not self.backing_up
         for b in (self.btn_backup, self.btn_restore, self.btn_existing, self.chk_voices):

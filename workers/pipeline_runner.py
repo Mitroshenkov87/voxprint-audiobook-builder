@@ -19,7 +19,8 @@ from core.dataset_builder import BuildConfig, DatasetBuilder
 from core.errors import DatasetMakerError
 from core.events import CancelToken, ProgressCallback, Stage, noop_progress
 from core.i18n import tr
-from infra import model_downloader as md, paths
+from infra import model_downloader as md
+from infra import paths
 from infra.updater import Updater
 
 log = logging.getLogger("voxprint.runner")
@@ -54,6 +55,7 @@ class TaskRequest:
     audio: Optional[Path] = None
     text: Optional[Path] = None
     out_root: Optional[Path] = None
+    projects_root: Optional[Path] = None        # GUI: <projects folder>/Voices (infra/projects.py); None = next to the audio
     force_cpu: bool = False
     adapter_dir: Optional[Path] = None   # KIND_MERGE only: folder of the trained adapter
     voice_display_name: str = ""         # optional, typed by the user: voice name, library folder and result folder
@@ -112,9 +114,11 @@ class TaskRequest:
         return safe_name(voice_info.with_type_suffix(self.voice_name(), self.effective_voice_type()))
 
     def resolved_root(self) -> Path:
-        """Result folder: ``out_root`` if given, else ``<audio folder>/<voice>_Voxprint``."""
+        """Result folder: ``out_root`` if given, else ``<projects_root>/<voice>_Voxprint``, else ``<audio folder>/<voice>_Voxprint``."""
         if self.out_root:
             return Path(self.out_root)
+        if self.projects_root:
+            return Path(self.projects_root) / f"{self.voice_name()}_Voxprint"
         if self.audio is None and not self.audio_files:
             raise ValueError("audio is required")
         base = Path(self.audio) if self.audio else Path(self.audio_files[0])
@@ -342,7 +346,8 @@ def _quality_check(req, res, build, asr_factory, deps, cancel) -> None:
     """Automatic post-training check: synthesize a short sample with the new voice, judge it, suggest what to change.  Never raises."""
     import numpy as np
 
-    from core import audio_utils as au, voice_check
+    from core import audio_utils as au
+    from core import voice_check
     from core.tts_engine import FRAMES_PER_SECOND, max_tokens_for
     from workers import preview_runner
 
@@ -675,7 +680,9 @@ def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[
         _prefetch_dnsmos(progress)
         _prefetch_text_extras(progress)
     if ensure is md.ensure_model and sys.platform == "win32":
-        from infra import assets   # system ffmpeg, else the pinned LGPL build (best effort, never blocks)
+        from infra import (
+            assets,  # system ffmpeg, else the pinned LGPL build (best effort, never blocks)
+        )
 
         assets.ensure_ffmpeg_tool(lambda f, m: progress(Stage.MODEL, 0.0, m))
     return todo

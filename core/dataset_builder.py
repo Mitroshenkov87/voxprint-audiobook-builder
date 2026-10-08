@@ -1,4 +1,4 @@
-"""Dataset builder in the Alexandria format (``train_lora.py``): audio + text -> ``segment_XXX.wav``, ``ref.wav``,
+"""Dataset builder in the Alexandria format (``train_lora.py``): audio + text -> ``segment_XXX.flac``, ``ref.wav``,
 ``ref_text.txt``, ``metadata.jsonl`` (plus ``report.json`` with diagnostics).
 
 The contract, read from Alexandria's ``train_lora.py``:
@@ -15,7 +15,6 @@ quality filter -> optional speech-recognition cross-check (:mod:`core.clip_check
 """
 from __future__ import annotations
 
-from core.i18n import tr
 import json
 import logging
 import re
@@ -27,12 +26,19 @@ import numpy as np
 
 from core import audio_utils as au
 from core import quality
-from core.aligner import BaseAligner, MAX_CHUNK_SEC, align_long, check_alignment
+from core.aligner import MAX_CHUNK_SEC, BaseAligner, align_long, check_alignment
 from core.errors import AlignmentError, AudioReadError
 from core.events import CancelToken, ProgressCallback, Stage, noop_progress
+from core.i18n import tr
 from core.normalizer import NormalizedText, normalize_for_tts
 from core.slicer import SliceConfig, cut_segments, slice_words
-from core.text_utils import attach_spans, collapse_ws, detect_language, read_text_file, split_sentences
+from core.text_utils import (
+    attach_spans,
+    collapse_ws,
+    detect_language,
+    read_text_file,
+    split_sentences,
+)
 from core.types import Segment
 
 log = logging.getLogger("voxprint.dataset")
@@ -386,11 +392,11 @@ class DatasetBuilder:
 
     @staticmethod
     def _clean_old(out: Path) -> None:
-        """Delete only our own earlier outputs (``segment_NNN.wav``, ``ref.wav``, ``ref_text.txt``, ``metadata.jsonl``, ``report.json``)."""
+        """Delete only our own earlier outputs (``segment_NNN.flac`` or ``.wav``, ``ref.wav``, ``ref_text.txt``, ``metadata.jsonl``, ``report.json``)."""
         if not out.exists():
             return
         for p in out.iterdir():
-            if p.is_file() and (re.fullmatch(r"segment_\d+\.wav", p.name) or p.name in
+            if p.is_file() and (re.fullmatch(r"segment_\d+\.(wav|flac)", p.name) or p.name in
                                 ("ref.wav", "ref_text.txt", "metadata.jsonl", "report.json")):
                 p.unlink()
         t = out / "train_24k"       # obsolete folder from earlier versions

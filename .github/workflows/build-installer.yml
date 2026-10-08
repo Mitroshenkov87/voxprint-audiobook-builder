@@ -207,6 +207,15 @@ jobs:
         if: ${{ !inputs.skip_tests }}
         shell: pwsh
         run: .venv\Scripts\python.exe -m pytest -q --deselect tests/test_ui.py::test_selftest_imports_reports_and_writes_log --deselect tests/test_frozen_install.py --deselect tests/test_linux_package.py::test_text_selftest_passes_without_models
+      - name: Build number (GITHUB_RUN_NUMBER + BUILD.json offset; first numbered build = 665) and codename into credits.json
+        shell: pwsh
+        run: |
+          $n = python tools\build_number.py --stamp
+          if ($LASTEXITCODE -ne 0) { throw "build number failed" }
+          $c = (Get-Content BUILD.json -Raw | ConvertFrom-Json).codename
+          "VOXPRINT_BUILD=$n" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "VOXPRINT_CODENAME=$c" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "build $n `"$c`""
       - name: Thin shell (PyInstaller, heavy libraries excluded)
         shell: cmd
         run: build_thin.bat
@@ -274,8 +283,8 @@ jobs:
         with:
           name: Voxprint-Setup-online
           path: |
-            build/online-release/Voxprint-Setup-online.exe
-            build/online-release/Voxprint-Setup-online.exe.sha256
+            build/online-release/Voxprint-Setup-online*.exe
+            build/online-release/Voxprint-Setup-online*.exe.sha256
             build/online-release/manifest-thin-*.json
           retention-days: 14
       - name: Attach to the release (installer, hash, manifest, shell parts; older assets are not touched)

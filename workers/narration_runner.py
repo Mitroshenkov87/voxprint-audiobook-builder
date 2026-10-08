@@ -9,8 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional, Sequence
 
-from core import narration as nr
 from core import languages, tts_engine
+from core import narration as nr
 from core.audio_utils import ensure_ffmpeg
 from core.book_parsers import Book
 from core.events import CancelToken
@@ -54,10 +54,10 @@ def run_narration(job: NarrationJob, progress: Callable[[nr.NarrationProgress], 
 
 
 def default_output_dir() -> Path:
-    """Default parent folder of audiobooks: ``~/Documents/Voxprint/Audiobooks``."""
-    from infra import paths
+    """Default parent folder of audiobooks: ``<projects folder>/Audiobooks`` (local, not synced; :mod:`infra.projects`)."""
+    from infra import projects
 
-    return paths.default_results_dir() / "Audiobooks"
+    return projects.sub(projects.AUDIOBOOKS)
 
 
 def format_eta(seconds: Optional[float]) -> str:

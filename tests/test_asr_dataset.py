@@ -89,7 +89,7 @@ def test_many_files_become_one_dataset_with_totals_and_gates(tmp_path):
     assert report["mode"] == "no_transcript" and report["asr"]["kept"] == rep.kept
     assert all(s["source"] and 0 <= s["confidence"] <= 1 for s in report["segment_times"])
     assert any("распознан" in w for w in res.warnings)                    # the "not checked by a human" note is always there
-    x, sr = au.load_audio(tmp_path / "ds" / "segment_001.wav", 24000)
+    x, sr = au.load_audio(tmp_path / "ds" / "segment_001.flac", 24000)
     assert sr == 24000 and np.max(np.abs(x)) <= 0.96
 
 

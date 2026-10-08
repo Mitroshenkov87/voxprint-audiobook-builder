@@ -37,6 +37,22 @@ APP_NAME: str = _app().get("name", "Voxprint")      # technical name (folders, e
 APP_DISPLAY_NAME: str = _app().get("display_name", "Voxprint AI Audiobook Builder")
 APP_VERSION: str = _app().get("version", "0.1.0")
 APP_AUTHOR: str = _app().get("author", "Aleksandr Mitroshenkov")
+#: CI build number (``tools/build_number.py`` stamps it into credits.json; 0 = a local / developer build) and its commit.
+APP_BUILD: int = int(str(_app().get("build", 0) or 0)) if str(_app().get("build", 0) or 0).isdigit() else 0
+APP_COMMIT: str = str(_app().get("commit", ""))
+#: One Biblical Hebrew word (Latin transliteration) naming the build's changes, from BUILD.json (stamped with the number).
+APP_CODENAME: str = str(_app().get("codename", ""))
+APP_CHANNEL: str = str(_app().get("channel", ""))       # "beta" -> shown as 0.1.1-beta
+
+
+def version_label() -> str:
+    """``0.1.1-beta · build 665 "Tikkun"`` - the version as shown to people; a local build shows only the version."""
+    label = f"{APP_VERSION}-{APP_CHANNEL}" if APP_CHANNEL else APP_VERSION
+    if APP_BUILD:
+        label += f" \u00b7 build {APP_BUILD}"
+    if APP_CODENAME:
+        label += f' "{APP_CODENAME}"'
+    return label
 #: Repository URL; the only place to edit it is credits.json ("repo_url").
 REPO_URL: str = str(load_credits().get("repo_url", _FALLBACK["repo_url"]))
 

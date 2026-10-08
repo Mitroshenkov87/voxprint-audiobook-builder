@@ -35,8 +35,15 @@
 #define AppName "Voxprint"
 ; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
 #define AppDisplayName "Voxprint AI Audiobook Builder"
-#define AppVersion "0.1.0"
+#define AppVersion "0.1.1"
 #define AppExe "Voxprint.exe"
+; CI build number and codename (tools/build_number.py; build_online.ps1 passes /DAppBuild= /DAppCodename=); 0 = local build
+#ifndef AppBuild
+#define AppBuild "0"
+#endif
+#ifndef AppCodename
+#define AppCodename ""
+#endif
 #ifndef ManifestUrl
 #define ManifestUrl "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/latest/download/manifest-stable.json"
 #endif
@@ -50,6 +57,11 @@
 AppId={{6F1D2B7A-3C54-4E0B-9A41-7B5E0C9D2F18}
 AppName={#AppDisplayName}
 AppVersion={#AppVersion}
+VersionInfoVersion={#AppVersion}.{#AppBuild}
+VersionInfoProductVersion={#AppVersion}.{#AppBuild}
+#if AppBuild != "0"
+AppVerName={#AppDisplayName} {#AppVersion} build {#AppBuild} {#AppCodename}
+#endif
 AppPublisher=Voxprint
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppDisplayName}

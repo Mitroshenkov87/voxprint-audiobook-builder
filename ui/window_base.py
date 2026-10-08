@@ -11,12 +11,25 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from core.i18n import tr
 from ui import screen_fit
-from ui.main_window import APP_TITLE, MIN_WINDOW_H, MIN_WINDOW_W, apply_look, build_style
+from ui.main_window import (
+    APP_TITLE,
+    MIN_WINDOW_H,
+    MIN_WINDOW_W,
+    apply_look,
+    build_style,
+)
 
 
 def fit_to_screen(win: QWidget, content: QWidget, min_w: int = 820, min_h: int = 560) -> None:
@@ -133,7 +146,6 @@ class SubWindow(QWidget):
         head = QHBoxLayout()
         self.btn_back = QPushButton()
         self.btn_back.setObjectName("back")
-        self.btn_back.setVisible(with_back)
         self.btn_back.clicked.connect(lambda: self.go.emit("studio"))
         head.addWidget(self.btn_back)
         self.lbl_title = QLabel()
@@ -146,6 +158,9 @@ class SubWindow(QWidget):
             self.btn_gear.setObjectName("gear")
             head.addWidget(self.btn_gear)
         self.body.addLayout(head)
+        # only now: setVisible(True) on a widget without a parent shows it as a separate top-level window (the stray
+        # blank "Voxprint" window that flashed at start-up)
+        self.btn_back.setVisible(with_back)
         self.setStyleSheet(build_style(False))
 
     # ------------------------------------------------------------------ to override

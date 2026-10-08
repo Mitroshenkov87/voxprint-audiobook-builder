@@ -1,9 +1,37 @@
 # Changelog
 
 All notable changes to Voxprint. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
-The first pre-release is v0.1.0-beta; everything below is the history of the 0.1.0 development line.
+The first pre-release is v0.1.0-beta; the sections below list the changes per release.
 
 ## [Unreleased]
+
+## [0.1.1-beta] - 2026-10-08 - build 665 "Tikkun"
+
+Fixes and wishes from the first install on a real PC (RTX 4090 laptop, Windows 11, 150 % display scale). Codename *Tikkun*
+(Biblical Hebrew: repair, mending).
+
+### Fixed
+- **Stray blank "Voxprint" window at start-up** (`ui/window_base.py`): the sub-windows' *Back* button was made visible before it had a parent, so Qt showed it as its own top-level window for a moment. Test: `tests/test_release_011.py`.
+- **False "update 0.1.0-beta -> 0.1.0-beta" in the Components window** (`infra/modules.py`): a rebuild of the same release (wheels built from sdists differ byte for byte) is no longer offered as an update and is not re-downloaded; only a strictly newer app version is an update. Manifests and the installed state record the build id (commit), shown next to the version (`0.1.1-beta (build 1a2b3c4d)`). Tests: `tests/test_thin_modules.py`.
+- **Settings at 150 %**: the four choices (language, transparency, network, speech recognition) sit in one aligned grid; the combos grow with the dialog and are as wide as their longest entry (the ASR choice was cut off, the network combo misaligned).
+- **Components window text cut off at 150 %**: dialogs grow to the height their wrapped texts need (`ui/glass.fit_height`).
+- **Window size after Narrate**: going back from the widened Narrate window restores the size the window had before.
+- **Diagnostic report / `diag` CLI**: the report adds the Vulkan devices (llama.cpp) and the installed models with sizes; the CLI prints a short summary (PyTorch, CUDA available, GPU, driver, Vulkan, models).
+- **Log noise**: Qt's harmless `QFont::setPointSize: Point size <= 0` and `QThreadStorage` exit messages, pydub's "Couldn't find ffmpeg" (it is pointed at Voxprint's ffmpeg, whose folder is also put on `PATH`) and the SoX / Triton notices are no longer logged.
+- **Grey first frame** of a window before the Acrylic backdrop (Windows): new windows fade in once their first real frame is ready (`VOXPRINT_NO_FADE_IN=1` switches it off).
+
+### Changed
+- **All dialogs look like the main window** (`ui/glass.py`): Settings, Components, About, the upgrade offer, the clean-up and voice dialogs get the same Acrylic backdrop and transparency level.
+- **One "Check & repair" button** in Settings replaces "Repair the installation" and "Auto-repair": it checks the program, components and models by SHA-256, downloads missing or damaged files again, explains itself and shows a live "Step n of m: ..." line. Texts in en/ru/de.
+- **Training clips are stored as FLAC** (`segment_NNN.flac`, lossless, about half the size of WAV); older datasets with WAV clips keep working. FLAC audiobook output (per-chapter files) was already available.
+- **Re-voice recordings are stored as Ogg Opus** (48 kbit/s mono, converted with ffmpeg right after recording; the models get PCM decoded in memory).
+- **Accessible names** for the Studio cards (screen readers read the title and description).
+
+### Added
+- **Build numbers and codenames** (`BUILD.json`, `tools/build_number.py`): every CI installer build gets the next number (`GITHUB_RUN_NUMBER` + `offset`; this release is build 665) and a one-word codename (a Biblical Hebrew word in Latin transliteration naming the build's changes, edited in `BUILD.json` per release). Shown as `0.1.1-beta · build 665 "Tikkun"` in About, the splash screen, Settings and the diagnostic report; in the installer's version info (`0.1.1.665`) and the file name of a numbered copy of the installer (`Voxprint-Setup-online-0.1.1-build665.exe`); recorded in the components manifest. The Components window offers a same-version build only when its number is higher.
+- **Projects folder** (`infra/projects.py`, Settings -> *Projects folder*): new audiobooks, voice trainings and Re-voice recordings go to a local, non-synced folder, by default `%LOCALAPPDATA%\Voxprint\Projects` (`Audiobooks/<book>/`, `Voices/<voice>_Voxprint/`, `Re-voice/`); *Open projects folder*, *Change...*, *Default*; a warning when the chosen folder is inside OneDrive; a *Voxprint Projects* shortcut in the real Documents folder (Known Folder API, follows a OneDrive redirect). Existing projects and a working folder chosen earlier stay where they are. Texts in en/ru/de. Tests: `tests/test_release_011.py`.
+
+## [0.1.0-beta] and its rebuilds - the 0.1.0 development line
 
 ### Added
 - **Code audit** (`tools/audit.py`, `requirements-audit.txt`, manual `audit` workflow, weekly CodeQL, Dependabot): one summary of ruff / mypy / bandit / pip-audit / vulture / radon / coverage. Findings fixed in the same batch: unused code and variables, a dead compatibility alias, reviewed false positives annotated; `setuptools>=78.1.1` (PYSEC-2025-49). Runtime updates now delete the files the new version no longer has (`online_fetch.run(prune=True)`, `voxprint-files.json`, runtime folder only). Docs: [docs/TESTING.md](docs/TESTING.md).

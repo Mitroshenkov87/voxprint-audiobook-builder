@@ -10,11 +10,19 @@ from typing import Callable, Optional
 
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QTextBrowser, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTextBrowser,
+    QVBoxLayout,
+    QWidget,
+)
 
 from core import appinfo
 from core.i18n import get_language, tr
+from ui.glass import GlassDialog
 
 
 def _open_url_default(url: QUrl) -> bool:
@@ -22,7 +30,7 @@ def _open_url_default(url: QUrl) -> bool:
     return QDesktopServices.openUrl(url)
 
 
-class AboutDialog(QDialog):
+class AboutDialog(GlassDialog):
     """Modal About dialog with a scrollable rich-text body and buttons for the licence notices and the repository."""
     def __init__(self, parent: Optional[QWidget] = None, repo_url: Optional[str] = None,
                  open_url: Callable[[QUrl], bool] = _open_url_default) -> None:
@@ -40,7 +48,7 @@ class AboutDialog(QDialog):
         lay.setSpacing(10)
 
         title = QLabel(f"{html.escape(appinfo.APP_DISPLAY_NAME)}  <span style='font-size:14px;color:#9aa0aa'>"
-                       f"{html.escape(tr('about.version', version=appinfo.APP_VERSION))}</span>")
+                       f"{html.escape(tr('about.version', version=appinfo.version_label()))}</span>")
         title.setObjectName("title")
         title.setTextFormat(Qt.TextFormat.RichText)
         lay.addWidget(title)

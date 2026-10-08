@@ -58,5 +58,5 @@ class Segment:
 
     @property
     def filename(self) -> str:
-        """File name of the cut clip inside the dataset folder, e.g. ``segment_007.wav``."""
-        return f"segment_{self.index:03d}.wav"
+        """File name of the cut clip inside the dataset folder, e.g. ``segment_007.flac``."""
+        return f"segment_{self.index:03d}.flac"           # lossless and about half the size of WAV

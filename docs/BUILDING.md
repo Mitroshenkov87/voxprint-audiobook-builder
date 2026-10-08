@@ -63,6 +63,16 @@ Ukrainian and Belarusian were dropped on purpose (fewer languages to keep in syn
 ### Repository link
 The GitHub URL lives in one place: `"repo_url"` in `credits.json` (read as `core.appinfo.REPO_URL`). A placeholder containing `OWNER` hides the link in **About**.
 
+### Build numbers and codenames
+Every CI installer build (workflow *build-installer*, job *build-thin*) gets a build number: `GITHUB_RUN_NUMBER` + `offset` from
+`BUILD.json` (build 665 = v0.1.1-beta, then 666, 667 ...). `BUILD.json` also holds the **codename**: one Biblical Hebrew word in
+Latin transliteration (ASCII letters only) that names the build's changes - edit it for each release. `tools/build_number.py --stamp`
+writes number, codename and commit into `credits.json` before PyInstaller runs; the app shows `0.1.1-beta · build 665 "Tikkun"`
+(About, splash, Settings, diagnostic report), the installer gets `VersionInfoVersion` `0.1.1.665` and a numbered copy
+`Voxprint-Setup-online-<version>-build<N>.exe` (the plain `Voxprint-Setup-online.exe` stays for stable links), and the components
+manifest records `build`, so the Components window offers a same-version build only when its number is higher. Local builds are build 0.
+To keep the numbering after failed runs, lower `offset` so the next successful build gets the intended number.
+
 ### Versions: "verified by Voxprint"
 `infra/verified_manifest.json` pins the package versions and model revisions (HF commit shas) Voxprint was tested with. The updater installs exactly those
 (rolling back if needed: `restore_verified()`) and merely logs newer PyPI releases as "not verified yet". Channel "latest": `VOXPRINT_CHANNEL=latest`

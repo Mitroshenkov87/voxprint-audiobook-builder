@@ -9,10 +9,20 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtWidgets import QApplication, QCheckBox, QDialog, QHBoxLayout, QMessageBox, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QDialog,
+    QHBoxLayout,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from core import workspace as ws
 from core.i18n import tr
+from ui.glass import GlassDialog
 from ui.window_base import hint_label
 
 
@@ -41,7 +51,7 @@ def _mb(n: int) -> str:
     return f"{max(n, 0) / 1024 ** 2:.1f}"
 
 
-class CleanupDialog(QDialog):
+class CleanupDialog(GlassDialog):
     """After a finished job: tick what to keep (result audio, original book, prepared text); temporary parts always go."""
 
     def __init__(self, files: ws.JobFiles, parent: Optional[QWidget] = None) -> None:

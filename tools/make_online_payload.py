@@ -14,6 +14,7 @@ import argparse
 import datetime
 import hashlib
 import json
+import os
 import sys
 import zipfile
 from pathlib import Path
@@ -132,6 +133,14 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
         comps += rt_comps
     manifest = {"schema": SCHEMA, "channel": channel, "app_version": app_version or tag.lstrip("vV"), "tag": tag, "repo": repo,
                 "created": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "components": comps}
+    build = os.environ.get("VOXPRINT_BUILD", "").strip()   # CI build number (tools/build_number.py): 665, 666, ...
+    if build.isdigit() and int(build) > 0:
+        manifest["build"] = int(build)
+        codename = os.environ.get("VOXPRINT_CODENAME", "").strip()
+        if codename:
+            manifest["codename"] = codename
+    if os.environ.get("GITHUB_SHA"):
+        manifest["commit"] = os.environ["GITHUB_SHA"][:8]
     if thin:
         manifest["thin"] = True
         manifest["modules"] = modules

@@ -21,7 +21,7 @@ import threading
 import time
 import zipfile
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 log = logging.getLogger("voxprint.diag")
 
@@ -81,6 +81,23 @@ def install_exception_hooks() -> None:
     threading.excepthook = thread_hook
 
 
+#: Harmless Qt messages that are not logged: a pixel-sized stylesheet font copied by Qt's rich-text code, and Qt's own
+#: per-thread storage released after the worker threads at exit.
+QT_NOISE = ("QFont::setPointSize: Point size <= 0", "QThreadStorage: entry")
+
+#: Harmless Python warnings that are not logged (pydub looks for ffmpeg on PATH when imported; Voxprint points it at its
+#: own ffmpeg right afterwards; optional accelerators of the speech libraries that Voxprint does not use).
+WARNING_NOISE = (r"Couldn't find ffmpeg or avconv", r"Couldn't find ffprobe or avprobe", r".*[Tt]riton", r".*SoX could not be found")
+
+
+def quiet_known_warnings() -> None:
+    """Drop the warnings of :data:`WARNING_NOISE` (called once at start-up, before the heavy imports)."""
+    import warnings
+
+    for pattern in WARNING_NOISE:
+        warnings.filterwarnings("ignore", message=pattern)
+
+
 def install_qt_message_handler() -> None:
     """Qt's own warnings / errors (qWarning ...) into the log."""
     try:
@@ -93,6 +110,8 @@ def install_qt_message_handler() -> None:
               QtMsgType.QtFatalMsg: logging.CRITICAL}
 
     def handler(mode, context, message):
+        if any(message.startswith(m) for m in QT_NOISE):
+            return
         qlog.log(levels.get(mode, logging.WARNING), "%s", message)
 
     qInstallMessageHandler(handler)
@@ -131,17 +150,93 @@ def gpu_info(import_torch: bool = True) -> Dict[str, object]:
     return out
 
 
-def system_info(import_torch: bool = True) -> Dict[str, object]:
-    """Everything the start-up line and the report need."""
-    from core.appinfo import APP_VERSION
+def vulkan_info(run: Optional[Callable[..., Any]] = None) -> Dict[str, object]:
+    """Vulkan for the optional AI text model (llama.cpp Vulkan build): the loader DLL (Windows) and, when llama-server is
+    installed, the devices it lists.  Never downloads anything."""
+    import subprocess
+
+    out: Dict[str, object] = {}
+    if sys.platform == "win32":
+        out["loader"] = (Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "vulkan-1.dll").is_file()
+    try:
+        from infra import llm_tool
+
+        exe = llm_tool.server_exe()
+    except Exception:  # noqa: BLE001
+        exe = None
+    if exe is None:
+        out["llama_server"] = "not installed"
+        return out
+    try:
+        r = (run or subprocess.run)([str(exe), "--list-devices"], capture_output=True, text=True, timeout=30,
+                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        text = (r.stdout or "") + "\n" + (r.stderr or "")
+        out["devices"] = [ln.strip() for ln in text.splitlines() if ln.strip().lower().startswith("vulkan")]
+    except Exception as exc:  # noqa: BLE001
+        out["error"] = str(exc)
+    return out
+
+
+def installed_models(models_dir: Optional[Path] = None) -> List[Dict[str, object]]:
+    """Folders of the models folder with their size (GB); ``partial`` marks an unfinished download."""
+    if models_dir is None:
+        from infra import paths
+
+        models_dir = paths.models_dir()
+    out: List[Dict[str, object]] = []
+    try:
+        folders = sorted(p for p in Path(models_dir).iterdir() if p.is_dir())
+    except OSError:
+        return out
+    for d in folders:
+        size = 0
+        for f in d.rglob("*"):
+            try:
+                size += f.stat().st_size if f.is_file() else 0
+            except OSError:
+                pass
+        out.append({"name": d.name, "gb": round(size / 1024 ** 3, 2), "partial": d.name.endswith(".partial")})
+    return out
+
+
+def system_info(import_torch: bool = True, full: bool = False) -> Dict[str, object]:
+    """Everything the start-up line and the report need; ``full`` (the report) adds Vulkan and the installed models."""
+    from core.appinfo import APP_BUILD, APP_CODENAME, APP_COMMIT, APP_VERSION
     from infra import sysinfo
 
     total, avail = sysinfo.memory()
-    return {"app_version": APP_VERSION, "os": platform.platform(), "python": sys.version.split()[0],
-            "frozen": bool(getattr(sys, "frozen", False)), "cpu_logical": os.cpu_count(),
-            "cpu_physical": sysinfo.physical_cores(), "ram_total_gb": round(total / 1024 ** 3, 1),
-            "ram_available_gb": round(avail / 1024 ** 3, 1), "gpu": gpu_info(import_torch),
-            "time": time.strftime("%Y-%m-%d %H:%M:%S %z")}
+    info: Dict[str, object] = {
+        "app_version": APP_VERSION, "build": APP_BUILD, "codename": APP_CODENAME, "commit": APP_COMMIT, "os": platform.platform(), "python": sys.version.split()[0],
+        "frozen": bool(getattr(sys, "frozen", False)), "cpu_logical": os.cpu_count(),
+        "cpu_physical": sysinfo.physical_cores(), "ram_total_gb": round(total / 1024 ** 3, 1),
+        "ram_available_gb": round(avail / 1024 ** 3, 1), "gpu": gpu_info(import_torch),
+        "time": time.strftime("%Y-%m-%d %H:%M:%S %z")}
+    if full:
+        info["vulkan"] = vulkan_info()
+        info["models"] = installed_models()
+    return info
+
+
+def summary_lines(info: Dict[str, object]) -> List[str]:
+    """A few human-readable lines of :func:`system_info` (printed by the CLI ``diag`` command)."""
+    g = info.get("gpu") or {}
+    assert isinstance(g, dict)
+    lines = [f"Voxprint {info.get('app_version')}" + (f" build {info['build']}" if info.get("build") else "") + (f" \"{info['codename']}\"" if info.get("codename") else "") + f" | {info.get('os')} | Python {info.get('python')}",
+             f"PyTorch {g.get('torch', 'not found')} (CUDA build {g.get('cuda_build')}) | CUDA available: "
+             f"{'yes' if g.get('cuda_available') else 'no'}" + (f" | {g.get('gpu')} {g.get('vram_total_gb')} GB" if g.get("gpu") else "")
+             + (f" | driver {g.get('driver')}" if g.get("driver") else "")]
+    if g.get("error"):
+        lines.append(f"GPU probe error: {g['error']}")
+    v = info.get("vulkan")
+    if isinstance(v, dict):
+        devs = v.get("devices")
+        lines.append("Vulkan: " + (", ".join(devs) if devs else str(v.get("llama_server") or v.get("error") or "no devices"))
+                     + (f" | loader {'present' if v['loader'] else 'missing'}" if "loader" in v else ""))
+    ms = info.get("models")
+    if isinstance(ms, list):
+        lines.append(f"Models ({len(ms)}): " + (", ".join(f"{m['name']} {m['gb']} GB" + (" (partial)" if m["partial"] else "")
+                                                          for m in ms) or "none"))
+    return lines
 
 
 def _clean(key: str, value):
@@ -231,7 +326,7 @@ def write_report(dest: Path, logs_dir: Optional[Path] = None, state_dir: Optiona
                     z.write(f, "logs/" + f.relative_to(logs_dir).as_posix())
                 except OSError as exc:       # a file locked by another program: skip it, say so
                     log.warning("diagnostic report: %s skipped: %s", f.name, exc)
-        z.writestr("system_info.json", json.dumps((info or system_info)(), indent=1, ensure_ascii=False))
+        z.writestr("system_info.json", json.dumps((info or (lambda: system_info(full=True)))(), indent=1, ensure_ascii=False))
         z.writestr("settings.json", json.dumps(settings_snapshot(state_dir), indent=1, ensure_ascii=False))
     log.info("diagnostic report written: %s", dest.name)
     return dest

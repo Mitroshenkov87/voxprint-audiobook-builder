@@ -9,8 +9,17 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import QThread, QUrl, Signal
-from PySide6.QtWidgets import (QFileDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QPlainTextEdit, QProgressBar,
-                               QPushButton, QVBoxLayout)
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QPlainTextEdit,
+    QProgressBar,
+    QPushButton,
+    QVBoxLayout,
+)
 
 from core import revoice
 from core.errors import CancelledByUser
@@ -32,10 +41,29 @@ def default_asr():
 
 
 def revoice_dir() -> Path:
-    """``~/Documents/Voxprint/Re-voice``: recordings and the texts handed to the narrator."""
-    from infra import paths
+    """``<projects folder>/Re-voice``: recordings and the texts handed to the narrator (:mod:`infra.projects`)."""
+    from infra import projects
 
-    return paths.default_results_dir() / "Re-voice"
+    return projects.sub(projects.REVOICE)
+
+
+def record_format():
+    """The dictaphone's format: Ogg Opus (small; speech needs no lossless copy, the models get PCM decoded in memory),
+    else FLAC, WAV or M4A - whatever the platform's Qt Multimedia backend can encode first."""
+    from PySide6.QtMultimedia import QMediaFormat
+
+    enc = QMediaFormat.ConversionMode.Encode
+    probe = QMediaFormat()
+    supported = probe.supportedFileFormats(enc)
+    if QMediaFormat.FileFormat.Ogg in supported:
+        fmt = QMediaFormat(QMediaFormat.FileFormat.Ogg)
+        if QMediaFormat.AudioCodec.Opus in fmt.supportedAudioCodecs(enc):
+            fmt.setAudioCodec(QMediaFormat.AudioCodec.Opus)
+            return fmt
+    for ff in (QMediaFormat.FileFormat.FLAC, QMediaFormat.FileFormat.Wave, QMediaFormat.FileFormat.Mpeg4Audio):
+        if ff in supported:                         # ffmpeg / soundfile read any of them
+            return QMediaFormat(ff)
+    return probe
 
 
 class TranscribeWorker(QThread):
@@ -223,7 +251,7 @@ class RevoiceWindow(SubWindow):
 
     def toggle_record(self) -> None:
         """Start recording from the default microphone, or stop and add the recording to the list."""
-        from PySide6.QtMultimedia import QAudioInput, QMediaCaptureSession, QMediaFormat, QMediaRecorder
+        from PySide6.QtMultimedia import QAudioInput, QMediaCaptureSession, QMediaRecorder
 
         if self._rec is not None:
             self._rec.stop()
@@ -233,13 +261,7 @@ class RevoiceWindow(SubWindow):
         self._session, self._input, rec = QMediaCaptureSession(), QAudioInput(), QMediaRecorder()
         self._session.setAudioInput(self._input)
         self._session.setRecorder(rec)
-        fmt = QMediaFormat()
-        supported = fmt.supportedFileFormats(QMediaFormat.ConversionMode.Encode)
-        for ff in (QMediaFormat.FileFormat.Wave, QMediaFormat.FileFormat.FLAC, QMediaFormat.FileFormat.Mpeg4Audio):
-            if ff in supported:                         # lossless where the platform backend can; ffmpeg reads any of them
-                fmt.setFileFormat(ff)
-                break
-        rec.setMediaFormat(fmt)
+        rec.setMediaFormat(record_format())
         rec.setQuality(QMediaRecorder.Quality.HighQuality)
         stamp = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
         rec.setOutputLocation(QUrl.fromLocalFile(str(self.out_dir / f"recording {stamp}")))    # the backend adds the suffix
@@ -258,6 +280,9 @@ class RevoiceWindow(SubWindow):
         path = Path(self._rec.actualLocation().toLocalFile())
         self._rec = self._session = self._input = None
         if path.is_file() and path.stat().st_size > 0:
+            from core import audio_utils
+
+            path = revoice.to_opus(path, audio_utils.ensure_ffmpeg())     # stored as Opus; decoded to PCM in memory for the models
             self.set_files(self.files + [path])
             self.lst_files.setCurrentRow(len(self.files) - 1)
             self.lbl_rec.setText(tr("revoice.recorded", name=path.name))

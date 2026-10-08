@@ -17,6 +17,8 @@ param(
                                     #   the release gets only the shell + manifest-thin-<channel>.json; the installer is named Voxprint-Setup-online.exe
     [switch]$Portable,              # compile the wizard page "Keep a portable setup folder" (installer\Voxprint.iss /DPORTABLE; not in the default build yet)
     [string]$MirrorBase = "",       # optional fallback address prefix for the locked files (our mirror)
+    [string]$Build = $env:VOXPRINT_BUILD,      # CI build number (tools/build_number.py); also in the file name of a copy of the installer
+    [string]$Codename = $env:VOXPRINT_CODENAME,
     [switch]$LegacyPayload          # allow the OLD multi-GB payload parts for a real release (deleted on purpose; never needed now)
 )
 $ErrorActionPreference = "Stop"
@@ -78,6 +80,8 @@ $isArgs = @("/DONLINE", "/DONEDIR", "/DManifestUrl=$ManifestUrl")
 if ($LatestManifestUrl) { $isArgs += "/DLatestManifestUrl=$LatestManifestUrl" }
 if ($Thin) { $isArgs += "/DTHIN" }
 if ($Portable) { $isArgs += "/DPORTABLE" }
+if ($Build -match '^\d+$') { $isArgs += "/DAppBuild=$Build" }
+if ($Codename -match '^[A-Za-z]+$') { $isArgs += "/DAppCodename=$Codename" }
 & $iscc @isArgs installer\Voxprint.iss
 Check "Inno Setup (online)"
 
@@ -86,5 +90,12 @@ if ($setupMb -gt 200) { throw "$setupName is $([int]$setupMb) MB (expected a few
 Move-Item "installer\Output\$setupName" "build\online-release\$finalName" -Force
 $h = (Get-FileHash "build\online-release\$finalName" -Algorithm SHA256).Hash.ToLower()
 "$h  $finalName" | Out-File -Encoding ascii "build\online-release\$finalName.sha256"
+if ($Build -match '^\d+$' -and [int]$Build -gt 0) {
+    # the same installer under a name with the version and build number (the plain name stays for stable links)
+    $ver = (Get-Content credits.json -Raw | ConvertFrom-Json).app.version
+    $numbered = "Voxprint-Setup-online-$ver-build$Build.exe"
+    Copy-Item "build\online-release\$finalName" "build\online-release\$numbered" -Force
+    "$h  $numbered" | Out-File -Encoding ascii "build\online-release\$numbered.sha256"
+}
 Get-ChildItem build\online-release | Format-Table Name, Length
 "manifest: $manifest   installer manifest url: $ManifestUrl"

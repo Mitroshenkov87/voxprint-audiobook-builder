@@ -17,8 +17,25 @@ from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (QComboBox, QDialog, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QLabel,
-                               QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox, QProgressBar, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMenu,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from core import adapter_strength, voice_info
 from core.errors import DatasetMakerError
@@ -28,6 +45,7 @@ from core.voice_library import VoiceLibrary, VoiceRecord
 from infra import voice_catalog as catalog
 from infra import voice_repository as repo
 from ui.audio_preview import Previewer
+from ui.glass import GlassDialog
 from ui.window_base import SubWindow, card_frame, fit_to_screen, hint_label
 from workers.narrate_worker import RepoDownloadWorker, RepoIndexWorker
 
@@ -218,7 +236,7 @@ class VoiceCard(QFrame):
         self.btn_folder.clicked.connect(lambda: self.open_folder.emit(self.voice_id))
 
 
-class VoiceEditDialog(QDialog):
+class VoiceEditDialog(GlassDialog):
     """Edit name, author, speaker, prepared by, organization, project link, licence, gender / age and description.
 
     A form layout (label left, field right) keeps the dialog short enough for 150 % display scaling."""
@@ -319,7 +337,7 @@ class VoiceEditDialog(QDialog):
                 "description": self.edt_desc.text(), "adapter_scale": round(self.sp_strength.value(), 2)}
 
 
-class RepoDialog(QDialog):
+class RepoDialog(GlassDialog):
     """Browse the online voice index and download selected voices (SHA-256 verified)."""
 
     voices_added = Signal(list)

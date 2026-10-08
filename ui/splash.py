@@ -60,12 +60,13 @@ class Splash(QSplashScreen):
         p.setPen(QColor(TEXT))
         p.drawText(QRect(18, top + 10, s - 36, 26), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                    appinfo.APP_DISPLAY_NAME)
-        f.setPixelSize(13)
+        f.setPixelSize(12)
         f.setBold(False)
         p.setFont(f)
         p.setPen(QColor(MUTED))
-        p.drawText(QRect(18, top + 10, s - 36, 26), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-                   f"v{appinfo.APP_VERSION}")
+        # the version line (0.1.1-beta · build 665 "Tikkun") sits on the status row, right-aligned: too long for the title row
+        p.drawText(QRect(18, top + 54, s - 36, 26), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                   f"v{appinfo.version_label()}")
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QColor(255, 255, 255, 50))
         p.drawRoundedRect(QRectF(18, top + 44, s - 36, 4), 2, 2)

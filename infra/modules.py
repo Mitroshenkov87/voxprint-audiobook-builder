@@ -208,6 +208,8 @@ def modules(manifest: Dict[str, Any]) -> List[Module]:
     state = of.load_state(runtime_dir())
     by_id = {c["id"]: c for c in manifest.get("components", [])}
     flavor = flavor_for(manifest)
+    installed_v, installed_b = _installed_release()
+    available_v, available_b = str(manifest.get("app_version", "")), str(manifest.get("build", ""))
     out: List[Module] = []
     for m in manifest.get("modules", []):
         comps = _components_of(m, by_id, flavor)
@@ -224,18 +226,66 @@ def modules(manifest: Dict[str, Any]) -> List[Module]:
         mod.reused = reused
         # the component ids of a module are stable across releases (rt-<module>-NN) while their SHA-256 changes: an id
         # recorded with another hash means this module was installed from an older manifest
-        mod.update = not ok and any(c["id"] in state for c in comps)
+        was_installed = not ok and bool(comps) and all(c["id"] in state for c in comps) and \
+            all((runtime_dir() / mk).exists() for c in comps for mk in c.get("markers", []))
+        if was_installed and not is_newer(available_v, installed_v, available_b, installed_b):
+            # same (or older) version and build with other hashes, or a build without a number: wheels built from sdists differ
+            # byte for byte between rebuilds; the installed files work, so this is neither missing nor an update
+            mod.installed = True
+            mod.size = mod.unpacked = 0
+        else:
+            mod.update = not ok and any(c["id"] in state for c in comps)
         out.append(mod)
     return out
 
 
-def versions(manifest: Dict[str, Any]) -> tuple:
-    """``(installed, available)`` app versions of the runtime: the manifest the installed components came from vs this one."""
+def _installed_release() -> tuple:
+    """``(app_version, build)`` of the manifest the installed runtime components came from (empty strings if unknown)."""
     try:
-        installed = str(json.loads((runtime_dir() / _fetch_module().STATE_FILE).read_text(encoding="utf-8")).get("app_version", ""))
+        d = json.loads((runtime_dir() / _fetch_module().STATE_FILE).read_text(encoding="utf-8"))
+        return str(d.get("app_version", "")), str(d.get("build", ""))
     except (OSError, ValueError, AttributeError):
-        installed = ""
-    return installed, str(manifest.get("app_version", ""))
+        return "", ""
+
+
+def _version_key(v: str) -> tuple:
+    """Sortable key of ``0.1.1-beta`` / ``v0.2.0`` / ``0.2.0-rc.1``: numbers first; a pre-release sorts before the final."""
+    v = v.strip().lstrip("vV")
+    core, _, pre = v.partition("-")
+    nums = []
+    for part in core.split("."):
+        digits = "".join(ch for ch in part if ch.isdigit())
+        nums.append(int(digits) if digits else 0)
+    while len(nums) < 3:
+        nums.append(0)
+    return tuple(nums), (0, pre) if pre else (1, "")
+
+
+def is_newer(available: str, installed: str, available_build: object = "", installed_build: object = "") -> bool:
+    """True only when ``available`` is strictly newer than ``installed``: a newer app version, or the same version with a
+    higher build number (CI builds 665, 666 ...).  Unknown installed version = newer; a missing build number on either
+    side never makes a same-version build "newer" (that was the false "0.1.0-beta -> 0.1.0-beta" offer)."""
+    if not available:
+        return False
+    if not installed:
+        return True
+    a, i = _version_key(available), _version_key(installed)
+    if a != i:
+        return a > i
+    ab, ib = str(available_build or ""), str(installed_build or "")
+    return ab.isdigit() and ib.isdigit() and int(ab) > int(ib)
+
+
+def label(version: str, build: object = "") -> str:
+    """``0.1.1-beta · build 665`` - the version with its build number when known."""
+    return f"{version} \u00b7 build {build}" if version and build else version
+
+
+def versions(manifest: Dict[str, Any]) -> tuple:
+    """``(installed, available)`` labels of the runtime: the manifest the installed components came from vs this one,
+    each with its build id when known."""
+    installed, build = _installed_release()
+    return label(installed, build), label(str(manifest.get("app_version", "")), str(manifest.get("build", "")))
 
 
 def pending(mods: List[Module]) -> List[Module]:

@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 from core import asr as asr_mod
 from core import audio_utils as au
@@ -76,3 +76,29 @@ def save_text(text: str, folder: Path, name: str) -> Path:
     p = folder / f"{safe_filename(name, 80, fallback='re-voice')}.txt"
     p.write_text(text, encoding="utf-8")
     return p
+
+
+OPUS_KBPS = 48                     # speech, mono: transparent for recognition, ~20x smaller than 16-bit WAV
+
+
+def to_opus(src: Path, ffmpeg: Optional[str], run: Optional[Callable[..., Any]] = None) -> Path:
+    """Store a dictaphone recording as Ogg Opus (``<name>.opus``) and delete the lossless original; the models always get
+    PCM decoded in memory.  Returns the file to use - the original when it already is Opus, ffmpeg is missing or fails."""
+    import subprocess
+
+    src = Path(src)
+    if src.suffix.lower() in (".opus", ".ogg") or not ffmpeg:
+        return src
+    dst = src.with_suffix(".opus")
+    cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(src), "-c:a", "libopus", "-b:a", f"{OPUS_KBPS}k",
+           "-ac", "1", "-application", "voip", str(dst)]
+    try:
+        r = (run or subprocess.run)(cmd, capture_output=True, timeout=600,
+                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if getattr(r, "returncode", 1) == 0 and dst.is_file() and dst.stat().st_size > 0:
+            src.unlink(missing_ok=True)
+            return dst
+    except (OSError, subprocess.SubprocessError) as exc:
+        log.warning("recording kept as %s (Opus conversion failed: %s)", src.suffix, exc)
+    dst.unlink(missing_ok=True)
+    return src

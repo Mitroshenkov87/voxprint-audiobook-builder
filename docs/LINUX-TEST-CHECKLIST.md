@@ -26,7 +26,7 @@ Mark each line OK / FAIL and note the message. Logs: `~/.local/share/voxprint/lo
 ## 4. Narration (the main function)
 - [ ] Narrate: choose a small `.txt` / `.epub`, a voice (download one under "Voices" or train one) and start
 - [ ] Preview playback works (sound through PipeWire / PulseAudio)
-- [ ] The result (mp3 / m4b) is written under `~/Documents/Voxprint/` and plays in an ordinary player
+- [ ] The result (mp3 / m4b) is written under `~/.local/share/voxprint/Projects/Audiobooks/` and plays in an ordinary player
 - [ ] Translation card: a Russian text narrated as English downloads the Opus-MT model and produces the translated text file
 - [ ] On a GPU: speed is clearly better than CPU; on CPU it works, only slowly (a short sentence is enough)
 

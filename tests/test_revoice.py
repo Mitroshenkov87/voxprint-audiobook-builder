@@ -58,3 +58,25 @@ def test_missing_recogniser_is_reported(app, tmp_path):
     rv.add_files()
     rv.transcribe()
     assert wait_for(lambda: "No speech recognition model" in rv.lbl_state.text())
+
+
+def test_dictaphone_recording_is_stored_as_opus(tmp_path):
+    from core import revoice
+
+    src = tmp_path / "recording.flac"
+    src.write_bytes(b"flac")
+    calls = []
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+        Path(cmd[-1]).write_bytes(b"opus")
+        return type("R", (), {"returncode": 0})()
+
+    out = revoice.to_opus(src, "ffmpeg", run=run)
+    assert out == tmp_path / "recording.opus" and out.is_file() and not src.exists()
+    assert "libopus" in calls[0] and "-ac" in calls[0]
+    keep = tmp_path / "b.flac"
+    keep.write_bytes(b"x")
+    assert revoice.to_opus(keep, None) == keep and revoice.to_opus(out, "ffmpeg", run=run) == out
+    failed = revoice.to_opus(keep, "ffmpeg", run=lambda cmd, **kw: type("R", (), {"returncode": 1})())
+    assert failed == keep and keep.exists() and not (tmp_path / "b.opus").exists()

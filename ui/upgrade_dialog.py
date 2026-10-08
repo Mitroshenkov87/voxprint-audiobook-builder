@@ -10,12 +10,19 @@ import html
 from typing import Dict, List, Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from core.i18n import tr
+from ui.glass import GlassDialog
 
 
-class UpgradeOfferDialog(QDialog):
+class UpgradeOfferDialog(GlassDialog):
     """Asks whether to upgrade the listed components of the user's environment; emits ``decided`` exactly once."""
     decided = Signal(list)     # names the user agreed to upgrade ([] = declined)
 

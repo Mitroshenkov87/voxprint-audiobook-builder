@@ -43,7 +43,7 @@ def _dataset(tmp_path, n=6):
     segs = []
     for i in range(1, n + 1):
         x = (np.sin(2 * np.pi * 150 * np.arange(24000 * 3) / 24000) * 0.2).astype(np.float32)
-        au.write_wav(d / f"segment_{i:03d}.wav", x, 24000)
+        au.write_wav(d / f"segment_{i:03d}.flac", x, 24000)
         segs.append(Segment(i, 0, 3, f"Текст номер {i}."))
     au.write_wav(d / "ref.wav", x, 24000)
     (d / "ref_text.txt").write_text("Образец голоса.\n", encoding="utf-8")

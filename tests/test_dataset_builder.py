@@ -3,6 +3,7 @@ import json
 import wave
 
 import numpy as np
+import soundfile as sf
 import pytest
 
 from core import audio_utils as au
@@ -34,7 +35,7 @@ def test_jsonl_roundtrip_utf8_no_bom(tmp_path):
     assert not raw.startswith(b"\xef\xbb\xbf") and b"\r" not in raw
     assert "Привет" in raw.decode("utf-8")  # no \u escaping
     rows = read_metadata_jsonl(p)
-    assert rows[0] == {"audio": "segment_001.wav", "text": "Привет, мир!", "ref_audio": "ref.wav"}
+    assert rows[0] == {"audio": "segment_001.flac", "text": "Привет, мир!", "ref_audio": "ref.wav"}
     assert list(rows[0].keys()) == ["audio", "text", "ref_audio"]
 
 
@@ -49,9 +50,9 @@ def test_full_pipeline_with_true_rate_aligner(tmp_path):
     assert {r["ref_audio"] for r in rows} == {"ref.wav"}
     for r in rows:
         f = out / r["audio"]
-        with wave.open(str(f)) as w:
-            assert w.getframerate() == 24000 and w.getnchannels() == 1
-            dur = w.getnframes() / 24000
+        info = sf.info(str(f))                           # training clips are FLAC now
+        assert info.format == "FLAC" and info.samplerate == 24000 and info.channels == 1
+        dur = info.frames / 24000
         # 3-12 s of speech + ~1 s of silence at the end
         assert 3.0 + 0.95 <= dur <= 12.0 + 1.05
         x, _ = au.load_audio(f, 24000)
@@ -99,7 +100,7 @@ def test_quality_filter_drops_clipped_segments_automatically(tmp_path):
     assert rep["quality_dropped"] == res.n_dropped_quality and "clipping" in rep["quality_dropped_reasons"]
     # file indices are consecutive and match metadata.jsonl
     rows = read_metadata_jsonl(tmp_path / "b" / "metadata.jsonl")
-    assert [r["audio"] for r in rows] == [f"segment_{i:03d}.wav" for i in range(1, len(rows) + 1)]
+    assert [r["audio"] for r in rows] == [f"segment_{i:03d}.flac" for i in range(1, len(rows) + 1)]
     assert all((tmp_path / "b" / r["audio"]).exists() for r in rows)
 
 

@@ -295,8 +295,11 @@ def cmd_diag(args) -> int:
     from infra import diagnostics
 
     out = args.out or Path.cwd() / time.strftime("voxprint-diagnostics-%Y%m%d-%H%M%S.zip")
+    info = diagnostics.system_info(import_torch=True, full=True)
+    for line in diagnostics.summary_lines(info):
+        print(line)
     try:
-        path = diagnostics.write_report(out)
+        path = diagnostics.write_report(out, info=lambda: info)
     except OSError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2

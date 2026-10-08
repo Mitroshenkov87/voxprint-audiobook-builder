@@ -22,10 +22,19 @@ import logging
 from typing import Any, Callable, Dict, List, Optional
 
 from PySide6.QtCore import QThread, Signal
-from PySide6.QtWidgets import QCheckBox, QDialog, QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QHBoxLayout,
+    QLabel,
+    QProgressBar,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from core.i18n import tr
 from infra import modules as mods
+from ui.glass import GlassDialog, fit_height
 
 log = logging.getLogger("voxprint.ui.modules")
 
@@ -112,7 +121,7 @@ def _gb(n: int) -> str:
     return f"{n / 1024 ** 3:.1f} GB" if n >= 1024 ** 3 else f"{max(1, n // 1024 ** 2)} MB"
 
 
-class ModulesDialog(QDialog):
+class ModulesDialog(GlassDialog):
     """One live status line + one overall progress bar; Download / Retry, Cancel, Close."""
 
     ready = Signal()                 # every required module is installed
@@ -158,6 +167,7 @@ class ModulesDialog(QDialog):
         self.lbl_status = QLabel()       # THE live line: what is being downloaded / verified right now, or the error
         self.lbl_status.setObjectName("liveline")
         self.lbl_status.setWordWrap(True)
+        self.lbl_status.setMinimumWidth(300)
         self.bar = QProgressBar()
         self.bar.setRange(0, 1000)
         self.bar.setVisible(False)
@@ -232,6 +242,7 @@ class ModulesDialog(QDialog):
         st = self.lbl_status.style()
         st.unpolish(self.lbl_status)
         st.polish(self.lbl_status)
+        fit_height(self)
 
     def _set_overall(self, fraction: float) -> None:
         fraction = max(0.0, min(1.0, fraction))
@@ -254,6 +265,7 @@ class ModulesDialog(QDialog):
         self.btn_cancel.setVisible(self.busy)                # the model download of step 2 has no cancel: it can be closed
         self.btn_close.setEnabled(not self.busy)
         self.chk_latest.setEnabled(not working)
+        fit_height(self)                                      # wrapped texts at 150 % never get cut off
 
     # ---------------------------------------------------------------- list
     def refresh(self) -> None:

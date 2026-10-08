@@ -78,7 +78,7 @@ def test_cli_diag_and_settings_button(tmp_path, monkeypatch, app, lib):
     import cli
 
     made = []
-    monkeypatch.setattr(dg, "write_report", lambda p: made.append(p) or p)
+    monkeypatch.setattr(dg, "write_report", lambda p, **kw: made.append(p) or p)
     assert cli.is_user_cli(["voxprint", "diag"])
     assert cli.main(["diag", "--out", str(tmp_path / "d.zip")]) == 0 and made == [tmp_path / "d.zip"]
     s = make_studio(lib)
@@ -89,3 +89,26 @@ def test_cli_diag_and_settings_button(tmp_path, monkeypatch, app, lib):
     assert d.save_diagnostics().name.startswith("voxprint-diagnostics-") and notes
     d.pick_save = lambda title, name: ""
     assert d.save_diagnostics() is None
+
+
+def test_report_lists_models_vulkan_and_a_cuda_summary(tmp_path):
+    models = tmp_path / "models"
+    (models / "Qwen--Qwen3-TTS-12Hz-1.7B-Base").mkdir(parents=True)
+    (models / "Qwen--Qwen3-TTS-12Hz-1.7B-Base" / "model.safetensors").write_bytes(b"x" * 2048)
+    (models / "Qwen--Qwen3-ASR-1.7B.partial").mkdir()
+    ms = dg.installed_models(models)
+    assert [m["name"] for m in ms] == ["Qwen--Qwen3-ASR-1.7B.partial", "Qwen--Qwen3-TTS-12Hz-1.7B-Base"] and ms[0]["partial"]
+    info = {"app_version": "0.1.1", "os": "Windows-11", "python": "3.11.9", "models": ms,
+            "gpu": {"cuda_available": True, "torch": "2.11.0+cu128", "cuda_build": "12.8", "gpu": "RTX 4090", "vram_total_gb": 16.0},
+            "vulkan": {"loader": True, "devices": ["Vulkan0: NVIDIA GeForce RTX 4090"]}}
+    text = "\n".join(dg.summary_lines(info))
+    assert "CUDA available: yes" in text and "RTX 4090" in text and "Vulkan0: NVIDIA" in text and "loader present" in text
+    assert "Models (2)" in text and "(partial)" in text
+    assert dg.vulkan_info().get("llama_server") == "not installed"
+
+
+def test_known_noise_is_not_logged():
+    assert any("QFont::setPointSize: Point size <= 0 (-1), must be greater than 0".startswith(m) for m in dg.QT_NOISE)
+    assert any("QThreadStorage: entry 1 destroyed before end of thread 0x1".startswith(m) for m in dg.QT_NOISE)
+    import re
+    assert any(re.match(p, "Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work") for p in dg.WARNING_NOISE)

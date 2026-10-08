@@ -1,4 +1,4 @@
-"""Auto-repair (Settings -> "Auto-repair"): check every component and model, re-download what is missing, repair what is broken.
+"""Check & repair (Settings -> "Check & repair", formerly "Auto-repair"): check every component and model, re-download what is missing, repair what is broken.
 
 Built on the existing pieces instead of duplicating them:
 
@@ -261,7 +261,7 @@ def run(progress: Progress = lambda f, m: None, cancel: Optional[CancelToken] = 
         # one item = one share of the bar; the share is passed twice for a repaired model (check, then download), so the
         # value is kept monotonic: the bar never goes back
         last[0] = max(last[0], min(1.0, (done[0] + max(0.0, min(1.0, f))) / steps))
-        progress(last[0], m)
+        progress(last[0], tr("autorepair.step", n=min(done[0] + 1, steps), total=steps, text=m) if m else m)
 
     def step() -> None:
         done[0] += 1

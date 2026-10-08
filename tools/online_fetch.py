@@ -187,9 +187,11 @@ def load_state(dest: Path) -> Dict[str, str]:
         return {}
 
 
-def save_state(dest: Path, state: Dict[str, str], version: str = "") -> None:
+def save_state(dest: Path, state: Dict[str, str], version: str = "", build: str = "") -> None:
+    """Write the installed components with the app version and build id of the manifest they came from."""
     tmp = dest / (STATE_FILE + ".tmp")
-    tmp.write_text(json.dumps({"schema": SCHEMA, "app_version": version, "components": state}, indent=1), encoding="utf-8")
+    tmp.write_text(json.dumps({"schema": SCHEMA, "app_version": version, "build": build, "components": state}, indent=1),
+                   encoding="utf-8")
     os.replace(tmp, dest / STATE_FILE)
 
 
@@ -636,7 +638,7 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
                 index[c["id"]] = files
                 (dest / FILES_INDEX).write_text(json.dumps(index), encoding="utf-8")
             state[c["id"]] = c["sha256"]
-            save_state(dest, state, str(man.get("app_version", "")))
+            save_state(dest, state, str(man.get("app_version", "")), str(man.get("build", "")))
             fetched += 1
         base += w / 2
         if portable is None:
@@ -648,11 +650,11 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
         for cid in stale:
             state.pop(cid, None)
         (dest / FILES_INDEX).write_text(json.dumps(index), encoding="utf-8")
-        save_state(dest, state, str(man.get("app_version", "")))
+        save_state(dest, state, str(man.get("app_version", "")), str(man.get("build", "")))
         if removed:
             print(f"removed {removed} file(s) of the previous version", file=sys.stderr, flush=True)
     if not todo:
-        save_state(dest, state, str(man.get("app_version", "")))
+        save_state(dest, state, str(man.get("app_version", "")), str(man.get("build", "")))
     if portable is not None and not offline:
         if keep_all or old_man is None:
             (portable / "manifest.json").parent.mkdir(parents=True, exist_ok=True)
