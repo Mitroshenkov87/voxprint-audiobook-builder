@@ -47,7 +47,8 @@ def test_sdist_only_packages_are_few_and_known():
 
 
 def test_the_lock_covers_requirements_txt():
-    have = {mk.norm(w["dist"]) for w in LOCK["wheels"]} | set(LOCK["shell"]) | set(mk.TORCH)
+    # build tooling (setuptools etc.) is pinned in requirements.txt for dev venvs but never shipped
+    have = {mk.norm(w["dist"]) for w in LOCK["wheels"]} | set(LOCK["shell"]) | set(mk.TORCH) | mk.SKIP
     for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines():
         line = line.split("#")[0].strip()
         if not line:
