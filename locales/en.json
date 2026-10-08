@@ -739,5 +739,13 @@
  "narr.checking": "Checking fragments {first}–{last} of {total} by speech recognition…",
  "narr.check_summary": "Speech check: {n} of {total} fragments generated again, {bad} still doubtful.",
  "clipmax.label": "Longest training clip:",
- "clipmax.tip": "Most clips stay around 8 seconds; with more than 12 s, long sentences with commas are kept whole up to this length, which helps the voice stay stable in long passages. 12 s is the classic cut. GPUs with less than 10 GB of video memory and the CPU are limited to 15 s."
+ "clipmax.tip": "Most clips stay around 8 seconds; with more than 12 s, long sentences with commas are kept whole up to this length, which helps the voice stay stable in long passages. 12 s is the classic cut. GPUs with less than 10 GB of video memory and the CPU are limited to 15 s.",
+ "denoise.hint": "This recording sounds noisy (background score {bak} of 5). A noise clean-up can help, but its artefacts can also be learnt as part of the voice: use it only if the noise is clearly audible.",
+ "denoise.checkbox": "Clean up background noise before training (DeepFilterNet3)",
+ "denoise.tip": "Removes steady background noise (fans, street, hum) from a copy of the recording; the original file is not changed. Runs on the CPU, roughly five times faster than real time.",
+ "denoise.download": "Download noise clean-up ({mb} MB)",
+ "denoise.download_failed": "The noise clean-up could not be downloaded: {err}",
+ "progress.denoise": "Cleaning up noise: {name}…",
+ "warn.denoise_missing": "Noise clean-up was requested but is not downloaded; the original recording was used.",
+ "warn.denoise_failed": "Noise clean-up failed for {n} file(s); the original audio was used for them."
 }

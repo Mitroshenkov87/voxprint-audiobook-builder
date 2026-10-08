@@ -43,6 +43,7 @@ SOURCES = {
     "einops": ("repo", "arogozhnikov/einops"),
     "onnxruntime": ("repo", "microsoft/onnxruntime"),
     "dnsmos-code": ("url", "https://raw.githubusercontent.com/microsoft/DNS-Challenge/591184a9fcb2cbdec02520fed81a32bbbf9d73ff/LICENSE-CODE"),   # DNSMOS reference code (MIT); the model itself is CC-BY-4.0
+    "deepfilternet": ("url", "https://raw.githubusercontent.com/Rikorose/DeepFilterNet/v0.5.6/LICENSE-MIT"),   # optional noise clean-up; dual MIT OR Apache-2.0, MIT chosen
     "nagisa": ("repo", "taishi-i/nagisa"),
     "sox": ("repo", "rabitt/pysox"),
     "ru-normalizr": ("repo", "NickZaitsev/ru-normalizr"),

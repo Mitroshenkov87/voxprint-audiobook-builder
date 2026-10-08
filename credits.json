@@ -105,6 +105,22 @@
    }
   },
   {
+   "id": "deepfilternet",
+   "name": "DeepFilterNet3 (deep-filter 0.5.6, Rikorose/DeepFilterNet)",
+   "kind": "model",
+   "ship": "download",
+   "license": "MIT OR Apache-2.0 (MIT chosen)",
+   "license_files": [
+    "deepfilternet"
+   ],
+   "url": "https://github.com/Rikorose/DeepFilterNet",
+   "purpose": {
+    "en": "Optional noise clean-up of a noisy training recording (downloaded on request from the Train window, about 27 MB, runs on the CPU; the program embeds the DeepFilterNet3 model). Credit: Schröter, Rosenkranz, Escalante-B., Maier, \"DeepFilterNet: Perceptually Motivated Real-Time Speech Enhancement\", INTERSPEECH 2023; used unmodified",
+    "de": "Optionale Rauschunterdrückung einer verrauschten Trainingsaufnahme (auf Wunsch im Trainingsfenster geladen, ca. 27 MB, läuft auf der CPU; das Programm enthält das Modell DeepFilterNet3). Quelle: Schröter, Rosenkranz, Escalante-B., Maier, \"DeepFilterNet: Perceptually Motivated Real-Time Speech Enhancement\", INTERSPEECH 2023; unverändert verwendet",
+    "ru": "Необязательное шумоподавление шумной записи для обучения (скачивается по запросу в окне обучения, около 27 МБ, работает на процессоре; программа содержит модель DeepFilterNet3). Авторы: Schröter, Rosenkranz, Escalante-B., Maier, «DeepFilterNet: Perceptually Motivated Real-Time Speech Enhancement», INTERSPEECH 2023; используется без изменений"
+   }
+  },
+  {
    "id": "opus-mt",
    "name": "Opus-MT translation models (Helsinki-NLP/opus-mt-ru-en, en-ru, de-en, en-de)",
    "kind": "model",

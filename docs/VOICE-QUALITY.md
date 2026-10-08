@@ -178,3 +178,27 @@ normaliser rather than at the voice), and whether the retries are audibly better
 Needs the GPU laptop: peak VRAM of a 20 s clip on the 16 GB card (1.7B, no 8-bit Adam) and of a 15 s clip on an 8 GB card,
 the share of > 12 s clips on a real recording, and whether long-passage stability improves (narrate a chapter with sentences
 longer than 30 s of speech before / after).
+
+## B5. Optional noise clean-up of noisy recordings (research item 10)
+
+Licence check of the candidates (2026-10-08):
+
+| Candidate | Licence | Size / runtime | Decision |
+| --- | --- | --- | --- |
+| DeepFilterNet3 (`deep-filter` 0.5.6 program, Rikorose/DeepFilterNet) | MIT OR Apache-2.0 (code and bundled models) | one 26.9 MB program (Windows) with the model embedded, CPU, real-time factor ~0.2 | **used** |
+| MossFormer2_SE_48K (ClearerVoice-Studio) | Apache-2.0 | PyTorch pipeline + a larger checkpoint | not used: more code and download for the same job |
+| Sidon (sarulab-speech) | MIT | needs w2v-BERT 2.0 (~600M parameters) + vocoder, GPU | not used: too heavy for an optional step |
+
+`infra/denoise_tool.py` pins the program per platform (URL, size, SHA-256; Windows x64 and Linux x64; other platforms: not
+offered). It is a **separate optional download**: only the button in the Train window fetches it, never the "download all"
+step and never the training itself. `core/denoise.py` cleans a copy of each recording (48 kHz, `-D` delay compensation,
+attenuation limit 30 dB so a little natural background stays instead of full-suppression artefacts; same length as the
+original) into `<job>/denoised/`; the original is never modified. `TaskRequest.denoise` (default off).
+
+When it is offered: after a recording is chosen, the DNSMOS P.835 background score (BAK, 1-5) of up to 6 excerpts of 10 s is
+computed in the background (only if the DNSMOS file is installed). Below 3.0 the Train window shows a hint, an unticked
+check box and the download button; otherwise nothing is shown. A failed clean-up keeps the original file (warning).
+
+Needs the GPU laptop / real recordings: whether BAK < 3.0 separates "audibly noisy" from "fine" home recordings, whether the
+30 dB limit leaves audible artefacts in the trained voice (A/B: same noisy recording with / without the clean-up), and the
+Windows program on a real machine (only the Linux build was smoke-tested on the box with a synthetic signal).

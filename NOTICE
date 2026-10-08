@@ -17,6 +17,10 @@ Not covered by that licence (each has its own terms):
     (https://creativecommons.org/licenses/by/4.0/), used unmodified. Reddy, Gopal, Cutler: "DNSMOS P.835: a non-intrusive
     perceptual objective speech quality metric to evaluate noise suppressors", ICASSP 2022. core/mos.py follows the
     MIT-licensed reference code DNSMOS/dnsmos_local.py of the same repository (licenses/dnsmos-code.txt).
+  * DeepFilterNet3 noise clean-up (the deep-filter 0.5.6 program, which embeds the model), optional download on request:
+    (c) 2021 Hendrik Schröter, https://github.com/Rikorose/DeepFilterNet, dual-licensed MIT OR Apache-2.0, used under the
+    MIT licence (licenses/deepfilternet.txt), unmodified. Schröter, Rosenkranz, Escalante-B., Maier: "DeepFilterNet:
+    Perceptually Motivated Real-Time Speech Enhancement", INTERSPEECH 2023.
 
 Voxprint AI Audiobook Builder is an independent project and is not affiliated with other products or services
 with similar names.

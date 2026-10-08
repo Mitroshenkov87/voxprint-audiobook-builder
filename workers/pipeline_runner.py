@@ -80,6 +80,7 @@ class TaskRequest:
     auto_pick: bool = False              # LoRA: hold out ~5 % of the clips, then pick the best checkpoint + strength (core/checkpoint_pick.py)
     clip_max_cer: float = 0.0            # audio + text, LoRA / dataset: drop clips whose ASR re-reading differs by more (core/clip_check.py; 0 = off)
     max_clip_s: float = 15.0             # audio + text: longest training clip, 12-20 s (core/slicer.long_clip_config; 12 = classic cut)
+    denoise: bool = False                # noise clean-up of the recording(s) first (core/denoise.py); only offered for noisy input
 
     def voice_name(self) -> str:
         """Voice name = the recording's file name (or the adapter folder's name); also the result folder name in ``output/``."""
@@ -229,6 +230,42 @@ def _register_voice(adapter_dir: Path, info: dict, library=None, typed_id: bool 
     except Exception as exc:  # noqa: BLE001 - the adapter itself is already saved; never fail the run for the library
         log.warning("cannot register the voice in the library: %s", exc)
         return ""
+
+
+def _denoise_inputs(req: TaskRequest, root: Path, progress: ProgressCallback, cancel: CancelToken,
+                    tool: Optional[Path] = None, run=None):
+    """``(request, warning)``: with ``req.denoise`` the recordings are cleaned into ``<job>/denoised`` and the request points
+    at the copies (the originals are never touched).  The program is never downloaded here: missing -> a warning, original
+    audio.  A failed clean-up of a file keeps that file as it is (warning)."""
+    if not req.denoise:
+        return req, ""
+    import dataclasses
+
+    from core import denoise
+    from infra import denoise_tool
+
+    tool = tool or denoise_tool.ready()
+    if tool is None:
+        return req, tr("warn.denoise_missing")
+    if req.no_transcript:
+        from core.asr_dataset import expand_inputs
+
+        files = expand_inputs(req.audio_files)          # folders of clips -> the clips (each cleaned on its own)
+    else:
+        files = [req.audio]
+    out, failed = [], 0
+    for i, src in enumerate(files):
+        cancel.check()
+        progress(Stage.ALIGN, i / max(1, len(files)), tr("progress.denoise", name=Path(src).name))
+        dst = root / "denoised" / f"{i + 1:02d}_{Path(src).stem}.wav"
+        try:
+            out.append(denoise.denoise_file(Path(src), dst, tool, run=run))
+        except Exception as exc:  # noqa: BLE001 - the clean-up is optional: train on the original instead
+            log.warning("noise clean-up of %s failed: %s", src, exc)
+            out.append(Path(src))
+            failed += 1
+    req = dataclasses.replace(req, audio_files=out) if req.no_transcript else dataclasses.replace(req, audio=out[0])
+    return req, tr("warn.denoise_failed", n=failed) if failed else ""
 
 
 def _slice_config(req: TaskRequest, gpu=None):
@@ -464,6 +501,7 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
     progress(Stage.UPDATES, 0.0, tr("upd.checking"))
     summary = safe_auto_update(progress, updater)
     cancel.check()
+    req, denoise_warn = _denoise_inputs(req, root, progress, cancel)
 
     if req.no_transcript:   # audio only: ASR -> quality gates -> merged dataset (no aligner, no text file)
         from core.asr import make_default_asr
@@ -509,6 +547,8 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
                 pass
     res = TaskResult(req.kind, root, dataset_dir, n_segments=build.n_segments, warnings=list(build.warnings),
                      update_summary=summary, asr_report=getattr(build, "asr_report", None))
+    if denoise_warn:
+        res.warnings.append(denoise_warn)
     if preview:
         res.previews = _run_preview(req, build, dataset_dir, root, progress, cancel, asr_factory, synth_deps or {})
         return res

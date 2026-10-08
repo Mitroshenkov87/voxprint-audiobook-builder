@@ -260,6 +260,8 @@ class MainWindow(QWidget):
     closing = Signal()               # the user closed this window
     language_changed = Signal()      # the UI language was switched here
     voice_type_suggested = Signal(str, float)   # (type, median pitch in Hz) from the background pitch analysis
+    noise_scored = Signal(object)               # DNSMOS background score of the chosen recording(s) or None (core/denoise.py)
+    denoise_downloaded = Signal(str)            # "" = the clean-up program is ready, else the error text
     def __init__(self, runner: Callable[..., Any] = run_task, updater_factory: Optional[Callable[[], Any]] = None,
                  autocheck: bool = True, auto_open_folder: bool = True,
                  prefetch_fn: Optional[Callable[..., Any]] = None, prefetch: bool = False,
@@ -569,6 +571,31 @@ class MainWindow(QWidget):
         self.clipmax_row = QWidget()
         self.clipmax_row.setLayout(lrow)
         root.addWidget(self.clipmax_row)
+        # optional noise clean-up (core/denoise.py): the row appears ONLY when the recording sounds noisy; never ticked by itself
+        drow = QVBoxLayout()
+        drow.setContentsMargins(0, 0, 0, 0)
+        self.lbl_denoise = QLabel()
+        self.lbl_denoise.setWordWrap(True)
+        self.lbl_denoise.setObjectName("hint")
+        dline = QHBoxLayout()
+        self.chk_denoise = QCheckBox()
+        self.btn_denoise_dl = QPushButton()
+        dline.addWidget(self.chk_denoise)
+        dline.addWidget(self.btn_denoise_dl)
+        dline.addStretch(1)
+        drow.addWidget(self.lbl_denoise)
+        drow.addLayout(dline)
+        self.denoise_row = QWidget()
+        self.denoise_row.setLayout(drow)
+        self.denoise_row.setVisible(False)
+        root.addWidget(self.denoise_row)
+        self.noise_bak = None
+        self._noise_token = 0
+        self._denoise_downloading = False
+        self.noise_scorer = None            # tests: callable(files) -> background score; None = DNSMOS if installed
+        self.noise_scored.connect(self._apply_noise_score)
+        self.denoise_downloaded.connect(self._on_denoise_downloaded)
+        self.btn_denoise_dl.clicked.connect(self.download_denoise)
         self.lbl_preview_estimate = QLabel()
         self.lbl_preview_estimate.setObjectName("hint")
         self.lbl_preview_estimate.setWordWrap(True)
@@ -767,6 +794,11 @@ class MainWindow(QWidget):
         self.chk_clipcheck.setToolTip(tr("clipcheck.tip"))
         self.sp_clipcer.setToolTip(tr("clipcheck.tip"))
         self.lbl_clipmax.setText(tr("clipmax.label"))
+        self.chk_denoise.setText(tr("denoise.checkbox"))
+        self.chk_denoise.setToolTip(tr("denoise.tip"))
+        self.btn_denoise_dl.setText(tr("denoise.download", mb=self._denoise_mb()))
+        if self.noise_bak is not None:
+            self.lbl_denoise.setText(tr("denoise.hint", bak=f"{self.noise_bak:.1f}"))
         self.lbl_clipmax.setToolTip(tr("clipmax.tip"))
         self.sp_clipmax.setToolTip(tr("clipmax.tip"))
         self.btn_lora.setText(tr("ui.btn_lora"))
@@ -878,6 +910,7 @@ class MainWindow(QWidget):
         self._on_preset()
         self._refresh_buttons()
         self._suggest_voice_type(self.audio)
+        self._assess_noise()
 
     def _on_voice_more_toggled(self, on: bool) -> None:
         """Show / hide the optional speaker, prepared-by, organization and project-link fields."""
@@ -911,6 +944,110 @@ class MainWindow(QWidget):
                     pass
 
         threading.Thread(target=work, daemon=True).start()
+
+    # ------------------------------------------------------------------ optional noise clean-up (core/denoise.py)
+    def _noise_inputs(self) -> list:
+        if self.no_transcript:
+            from core.asr_dataset import expand_inputs
+
+            return expand_inputs(self.audio_files)
+        return [self.audio] if self.audio else []
+
+    @staticmethod
+    def _denoise_mb() -> int:
+        from infra import denoise_tool
+
+        return int(round(denoise_tool.download_size() / 1e6))
+
+    def _assess_noise(self) -> None:
+        """Score the background noise of the chosen recording(s) in a background thread (DNSMOS, if installed)."""
+        import threading
+
+        from infra import denoise_tool
+
+        self._noise_token += 1
+        token = self._noise_token
+        self._apply_noise_score(None)
+        files = self._noise_inputs()
+        if not files or denoise_tool.platform_key() is None:
+            return
+        scorer = self.noise_scorer
+        if scorer is None:
+            from core import denoise, mos
+
+            m = mos.default_mos()
+            if m is None:                       # no DNSMOS file: no score, no suggestion
+                return
+            scorer = lambda fs: denoise.background_score(fs, m)  # noqa: E731
+
+        def work() -> None:
+            try:
+                bak = scorer(files)
+            except Exception:  # noqa: BLE001 - a hint must never get in the way
+                bak = None
+            if token == self._noise_token:
+                try:
+                    self.noise_scored.emit(bak)
+                except RuntimeError:            # the window was closed meanwhile
+                    pass
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _apply_noise_score(self, bak) -> None:
+        """Offer the clean-up only for a noisy recording (low DNSMOS background score); it is never ticked by itself."""
+        from core import denoise
+
+        self.noise_bak = bak
+        show = denoise.should_suggest(bak)
+        if not show:
+            self.chk_denoise.setChecked(False)
+        else:
+            self.lbl_denoise.setText(tr("denoise.hint", bak=f"{bak:.1f}"))
+        self.denoise_row.setVisible(show)
+        self._sync_denoise_controls()
+
+    def _sync_denoise_controls(self) -> None:
+        from infra import denoise_tool
+
+        installed = denoise_tool.ready() is not None
+        self.chk_denoise.setEnabled(installed and not self.busy)
+        if not installed:
+            self.chk_denoise.setChecked(False)
+        self.btn_denoise_dl.setVisible(not installed)
+        self.btn_denoise_dl.setEnabled(not self.busy and not self._denoise_downloading)
+
+    def download_denoise(self, ensure: Optional[Callable[..., Any]] = None) -> None:
+        """The separate optional download of the clean-up program, on the user's click only."""
+        import threading
+
+        from infra import denoise_tool
+
+        ensure = ensure or denoise_tool.ensure
+        self._denoise_downloading = True
+        self._sync_denoise_controls()
+        self.lbl_status.setText(tr("progress.downloading", short=denoise_tool.LABEL, pct=0))
+
+        def work() -> None:
+            try:
+                ensure()
+                err = ""
+            except Exception as exc:  # noqa: BLE001 - shown to the user
+                err = str(exc) or type(exc).__name__
+            try:
+                self.denoise_downloaded.emit(err)
+            except RuntimeError:
+                pass
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_denoise_downloaded(self, err: str) -> None:
+        self._denoise_downloading = False
+        self._sync_denoise_controls()
+        if err:
+            self.lbl_status.setText(tr("denoise.download_failed", err=err))
+            return
+        self.lbl_status.setText("")
+        self.chk_denoise.setChecked(True)       # the user asked for the program just now: use it for this recording
 
     def _apply_voice_type_suggestion(self, kind: str, hz: float) -> None:
         """Show the suggestion; select it if the user has not chosen a type yet."""
@@ -1058,7 +1195,8 @@ class MainWindow(QWidget):
         return dict(compare=self.chk_compare.isChecked(), quality_check=self.chk_check.isChecked(),
                     auto_pick=self.chk_pick.isChecked(), adapter_scale=getattr(self, "preview_scale", None),
                     clip_max_cer=self.sp_clipcer.value() / 100.0 if self.chk_clipcheck.isChecked() else 0.0,
-                    max_clip_s=float(self.sp_clipmax.value()))
+                    max_clip_s=float(self.sp_clipmax.value()),
+                    denoise=not self.denoise_row.isHidden() and self.chk_denoise.isChecked())
 
     def _consent_kwargs(self) -> dict:
         return dict(consent_mode=self.consent_mode, consent_scope=str(self.cmb_consent_scope.currentData()),
@@ -1178,6 +1316,7 @@ class MainWindow(QWidget):
         self._apply_text_row()      # the text row stays: in this mode it is the OPTIONAL script that was read aloud
         self._show_audio_label()
         self._refresh_buttons()
+        self._assess_noise()        # the other mode has other recordings
 
     def _apply_text_row(self) -> None:
         """Texts of the text row: the transcript (normal mode) or the optional recording script (audio-only mode)."""
@@ -1198,6 +1337,7 @@ class MainWindow(QWidget):
         self._show_audio_label()
         self._on_preset()
         self._refresh_buttons()
+        self._assess_noise()
 
     def _show_audio_label(self) -> None:
         if self.no_transcript:
@@ -1300,6 +1440,7 @@ class MainWindow(QWidget):
         self.chk_clipcheck.setEnabled(not busy)
         self.sp_clipcer.setEnabled(not busy and self.chk_clipcheck.isChecked())
         self.sp_clipmax.setEnabled(not busy)
+        self._sync_denoise_controls()
         if self._settings is not None:
             self._settings.refresh()
         self.btn_cancel.setVisible(bool(self.worker and self.worker.isRunning()))

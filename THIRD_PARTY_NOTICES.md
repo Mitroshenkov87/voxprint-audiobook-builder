@@ -56,6 +56,14 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 * Status: downloaded on first start
 * Licence text: [`licenses/CC-BY-4.0.txt`](licenses/CC-BY-4.0.txt), [`licenses/dnsmos-code.txt`](licenses/dnsmos-code.txt)
 
+### DeepFilterNet3 (deep-filter 0.5.6, Rikorose/DeepFilterNet)
+
+* Purpose: Optional noise clean-up of a noisy training recording (downloaded on request from the Train window, about 27 MB, runs on the CPU; the program embeds the DeepFilterNet3 model). Credit: Schröter, Rosenkranz, Escalante-B., Maier, "DeepFilterNet: Perceptually Motivated Real-Time Speech Enhancement", INTERSPEECH 2023; used unmodified
+* Licence: MIT OR Apache-2.0 (MIT chosen)
+* Project: <https://github.com/Rikorose/DeepFilterNet>
+* Status: downloaded on first start
+* Licence text: [`licenses/deepfilternet.txt`](licenses/deepfilternet.txt)
+
 ### Opus-MT translation models (Helsinki-NLP/opus-mt-ru-en, en-ru, de-en, en-de)
 
 * Purpose: Optional offline machine translation of a book before narration (English, Russian, German; downloaded on request, about 300 MB per direction). Credit: OPUS-MT, University of Helsinki / Helsinki-NLP (Tiedemann and Thottingal, 2020). Machine translation quality varies.
