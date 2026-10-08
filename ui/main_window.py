@@ -1823,7 +1823,9 @@ class MainWindow(QWidget):
         self.maybe_show_privacy_notice()
         if not self._os_check.ok and self._os_check.message and \
                 os.environ.get("QT_QPA_PLATFORM") != "offscreen":
-            QMessageBox.information(self, APP_TITLE, self._os_check.message)
+            from ui import std_buttons
+
+            std_buttons.information(self, APP_TITLE, self._os_check.message)
         self.refresh_status()
         if self.busy:
             return
@@ -1838,7 +1840,9 @@ class MainWindow(QWidget):
         """Show the privacy notice on the very first run.  Under offscreen (tests) nothing is shown or stored."""
         if privacy_acknowledged() or os.environ.get("QT_QPA_PLATFORM") == "offscreen":
             return False
-        QMessageBox.information(self, tr("ui.privacy_title"), tr("ui.privacy_text"))
+        from ui import std_buttons
+
+        std_buttons.information(self, tr("ui.privacy_title"), tr("ui.privacy_text"))
         acknowledge_privacy()
         return True
 

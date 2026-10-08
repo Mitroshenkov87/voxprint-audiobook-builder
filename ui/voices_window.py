@@ -803,7 +803,9 @@ class VoicesWindow(SubWindow):
             return bool(self._confirm(title, text))
         if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
             return False
-        return QMessageBox.question(self, title, text) == QMessageBox.StandardButton.Yes
+        from ui import std_buttons
+
+        return std_buttons.question(self, title, text)
 
     def open_repository(self) -> None:
         """Show the repository dialog (non-blocking offscreen)."""

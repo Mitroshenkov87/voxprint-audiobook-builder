@@ -52,6 +52,14 @@ def _abandon(folder: Path, th: threading.Thread) -> None:
             _abandoned[_key(folder)] = th
 
 
+def busy(folder: Path) -> bool:
+    """True while a helper thread that was given up on still runs for ``folder`` (it may hold files open there, e.g. the
+    lock files of huggingface_hub in ``.cache``)."""
+    with _abandoned_lock:
+        th = _abandoned.get(_key(folder))
+    return th is not None and th.is_alive()
+
+
 def wait_released(folder: Path, timeout: Optional[float] = None) -> bool:
     """Wait until an abandoned helper thread of ``folder`` has ended (two downloads must never write the same partial
     files: Windows refuses with WinError 32 / 5).  Returns False if it is still running after ``timeout``."""
@@ -90,6 +98,52 @@ def dir_bytes(folder: Path) -> int:
                         continue
         except OSError:
             continue
+    return total
+
+
+_PARTS = ".incomplete.parts"
+_OURS_INCOMPLETE = ".incomplete"
+
+
+def progress_bytes(folder: Path) -> int:
+    """Bytes of the download in ``folder`` for the progress line, each file counted ONCE.
+
+    :func:`dir_bytes` counts everything (right for the stall watchdog: any growth is activity), but the same file can be on
+    disk several times while it is assembled or re-fetched: the multi-connection parts (``X.incomplete.parts/``), the joined
+    ``X.incomplete`` and the finished ``X``; the temporary ``*.assembling`` copy; the lock and metadata files of
+    huggingface_hub.  Here a finished file wins over its ``.incomplete`` and parts, ``*.assembling`` is ignored and only the
+    ``*.incomplete`` downloads of the hub's ``.cache`` count."""
+    total = 0
+    stack = [(str(folder), False)]
+    while stack:
+        cur, in_cache = stack.pop()
+        try:
+            with os.scandir(cur) as it:
+                entries = list(it)
+        except OSError:
+            continue
+        names = {e.name for e in entries}
+        for e in entries:
+            try:
+                if e.is_dir(follow_symlinks=False):
+                    if e.name.endswith(_PARTS):
+                        base = e.name[: -len(_PARTS)]
+                        if base in names or base + _OURS_INCOMPLETE in names:
+                            continue                     # already joined / finished: the parts are a duplicate
+                    stack.append((e.path, in_cache or e.name == ".cache"))
+                    continue
+                n = e.name
+                if n.endswith(".assembling"):
+                    continue
+                if in_cache:
+                    if n.endswith(_OURS_INCOMPLETE):     # the hub's running download (lock / metadata files are not data)
+                        total += e.stat(follow_symlinks=False).st_size
+                    continue
+                if n.endswith(_OURS_INCOMPLETE) and n[: -len(_OURS_INCOMPLETE)] in names:
+                    continue                             # finished file next to a stale partial copy
+                total += e.stat(follow_symlinks=False).st_size
+            except OSError:
+                continue
     return total
 
 
@@ -229,9 +283,9 @@ def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threa
 
     th = threading.Thread(target=target, daemon=True, name="vx-model-download")
     th.start()
-    base = dir_bytes(folder)
+    base = dir_bytes(folder)                  # raw growth = activity (stall watchdog)
     last_size, last_move, last_log = base, clock(), clock()
-    meter.sample(base)
+    meter.sample(progress_bytes(folder))      # each file once (progress line)
     while True:
         th.join(poll)
         if not th.is_alive():
@@ -240,7 +294,7 @@ def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threa
         now = clock()
         if size != last_size:
             last_size, last_move = size, now
-        meter.sample(size)
+        meter.sample(progress_bytes(folder))
         if on_tick is not None:
             try:
                 on_tick(meter)
@@ -248,8 +302,9 @@ def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threa
                 pass
         if now - last_log >= log_every:
             last_log = now
-            log.info("download via %s: %s%s, %s/s", meter.source, fmt_bytes(meter.done),
-                     f" of {fmt_bytes(meter.total)}" if meter.total else "", fmt_bytes(meter.speed))
+            total = meter.total
+            log.info("download via %s: %s%s, %s/s", meter.source, fmt_bytes(min(meter.done, total) if total else meter.done),
+                     f" of {fmt_bytes(total)}" if total else "", fmt_bytes(meter.speed))
         if now - last_move >= stall:
             if idle_ok is not None and idle_ok():
                 # nothing is left to download (everything is on disk): that is not a stall - finish with what we have

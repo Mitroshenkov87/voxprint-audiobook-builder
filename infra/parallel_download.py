@@ -324,6 +324,67 @@ def download_file(url: str, target: Path, size: int, *, opener: Optional[Opener]
     shutil.rmtree(parts_dir, ignore_errors=True)
 
 
+#: One file that fails (a TLS handshake timeout to huggingface.co, a reset) is tried again this many times, ``FILE_BACKOFF``
+#: seconds doubling in between, before the whole model falls back to another path.
+FILE_RETRIES = 3
+FILE_BACKOFF = 1.0
+_sleep = time.sleep
+
+
+def _pause(seconds: float, cancel: Optional[threading.Event]) -> None:
+    """Sleep ``seconds`` in short slices; an abandoned download (``cancel``) ends the wait at once."""
+    end = time.monotonic() + seconds
+    while True:
+        _check_cancel(cancel)
+        left = end - time.monotonic()
+        if left <= 0:
+            return
+        _sleep(min(0.25, left))
+
+
+def _permanent(exc: BaseException) -> bool:
+    """An HTTP 4xx answer (not found, forbidden ...): asking again would not help (408 / 429 are worth a retry)."""
+    e: Optional[BaseException] = exc
+    for _ in range(5):
+        if e is None:
+            break
+        code = getattr(e, "code", None)
+        if isinstance(e, urllib.error.HTTPError) and isinstance(code, int):
+            return 400 <= code < 500 and code not in (408, 429)
+        e = e.__cause__ or e.__context__
+    return False
+
+
+def remaining(files: Dict[str, int], dest: Path) -> List[str]:
+    """Names of ``files`` (``{name: size}``) that are not complete in ``dest`` yet (missing or another size)."""
+    out = []
+    for name, size in files.items():
+        if not _safe_rel(name):
+            continue
+        p = Path(dest).joinpath(*name.split("/"))
+        try:
+            if p.is_file() and (int(size) <= 0 or p.stat().st_size == int(size)):
+                continue
+        except OSError:
+            pass
+        out.append(name)
+    return out
+
+
+def discard_partials(dest: Path, names: Iterable[str]) -> None:
+    """Remove this module's unfinished pieces (``X.incomplete``, ``X.incomplete.parts/``) of ``names``: before another
+    downloader fetches those files they would only be counted twice (and could not be resumed by it anyway)."""
+    for name in names:
+        if not _safe_rel(name):
+            continue
+        target = Path(dest).joinpath(*name.split("/"))
+        shutil.rmtree(_parts_dir(target), ignore_errors=True)
+        try:
+            _incomplete(target).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def download_listed(files: Dict[str, int], dest: Path, url_for: Callable[[str], str], *,
                     opener: Optional[Opener] = None, progress: Callable[[float], None] = lambda f: None,
                     cancel: Optional[threading.Event] = None, timeout: float = 30.0,
@@ -331,7 +392,8 @@ def download_listed(files: Dict[str, int], dest: Path, url_for: Callable[[str], 
     """Download every ``{relative_path: size}`` into ``dest`` (resuming).  ``url_for(name)`` builds the URL.
 
     ``progress`` receives an overall 0..1 fraction.  Glob ``patterns`` (like HF ``allow_patterns``)
-    select a subset.  Raises :class:`ParallelError` on the first failed file (partials stay for resume).
+    select a subset.  A failed file is tried again ``FILE_RETRIES`` times with a growing pause (it resumes from its parts);
+    :class:`ParallelError` is raised only when a file failed every time (partials stay for resume).
     """
     import fnmatch
 
@@ -357,13 +419,24 @@ def download_listed(files: Dict[str, int], dest: Path, url_for: Callable[[str], 
             continue
         base = done
         lock = threading.Lock()
+        for attempt in range(FILE_RETRIES + 1):
+            seen = [0]                     # bytes of THIS attempt (a resumed attempt reports the bytes on disk again)
 
-        def on_bytes(n: int, _b=[0]) -> None:  # noqa: B006 - per-file counter
-            with lock:  # noqa: B023 - called within this iteration
-                _b[0] += n
-                progress(min(1.0, (base + _b[0]) / total))  # noqa: B023
+            def on_bytes(n: int, _b=seen) -> None:
+                with lock:  # noqa: B023 - called within this iteration
+                    _b[0] += n
+                    progress(min(1.0, (base + _b[0]) / total))  # noqa: B023
 
-        download_file(url_for(name), target, size, opener=opener, on_bytes=on_bytes,
-                      cancel=cancel, timeout=timeout)
+            try:
+                download_file(url_for(name), target, size, opener=opener, on_bytes=on_bytes,
+                              cancel=cancel, timeout=timeout)
+                break
+            except ParallelError as exc:
+                if attempt >= FILE_RETRIES or _permanent(exc):
+                    raise
+                wait = FILE_BACKOFF * 2 ** attempt
+                log.warning("%s: attempt %d of %d failed (%s) - trying again in %.0f s", name, attempt + 1,
+                            FILE_RETRIES + 1, exc, wait)
+                _pause(wait, cancel)
         done += size if size > 0 else target.stat().st_size
         progress(min(1.0, done / total))

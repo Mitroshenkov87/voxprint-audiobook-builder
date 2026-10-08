@@ -40,7 +40,7 @@
 #define AppName "Voxprint"
 ; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
 #define AppDisplayName "Voxprint AI Audiobook Builder"
-#define AppVersion "0.1.2"
+#define AppVersion "0.1.3"
 #define AppExe "Voxprint.exe"
 ; CI build number and codename (tools/build_number.py; build_online.ps1 passes /DAppBuild= /DAppCodename=); 0 = local build
 #ifndef AppBuild
@@ -50,7 +50,7 @@
 #define AppCodename ""
 #endif
 ; Pinned sizes of the complete download in MiB (infra/setup_mode.py: full_sizes; tests/test_setup_modes.py keeps them in step)
-#define FullModelsMB "25369"
+#define FullModelsMB "25281"
 #define FullRuntimeMB "2895"
 #ifndef ManifestUrl
 #define ManifestUrl "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/latest/download/manifest-stable.json"
@@ -796,6 +796,17 @@ begin
     Log('vc_redist.x64.exe could not be started: ' + SysErrorMessage(Rc) + ' (ignored)');
 end;
 
+{ UI language code of the app (core/i18n.py LANGS) for the wizard language. }
+function AppLanguageCode(): String;
+begin
+  if ActiveLanguage = 'russian' then
+    Result := 'ru'
+  else if ActiveLanguage = 'german' then
+    Result := 'de'
+  else
+    Result := 'en';
+end;
+
 { Only paths are remembered (UTF-8 files in state\); no model is copied.  models_dir.txt = the models folder (deleted when it is the
   default, so the app follows its own default); existing_models_dir.txt = an optional folder to import models from (/ModelsDir=).
   A chosen folder with a Voxprint backup is NOT written to models_dir.txt: its root goes to existing_models_dir.txt and the app
@@ -852,8 +863,14 @@ begin
       Lines[0] := Dir;
       SaveStringsToUTF8File(StateDir + '\existing_models_dir.txt', Lines, False);
     end;
-    Lines[0] := SetupMode();                               { Full / Quick (infra/setup_mode.py) }
-    SaveStringsToUTF8File(StateDir + '\install_mode.txt', Lines, False);
+    Lines[0] := SetupMode();                               { Full / Quick (infra/setup_mode.py); no BOM }
+    SaveStringsToUTF8FileWithoutBOM(StateDir + '\install_mode.txt', Lines, False);
+    { the wizard language becomes the app's UI language, unless the user already chose one (core/i18n.py reads state\language) }
+    if not FileExists(StateDir + '\language') then
+    begin
+      Lines[0] := AppLanguageCode();
+      SaveStringsToUTF8FileWithoutBOM(StateDir + '\language', Lines, False);
+    end;
   end;
 end;
 
@@ -865,8 +882,9 @@ begin
   begin
     DataDir := ExpandConstant('{localappdata}\Voxprint');
     if DirExists(DataDir) then
-      if MsgBox(FmtMessage(CustomMessage('UninstallDataQuestion'), [DataDir]),
-         mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
+      { SuppressibleMsgBox: a silent uninstall (/SUPPRESSMSGBOXES) keeps the models and voices (IDNO) instead of waiting }
+      if SuppressibleMsgBox(FmtMessage(CustomMessage('UninstallDataQuestion'), [DataDir]),
+         mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES then
         DelTree(DataDir, True, True, True);
   end;
 end;

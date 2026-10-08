@@ -197,6 +197,162 @@
    "source_repo": "Helsinki-NLP/opus-mt-ru-en",
    "source_revision": "fbd6dc73284f95536648512cc21d57f19191961a"
   },
+  "Helsinki-NLP/opus-mt-tc-big-de-zle": {
+   "files": {
+    "config.json": {
+     "sha256": "87339bacf38f0f193b9f3b79c1cc0e4de4ed8fcdbd886b87f2be69caa1236a71",
+     "size": 1076
+    },
+    "generation_config.json": {
+     "sha256": "5c3d58c11c2cf673224cd7bb9c7ad3fac618ffb185c4478144a96623940bd3ef",
+     "size": 301
+    },
+    "model.safetensors": {
+     "sha256": "2af78d2ff8d53c73e88dd032506c0dff28d17fb6a828f8b572afe128dbe1647e",
+     "size": 478062830
+    },
+    "source.spm": {
+     "sha256": "dde526685600b958138d2b3863bf9b8be10774bf8a99573aede7db619c9b5eb0",
+     "size": 822915
+    },
+    "special_tokens_map.json": {
+     "sha256": "09059cedc26bc46bc09a52f05b92d4922e11917e87f3b92059bb1a63a59ab2c4",
+     "size": 65
+    },
+    "target.spm": {
+     "sha256": "3341e4c42304e509ef8068c1b0726be116a8ad90b513c62638db210bf47b4fb6",
+     "size": 1009491
+    },
+    "tokenizer_config.json": {
+     "sha256": "4cd738433f516c1205d9619098efdb383cde555fafd035f5410601908553f306",
+     "size": 336
+    },
+    "vocab.json": {
+     "sha256": "1afcad767fa7863a9a935f5b3e0efa0afa6a6918909b1fbffb14c5e2c07f3ff3",
+     "size": 2504592
+    }
+   },
+   "license": "CC-BY-4.0",
+   "source_repo": "Helsinki-NLP/opus-mt-tc-big-de-zle",
+   "source_revision": "d4db2a2cbaa6c2f1ea57d0ed40924d35767b05f9"
+  },
+  "Helsinki-NLP/opus-mt-tc-big-en-zle": {
+   "files": {
+    "config.json": {
+     "sha256": "962d235879c9def4cfdf140be81436d4fb9da25271dd69079df2c90b459f1332",
+     "size": 1076
+    },
+    "generation_config.json": {
+     "sha256": "d851d84c804c745d92dae5659bd2d8e8b976b664dd0fbc39b82ee88340147802",
+     "size": 301
+    },
+    "model.safetensors": {
+     "sha256": "e68caa9a233c177a3489257b69c18cece6da97767ab2581918ce3fc3c3899416",
+     "size": 478977130
+    },
+    "source.spm": {
+     "sha256": "3612abfe04bf08344ba91115f0e15e228a7a15a621ea856bfd548097dbaeb43c",
+     "size": 802747
+    },
+    "special_tokens_map.json": {
+     "sha256": "09059cedc26bc46bc09a52f05b92d4922e11917e87f3b92059bb1a63a59ab2c4",
+     "size": 65
+    },
+    "target.spm": {
+     "sha256": "22940e744b3a9fd166a04880938fb61f7dfa8ba4b5d2d3f6371a6c4ba8f3b019",
+     "size": 1017004
+    },
+    "tokenizer_config.json": {
+     "sha256": "41deeedfc0e3ce366d6bde180dee025a8ca1bcd62b1451889301e8ea4bcbb609",
+     "size": 339
+    },
+    "vocab.json": {
+     "sha256": "41dbdff4a0b5a6ab125715c3342c5ce6516e93ffd49608813240403f036c5efb",
+     "size": 2510527
+    }
+   },
+   "license": "CC-BY-4.0",
+   "source_repo": "Helsinki-NLP/opus-mt-tc-big-en-zle",
+   "source_revision": "708be1d372fe4c358a352f404e6dc9ca0126ba48"
+  },
+  "Helsinki-NLP/opus-mt-tc-big-zle-de": {
+   "files": {
+    "config.json": {
+     "sha256": "3365e8a0008b014e8360cfb8a48c21bcc250490e623d9fb38ba57372a9d4975a",
+     "size": 1076
+    },
+    "generation_config.json": {
+     "sha256": "3e5f85e6a764107acbf215671ce7b6a18b21cfb52f13892ff01498c71d4baf50",
+     "size": 301
+    },
+    "model.safetensors": {
+     "sha256": "cab19ba28674308c4e51bc05ebf19dd8f2b9cacbc339a350ec389c47cf591a96",
+     "size": 478134580
+    },
+    "source.spm": {
+     "sha256": "ce6c0b9887274cbaef5320aec5db60c5afab66f983723ac4051aa68523f9032f",
+     "size": 1008968
+    },
+    "special_tokens_map.json": {
+     "sha256": "09059cedc26bc46bc09a52f05b92d4922e11917e87f3b92059bb1a63a59ab2c4",
+     "size": 65
+    },
+    "target.spm": {
+     "sha256": "7c23b510033f9329f8f2c6200a5c8f2cedc03133690dbde920c0f4f14e6a8bda",
+     "size": 823197
+    },
+    "tokenizer_config.json": {
+     "sha256": "9946907fad1e49a4ff5e493feaaf3af386211feac30e9d883aaaea61cf822a14",
+     "size": 336
+    },
+    "vocab.json": {
+     "sha256": "768fd9a234ab432101826b4fd77ebea6aff67b1e461bc242d81877442db9fcfc",
+     "size": 2504322
+    }
+   },
+   "license": "CC-BY-4.0",
+   "source_repo": "Helsinki-NLP/opus-mt-tc-big-zle-de",
+   "source_revision": "b2e247f0c413ca6aa51a32f2f2be8666cf72405e"
+  },
+  "Helsinki-NLP/opus-mt-tc-big-zle-en": {
+   "files": {
+    "config.json": {
+     "sha256": "c3a0d99762cd5009ab0d9e793fab27b02a8362bb366191a58af677ea712c1263",
+     "size": 1076
+    },
+    "generation_config.json": {
+     "sha256": "aeafe756fb795970bccbb7c16391b79f42a4f9c1d5f32bc6e36b45f17cfa5a35",
+     "size": 301
+    },
+    "model.safetensors": {
+     "sha256": "78608083ed48db06dd4b0afdb58b1ac7e2a3648b295fac58449c131c7bf0cc2c",
+     "size": 477829130
+    },
+    "source.spm": {
+     "sha256": "a982dbb9362861151e36b0db1595b324cd1ce09acf46ce1f4d6d624e11c5807f",
+     "size": 1016851
+    },
+    "special_tokens_map.json": {
+     "sha256": "09059cedc26bc46bc09a52f05b92d4922e11917e87f3b92059bb1a63a59ab2c4",
+     "size": 65
+    },
+    "target.spm": {
+     "sha256": "e69faed7f1e60eec38c64cceba35cc4fb05ec6478082f4c8a14b141fd6596e9e",
+     "size": 802387
+    },
+    "tokenizer_config.json": {
+     "sha256": "1c99d6f6250779f482836b8380d5fdcaa3ab8c7b6f332a6fcec1d8040eeb6c00",
+     "size": 339
+    },
+    "vocab.json": {
+     "sha256": "92148daf001ba378588442dfcdc7c4529210f2f28635ebc092faecf508190680",
+     "size": 2492486
+    }
+   },
+   "license": "CC-BY-4.0",
+   "source_repo": "Helsinki-NLP/opus-mt-tc-big-zle-en",
+   "source_revision": "09a40f722d6d8b76aaad6fe51a06c914622a13d1"
+  },
   "Qwen/Qwen3-ASR-0.6B": {
    "files": {
     ".gitattributes": {

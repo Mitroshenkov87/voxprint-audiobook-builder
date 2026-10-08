@@ -64,6 +64,8 @@ def test_every_key_used_in_code_exists():
     used |= {f"preset.adv_{c}" for c in ("epochs", "rank", "alpha", "lr", "accum")}     # dynamic keys of the Train window presets
     from infra.install_state import ALL_CODES
     used |= {f"health.{c}" for c in ALL_CODES}          # install-check reason codes (dynamic key)
+    from ui.std_buttons import KEYS as BUTTON_KEYS
+    used |= set(BUTTON_KEYS.values())                     # standard dialog buttons (ui/std_buttons.py)
     en = _cat("en")
     used.discard("stage.")
     used -= {"preset.", "preset.desc_", "preset.adv_", "consent.badge_", "consent.hint_", "consent.mode_", "consent.scope_", "consent.tip_", "check.sugg_", "check.verdict_"}             # prefix of the dynamic keys stage.<stage>

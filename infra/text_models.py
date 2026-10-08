@@ -13,6 +13,7 @@ file sizes.
 from __future__ import annotations
 
 import hashlib
+import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +24,8 @@ from core.events import ProgressCallback, noop_progress
 from core.i18n import tr
 from infra import model_downloader as md
 from infra import model_mirrors
+
+log = logging.getLogger("voxprint.models")
 
 KIND_CLEANUP, KIND_PUNCT, KIND_STRESS, KIND_TRANSLATE, KIND_ROLES = "cleanup", "punct", "stress", "translate", "roles"
 STATE_READY, STATE_NEEDS_DOWNLOAD, STATE_PLANNED = "ready", "needs_download", "planned"
@@ -214,18 +217,52 @@ def missing_component_extras() -> List[TextModel]:
 
 def ensure_component_extras(progress: ProgressCallback = noop_progress, ensure_fn=None) -> List[str]:
     """Download the missing :data:`COMPONENT_EXTRAS` one after another (pinned revision, hash-checked, existing models folder /
-    backup first: see :func:`ensure`).  ``progress(stage, overall_fraction, message)``; returns the keys that were fetched."""
+    backup first: see :func:`ensure`).  ``progress(stage, overall_fraction, message)``; returns the keys that were fetched.
+
+    One model that fails does not stop the others: every model is tried, then the first error is raised again (with
+    ``fetched`` / ``failed`` key lists attached) so the caller still learns that something is missing.  Cancelling stops at once."""
+    from core.errors import CancelledByUser
+
     ensure_fn = ensure_fn or ensure
     todo = missing_component_extras()
     total = float(sum(max(1, m.size_mb) for m in todo)) or 1.0
     done = 0.0
+    fetched: List[str] = []
+    failed: List[Tuple[str, BaseException]] = []
     for m in todo:
         def sub(stage, f, msg="", base=done, share=max(1, m.size_mb)):
             progress(stage, min(1.0, (base + share * float(f)) / total), msg)
 
-        ensure_fn(m, sub)
+        try:
+            ensure_fn(m, sub)
+            fetched.append(m.key)
+        except CancelledByUser:
+            raise
+        except Exception as exc:  # noqa: BLE001 - the next model is tried; the error is raised after the loop
+            log.warning("%s could not be downloaded (%s) - continuing with the next model", m.key, exc)
+            failed.append((m.key, exc))
         done += max(1, m.size_mb)
-    return [m.key for m in todo]
+    if failed:
+        first = failed[0][1]
+        try:
+            first.fetched = fetched                     # type: ignore[attr-defined]
+            first.failed = [k for k, _ in failed]       # type: ignore[attr-defined]
+        except Exception:  # noqa: BLE001 - an exception type without a __dict__
+            pass
+        raise first
+    return fetched
+
+
+def missing_other_integrated() -> List[TextModel]:
+    """Integrated models outside :data:`COMPONENT_EXTRAS` that are not on the disk yet (the 2020 Opus-MT ru <-> en fallbacks):
+    part of the complete set of the Full / Quick setup."""
+    return [m for m in REGISTRY if m.integrated and m.repo and m.key not in COMPONENT_EXTRAS
+            and state(m) == STATE_NEEDS_DOWNLOAD]
+
+
+def repos() -> List[str]:
+    """Repositories of every integrated text model (they are downloaded with their file patterns, never as a whole)."""
+    return [m.repo for m in REGISTRY if m.integrated and m.repo]
 
 
 def sha256_of(path: Path) -> str:

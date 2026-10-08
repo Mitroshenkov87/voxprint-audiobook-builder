@@ -655,15 +655,29 @@ def _prefetch_text_extras(progress: ProgressCallback) -> None:
         log.warning("translator / text model download failed: %s", exc)
 
 
+def _prefetch_text_fallbacks(progress: ProgressCallback) -> None:
+    """Full / Quick setup only: the other integrated text models (the 2020 Opus-MT ru <-> en fallbacks), with their file
+    patterns (as plain repositories they would bring TensorFlow / Flax / Rust copies of the weights).  Best effort."""
+    from infra import text_models
+
+    for m in text_models.missing_other_integrated():
+        try:
+            text_models.ensure(m, lambda s, f, msg="": progress(Stage.MODEL, float(f), msg))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("%s download failed: %s", m.key, exc)
+
+
 def all_model_repos() -> List[str]:
     """Every pinned model repository (both TTS and both speech-recognition sizes, the aligner, SAGE, the translators): the
     complete set of the Full / Quick setup (:mod:`infra.setup_mode`).  OpenVoice V2 lives in its own folder
-    (:mod:`infra.vc_model`) and the tc-big translators come with :func:`_prefetch_text_extras`."""
-    from infra import model_mirrors, vc_model
+    (:mod:`infra.vc_model`) and the translators come with :func:`_prefetch_text_extras` - with their file patterns: as a
+    plain repository they would bring their TensorFlow / Flax / Rust copies of the weights too."""
+    from infra import model_mirrors, text_models, vc_model
 
     repos = list(required_model_repos())
+    text = set(text_models.repos()) - set(repos)          # SAGE stays (it is required and has no patterns)
     for repo in sorted(model_mirrors.load()):
-        if repo != vc_model.REPO and repo not in repos:
+        if repo != vc_model.REPO and repo not in repos and repo not in text:
             repos.append(repo)
     return repos
 
@@ -697,7 +711,8 @@ def everything_missing() -> bool:
     """True while anything of the complete set (:func:`all_model_repos` + the optional modules) is not on the disk."""
     from infra import denoise_tool, llm_tool, quality_models, text_models, vc_model
 
-    return bool(models_missing(all_model_repos()) or text_models.missing_component_extras() or not vc_model.ready()
+    return bool(models_missing(all_model_repos()) or text_models.missing_component_extras()
+                or text_models.missing_other_integrated() or not vc_model.ready()
                 or (denoise_tool.platform_key() is not None and denoise_tool.ready() is None)
                 or not quality_models.dnsmos_ready()
                 or (llm_tool.platform_key() is not None and (llm_tool.server_exe() is None or not llm_tool.model_ready())))
@@ -736,6 +751,7 @@ def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[
         _prefetch_text_extras(progress)
         _prefetch_small_optional(progress)
         if everything:
+            _prefetch_text_fallbacks(progress)
             _prefetch_big_optional(progress)
     if ensure is md.ensure_model and sys.platform == "win32":
         from infra import (

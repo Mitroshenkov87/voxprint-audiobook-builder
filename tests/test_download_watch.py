@@ -242,6 +242,7 @@ def test_when_everything_fails_the_error_says_nothing_must_be_downloaded_again(m
 
     monkeypatch.setattr(md, "_sleep", lambda s: None)
     _flaky_rename(monkeypatch, None)
+    monkeypatch.setattr(md, "_move_finished", lambda *a, **k: (_ for _ in ()).throw(PermissionError("move denied")))
     monkeypatch.setattr(md.shutil, "copytree", lambda *a, **k: (_ for _ in ()).throw(PermissionError("copy denied")))
     part = _write_partial(REPO)
     with pytest.raises(ModelDownloadError) as ei:

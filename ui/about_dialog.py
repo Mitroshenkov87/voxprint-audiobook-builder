@@ -13,7 +13,6 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QPushButton,
     QTextBrowser,
     QVBoxLayout,
@@ -114,5 +113,7 @@ class AboutDialog(GlassDialog):
         if path.exists():
             return bool(self._open_url(QUrl.fromLocalFile(str(path))))
         if os.environ.get("QT_QPA_PLATFORM") != "offscreen":
-            QMessageBox.information(self, tr("about.title"), tr("about.notices_missing"))
+            from ui import std_buttons
+
+            std_buttons.information(self, tr("about.title"), tr("about.notices_missing"))
         return False

@@ -582,30 +582,74 @@ def _probe(host: str, port: int, route: Route, timeout: float) -> bool:
         return False
 
 
+#: Connect / read timeouts of every huggingface_hub request.  A read that blocks for ever would keep the download thread
+#: alive after the stall watchdog gave up on it - holding the hub's lock and ``.incomplete`` files in ``.cache`` (Windows
+#: then refuses to rename the model folder: WinError 5).  With these the thread ends within about a minute.
+HUB_CONNECT_TIMEOUT = 10.0
+HUB_READ_TIMEOUT = 20.0
+_hub_ip: Optional[str] = None          # the address the installed hub session binds to ("" = none); None = not installed yet
+
+
+def hub_timeout(timeout):
+    """The ``timeout`` a hub request is sent with: never None, the connect part capped at ``HUB_CONNECT_TIMEOUT``."""
+    if timeout is None:
+        return (HUB_CONNECT_TIMEOUT, HUB_READ_TIMEOUT)
+    if isinstance(timeout, (int, float)):
+        return (min(HUB_CONNECT_TIMEOUT, float(timeout)), float(timeout))
+    return timeout
+
+
+def set_hub_timeouts() -> None:
+    """The hub's own download / metadata timeouts (it passes them on every request); kept when the user set them."""
+    os.environ.setdefault("HF_HUB_DOWNLOAD_TIMEOUT", str(int(HUB_READ_TIMEOUT)))
+    os.environ.setdefault("HF_HUB_ETAG_TIMEOUT", str(int(HUB_CONNECT_TIMEOUT)))
+    try:
+        constants = importlib.import_module("huggingface_hub.constants")
+        constants.HF_HUB_DOWNLOAD_TIMEOUT = int(os.environ["HF_HUB_DOWNLOAD_TIMEOUT"])
+        constants.HF_HUB_ETAG_TIMEOUT = int(os.environ["HF_HUB_ETAG_TIMEOUT"])
+    except Exception:  # noqa: BLE001 - no hub (installer helper) or a changed hub: the adapter still bounds every request
+        pass
+
+
+def ensure_hub_session() -> None:
+    """Install the time-limited hub session if :func:`prepare_hf` has not installed one yet (never fails)."""
+    try:
+        set_hub_timeouts()
+        if _hub_ip is None:
+            _install_hf_adapter("")
+    except Exception as exc:  # noqa: BLE001
+        log.debug("hub session not configured: %s", exc)
+
+
 def _install_hf_adapter(ip: str) -> None:
-    """Make huggingface_hub's requests sessions bind to ``ip`` ("" = back to the default).  The Rust downloader (hf_xet)
-    cannot bind, so it is switched off while a specific address is used."""
+    """Make huggingface_hub's requests sessions use bounded connect / read timeouts and bind to ``ip`` ("" = the default
+    route).  The Rust downloader (hf_xet) cannot bind, so it is switched off while a specific address is used."""
+    global _hub_ip
     # loaded by name: voxprint-fetch.exe (PyInstaller) must not pull huggingface_hub / requests / torch into the installer
     configure_http_backend = importlib.import_module("huggingface_hub").configure_http_backend
-
-    if not ip:
-        configure_http_backend()
-        return
     requests = importlib.import_module("requests")
     HTTPAdapter = importlib.import_module("requests.adapters").HTTPAdapter
+    set_hub_timeouts()
 
-    class Bound(HTTPAdapter):
+    class HubAdapter(HTTPAdapter):
         def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
-            pool_kwargs["source_address"] = (ip, 0)
+            if ip:
+                pool_kwargs["source_address"] = (ip, 0)
             super().init_poolmanager(connections, maxsize, block=block, **pool_kwargs)
+
+        def send(self, request, stream=False, timeout=None, *args, **kwargs):
+            return super().send(request, stream, hub_timeout(timeout), *args, **kwargs)
 
     def factory() -> "requests.Session":
         s = requests.Session()
-        s.mount("https://", Bound())
-        s.mount("http://", Bound())
+        s.mount("https://", HubAdapter())
+        s.mount("http://", HubAdapter())
         return s
 
     configure_http_backend(backend_factory=factory)
+    _hub_ip = ip
+    if not ip:
+        return
     os.environ["HF_HUB_DISABLE_XET"] = "1"
     try:
         importlib.import_module("huggingface_hub.constants").HF_HUB_DISABLE_XET = True
@@ -646,8 +690,8 @@ def prepare_hf(host: str = "huggingface.co", force: bool = False) -> str:
 
 def reset_memory() -> None:
     """Forget everything kept in memory (tests)."""
-    global _remembered, _loaded, _announced, _hf_state
-    _remembered, _loaded, _announced, _hf_state = None, False, None, (float("-inf"), "")
+    global _remembered, _loaded, _announced, _hf_state, _hub_ip
+    _remembered, _loaded, _announced, _hf_state, _hub_ip = None, False, None, (float("-inf"), ""), None
 
 
 def describe() -> str:

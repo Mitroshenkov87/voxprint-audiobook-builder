@@ -31,7 +31,6 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QProgressBar,
     QPushButton,
     QScrollArea,
@@ -630,11 +629,15 @@ class SettingsDialog(GlassDialog):
 
     def _default_confirm(self, title: str, text: str) -> bool:
         """Yes / no question (replaced in tests)."""
-        return QMessageBox.question(self, title, text) == QMessageBox.StandardButton.Yes
+        from ui import std_buttons
+
+        return std_buttons.question(self, title, text)
 
     def _default_notify(self, title: str, text: str) -> None:
         """Information box (replaced in tests)."""
-        QMessageBox.information(self, title, text)
+        from ui import std_buttons
+
+        std_buttons.information(self, title, text)
 
     @property
     def backing_up(self) -> bool:

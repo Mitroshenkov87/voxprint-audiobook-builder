@@ -96,7 +96,7 @@ def _state_file() -> Path:
 def saved_language() -> Optional[str]:
     """The language the user picked earlier, or ``None``."""
     try:
-        return normalize_code(_state_file().read_text(encoding="utf-8"))
+        return normalize_code(_state_file().read_text(encoding="utf-8-sig"))   # the installer may have written it
     except OSError:
         return None
 

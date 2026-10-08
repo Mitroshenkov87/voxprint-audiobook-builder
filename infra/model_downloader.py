@@ -13,6 +13,7 @@ from __future__ import annotations
 from core.i18n import tr
 import fnmatch
 import gc
+import glob
 import logging
 import os
 import shutil
@@ -316,9 +317,94 @@ def _prepare_network() -> None:
 
 # ------------------------------------------------------------------------------------------------ finished downloads
 #: Renaming ``<name>.partial`` -> ``<name>`` can fail on Windows while an antivirus scanner or a stale process still holds a
-#: handle inside the folder: try again for about half a minute, then copy instead.
+#: handle inside the folder: try again for about half a minute, then move the finished files one by one instead.
 FINALIZE_ATTEMPTS = 10
+#: Seconds a new download attempt waits for an abandoned download thread of this process to let go of the ``.partial``
+#: folder before it continues in a fresh ``<name>.partial-N`` folder instead (the hub's lock files would block it).
+FRESH_PARTIAL_AFTER = 5.0
 _sleep = time.sleep
+
+
+class HeldByUs(OSError):
+    """The model folder could not be finished because a download thread of THIS program still holds files in it."""
+
+
+def _unfinished(name: str, is_dir: bool) -> bool:
+    """Download leftovers that are never part of a model: the hub's ``.cache`` and the unfinished pieces of a transfer."""
+    if is_dir:
+        return name == ".cache" or name.endswith(".incomplete.parts")
+    return name.endswith((".incomplete", ".assembling"))
+
+
+def _move_finished(src: Path, dst: Path) -> int:
+    """Move every finished file of ``src`` into ``dst`` (same tree layout), skipping the hub's ``.cache`` and unfinished
+    pieces; a file that is already in ``dst`` stays.  Moving single closed files works on Windows even while other files
+    of the folder are held open.  Returns the number of files moved; raises ``OSError`` if one could not be moved."""
+    moved = 0
+    for root, dirs, files in os.walk(src):
+        dirs[:] = [d for d in dirs if not _unfinished(d, True)]
+        rel = Path(root).relative_to(src)
+        for name in files:
+            if _unfinished(name, False):
+                continue
+            out = Path(dst) / rel / name
+            if out.exists():
+                continue
+            out.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(Path(root) / name, out)
+            moved += 1
+    return moved
+
+
+def _partials(target: Path) -> List[Path]:
+    """``<name>.partial`` and the fresh ``<name>.partial-N`` folders of a model that exist on disk."""
+    out = [target.with_name(target.name + ".partial")]
+    try:
+        out += sorted(target.parent.glob(glob.escape(target.name) + ".partial-*"))
+    except OSError:
+        pass
+    return [p for p in out if p.is_dir()]
+
+
+def _fresh_partial(target: Path, old: Path) -> Path:
+    """A ``<name>.partial-N`` folder no abandoned thread is using, with the finished files of ``old`` moved in."""
+    n = 1
+    while True:
+        cand = target.with_name(f"{target.name}.partial-{n}")
+        if cand != old and not download_watch.busy(cand):
+            break
+        n += 1
+    cand.mkdir(parents=True, exist_ok=True)
+    try:
+        moved = _move_finished(old, cand)
+    except OSError as exc:
+        moved = -1
+        log.warning("could not move all finished files of %s: %s", old.name, exc)
+    log.warning("an abandoned download thread still holds files in %s - continuing in %s (%s finished file(s) taken over)",
+                old.name, cand.name, moved if moved >= 0 else "some")
+    return cand
+
+
+def _merge_partials(target: Path) -> None:
+    """Fold fresh ``<name>.partial-N`` folders of an earlier run into ``<name>.partial`` (so that run's files are resumed)."""
+    main = target.with_name(target.name + ".partial")
+    for extra in _partials(target):
+        if extra == main or download_watch.busy(extra):
+            continue
+        try:
+            main.mkdir(parents=True, exist_ok=True)
+            _move_finished(extra, main)
+        except OSError as exc:
+            log.warning("could not take over %s: %s", extra.name, exc)
+            continue
+        _rmtree(extra)
+
+
+def cleanup_partials(target: Path) -> None:
+    """After the model folder is complete: delete its leftover ``.partial`` folders that no thread of ours still uses."""
+    for p in _partials(target):
+        if not download_watch.busy(p):
+            _rmtree(p)
 
 
 def _expected_sizes(repo_id: str, revision: Optional[str], mirror_manifest: Optional[Path],
@@ -407,13 +493,19 @@ def _holders(folder: Path) -> str:
 
 def finalize_download(partial: Path, target: Path) -> None:
     """Make the finished ``.partial`` folder the model folder.  Closes our own handles first, drops the hub's ``.cache``
-    (lock files), then renames with retries and backoff; if Windows keeps refusing, copies the tree instead.  Raises
-    ``OSError`` (with the reason of the last failure) only if everything failed."""
+    (lock files), then renames with retries and backoff; if Windows keeps refusing - or a download thread of this program
+    that was given up on still holds files in it, which no waiting fixes - the finished files are moved into the model
+    folder one by one (the ``.cache`` and unfinished pieces stay behind), and as the last resort copied.  Raises
+    ``OSError`` (:class:`HeldByUs` when our own thread is the holder) only if everything failed."""
     gc.collect()                                              # closes file objects of finished downloads (sessions, locks)
     _rmtree(partial / ".cache")
     _rmtree(target)
+    ours = download_watch.busy(partial)
     last: Optional[BaseException] = None
-    for attempt in range(1, FINALIZE_ATTEMPTS + 1):
+    if ours:
+        log.info("a download thread of this program still holds files in %s - moving the finished files instead of renaming",
+                 partial.name)
+    for attempt in range(1, 0 if ours else FINALIZE_ATTEMPTS + 1):
         try:
             partial.rename(target)
             if attempt > 1:
@@ -428,19 +520,36 @@ def finalize_download(partial: Path, target: Path) -> None:
                 _make_writable(partial)
             if target.exists() and not partial.exists():
                 return                                         # another process finished it
+            if download_watch.busy(partial):
+                ours = True
+                break                                          # our own abandoned thread: waiting longer does not help
             gc.collect()
             _sleep(min(5.0, 0.5 * 1.6 ** (attempt - 1)))
-    log.warning("rename kept failing (%s) - copying the model folder instead", last)
+    log.warning("finishing %s by moving the finished files (%s)", target.name, last or "held by this program")
     try:
-        _rmtree(target)
-        shutil.copytree(partial, target)
+        target.mkdir(parents=True, exist_ok=True)
+        _move_finished(partial, target)
+        _rmtree(partial)                                       # best effort: a held .cache is cleaned up next time
+        return
+    except OSError as exc:
+        log.warning("moving the finished files failed (%s) - copying them instead", exc)
+        last = last or exc
+    try:
+        shutil.copytree(partial, target, dirs_exist_ok=True,
+                        ignore=lambda d, names: [n for n in names if _unfinished(n, os.path.isdir(os.path.join(d, n)))])
     except OSError as exc:
         shutil.rmtree(target, ignore_errors=True)
-        raise OSError(f"{last}; copy failed too: {exc}") from exc
+        cls = HeldByUs if ours or download_watch.busy(partial) else OSError
+        raise cls(f"{last}; copy failed too: {exc}") from exc
     _rmtree(partial)
 
 
 _NETWORK_WORDS = ("Timeout", "Connection", "SSL", "Proxy", "HTTPError", "URLError", "Stalled", "Offline", "gaierror")
+
+
+def _exact_pattern(name: str) -> str:
+    """A glob pattern (``allow_patterns``) that matches exactly ``name``."""
+    return "".join(f"[{c}]" if c in "*?[" else c for c in name)
 
 
 def _locked(exc: BaseException) -> bool:
@@ -574,6 +683,7 @@ def ensure_model(*args: Any, **kwargs: Any) -> Path:
     repo_id, root, progress, stage = a["repo_id"], a["root"], a["progress"], a["stage"]
     target = local_dir_for(repo_id, root)
     if verify_local_model(target):
+        cleanup_partials(target)                       # leftovers of a folder finished while a thread still held them
         return target
     lock = ModelLock(target.parent / f".{target.name}.lock")
     short = repo_id.split("/")[-1]
@@ -677,6 +787,7 @@ def _ensure_model(
         except Exception as exc:  # noqa: BLE001 - the network may be down; the real error surfaces below
             log.warning("remote sha unavailable: %s", exc)
 
+    _merge_partials(target)                                # files of a fresh .partial-N folder of an earlier run are resumed too
     partial = target.with_name(target.name + ".partial")   # survives between runs: the download resumes where it stopped
     cur: Dict[str, Any] = {"f": 0.0, "meter": None, "cancel": threading.Event()}
 
@@ -728,11 +839,20 @@ def _ensure_model(
             from huggingface_hub import snapshot_download as sd
         except ImportError as exc:
             raise ModelDownloadError(tr("err.hub_missing"), url=hf_url(repo_id), details=str(exc)) from exc
+        netroute.ensure_hub_session()              # bounded connect / read timeouts: no thread blocks for ever in a read
         kwargs = {"repo_id": repo_id, "local_dir": str(partial)}
         if rev:
             kwargs["revision"] = rev
         if allow_patterns:
             kwargs["allow_patterns"] = list(allow_patterns)
+        if sizes:
+            # the hub fetches only what is not finished yet (it would re-download files the parallel path wrote: it has
+            # no metadata for them), and our unfinished pieces of those files go (they would be counted twice)
+            todo = parallel_download.remaining(sizes, partial)
+            if not todo:
+                return
+            parallel_download.discard_partials(partial, todo)
+            kwargs["allow_patterns"] = [_exact_pattern(n) for n in todo]
         try:
             sd(tqdm_class=tracker.make_tqdm_class(), **kwargs)  # nosec B615 - pinned revision when known; files verified after
         except TypeError:
@@ -862,10 +982,15 @@ def _ensure_model(
         progress(stage, cur["f"], m.text(tr, short, int(cur["f"] * 100)))
 
     attempts = [(src, 0) for src in order]
+    t_start = time.monotonic()
     while attempts and not ok_source:
         src, retry = attempts.pop(0)
         label = _SOURCE_NAMES[src]
         meter.set_source(label)
+        if download_watch.busy(partial) and not download_watch.wait_released(partial, FRESH_PARTIAL_AFTER):
+            # a thread of an abandoned attempt still sits in a read and holds the hub's lock / .incomplete files here:
+            # writing into the same folder would fail (and so would renaming it) - continue in a fresh folder
+            partial = _fresh_partial(target, partial)
         cur["cancel"] = threading.Event()
         tracker.cancel = cur["cancel"]
         tracker.total = tracker.done = 0
@@ -880,11 +1005,14 @@ def _ensure_model(
                 log.warning("download of %s from Hugging Face failed - trying ModelScope", repo_id)
             log.info("downloading %s from %s", repo_id, label)
             t_dl = time.monotonic()
+            before = download_watch.progress_bytes(partial)
             download_watch.run_watched(funcs[src], partial, meter, cur["cancel"], on_tick=tick, idle_ok=complete)
             ok_source = src
+            # speed of THIS attempt: the bytes it fetched over the time it ran (earlier attempts' files are not counted)
             spent = time.monotonic() - t_dl
-            got = sum(f.stat().st_size for f in partial.rglob("*") if f.is_file())
-            log.info("%s from %s: %.0f MB in %.0f s (%.1f MB/s)", repo_id, label, got / 1e6, spent, got / 1e6 / max(spent, 0.1))
+            got = max(0, download_watch.progress_bytes(partial) - before)
+            log.info("%s from %s: %.0f MB in %.0f s (%.1f MB/s); %.0f s since the download started", repo_id, label,
+                     got / 1e6, spent, got / 1e6 / max(spent, 0.1), time.monotonic() - t_start)
             if src == "hf" and mirror_ok:
                 modelscope_mirror.remember_hf(True)
         except Exception as exc:  # noqa: BLE001
@@ -918,7 +1046,9 @@ def _ensure_model(
         finalize_download(partial, target)
     except OSError as exc:
         log.error("could not finish %s: %s", repo_id, exc)
-        raise ModelDownloadError(tr("err.model_finalize", short=short), url=hf_url(repo_id), details=str(exc)) from exc
+        msg = tr("err.model_finalize_busy", short=short) if isinstance(exc, HeldByUs) else tr("err.model_finalize", short=short)
+        raise ModelDownloadError(msg, url=hf_url(repo_id), details=str(exc)) from exc
+    cleanup_partials(target)
     progress(stage, 1.0, tr("progress.model_done", short=short))
     return target
 

@@ -325,6 +325,9 @@ def main(argv=None) -> int:
 
 
     screen_fit.install(app)               # every window / dialog clamped to the screen's work area when shown
+    from ui import std_buttons
+
+    std_buttons.install(app)              # OK / Cancel / Yes / No ... in the UI language, not the system's
     import threading
 
     from infra import diagnostics
