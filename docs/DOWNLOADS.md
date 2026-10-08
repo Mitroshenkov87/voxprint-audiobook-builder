@@ -2,14 +2,14 @@
 
 The first pre-release is **[v0.1.0-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.1-beta)** (marked *pre-release*). Planned installer channels are listed in the [Roadmap](ROADMAP.md).
 
-**Right now only the small online installer is offered** (`Voxprint-Setup-online.exe`, 34,653,757 bytes). A full offline installer may return later. The Linux version is temporarily unavailable (see the end).
+**Right now only the small online installer is offered** (`Voxprint-Setup-online.exe`, 35,212,890 bytes). A full offline installer may return later. The Linux version is temporarily unavailable (see the end).
 
-## Current download: SHA-256 (v0.1.0-beta, rebuilt 2026-10-04)
+## Current download: SHA-256 (v0.1.1-beta, build 665 "Tikkun", 2026-10-08)
 
 | File | SHA-256 |
 |---|---|
 | `Voxprint-Setup-online.exe` (recommended, about 34 MB; 35,212,890 bytes; v0.1.1-beta build 665, same file as `Voxprint-Setup-online-0.1.1-build665.exe`) | `cbd4cfaff4fc9ef2d1741b17961fc3b6d9f112d428bedc697e50d6904d56abd3` |
-| `Voxprint-shell-01.zip` (our program shell, 77,461,877 bytes; fetched by the installer) | `8fb79cbe626e8fe6b37b631e84beb9b082cf1223d2f3bdaa3076358e7c66cf63` |
+| `Voxprint-shell-01.zip` (our program shell, 78,435,207 bytes; fetched by the installer) | `302d173932f2f841689f745e0b02fd4a3e82051804616eb99260a6c142669e60` |
 | `manifest-thin-beta.json` (the list of everything the installer downloads, 40,844 bytes) | `d59cd9951db698d14d12a9c4f75ddabc2a8486cb3fe6efa66e29b61aae528b00` |
 | `docopt-0.6.2-...whl`, `eng_to_ipa-0.0.2-...whl`, `sox-1.5.0-...whl` (tiny pure-Python packages that have no wheel upstream; built in CI) | `aa013a4e...0139`, `a287de76...fa8b`, `44e0d93c...971` |
 
