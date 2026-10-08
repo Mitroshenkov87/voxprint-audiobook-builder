@@ -849,5 +849,21 @@
  "qt.btn.restore_defaults": "Standardwerte",
  "qt.btn.yes_all": "Ja für alle",
  "qt.btn.no_all": "Nein für alle",
- "qt.btn.save_all": "Alle speichern"
+ "qt.btn.save_all": "Alle speichern",
+ "narrset.title": "Vorlesen: Pausen und Tempo",
+ "narrset.comma": "Pause nach einem Komma",
+ "narrset.mid": "Starke Grenze (Gedankenstrich, Doppelpunkt, Semikolon, \", und / aber\")",
+ "narrset.sentence": "Pause nach einem Satz",
+ "narrset.paragraph": "Absatz oder Vers",
+ "narrset.chapter": "Kapitel, Titel oder Szenenwechsel",
+ "narrset.seconds": " s",
+ "narrset.speed": "Lesetempo",
+ "narrset.speed_value": "{pct} %",
+ "narrset.style": "Lesestil",
+ "narrset.style_auto": "Automatisch",
+ "narrset.style_scripture": "Feierlich / Heilige Schrift",
+ "narrset.style_fiction": "Belletristik",
+ "narrset.style_dialogue": "Viele Dialoge",
+ "narrset.hint": "Bei jedem gesprochenen Stück wird zuerst die eigene Stille abgeschnitten, dann werden diese Pausen eingefügt. Lange, feierliche und beschreibende Sätze werden etwas langsamer gelesen, Dialoge im normalen Tempo. Gilt für die nächste Vertonung; fertige Teile werden dabei nicht neu synthetisiert.",
+ "narrset.defaults": "Standard-Pausen und -Tempo"
 }

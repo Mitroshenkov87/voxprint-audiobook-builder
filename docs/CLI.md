@@ -69,7 +69,9 @@ voxprint capabilities
 
 ```
 voxprint narrate BOOK --voice ID_OR_NAME --out DIR
-    [--format NAME] [--no-pauses|--pauses] [--ai-disclosure] [--work-dir DIR] [--json]
+    [--format NAME] [--no-pauses|--pauses] [--pause-comma SEC] [--pause-mid SEC] [--pause-sentence SEC]
+    [--pause-paragraph SEC] [--pause-chapter SEC] [--speed X] [--style auto|scripture|fiction|dialogue]
+    [--ai-disclosure] [--work-dir DIR] [--json]
 ```
 
 | Argument | Meaning |
@@ -79,7 +81,14 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 | `--out DIR` | Working folder; the job lands in `<DIR>/<book title>/` |
 | `--format` | Repeatable / comma-separated. Default: `opus_single`. Aliases: `opus`, `mp3`, `m4b`, `flac`, `wav`, … |
 | `--no-pauses` | Default: explicit pauses off (same as the Studio) |
-| `--pauses` | Turn explicit pauses on |
+| `--pauses` | Turn explicit pauses on (every comma is its own piece; may make the voice swallow short words) |
+| `--pause-comma SEC` | Silence after a plain comma (default 0.25; used with `--pauses` and for forced cuts) |
+| `--pause-mid SEC` | Strong break inside a sentence: dash, colon, semicolon, comma before a conjunction (и / но / а / and / but / und ...) (default 0.4) |
+| `--pause-sentence SEC` | After . ! ? (default 0.6) |
+| `--pause-paragraph SEC` | After a paragraph or a numbered / verse line (default 1.0) |
+| `--pause-chapter SEC` | After a chapter title, at the end of a chapter and at a scene break (default 2.0) |
+| `--speed X` | Global reading speed 0.7-1.3 (1 = the voice's own speed) |
+| `--style NAME` | `auto` (detected), `scripture` (solemn, a little slower), `fiction`, `dialogue` |
 | `--ai-disclosure` | Speak a short AI note at the start (opt-in) |
 | `--work-dir DIR` | Remember this folder as the app working folder |
 
@@ -87,7 +96,9 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
 ```
 
-Running the same narrate command again skips chunks that are already cached.
+Every narration cuts the text per sentence and at strong transitions, trims each spoken piece of its own silence and joins the pieces with the pause lengths above; long, comma-rich, descriptive or scripture-like sentences are time-stretched a little slower (pitch kept), dialogue stays at the voice's speed. Defaults come from Settings (*Narration: pauses and speed*); the flags override them for one run.
+
+Running the same narrate command again skips chunks that are already cached (pause, speed and style changes never re-synthesize).
 
 ## Train a voice
 

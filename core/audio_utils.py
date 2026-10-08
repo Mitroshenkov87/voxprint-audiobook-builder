@@ -311,3 +311,64 @@ def apply_fade(x: np.ndarray, sr: int, ms: float = 8.0) -> np.ndarray:
     y[:n] *= ramp
     y[-n:] *= ramp[::-1]
     return y
+
+
+def trim_silence(x: np.ndarray, sr: int, threshold: float = 0.01, keep_ms: float = 30.0, hop_ms: float = 10.0) -> np.ndarray:
+    """``x`` without its own leading / trailing silence (frames below ``threshold`` RMS, about -40 dBFS), keeping
+    ``keep_ms`` around the voice so no consonant is cut.  An all-quiet piece is returned unchanged."""
+    if x.size == 0 or sr <= 0:
+        return x
+    hop = max(1, int(sr * hop_ms / 1000))
+    n = x.size // hop
+    if n == 0:
+        return x
+    rms = np.sqrt(np.mean(np.square(x[: n * hop].astype(np.float64)).reshape(n, hop), axis=1))
+    loud = np.flatnonzero(rms >= threshold)
+    if loud.size == 0:
+        return x
+    keep = int(sr * keep_ms / 1000)
+    start = max(0, loud[0] * hop - keep)
+    end = min(x.size, (loud[-1] + 1) * hop + keep)
+    return x[start:end]
+
+
+def time_stretch(x: np.ndarray, sr: int, rate: float, frame_ms: float = 30.0) -> np.ndarray:
+    """Change the speed by ``rate`` (> 1 faster, < 1 slower) without changing the pitch (WSOLA overlap-add).
+
+    Good for the small factors of :mod:`core.pace` (0.8 ... 1.2); ``rate`` close to 1 returns ``x`` unchanged."""
+    if x.size == 0 or abs(rate - 1.0) < 0.01:
+        return x
+    x = x.astype(np.float32, copy=False)
+    n = max(64, int(sr * frame_ms / 1000)) // 2 * 2
+    hop_out = n // 2
+    hop_in = hop_out * rate
+    tol = n // 4
+    win = np.hanning(n).astype(np.float32)
+    if x.size < 2 * n:
+        return x
+    out_len = int(x.size / rate) + n
+    out = np.zeros(out_len, dtype=np.float32)
+    norm = np.zeros(out_len, dtype=np.float32)
+    pad = np.concatenate([np.zeros(tol, np.float32), x, np.zeros(n + tol, np.float32)])
+    prev = pad[tol: tol + n]
+    pos_out, k = 0, 0
+    while True:
+        center = int(round(k * hop_in)) + tol
+        if center + n + tol > pad.size or pos_out + n > out_len:
+            break
+        if k == 0:
+            best = center
+        else:   # the input frame (within +-tol) that continues the previous output frame best
+            target = prev[hop_out:]
+            seg = pad[center - tol: center + tol + hop_out]
+            corr = np.correlate(seg, target, mode="valid")
+            best = center - tol + int(np.argmax(corr))
+        frame = pad[best: best + n]
+        out[pos_out: pos_out + n] += frame * win
+        norm[pos_out: pos_out + n] += win
+        prev = pad[best: best + n]
+        pos_out += hop_out
+        k += 1
+    norm[norm < 1e-3] = 1.0
+    y = out / norm
+    return np.clip(y[: int(x.size / rate)], -1.0, 1.0).astype(np.float32)

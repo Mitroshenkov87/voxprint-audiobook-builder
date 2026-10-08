@@ -849,5 +849,21 @@
  "qt.btn.restore_defaults": "Restore Defaults",
  "qt.btn.yes_all": "Yes to All",
  "qt.btn.no_all": "No to All",
- "qt.btn.save_all": "Save All"
+ "qt.btn.save_all": "Save All",
+ "narrset.title": "Narration: pauses and speed",
+ "narrset.comma": "Pause after a comma",
+ "narrset.mid": "Strong break (dash, colon, semicolon, \", and / but\")",
+ "narrset.sentence": "Pause after a sentence",
+ "narrset.paragraph": "Paragraph or verse line",
+ "narrset.chapter": "Chapter, title or scene break",
+ "narrset.seconds": " s",
+ "narrset.speed": "Reading speed",
+ "narrset.speed_value": "{pct} %",
+ "narrset.style": "Reading style",
+ "narrset.style_auto": "Automatic",
+ "narrset.style_scripture": "Solemn / scripture",
+ "narrset.style_fiction": "Fiction",
+ "narrset.style_dialogue": "Dialogue-heavy",
+ "narrset.hint": "Every spoken piece is trimmed of its own silence, then these pauses are inserted. Long, solemn and descriptive sentences are read a little slower, dialogue at the normal speed. Applies to the next narration; changing it never re-synthesizes finished parts.",
+ "narrset.defaults": "Default pauses and speed"
 }

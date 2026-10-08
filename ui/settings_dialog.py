@@ -26,6 +26,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -35,11 +36,14 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QSlider,
     QVBoxLayout,
     QWidget,
 )
 
 from core import i18n
+from core import pace as pc
+from core import pauses as pz
 from core.errors import BackupError
 from core.i18n import tr
 from infra import (
@@ -170,6 +174,60 @@ class SettingsDialog(GlassDialog):
         self.lbl_asr_note.setWordWrap(True)
         left.addWidget(self.lbl_asr_note)
         self.cmb_asr.currentIndexChanged.connect(self._on_asr_changed)
+
+        # --- narration: pause lengths (core/pauses.PauseLengths), reading speed and style (core/pace.py) ---
+        self.lbl_narr_title = QLabel()
+        self.lbl_narr_title.setObjectName("sectiontitle")
+        left.addWidget(self.lbl_narr_title)
+        ngrid = QGridLayout()
+        ngrid.setHorizontalSpacing(10)
+        ngrid.setColumnStretch(1, 1)
+        left.addLayout(ngrid)
+        self.lbl_pause: dict = {}
+        self.spn_pause: dict = {}
+        lengths = pz.load_lengths()
+        for kind in pz.DEFAULT_LENGTHS_MS:
+            lbl, spn = QLabel(), QDoubleSpinBox()
+            spn.setRange(0.0, pz.MAX_PAUSE_MS / 1000)
+            spn.setSingleStep(0.05)
+            spn.setDecimals(2)
+            spn.setValue(getattr(lengths, kind) / 1000)
+            spn.valueChanged.connect(self._on_pause_changed)
+            r = ngrid.rowCount()
+            ngrid.addWidget(lbl, r, 0)
+            ngrid.addWidget(spn, r, 1)
+            self.lbl_pause[kind], self.spn_pause[kind] = lbl, spn
+        pace = pc.load()
+        self.lbl_speed = QLabel()
+        self.sld_speed = QSlider(Qt.Orientation.Horizontal)
+        self.sld_speed.setRange(int(pc.MIN_SPEED * 100), int(pc.MAX_SPEED * 100))
+        self.sld_speed.setSingleStep(5)
+        self.sld_speed.setPageStep(5)
+        self.sld_speed.setValue(int(round(pace.speed * 100)))
+        self.lbl_speed_value = QLabel()
+        srow = QHBoxLayout()
+        srow.addWidget(self.sld_speed, 1)
+        srow.addWidget(self.lbl_speed_value)
+        r = ngrid.rowCount()
+        ngrid.addWidget(self.lbl_speed, r, 0)
+        ngrid.addLayout(srow, r, 1)
+        self.lbl_style = QLabel()
+        self.cmb_style = screen_fit.ElidedCombo()
+        for style in pc.STYLES:
+            self.cmb_style.addItem("", style)
+        self.cmb_style.setCurrentIndex(max(0, self.cmb_style.findData(pace.style)))
+        r = ngrid.rowCount()
+        ngrid.addWidget(self.lbl_style, r, 0)
+        ngrid.addWidget(self.cmb_style, r, 1)
+        self.lbl_narr_hint = QLabel()
+        self.lbl_narr_hint.setObjectName("cardnote")
+        self.lbl_narr_hint.setWordWrap(True)
+        left.addWidget(self.lbl_narr_hint)
+        self.btn_narr_defaults = QPushButton()
+        left.addWidget(self.btn_narr_defaults)
+        self.sld_speed.valueChanged.connect(self._on_pace_changed)
+        self.cmb_style.currentIndexChanged.connect(self._on_pace_changed)
+        self.btn_narr_defaults.clicked.connect(self.reset_narration)
 
         # --- service buttons ---
         self.btn_update = QPushButton()
@@ -337,6 +395,25 @@ class SettingsDialog(GlassDialog):
             apply_look(self._win)
         apply_look(self)
 
+    # ------------------------------------------------------------------ narration pauses and pace
+    def _on_pause_changed(self, _v: float = 0.0) -> None:
+        """Save the pause lengths (used by the next narration)."""
+        pz.save_lengths(pz.PauseLengths(**{k: round(s.value() * 1000) for k, s in self.spn_pause.items()}))
+
+    def _on_pace_changed(self, _v: int = 0) -> None:
+        """Save speed and style; show the speed in per cent."""
+        pc.save(pc.Pace(self.sld_speed.value() / 100, self.cmb_style.currentData()))
+        self.lbl_speed_value.setText(tr("narrset.speed_value", pct=self.sld_speed.value()))
+
+    def reset_narration(self) -> None:
+        """Back to the default pause lengths, speed 100 % and automatic style."""
+        for kind, ms in pz.DEFAULT_LENGTHS_MS.items():
+            self.spn_pause[kind].setValue(ms / 1000)
+        self.sld_speed.setValue(100)
+        self.cmb_style.setCurrentIndex(max(0, self.cmb_style.findData(pc.AUTO)))
+        self._on_pause_changed()
+        self._on_pace_changed()
+
     # ------------------------------------------------------------------ texts and state
     def retranslate(self) -> None:
         """Apply the current UI language to every label and button (called on language change)."""
@@ -391,6 +468,20 @@ class SettingsDialog(GlassDialog):
         self.cmb_asr.setToolTip(tr("asrmodel.tip"))
         self.lbl_asr.setToolTip(tr("asrmodel.tip"))
         self.refresh_asr()
+        self.lbl_narr_title.setText(tr("narrset.title"))
+        names = {"comma": tr("narrset.comma"), "mid": tr("narrset.mid"), "sentence": tr("narrset.sentence"),
+                 "paragraph": tr("narrset.paragraph"), "chapter": tr("narrset.chapter")}
+        for kind, lbl in self.lbl_pause.items():
+            lbl.setText(names[kind])
+            self.spn_pause[kind].setSuffix(tr("narrset.seconds"))
+        self.lbl_speed.setText(tr("narrset.speed"))
+        self.lbl_speed_value.setText(tr("narrset.speed_value", pct=self.sld_speed.value()))
+        self.lbl_style.setText(tr("narrset.style"))
+        for i, text in enumerate((tr("narrset.style_auto"), tr("narrset.style_scripture"), tr("narrset.style_fiction"),
+                                  tr("narrset.style_dialogue"))):
+            self.cmb_style.setItemText(i, text)              # same order as pace.STYLES
+        self.lbl_narr_hint.setText(tr("narrset.hint"))
+        self.btn_narr_defaults.setText(tr("narrset.defaults"))
 
     # ------------------------------------------------------------------ projects folder
     def render_projects(self) -> None:

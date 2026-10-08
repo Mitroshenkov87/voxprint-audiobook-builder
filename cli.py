@@ -32,6 +32,7 @@ from typing import Callable, Optional, Sequence, Set
 
 from core import audiobook_export as ex
 from core import pauses as pz
+from core import pace as pc
 from core import revoice
 from core import workspace as ws
 from core.appinfo import APP_BUILD, APP_CHANNEL, APP_CODENAME, APP_VERSION
@@ -387,6 +388,13 @@ def build_parser() -> argparse.ArgumentParser:
     pauses.add_argument("--no-pauses", dest="pauses", action="store_false",
                         help="Disable explicit pauses (default)")
     n.set_defaults(pauses=False)
+    for kind, default in pz.DEFAULT_LENGTHS_MS.items():
+        n.add_argument(f"--pause-{kind}", type=float, default=None, metavar="SEC", dest=f"pause_{kind}",
+                       help=f"Silence after a {PAUSE_HELP[kind]} in seconds (default: Settings, else {default / 1000:g})")
+    n.add_argument("--speed", type=float, default=None, metavar="X",
+                   help=f"Global reading speed {pc.MIN_SPEED:g}-{pc.MAX_SPEED:g} (1 = the voice's own; default: Settings)")
+    n.add_argument("--style", default=None, choices=pc.STYLES,
+                   help="Reading style: auto (detected) | scripture (solemn, slower) | fiction | dialogue (default: Settings)")
     n.add_argument("--ai-disclosure", action="store_true",
                    help="Speak a short AI disclosure at the start (opt-in)")
     n.add_argument("--work-dir", type=Path, default=None, metavar="DIR",
@@ -673,9 +681,11 @@ def cmd_narrate(args: argparse.Namespace, *,
         if args.work_dir is not None:
             ws.save_folder(Path(args.work_dir))
         formats = parse_formats(args.formats)
+        lengths, pace = narration_shaping(args)
         options = NarrationOptions(
             formats=formats,
-            pauses=pz.PauseProfile() if args.pauses else None,
+            pauses=pz.PauseProfile(lengths=lengths) if args.pauses else None,
+            pause_lengths=lengths, pace=pace,
             ai_disclosure=bool(args.ai_disclosure),
         )
         job = NarrationJob(book=book, voice=voice, out_dir=out_dir, options=options)
@@ -690,6 +700,30 @@ def cmd_narrate(args: argparse.Namespace, *,
         )
 
     return _run("narrate", args, body)
+
+
+PAUSE_HELP = {"comma": "comma", "mid": "strong mid-sentence break (dash, colon, semicolon, comma + conjunction)",
+              "sentence": "sentence end (. ! ?)", "paragraph": "paragraph or numbered / verse line",
+              "chapter": "chapter title, chapter end or scene break"}
+
+
+def narration_shaping(args: argparse.Namespace):
+    """Pause lengths and reading pace: the saved Settings, overridden by ``--pause-* / --speed / --style``."""
+    saved = pz.load_lengths().to_dict()
+    for kind in pz.DEFAULT_LENGTHS_MS:
+        sec = getattr(args, f"pause_{kind}", None)
+        if sec is not None:
+            if not 0 <= sec <= pz.MAX_PAUSE_MS / 1000:
+                raise CliError(EXIT_INPUT, f"--pause-{kind} must be 0-{pz.MAX_PAUSE_MS / 1000:g} seconds")
+            saved[kind] = round(sec * 1000)
+    pace = pc.load()
+    if getattr(args, "speed", None) is not None:
+        if not pc.MIN_SPEED <= args.speed <= pc.MAX_SPEED:
+            raise CliError(EXIT_INPUT, f"--speed must be {pc.MIN_SPEED:g}-{pc.MAX_SPEED:g}")
+        pace.speed = args.speed
+    if getattr(args, "style", None):
+        pace.style = args.style
+    return pz.PauseLengths.from_dict(saved), pc.Pace(pace.speed, pace.style)
 
 
 TRAIN_CONSENT = ("none", "auto", "commercial", "public_noncommercial", "private_only")

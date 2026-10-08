@@ -41,11 +41,12 @@ import numpy as np
 import soundfile as sf
 
 from core import audiobook_export as ex
-from core.audio_utils import resample
+from core.audio_utils import resample, time_stretch, trim_silence
 from core.book_parsers import Book
 from core.book_prep import PrepPlan, run_preparation
 from core import translate as tl
 from core import pauses as pz
+from core import pace as pc
 from core import ai_disclosure
 from core import cpu_budget
 from core.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_book
@@ -115,6 +116,11 @@ class NarrationOptions:
     #: Explicit silence between the pieces (comma, sentence, ellipsis, dash, paragraph, chapter ...), independent of the model's
     #: prosody (:mod:`core.pauses`).  ``None`` = the earlier packed chunks with fixed pauses.
     pauses: Optional[pz.PauseProfile] = None   # opt-in: explicit pauses can make the model swallow short words
+    #: Structured pauses (:class:`core.pauses.PauseLengths`, Settings / ``--pause-*``): a chunk per sentence and strong
+    #: transition, every piece trimmed of its own silence and joined with these lengths.  ``None`` = packed chunks.
+    pause_lengths: Optional[pz.PauseLengths] = None
+    #: Reading speed (:class:`core.pace.Pace`): a tempo factor per chunk, applied by time-stretching.  ``None`` = as spoken.
+    pace: Optional[pc.Pace] = None
     #: Machine translation of the book before narration (:mod:`core.translate`); ``None`` = narrate the book as it is.
     translate: Optional[tl.TranslatePlan] = None
     #: "Prepare text for narration" with the AI text model (:mod:`core.llm_text`, a ``LLMPlan``); ``None`` = off.
@@ -434,8 +440,12 @@ def _synth_with_retry(engine: TTSEngine, text: str, index: int, attempts: int = 
 
 def assemble_chapter(book: Book, position: int, chapter: int, chunks: Sequence[Chunk], engine_tag: str,
                      cache: ChunkCache, texts: Dict[int, str], work_dir: Path,
-                     pauses: Optional[pz.PauseProfile] = None) -> ex.ChapterAudio:
-    """Join the cached chunks of one chapter (``chunks``, in order) with their pauses into ``chapter_<position+1>.wav``."""
+                     pauses: Optional[pz.PauseProfile] = None, lengths: Optional[pz.PauseLengths] = None,
+                     shape: bool = False) -> ex.ChapterAudio:
+    """Join the cached chunks of one chapter (``chunks``, in order) with their pauses into ``chapter_<position+1>.wav``.
+
+    With ``shape`` every piece first loses its own leading / trailing silence (so the inserted pauses are what is heard)
+    and is time-stretched by its ``tempo`` (:mod:`core.pace`)."""
     work_dir.mkdir(parents=True, exist_ok=True)
     wav = work_dir / f"chapter_{position + 1:04d}.wav"
     frames = 0
@@ -452,10 +462,12 @@ def assemble_chapter(book: Book, position: int, chapter: int, chunks: Sequence[C
                 sf_out = sf.SoundFile(str(wav), "w", samplerate=sr_out, channels=1, subtype="PCM_16")
             elif sr != sr_out:
                 data = resample(data, sr, sr_out)
+            if shape:
+                data = time_stretch(trim_silence(data, sr_out), sr_out, c.tempo)
             sf_out.write(data)
             frames += len(data)
             is_last = c is chunks[-1]
-            tail_ms = pauses.ms(pz.CHAPTER) if pauses is not None else CHAPTER_TAIL_MS
+            tail_ms = pauses.ms(pz.CHAPTER) if pauses is not None else (lengths.ms(pz.CHAPTER) if lengths else CHAPTER_TAIL_MS)
             gap = int(sr_out * (tail_ms if is_last else c.pause_ms) / 1000)
             sf_out.write(np.zeros(gap, dtype=np.float32))
             frames += gap
@@ -476,9 +488,10 @@ def _by_chapter(chunks: Sequence[Chunk]) -> Dict[int, List[Chunk]]:
 
 def assemble_chapters(book: Book, chunks: Sequence[Chunk], engine_tag: str, cache: ChunkCache,
                       texts: Dict[int, str], work_dir: Path,
-                      pauses: Optional[pz.PauseProfile] = None) -> List[ex.ChapterAudio]:
+                      pauses: Optional[pz.PauseProfile] = None, lengths: Optional[pz.PauseLengths] = None,
+                      shape: bool = False) -> List[ex.ChapterAudio]:
     """Join the cached chunks of every chapter with their pauses into lossless chapter WAV files (streamed to disk)."""
-    return [assemble_chapter(book, pos, ci, group, engine_tag, cache, texts, work_dir, pauses)
+    return [assemble_chapter(book, pos, ci, group, engine_tag, cache, texts, work_dir, pauses, lengths, shape)
             for pos, (ci, group) in enumerate(_by_chapter(chunks).items())]
 
 
@@ -489,8 +502,10 @@ class _ChapterPipeline:
 
     def __init__(self, book: Book, chunks: Sequence[Chunk], engine_tag: str, cache: ChunkCache, texts: Dict[int, str],
                  work: Path, pauses: Optional[pz.PauseProfile], exporter: ex.Exporter, pool: ThreadPoolExecutor,
-                 cancel: CancelToken, pause: PauseToken) -> None:
+                 cancel: CancelToken, pause: PauseToken, lengths: Optional[pz.PauseLengths] = None,
+                 shape: bool = False) -> None:
         self.book, self.engine_tag, self.cache, self.texts, self.work, self.pauses = book, engine_tag, cache, texts, work, pauses
+        self.lengths, self.shape = lengths, shape
         self.exporter, self.pool, self.cancel, self.pause = exporter, pool, cancel, pause
         self.groups = _by_chapter(chunks)
         self.position = {ci: pos for pos, ci in enumerate(self.groups)}
@@ -523,7 +538,7 @@ class _ChapterPipeline:
         self.pause.wait(self.cancel)               # paused: background work holds too (the user wants the machine back)
         self.cancel.check()
         ch = assemble_chapter(self.book, self.position[ci], ci, self.groups[ci], self.engine_tag, self.cache, self.texts,
-                              self.work, self.pauses)
+                              self.work, self.pauses, self.lengths, self.shape)
         self.exporter.add_chapter(ch)
         return ch
 
@@ -611,7 +626,9 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
             book, plan, language, debug_dir=job_dir / ".debug", cache_dir=job_dir / ".cache",
             progress=lambda f, m: progress(NarrationProgress(int(f * 100), 100, None, tr("narr.preparing_neural", done=m), "prepare")),
             cancel=cancel)
-    chunk_list = chunk_book(book, options.max_chars, chapters, options.speak_titles, options.pauses)
+    chunk_list = chunk_book(book, options.max_chars, chapters, options.speak_titles, options.pauses, options.pause_lengths,
+                            options.pace)
+    shape = options.pause_lengths is not None or options.pace is not None
     if not chunk_list:
         raise NarrationError(tr("err.book_empty"))
     if options.ai_disclosure:              # in the narrated language (the translation target when translating)
@@ -644,7 +661,7 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
         n_chapters = len({c.chapter for c in chunk_list})
         exporter = ex.Exporter(ffmpeg, formats, meta, job_dir, n_chapters, options.bitrates, run, work, pool.submit)
         chapters_pipe = _ChapterPipeline(source_book, chunk_list, engine_tag, cache, texts, work, options.pauses, exporter,
-                                         pool, cancel, pause)
+                                         pool, cancel, pause, options.pause_lengths, shape)
         chapters_pipe.start()
         handed_over, engine_future = engine_future, None          # from here on synthesize_chunks owns (and closes) it
         counts = synthesize_chunks(chunk_list, engine_factory, engine_tag, cache, texts, progress, cancel, pause,

@@ -35,7 +35,8 @@ class Chunk:
     chapter: int
     text: str
     pause_ms: int
-    pause_kind: str = ""          # comma | sentence | ellipsis | dash | paragraph | scene | title (explicit pauses only)
+    pause_kind: str = ""          # comma | mid | sentence | ellipsis | dash | paragraph | scene | title (not in packed mode)
+    tempo: float = 1.0            # reading-speed factor applied after synthesis (core/pace.py); 1.0 = as synthesized
 
 
 def _wrap_long(text: str, limit: int) -> List[str]:
@@ -102,9 +103,27 @@ def _end_kind(piece: str) -> str:
         return pz.ELLIPSIS
     if t.endswith(("—", "–")) or t.endswith(" -"):
         return pz.DASH
-    if t.endswith((",", ";", ":")):
+    if t.endswith((";", ":")):
+        return pz.MID
+    if t.endswith(","):
         return pz.COMMA
     return pz.SENTENCE
+
+
+#: Conjunctions that open a new clause after a comma ("..., и ...", "..., but ..."): a strong transition (``mid`` pause).
+CONJUNCTIONS = frozenset("""и а но да или либо однако зато поэтому потому чтобы хотя если когда пока
+    і та але чи бо щоб якщо коли and but or so yet nor because although though while whereas
+    und aber oder denn sondern doch weil obwohl während""".split())
+
+
+def _comma_kind(piece: str, following: str) -> str:
+    """``mid`` for a comma before a clause-opening conjunction, else the punctuation's own kind."""
+    kind = _end_kind(piece)
+    if kind == pz.COMMA:
+        m = re.match(r"[\W_]*(\w+)", following)
+        if m and m.group(1).lower() in CONJUNCTIONS:
+            return pz.MID
+    return kind
 
 
 def _inner_pieces(sentence: str, limit: int) -> List[Tuple[str, str]]:
@@ -125,10 +144,11 @@ def _inner_pieces(sentence: str, limit: int) -> List[Tuple[str, str]]:
         tail = merged.pop()
         merged[-1] = f"{merged[-1]} {tail}"
     out: List[Tuple[str, str]] = []
-    for p in merged:
+    for n, p in enumerate(merged):
         segs = [p] if len(p) <= limit else _wrap_long(p, limit)
+        nxt = merged[n + 1] if n + 1 < len(merged) else ""
         for i, seg in enumerate(segs):                 # a forced cut inside a long piece is a comma-sized pause
-            out.append((seg, _end_kind(seg) if i == len(segs) - 1 else pz.COMMA))
+            out.append((seg, _comma_kind(seg, nxt) if i == len(segs) - 1 else pz.COMMA))
     if out:                                            # the sentence end wins over a trailing comma-like mark
         kind = _end_kind(sentence)
         out[-1] = (out[-1][0], pz.SENTENCE if kind == pz.COMMA else kind)
@@ -149,6 +169,79 @@ def chunk_text_pauses(text: str, max_chars: int = DEFAULT_MAX_CHARS) -> List[Tup
         start = len(out)
         for sent in split_sentences(para) or [para]:
             out.extend(_inner_pieces(sent, max_chars))
+        if len(out) > start:
+            out[-1] = (out[-1][0], pz.PARAGRAPH)
+    return out
+
+
+# --------------------------------------------------------------------------- structured pauses (the default of the app)
+
+#: A numbered / verse line ("1 В начале...", "2. ...", "1:3 ..."): its own paragraph-sized pause.
+_NUMBERED_RE = re.compile(r"^\s*\d{1,3}(?::\d{1,3})?[.):]?\s+\S")
+#: Strong transitions a sentence is cut at in structured mode: after a dash, colon, semicolon, or a comma that is followed by
+#: a clause-opening conjunction.  Both sides must keep MIN_STRONG_CHARS so the voice never gets a tiny utterance.
+MIN_STRONG_CHARS = 20
+_STRONG_RE = re.compile(r"(?<=[;:])\s+|(?<=[—–])\s+|(?<=\s-)\s+|(?<=,)\s+(?=[\"'«„“]?(?:%s)\b)" % "|".join(
+    sorted(CONJUNCTIONS, key=len, reverse=True)), re.IGNORECASE)
+
+
+def blocks(text: str) -> List[str]:
+    """Paragraphs of a chapter: blank-line separated, and every numbered / verse line on its own."""
+    out: List[str] = []
+    for para in re.split(r"\n\s*\n", text):
+        lines = [ln for ln in para.split("\n") if ln.strip()]
+        if len(lines) > 1 and sum(bool(_NUMBERED_RE.match(ln)) for ln in lines) >= 2:
+            cur: List[str] = []
+            for ln in lines:
+                if _NUMBERED_RE.match(ln) and cur:
+                    out.append("\n".join(cur))
+                    cur = []
+                cur.append(ln)
+            out.append("\n".join(cur))
+        else:
+            out.append(para)
+    return [b.strip() for b in out if b.strip()]
+
+
+def _strong_pieces(sentence: str, limit: int) -> List[Tuple[str, str]]:
+    """``(text, kind)`` of one sentence cut only at strong transitions (``mid``); a too-long piece is wrapped (``comma``)."""
+    raw = [p for p in _STRONG_RE.split(sentence.strip()) if p and p.strip()] or [sentence.strip()]
+    merged: List[str] = []
+    for p in raw:
+        if merged and (len(merged[-1]) < MIN_STRONG_CHARS or len(p.strip()) < MIN_STRONG_CHARS):
+            merged[-1] = f"{merged[-1]} {p.strip()}"
+        else:
+            merged.append(p.strip())
+    if len(merged) > 1 and len(merged[-1]) < MIN_STRONG_CHARS:
+        tail = merged.pop()
+        merged[-1] = f"{merged[-1]} {tail}"
+    out: List[Tuple[str, str]] = []
+    for p in merged:
+        if len(p) <= limit:
+            out.append((p, pz.MID))
+        else:
+            for seg in split_clauses(p) if len(split_clauses(p)) > 1 else [p]:
+                for w in ([seg] if len(seg) <= limit else _wrap_long(seg, limit)):
+                    out.append((w, pz.COMMA))
+            out[-1] = (out[-1][0], pz.MID)
+    kind = _end_kind(sentence)
+    out[-1] = (out[-1][0], kind if kind in (pz.ELLIPSIS, pz.SENTENCE) else pz.SENTENCE)
+    return out
+
+
+def chunk_text_structured(text: str, max_chars: int = DEFAULT_MAX_CHARS) -> List[Tuple[str, str]]:
+    """``[(chunk text, pause kind after it)]``: one chunk per sentence, cut further only at strong transitions; paragraphs and
+    numbered / verse lines end with ``paragraph``, a scene break with ``scene``.  Plain commas stay inside a chunk (the
+    model phrases them), so pieces never get tiny."""
+    out: List[Tuple[str, str]] = []
+    for para in blocks(text):
+        if not _HAS_WORD.search(para):
+            if out:
+                out[-1] = (out[-1][0], pz.SCENE)
+            continue
+        start = len(out)
+        for sent in split_sentences(para.replace("\n", " ")) or [para]:
+            out.extend(_strong_pieces(sent, max_chars))
         if len(out) > start:
             out[-1] = (out[-1][0], pz.PARAGRAPH)
     return out
@@ -177,13 +270,23 @@ PAUSE_AFTER_TITLE_MS = 900
 
 
 def chunk_book(book: Book, max_chars: int = DEFAULT_MAX_CHARS, chapters: Sequence[int] = (),
-               speak_titles: bool = False, pauses: "pz.PauseProfile | None" = None) -> List[Chunk]:
+               speak_titles: bool = False, pauses: "pz.PauseProfile | None" = None,
+               lengths: "pz.PauseLengths | None" = None, pace: "object | None" = None) -> List[Chunk]:
     """All chunks of the book in reading order with global indexes (optionally only the given chapter numbers).
 
     With ``speak_titles`` every chapter starts with a chunk that reads its title aloud.  With ``pauses`` the text is cut at
     every sentence, comma, dash and ellipsis and the silence between the pieces comes from the profile (explicit pauses);
-    without it the earlier packed chunks with fixed pauses are produced.
+    With ``lengths`` (the app's default) the text is cut per sentence and at strong transitions (structured pauses,
+    :func:`chunk_text_structured`) and the silences come from ``lengths``; without both the earlier packed chunks with fixed
+    pauses are produced.  ``pace`` (:class:`core.pace.Pace`) gives every chunk its reading-speed factor.
     """
+    from core import pace as pc
+
+    style = pc.book_style(book, pace.style) if pace is not None else ""
+
+    def tempo(text: str, kind: str = "") -> float:
+        return pc.segment_tempo(text, style, pace.speed, kind) if pace is not None else 1.0
+
     chunks: List[Chunk] = []
     for ci, ch in enumerate(book.chapters):
         if chapters and ci not in chapters:
@@ -191,12 +294,16 @@ def chunk_book(book: Book, max_chars: int = DEFAULT_MAX_CHARS, chapters: Sequenc
         if speak_titles and ch.title.strip() and _HAS_WORD.search(ch.title):
             title = ch.title.strip()
             ttext = title if title[-1] in ".!?…" else title + "."
-            chunks.append(Chunk(len(chunks), ci, ttext, pauses.ms(pz.TITLE) if pauses else PAUSE_AFTER_TITLE_MS,
-                                pz.TITLE if pauses else ""))
+            ms = pauses.ms(pz.TITLE) if pauses else (lengths.ms(pz.TITLE) if lengths else PAUSE_AFTER_TITLE_MS)
+            chunks.append(Chunk(len(chunks), ci, ttext, ms, pz.TITLE if (pauses or lengths) else "", tempo(ttext, pz.TITLE)))
         if pauses is not None:
             for text, kind in chunk_text_pauses(ch.text, max_chars):
-                chunks.append(Chunk(len(chunks), ci, text, pauses.ms(kind), kind))
+                chunks.append(Chunk(len(chunks), ci, text, pauses.ms(kind), kind, tempo(text, kind)))
+            continue
+        if lengths is not None:
+            for text, kind in chunk_text_structured(ch.text, max_chars):
+                chunks.append(Chunk(len(chunks), ci, text, lengths.ms(kind), kind, tempo(text, kind)))
             continue
         for text, pause in chunk_text(ch.text, max_chars):
-            chunks.append(Chunk(len(chunks), ci, text, pause))
+            chunks.append(Chunk(len(chunks), ci, text, pause, "", tempo(text)))
     return chunks

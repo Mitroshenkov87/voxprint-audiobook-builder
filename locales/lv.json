@@ -849,5 +849,21 @@
  "qt.btn.restore_defaults": "Noklusējumi",
  "qt.btn.yes_all": "Jā visiem",
  "qt.btn.no_all": "Nē visiem",
- "qt.btn.save_all": "Saglabāt visu"
+ "qt.btn.save_all": "Saglabāt visu",
+ "narrset.title": "Ierunāšana: pauzes un ātrums",
+ "narrset.comma": "Pauze pēc komata",
+ "narrset.mid": "Stipra robeža (domuzīme, kols, semikols, \", un / bet\")",
+ "narrset.sentence": "Pauze pēc teikuma",
+ "narrset.paragraph": "Rindkopa vai pants",
+ "narrset.chapter": "Nodaļa, virsraksts vai ainas maiņa",
+ "narrset.seconds": " s",
+ "narrset.speed": "Lasīšanas ātrums",
+ "narrset.speed_value": "{pct} %",
+ "narrset.style": "Lasīšanas stils",
+ "narrset.style_auto": "Automātiski",
+ "narrset.style_scripture": "Svinīgs / Raksti",
+ "narrset.style_fiction": "Daiļliteratūra",
+ "narrset.style_dialogue": "Daudz dialogu",
+ "narrset.hint": "Katram ierunātajam fragmentam vispirms tiek nogriezts paša klusums, tad ievietotas šīs pauzes. Gari, svinīgi un aprakstoši teikumi tiek lasīti nedaudz lēnāk, dialogi - parastā ātrumā. Attiecas uz nākamo ierunāšanu; gatavās daļas netiek sintezētas no jauna.",
+ "narrset.defaults": "Noklusējuma pauzes un ātrums"
 }

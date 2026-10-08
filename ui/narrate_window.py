@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (QSlider, QCheckBox, QComboBox, QFileDialog, QFram
 from core import audiobook_export as ex
 from core import narration as nr
 from core import pauses as pz
+from core import pace as pc
 from core import ai_disclosure
 from core import text_prep
 from core import workspace as ws
@@ -691,7 +692,7 @@ class NarrateWindow(SubWindow):
         """The pause lengths chosen with the slider, or None (packed chunks, model's own phrasing) when switched off."""
         if not self.chk_pauses.isChecked():
             return None
-        return pz.PauseProfile(self.sld_pauses.value())
+        return pz.PauseProfile(self.sld_pauses.value(), lengths=pz.load_lengths())
 
     def _on_other_toggled(self, open_: bool) -> None:
         """Expand / collapse "Other formats"."""
@@ -1180,6 +1181,7 @@ class NarrateWindow(SubWindow):
         return nr.NarrationOptions(
             formats=self.selected_formats(), bitrates=self.bitrates(),
             speak_titles=self.chk_titles.isChecked(), allow_aac=self.aac_allowed, pauses=self.pause_profile(),
+            pause_lengths=pz.load_lengths(), pace=pc.load(),      # Settings: pause lengths, reading speed and style
             prep=self.plan_builder(self.selected_rule_steps(), self.selected_neural_steps()),
             translate=self.translate_plan(), ai_disclosure=self.chk_disclosure.isChecked(),
             check_chunks=self.chk_check_chunks.isChecked(), llm_prepare=self.llm_prepare_plan())

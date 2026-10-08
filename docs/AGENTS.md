@@ -121,7 +121,10 @@ voxprint train ./clips --name Boaz --type male --language ru --consent commercia
 ```
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3 --json
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
+voxprint narrate genesis.txt --voice boaz --out ./audiobooks --style scripture --pause-sentence 0.7 --speed 0.95 --json
 ```
+
+Pauses and speed: `--pause-comma`, `--pause-mid`, `--pause-sentence`, `--pause-paragraph`, `--pause-chapter` (seconds), `--speed` (0.7-1.3) and `--style auto|scripture|fiction|dialogue`; defaults come from the app's Settings. Details: [CLI.md](CLI.md#narrate-a-book).
 
 | You pass | File you get |
 |---|---|
