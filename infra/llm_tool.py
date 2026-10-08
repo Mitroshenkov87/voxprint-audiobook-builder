@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Callable, Dict, Optional
 
 from core.i18n import tr
-from infra import model_release
+from infra import external_models, model_release
 
 log = logging.getLogger("voxprint.llm")
 
@@ -60,11 +60,19 @@ def platform_key() -> Optional[str]:
 
 
 def _dir(models_dir: Optional[Path] = None) -> Path:
-    if models_dir is None:
-        from infra import paths
+    """``<models>/llm``. With no explicit folder, a verified external copy is used when the local one is absent."""
+    if models_dir is not None:
+        return Path(models_dir) / "llm"
+    from infra import paths
 
-        models_dir = paths.models_dir()
-    return Path(models_dir) / "llm"
+    local = paths.models_dir() / "llm"
+    try:
+        if (local / str(MODEL["file"])).is_file() or (local / f"llama.cpp-{LLAMA_BUILD}" / ".complete").is_file():
+            return local
+    except OSError:
+        pass
+    ext = external_models.verified_dir("llm")
+    return ext if ext is not None else local
 
 
 def model_path(models_dir: Optional[Path] = None) -> Path:

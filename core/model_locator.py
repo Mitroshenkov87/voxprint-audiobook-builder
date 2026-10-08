@@ -171,7 +171,15 @@ def _is_dir(p: Path) -> bool:
 def candidate_roots() -> List[Tuple[str, Path]]:
     """(kind, folder) pairs to search, most specific first, existing and de-duplicated."""
     raw: List[Tuple[str, Path]] = []
-    try:                       # the folder the user (or the installer) named explicitly goes first
+    try:                       # "use models from this folder" (external drive); explicit, searched even when guessing is off
+        from infra import external_models
+
+        ext = external_models.configured()
+        if ext is not None:
+            raw.append((external_models.KIND, ext))
+    except Exception:  # noqa: BLE001 - optional
+        pass
+    try:                       # the folder the user (or the installer) named explicitly goes next
         from infra import existing_models
 
         raw.extend(existing_models.roots())
@@ -447,9 +455,12 @@ def find_model(repo_id: str, pinned_revision: Optional[str] = None,
 
     ``pinned_revision`` is the verified commit from the manifest (None = no pin).  ``ignore_disabled`` is for roots the
     user chose explicitly (the "existing models folder"): ``VOXPRINT_NO_EXTERNAL_MODELS`` only switches off the guessing."""
-    if disabled() and not ignore_disabled:
-        return None
     roots = list(roots) if roots is not None else candidate_roots()
+    if disabled() and not ignore_disabled:
+        # Guessing stays off. A folder the user chose ("don't copy") is still searched: it is not a guess.
+        roots = [(k, p) for k, p in roots if k == "linked"]
+        if not roots:
+            return None
     rejected_other_rev: List[Tuple[Path, str]] = []
     for kind, root in roots:
         try:
@@ -465,6 +476,13 @@ def find_model(repo_id: str, pinned_revision: Optional[str] = None,
                 if why:
                     log.info("ignoring %s at %s: %s", repo_id, path, why)
                     continue
+                if kind == "linked":
+                    from infra.backup import linked_model_problem
+
+                    why_link = linked_model_problem(path)
+                    if why_link:
+                        log.info("ignoring linked %s at %s: %s", repo_id, path, why_link)
+                        continue
                 if match == "sizes" and not _sizes_match_verified(path, repo_id, pinned_revision or ""):
                     log.info("ignoring %s at %s: revision unknown and file sizes differ from the verified revision",
                              repo_id, path)

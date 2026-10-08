@@ -17,6 +17,7 @@ The developer dataset CLI remains ``python -m core.cli`` (see ``core/cli.py``).
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 from typing import Callable, Optional, Sequence, Set
@@ -24,11 +25,13 @@ from typing import Callable, Optional, Sequence, Set
 from core import audiobook_export as ex
 from core import pauses as pz
 from core.book_parsers import load_book
-from core.errors import DatasetMakerError
+from core.errors import BackupError, CancelledByUser, DatasetMakerError
 from core.events import CancelToken, Stage
 from core.narration import NarrationOptions, NarrationProgress, PauseToken
 from core.voice_info import VOICE_TYPES, normalize_voice_type
 from core.voice_library import VoiceLibrary, VoiceRecord
+from infra import backup as backup_mod
+from workers.backup_runner import collect as collect_backup
 from workers.narration_runner import NarrationJob, run_narration
 from workers.pipeline_runner import KIND_LORA, TaskRequest, run_task
 
@@ -48,7 +51,7 @@ FORMAT_ALIASES = {
     "wav_chapters": ex.FORMAT_WAV_CHAPTERS,
 }
 
-USER_COMMANDS = frozenset({"narrate", "train", "voices", "diag"})
+USER_COMMANDS = frozenset({"narrate", "train", "voices", "diag", "backup", "restore"})
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -104,6 +107,21 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--out", type=Path, default=None, metavar="ZIP",
                    help="Destination .zip (default: voxprint-diagnostics-<date>.zip in the current folder)")
     d.set_defaults(_handler="diag")
+
+    b = sub.add_parser("backup", help="Copy models and voices to a folder (resumable, with a manifest)")
+    b.add_argument("--out", required=True, type=Path, metavar="DIR", help="Folder the backup is written into")
+    b.add_argument("--no-models", action="store_true", help="Leave models out")
+    b.add_argument("--no-voices", action="store_true", help="Leave the voice library out")
+    b.add_argument("--json", action="store_true", help="Print the result as one JSON object")
+    b.set_defaults(_handler="backup")
+
+    r = sub.add_parser("restore", help="Restore a backup into the normal folders, or use its models in place")
+    r.add_argument("--from", dest="src", required=True, type=Path, metavar="DIR",
+                   help="Folder that contains the backup (or the Voxprint-backup folder itself)")
+    r.add_argument("--link", action="store_true",
+                   help="Use models from this folder (don't copy). The drive must stay connected.")
+    r.add_argument("--json", action="store_true", help="Print the result as one JSON object")
+    r.set_defaults(_handler="restore")
 
     return ap
 
@@ -288,6 +306,76 @@ def cmd_voices_export(args: argparse.Namespace, *, library: Optional[VoiceLibrar
     return 0
 
 
+def _report_payload(report, ok: bool = True) -> dict:
+    """JSON-friendly summary of a backup or restore report."""
+    return {
+        "ok": ok,
+        "target": str(report.target),
+        "copied_files": report.copied_files,
+        "skipped_files": report.skipped_files,
+        "copied_bytes": report.copied_bytes,
+        "problems": list(getattr(report, "problems", ()) or ()),
+        "conflicts": list(report.conflicts),
+        "external_models": getattr(report, "external", "") or "",
+    }
+
+
+def _emit_report(args, report, ok: bool = True) -> int:
+    """Print a report as JSON or as a short text line. Returns 0, or 1 when ``ok`` is false."""
+    payload = _report_payload(report, ok)
+    if args.json:
+        print(json.dumps(payload, ensure_ascii=False))
+    elif payload["external_models"]:
+        print(f"Models stay in {payload['external_models']} (not copied).")
+        if payload["problems"]:
+            print("Damaged or missing: " + ", ".join(payload["problems"]))
+        print("The drive must stay connected. If it is missing, models are downloaded into the usual folder.")
+    else:
+        print(f"Copied {payload['copied_files']} files, skipped {payload['skipped_files']}.")
+        if payload["problems"]:
+            print("Damaged or missing (downloaded as usual): " + ", ".join(payload["problems"]))
+        if payload["conflicts"]:
+            print("Not overwritten: " + ", ".join(payload["conflicts"]))
+    return 0 if ok else 1
+
+
+def cmd_backup(args) -> int:
+    """``backup --out DIR [--no-models|--no-voices] [--json]``."""
+    try:
+        items = collect_backup(include_voices=not args.no_voices, include_models=not args.no_models)
+    except OSError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+    if not items:
+        print("ERROR: nothing to back up", file=sys.stderr)
+        return 1
+    try:
+        report = backup_mod.run_backup(items, args.out, cancel=CancelToken())
+    except CancelledByUser:
+        print("ERROR: cancelled", file=sys.stderr)
+        return 1
+    except BackupError as exc:
+        print(f"ERROR: {exc.user_message}", file=sys.stderr)
+        return 1
+    return _emit_report(args, report)
+
+
+def cmd_restore(args) -> int:
+    """``restore --from DIR [--link] [--json]``. Damaged files are reported; the app downloads those later."""
+    try:
+        if args.link:
+            report = backup_mod.run_link(args.src, cancel=CancelToken())
+        else:
+            report = backup_mod.run_restore(args.src, strict=False, cancel=CancelToken())
+    except BackupError as exc:
+        if args.json:
+            print(json.dumps({"ok": False, "error": exc.code, "message": exc.user_message}, ensure_ascii=False))
+        else:
+            print(f"ERROR: {exc.user_message}", file=sys.stderr)
+        return 1
+    return _emit_report(args, report, ok=True)
+
+
 def cmd_diag(args) -> int:
     """``diag``: zip the logs, system information and a settings snapshot (infra/diagnostics.py)."""
     import time
@@ -325,6 +413,10 @@ def main(argv: Optional[Sequence[str]] = None, *,
         return cmd_voices_export(args, library=library)
     if handler == "diag":
         return cmd_diag(args)
+    if handler == "backup":
+        return cmd_backup(args)
+    if handler == "restore":
+        return cmd_restore(args)
     ap.error(f"unknown command: {handler}")
     return 2
 

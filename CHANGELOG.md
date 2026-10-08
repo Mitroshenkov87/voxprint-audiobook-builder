@@ -5,6 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Added
+- **Backup and restore of all heavy data** (Settings, the first-run Components window, Check & repair, and the CLI). *Back up models & voices* copies every model — the large snapshots and the smaller `llm/` (Gemma and the llama.cpp runtime), `deepfilternet/` and `dnsmos/` trees — plus the voice library, with checkboxes to leave either out. `voxprint-backup.json` stores the app version and build and each file's relative path, size and SHA-256. The copy shows progress, can be cancelled, checks free space, and skips files already present with the same size and hash. *Restore from backup folder* copies into the normal local folders and checks the manifest and the pinned hashes; damaged or missing files are reported and then downloaded as usual. *Use models from this folder (don't copy)* remembers an external models folder (the drive must stay connected); the model locator reads it. CLI: `voxprint backup --out DIR [--no-models|--no-voices] [--json]` and `voxprint restore --from DIR [--link] [--json]`. Texts in en/ru/de.
+
 ### Fixed
 - **Settings and the other dialogs were not translucent** (build 665 on Windows 11): the Settings content sat on an opaque grey block (`QScrollArea.setWidget` turns on the palette fill of the scrolled widget; the windows avoid it with the transparent `QWidget#content`), and a `QDialog#root` rule painted every dialog in the solid colour instead of the window tint. Dialogs now use the same tint, transparent scroll content and text browser, take their look from their own native window instead of copying the (possibly hidden, still plain) Train window's stylesheet, and ask for the Acrylic backdrop again once the fade-in has ended (the first request is made while the window is layered) or when Qt re-created the native window. Tests: `tests/test_dialog_glass.py`.
 

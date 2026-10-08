@@ -19,21 +19,28 @@ def backup_repos() -> List[str]:
     return repos
 
 
-def collect(include_voices: bool, **kw) -> List[backup.Item]:
+def collect(include_voices: bool, include_models: bool = True, **kw) -> List[backup.Item]:
     """The items of a backup (see :func:`infra.backup.collect_items`)."""
-    return backup.collect_items(include_voices=include_voices, repos=backup_repos(), **kw)
+    return backup.collect_items(include_voices=include_voices, include_models=include_models, repos=backup_repos(), **kw)
 
 
 def run_backup_job(target: Path, include_voices: bool, progress: Callable[[float, str], None], cancel: CancelToken,
-                   items: Optional[List[backup.Item]] = None, **kw) -> backup.Report:
+                   items: Optional[List[backup.Item]] = None, include_models: bool = True, **kw) -> backup.Report:
     """Collect the items and copy them to ``target``."""
-    items = items if items is not None else collect(include_voices)
+    items = items if items is not None else collect(include_voices, include_models)
     return backup.run_backup(items, target, progress, cancel, **kw)
 
 
 def run_restore_job(source: Path, include_voices: bool, progress: Callable[[float, str], None], cancel: CancelToken,
                     **kw) -> backup.Report:
-    """Restore the backup in ``source`` into the app folders."""
+    """Restore the backup in ``source``. ``link=True`` uses the models folder in place instead of copying it.
+
+    A damaged or missing file is reported (:attr:`infra.backup.Report.problems`) and left for the normal download
+    (``strict`` stays on only when the caller asks)."""
+    link = bool(kw.pop("link", False))
+    if link:
+        return backup.run_link(source, include_voices, progress, cancel, **kw)
+    kw.setdefault("strict", False)
     return backup.run_restore(source, include_voices, progress, cancel, **kw)
 
 

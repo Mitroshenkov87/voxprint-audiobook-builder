@@ -83,8 +83,20 @@ def test_parse_formats_aliases_and_unknown():
         user_cli.parse_formats(["bogus"])
 
 
+def test_parse_backup_and_restore():
+    ap = user_cli.build_parser()
+    b = ap.parse_args(["backup", "--out", "D:/bk", "--no-models", "--json"])
+    assert b._handler == "backup" and b.no_models and not b.no_voices and b.json and b.out == Path("D:/bk")
+    r = ap.parse_args(["restore", "--from", "D:/bk", "--link", "--json"])
+    assert r._handler == "restore" and r.link and r.json and r.src == Path("D:/bk")
+    plain = ap.parse_args(["backup", "--out", "out", "--no-voices"])
+    assert plain.no_voices and not plain.no_models and not plain.json
+
+
 def test_is_user_cli():
     assert user_cli.is_user_cli(["main.py", "narrate", "b.txt", "--voice", "v", "--out", "o"])
+    assert user_cli.is_user_cli(["voxprint", "backup", "--out", "d"])
+    assert user_cli.is_user_cli(["voxprint", "restore", "--from", "d"])
     assert user_cli.is_user_cli(["Voxprint.exe", "voices", "list"])
     assert not user_cli.is_user_cli(["main.py", "--selftest"])
     assert not user_cli.is_user_cli(["main.py"])

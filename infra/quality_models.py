@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from core.i18n import tr
-from infra import model_release
+from infra import external_models, model_release
 
 log = logging.getLogger("voxprint.quality_models")
 
@@ -34,11 +34,18 @@ DNSMOS_LABEL = "DNSMOS P.835"
 
 def dnsmos_path(models_dir: Optional[Path] = None) -> Path:
     """Where the DNSMOS file lives: ``<models folder>/dnsmos/sig_bak_ovr.onnx``."""
-    if models_dir is None:
-        from infra import paths
+    if models_dir is not None:
+        return Path(models_dir) / "dnsmos" / DNSMOS_FILE
+    from infra import paths
 
-        models_dir = paths.models_dir()
-    return Path(models_dir) / "dnsmos" / DNSMOS_FILE
+    local = paths.models_dir() / "dnsmos" / DNSMOS_FILE
+    try:
+        if local.is_file() and local.stat().st_size == int(DNSMOS_META["size"]):
+            return local
+    except OSError:
+        pass
+    ext = external_models.verified_file("dnsmos/" + DNSMOS_FILE)
+    return ext if ext is not None else local
 
 
 def dnsmos_ready(models_dir: Optional[Path] = None) -> bool:

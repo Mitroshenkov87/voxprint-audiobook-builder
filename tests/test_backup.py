@@ -123,14 +123,13 @@ def test_identical_content_with_another_timestamp_is_recognised_by_hash(target):
     os.utime(dst, (1000, 1000))                                     # same bytes, different time
     rep = bk.run_backup(bk.collect_items(False, []), target)
     assert rep.copied_files == 0
-    # same size but different content with the same time is only caught by verify=True
+    # same size but different bytes is copied again, even when the timestamp still matches
     data = bytearray(dst.read_bytes())
     data[-1] ^= 1
     st = os.stat(src / "model.safetensors")
     dst.write_bytes(bytes(data))
     os.utime(dst, ns=(st.st_atime_ns, st.st_mtime_ns))
-    assert bk.run_backup(bk.collect_items(False, []), target).copied_files == 0
-    assert bk.run_backup(bk.collect_items(False, []), target, verify=True).copied_files == 1
+    assert bk.run_backup(bk.collect_items(False, []), target).copied_files == 1
     assert dst.read_bytes() == (src / "model.safetensors").read_bytes()
 
 

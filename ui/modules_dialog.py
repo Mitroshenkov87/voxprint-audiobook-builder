@@ -12,18 +12,21 @@ Flow on the first start (``autostart=True``, see ``main._offer_components``):
    the voice check (a failed extra is not fatal: the model download of step 2 lists it again);
 2. step 2 "models": ``models_start(hook)`` starts the main window's first-run model download (TTS, alignment, speech recognition
    ...: :func:`workers.pipeline_runner.prefetch_models`, which honours the chosen models folder, existing copies and a backup)
-   and the window mirrors its progress.  The download keeps running in the main window if this window is closed.
+   and the window mirrors its progress.  *Restore from backup folder* (optional: use the folder in place) runs first when
+   the user asks; damaged files are reported and the download fills them in.  Closing the window does not stop step 2.
 
 The window never touches the network itself: the work runs in :class:`ModulesWorker` (and the main window's prefetch worker);
 the functions that talk to the network (``manifest_fn`` / ``install_fn`` / ``extras_fn``) are injectable for the tests."""
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QProgressBar,
@@ -33,8 +36,10 @@ from PySide6.QtWidgets import (
 )
 
 from core.i18n import tr
-from infra import modules as mods
+from infra import backup, modules as mods
 from ui.glass import GlassDialog, fit_height
+from workers.backup_runner import run_restore_job
+from workers.backup_worker import BackupWorker
 
 log = logging.getLogger("voxprint.ui.modules")
 
@@ -176,21 +181,33 @@ class ModulesDialog(GlassDialog):
         self.lbl_overall.setVisible(False)
         self.btn_download = QPushButton()
         self.btn_download.setObjectName("primary")
+        self.btn_restore = QPushButton()
+        self.chk_link = QCheckBox()
+        self.lbl_link_warn = QLabel()
+        self.lbl_link_warn.setWordWrap(True)
+        self.lbl_link_warn.setObjectName("warn")
+        self.lbl_link_warn.setVisible(False)
+        self.chk_link.toggled.connect(self.lbl_link_warn.setVisible)
         self.btn_cancel = QPushButton()
         self.btn_close = QPushButton()
+        self.pick_folder: Callable[[str], str] = self._default_pick_folder
+        self.restore_job = run_restore_job
+        self.restore_worker: Optional[BackupWorker] = None
         # pinned (tested with this release) by default; "try latest" = the newest release's manifest, pinned as the fallback
         self.chk_latest = QCheckBox()
         self.chk_latest.setChecked(mods.prefer_latest())
         self.chk_latest.setVisible(bool(mods.latest_url()))
         self.chk_latest.toggled.connect(mods.set_prefer_latest)
-        for w in (self.lbl_title, self.lbl_hint, self.lbl_status, self.bar, self.lbl_overall, self.chk_latest):
+        for w in (self.lbl_title, self.lbl_hint, self.lbl_status, self.bar, self.lbl_overall, self.chk_latest,
+                  self.chk_link, self.lbl_link_warn):
             lay.addWidget(w)
         brow = QHBoxLayout()
         brow.addStretch(1)
-        for b in (self.btn_download, self.btn_cancel, self.btn_close):
+        for b in (self.btn_download, self.btn_restore, self.btn_cancel, self.btn_close):
             brow.addWidget(b)
         lay.addLayout(brow)
         self.btn_download.clicked.connect(self.on_download_clicked)
+        self.btn_restore.clicked.connect(self.start_restore)
         self.btn_cancel.clicked.connect(self.cancel)
         self.btn_close.clicked.connect(self.accept)
         self.retranslate()
@@ -209,12 +226,16 @@ class ModulesDialog(GlassDialog):
         self.lbl_hint.setText(hint)
         self.btn_cancel.setText(tr("ui.cancel"))
         self.btn_close.setText(tr("modules.btn_close"))
+        self.btn_restore.setText(tr("backup.btn_restore_folder"))
+        self.chk_link.setText(tr("backup.link_models"))
+        self.lbl_link_warn.setText(tr("backup.link_warn"))
         self.chk_latest.setText(tr("modules.try_latest"))
         self._render()
 
     @property
     def busy(self) -> bool:
-        return self.worker is not None and self.worker.isRunning()
+        restoring = self.restore_worker is not None and self.restore_worker.isRunning()
+        return restoring or (self.worker is not None and self.worker.isRunning())
 
     @property
     def models_running(self) -> bool:
@@ -262,6 +283,8 @@ class ModulesDialog(GlassDialog):
         self.btn_download.setText(tr("modules.btn_retry") if retry else tr("modules.btn_download"))
         can = bool(self.missing()) or self.extras_missing() or self._list_failed or self._models_state == "failed"
         self.btn_download.setEnabled(not working and can)
+        self.btn_restore.setEnabled(not working)
+        self.chk_link.setEnabled(not working)
         self.btn_cancel.setVisible(self.busy)                # the model download of step 2 has no cancel: it can be closed
         self.btn_close.setEnabled(not self.busy)
         self.chk_latest.setEnabled(not working)
@@ -363,8 +386,73 @@ class ModulesDialog(GlassDialog):
         return True
 
     def cancel(self) -> None:
+        if self.restore_worker is not None and self.restore_worker.isRunning():
+            self.restore_worker.cancel()
+            return
         if self.busy and self.worker is not None:
             self.worker.cancel()
+
+    def _default_pick_folder(self, title: str) -> str:
+        """Folder chooser (replaced in tests)."""
+        return QFileDialog.getExistingDirectory(self, title)
+
+    def start_restore(self) -> bool:
+        """Copy a backup into the normal folders, or use its models folder in place. Then the model download fills gaps."""
+        if self.busy or self.models_running:
+            return False
+        src = self.pick_folder(tr("backup.choose_source"))
+        if not src:
+            return False
+        if backup.find_backup(Path(src)) is None:
+            self._set_line(tr("backup.err_no_manifest", path=src), error=True)
+            return False
+        link = self.chk_link.isChecked()
+        job = self.restore_job
+
+        def run(progress, cancel):
+            return job(Path(src), True, progress, cancel, link=link)
+
+        w = BackupWorker(run, parent=self)
+        w.progress.connect(self._on_restore_progress)
+        w.done.connect(self._on_restore_done)
+        w.failed.connect(self._on_restore_failed)
+        w.cancelled.connect(self._on_restore_cancelled)
+        self.restore_worker = w
+        self._set_overall(0.0)
+        self._set_line(tr("backup.scanning"))
+        w.start()
+        self._render()
+        return True
+
+    def _on_restore_progress(self, fraction: float, message: str) -> None:
+        self._set_overall(fraction)
+        if message:
+            self._set_line(message)
+
+    def _finish_restore(self, text: str, error: bool = False) -> None:
+        if self.restore_worker is not None:
+            self.restore_worker.wait(2000)
+        self.restore_worker = None
+        self._set_line(text, error=error)
+        self._render()
+
+    def _on_restore_done(self, report) -> None:
+        text = tr("backup.done", copied=report.copied_files, skipped=report.skipped_files,
+                  size=backup.format_size(report.copied_bytes))
+        problems = list(getattr(report, "problems", ()) or ())
+        if problems:
+            text += " " + tr("backup.done_problems", names=", ".join(problems))
+        if getattr(report, "external", ""):
+            text += " " + tr("backup.linked", path=report.external)
+        self._finish_restore(text)
+        if self.models_start is not None and self._models_state not in ("running", "done"):
+            self._start_models()
+
+    def _on_restore_failed(self, message: str) -> None:
+        self._finish_restore(message, error=True)
+
+    def _on_restore_cancelled(self) -> None:
+        self._finish_restore(tr("backup.cancelled"))
 
     def _on_progress(self, fraction: float, message: str) -> None:
         self._set_overall(fraction)
@@ -442,6 +530,9 @@ class ModulesDialog(GlassDialog):
         self._render()
 
     def shutdown(self) -> None:
-        if self.busy and self.worker is not None:
+        if self.restore_worker is not None and self.restore_worker.isRunning():
+            self.restore_worker.cancel()
+            self.restore_worker.wait(5000)
+        if self.worker is not None and self.worker.isRunning():
             self.worker.cancel()
             self.worker.wait(5000)
