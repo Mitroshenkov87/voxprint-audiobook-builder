@@ -751,5 +751,17 @@
  "diag.button": "Save diagnostic report…",
  "diag.tip": "Saves the program's log files, information about this computer (system, GPU, memory) and the settings as one zip file. Names of your files are cut to the file name; no recordings, books or voices are included. Attach the zip to a bug report.",
  "diag.saved": "Diagnostic report saved:\n{path}",
- "diag.failed": "The diagnostic report could not be saved: {err}"
+ "diag.failed": "The diagnostic report could not be saved: {err}",
+ "llm.title": "AI text model (optional)",
+ "llm.ready": "Gemma 4 12B is downloaded. It runs before the narration and is unloaded before the voice starts.",
+ "llm.needs": "Separate download (about {size} GB: Gemma 4 12B + llama.cpp). Not part of \"download all\".",
+ "llm.low_vram": "Needs an NVIDIA GPU with about {need} GB of video memory or more.",
+ "llm.unsupported": "Not available on this system.",
+ "llm.literary": "Literary translation (AI model, slower; Opus-MT takes over where it fails)",
+ "llm.prepare": "Prepare text for narration (numbers, dates and abbreviations as words, no brackets)",
+ "llm.note": "Both are off by default. The model can be wrong: the translation file next to the audiobook can be edited.",
+ "llm.prompts": "Edit prompts",
+ "llm.prompts_tip": "Opens the folder with the instructions for the model. Edited files are used instead of the built-in ones; delete a file to get the original back.",
+ "narr.literary_translating": "Literary translation… {pct}%",
+ "narr.llm_preparing": "Preparing the text with the AI model… {pct}%"
 }

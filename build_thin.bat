@@ -32,7 +32,7 @@ pyinstaller --onedir --windowed --noconfirm --clean --name Voxprint --distpath d
   --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" ^
   --paths "%CD%" --paths "%CD%\infra" --paths "%CD%\build\stdlib_bundle" --hidden-import _vx_stdlib ^
   --add-data "%CD%\infra\verified_manifest.json;infra" --add-data "%CD%\infra\assets_manifest.json;infra" --add-data "%CD%\infra\model_mirrors.json;infra" --add-data "%CD%\infra\model_release.json;infra" --add-data "%CD%\infra\runtime_lock.json;infra" ^
-  --add-data "%CD%\locales;locales" --add-data "%CD%\credits.json;." --add-data "%CD%\licenses;licenses" ^
+  --add-data "%CD%\locales;locales" --add-data "%CD%\prompts;prompts" --add-data "%CD%\credits.json;." --add-data "%CD%\licenses;licenses" ^
   --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^
   --collect-submodules core --collect-submodules infra --collect-submodules ui --collect-submodules workers --collect-submodules tools ^
   --hidden-import netroute --hidden-import soundfile --collect-all certifi ^

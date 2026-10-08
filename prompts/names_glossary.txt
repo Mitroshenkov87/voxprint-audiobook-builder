@@ -1,0 +1,6 @@
+These names (people, places, organisations) occur in a book written in {source_language}. Give the form each one should
+have in a {target_language} translation (the usual established form if there is one, otherwise a transliteration), in the
+basic (nominative) form. Answer with one line per name, exactly in the form "name = translation", and nothing else.
+If a word is not a name, leave it out.
+
+{names}

@@ -78,6 +78,9 @@ class TranslatePlan:
     target: str
     source: str = ""
     engine_factory: Optional[EngineFactory] = None
+    #: "Literary translation": a :class:`core.llm_text.LLMPlan` translating whole paragraphs; Opus-MT stays the fallback
+    #: for titles and for every paragraph the model fails on.
+    llm: Optional[object] = None
 
     @property
     def enabled(self) -> bool:
@@ -279,7 +282,7 @@ def translate_texts(texts: Sequence[str], hops: Sequence[Tuple[str, str]], facto
 
 def translate_book(book: Book, plan: TranslatePlan, source: str, cache: TranslationCache,
                    progress: Optional[ProgressFn] = None, cancel: Optional[CancelToken] = None,
-                   only: Optional[Set[int]] = None) -> Book:
+                   only: Optional[Set[int]] = None, glossary_file: Optional[Path] = None) -> Book:
     """The translated copy of ``book`` (title, chapter titles and texts; cover and author are kept).
 
     ``only`` limits the work to the given 0-based chapters; the others stay in their original language."""
@@ -289,8 +292,19 @@ def translate_book(book: Book, plan: TranslatePlan, source: str, cache: Translat
     structure: List[Optional[List[_Para]]] = [
         split_paragraphs(ch.text) if (only is None or i in only) else None for i, ch in enumerate(book.chapters)]
     titles = [book.title] + [ch.title for i, ch in enumerate(book.chapters) if only is None or i in only]
-    units = [u for t in titles for u in [t]] + [u for paras in structure if paras for p in paras for u in p.units]
-    mapping = translate_texts(units, hops, plan.engine_factory, cache, progress, cancel)
+    flat = [p for paras in structure if paras for p in paras]
+    literary: Dict[int, str] = {}                     # index in ``flat`` -> paragraph translated by the AI model
+    if plan.llm is not None:
+        from core import llm_text
+
+        report = progress or (lambda f, m: None)
+        literary = llm_text.translate_paragraphs(
+            [p.joiner.join(p.units) for p in flat], source, plan.target, plan.llm, cache, glossary_file,  # type: ignore[arg-type]
+            lambda f: report(0.9 * f, tr("narr.literary_translating", pct=int(90 * f))), cancel)
+    units = list(titles) + [u for k, p in enumerate(flat) if k not in literary for u in p.units]
+    opus_progress = progress if plan.llm is None or progress is None else (lambda f, m: progress(0.9 + 0.1 * f, m))
+    mapping = translate_texts(units, hops, plan.engine_factory, cache, opus_progress, cancel)
+    by_id = {id(p): literary[k] for k, p in enumerate(flat) if k in literary}
 
     def tx(s: str) -> str:
         return mapping.get(s, s)
@@ -300,7 +314,7 @@ def translate_book(book: Book, plan: TranslatePlan, source: str, cache: Translat
         if paras is None:
             chapters.append(Chapter(ch.title, ch.text))
             continue
-        text = "\n\n".join(p.joiner.join(tx(u) for u in p.units) for p in paras)
+        text = "\n\n".join(by_id.get(id(p)) or p.joiner.join(tx(u) for u in p.units) for p in paras)
         chapters.append(Chapter(tx(ch.title) if ch.title else ch.title, text))
     return Book(tx(book.title) if book.title else book.title, book.author, plan.target, chapters, book.cover, book.cover_ext)
 
@@ -370,7 +384,8 @@ def ensure_translation(book: Book, plan: TranslatePlan, job_dir: Path, progress:
     route(source, plan.target)                                   # fail early for an unsupported pair
     out_file = job_dir / file_name(plan.target)
     meta_file = job_dir / ".translation" / f"translation_{plan.target}.json"
-    fp = source_fingerprint(book, plan.target, only)
+    # the literary mode is part of the fingerprint (switching it translates again); plain Opus-MT keeps the old value
+    fp = source_fingerprint(book, plan.target + ("|literary" if plan.llm is not None else ""), only)
     try:
         meta = json.loads(meta_file.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -384,7 +399,10 @@ def ensure_translation(book: Book, plan: TranslatePlan, job_dir: Path, progress:
         out_file.replace(out_file.with_suffix(".previous.txt"))
     job_dir.mkdir(parents=True, exist_ok=True)
     cache = TranslationCache(job_dir / ".translation" / "translation_cache.json")
-    translated = translate_book(book, plan, source, cache, progress, cancel, only)
+    translated = translate_book(book, plan, source, cache, progress, cancel, only,
+                                glossary_file=job_dir / ".translation" / f"names_{plan.target}.txt")
+    if plan.llm is not None:
+        model_note = f"{getattr(plan.llm, 'tag', 'AI model')} literary translation, {model_note} fallback"
     write_translation_file(out_file, translated, source, plan.target, model_note)
     meta_file.parent.mkdir(parents=True, exist_ok=True)
     meta_file.write_text(json.dumps({"source": fp, "from": source, "to": plan.target, "chapters": len(book.chapters)}),

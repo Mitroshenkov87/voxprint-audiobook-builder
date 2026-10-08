@@ -160,7 +160,7 @@ if [ -n "$SRC" ]; then
   say "Installing the program from $SRC"
   mkdir -p "$APP.new"
   for item in main.py credits.json requirements.txt requirements-verified.txt requirements-nodeps.txt requirements-torch.txt \
-              LICENSE NOTICE THIRD_PARTY_NOTICES.md core infra ui workers locales licenses assets installer; do
+              LICENSE NOTICE THIRD_PARTY_NOTICES.md core infra ui workers locales prompts licenses assets installer; do
     [ -e "$SRC/$item" ] && cp -a "$SRC/$item" "$APP.new/"
   done
   find "$APP.new" -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null || true

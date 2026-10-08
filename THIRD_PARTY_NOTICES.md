@@ -64,6 +64,14 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 * Status: downloaded on first start
 * Licence text: [`licenses/deepfilternet.txt`](licenses/deepfilternet.txt)
 
+### Gemma 4 12B Instruct (GGUF Q4_K_M, unsloth/gemma-4-12b-it-GGUF, base google/gemma-4-12B-it)
+
+* Purpose: Optional AI text model for literary translation and preparing the text for narration (downloaded on request from the Narrate window, about 7.1 GB, needs about 10 GB of video memory). Gemma 4 by Google DeepMind; quantized GGUF by Unsloth; used unmodified
+* Licence: Apache-2.0
+* Project: <https://huggingface.co/google/gemma-4-12B-it>
+* Status: downloaded on first start
+* Licence text: [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt)
+
 ### Opus-MT translation models (Helsinki-NLP/opus-mt-tc-big-en-zle, tc-big-zle-en, tc-big-zle-de, tc-big-de-zle; opus-mt-de-en, en-de, ru-en, en-ru)
 
 * Purpose: Offline machine translation of a book before narration (English, Russian, German; Russian <-> German directly). Opus-MT tc-big models, CC-BY-4.0, about 480 MB per direction; the 2020 Opus-MT models (about 300 MB) for English <-> German and as a fallback. Credit: OPUS-MT, University of Helsinki / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: "Democratizing neural machine translation with OPUS-MT", Language Resources and Evaluation 58 (2024); Tiedemann and Thottingal (2020). Machine translation quality varies.
@@ -73,6 +81,14 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 * Licence text: [`licenses/CC-BY-4.0.txt`](licenses/CC-BY-4.0.txt), [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt)
 
 ## Libraries and programs shipped with Voxprint
+
+### llama.cpp (llama-server, build b11476, Vulkan)
+
+* Purpose: Runs the optional AI text model (pre-built llama-server program, downloaded together with it, about 33 MB)
+* Licence: MIT
+* Project: <https://github.com/ggml-org/llama.cpp>
+* Status: downloaded on first start
+* Licence text: [`licenses/llama.cpp.txt`](licenses/llama.cpp.txt)
 
 ### SentencePiece
 

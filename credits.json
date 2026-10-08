@@ -121,6 +121,38 @@
    }
   },
   {
+   "id": "gemma-4-12b",
+   "name": "Gemma 4 12B Instruct (GGUF Q4_K_M, unsloth/gemma-4-12b-it-GGUF, base google/gemma-4-12B-it)",
+   "kind": "model",
+   "ship": "download",
+   "license": "Apache-2.0",
+   "license_files": [
+    "Apache-2.0"
+   ],
+   "url": "https://huggingface.co/google/gemma-4-12B-it",
+   "purpose": {
+    "en": "Optional AI text model for literary translation and preparing the text for narration (downloaded on request from the Narrate window, about 7.1 GB, needs about 10 GB of video memory). Gemma 4 by Google DeepMind; quantized GGUF by Unsloth; used unmodified",
+    "de": "Optionales KI-Textmodell für literarische Übersetzung und die Vorbereitung des Texts fürs Vorlesen (auf Wunsch im Vorlese-Fenster geladen, ca. 7,1 GB, benötigt ca. 10 GB Grafikspeicher). Gemma 4 von Google DeepMind; quantisiertes GGUF von Unsloth; unverändert verwendet",
+    "ru": "Необязательная ИИ-модель для литературного перевода и подготовки текста к озвучиванию (загружается по запросу в окне озвучивания, около 7,1 ГБ, нужно около 10 ГБ видеопамяти). Gemma 4 от Google DeepMind; квантованный GGUF от Unsloth; используется без изменений"
+   }
+  },
+  {
+   "id": "llama.cpp",
+   "name": "llama.cpp (llama-server, build b11476, Vulkan)",
+   "kind": "library",
+   "ship": "download",
+   "license": "MIT",
+   "license_files": [
+    "llama.cpp"
+   ],
+   "url": "https://github.com/ggml-org/llama.cpp",
+   "purpose": {
+    "en": "Runs the optional AI text model (pre-built llama-server program, downloaded together with it, about 33 MB)",
+    "de": "Führt das optionale KI-Textmodell aus (vorkompiliertes Programm llama-server, wird mit ihm geladen, ca. 33 MB)",
+    "ru": "Запускает необязательную ИИ-модель для текста (готовая программа llama-server, загружается вместе с ней, около 33 МБ)"
+   }
+  },
+  {
    "id": "opus-mt",
    "name": "Opus-MT translation models (Helsinki-NLP/opus-mt-tc-big-en-zle, tc-big-zle-en, tc-big-zle-de, tc-big-de-zle; opus-mt-de-en, en-de, ru-en, en-ru)",
    "kind": "model",

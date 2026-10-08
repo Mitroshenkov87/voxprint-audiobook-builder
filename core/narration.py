@@ -117,6 +117,8 @@ class NarrationOptions:
     pauses: Optional[pz.PauseProfile] = None   # opt-in: explicit pauses can make the model swallow short words
     #: Machine translation of the book before narration (:mod:`core.translate`); ``None`` = narrate the book as it is.
     translate: Optional[tl.TranslatePlan] = None
+    #: "Prepare text for narration" with the AI text model (:mod:`core.llm_text`, a ``LLMPlan``); ``None`` = off.
+    llm_prepare: Optional[object] = None
     #: Per-chunk speech-recognition check with regeneration (:mod:`core.chunk_check`); the runner builds the checker.
     check_chunks: bool = False
     check_max_cer: float = 0.15
@@ -593,6 +595,14 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
             book, tplan, job_dir, cancel=cancel, only=set(chapters) if chapters else None,
             progress=lambda f, m: progress(NarrationProgress(int(f * 100), 100, None, m, "prepare")))
         language = tl.LANGUAGE_NAMES.get(tplan.target, language)      # narrate with the target language
+    if options.llm_prepare is not None:           # the AI model runs (and is closed again) before the voice model loads
+        from core import llm_text
+
+        progress(NarrationProgress(0, 1, None, tr("narr.llm_preparing", pct=0), "prepare"))
+        book = llm_text.prepare_book(
+            book, options.llm_prepare, tplan.target if tplan is not None else (tl.detect_book_language(book) or "en"),
+            job_dir, lambda f: progress(NarrationProgress(int(f * 100), 100, None, tr("narr.llm_preparing", pct=int(f * 100)),
+                                                          "prepare")), cancel, set(chapters) if chapters else ())
     source_book = book                                        # titles of the exported files (translated ones when translating)
     plan = options.prep
     if plan is not None and plan.enabled:

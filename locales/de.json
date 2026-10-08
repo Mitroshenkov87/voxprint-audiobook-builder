@@ -751,5 +751,17 @@
  "diag.button": "Diagnosebericht speichern…",
  "diag.tip": "Speichert die Protokolle des Programms, Angaben zu diesem Computer (System, Grafikkarte, Speicher) und die Einstellungen in einer Zip-Datei. Pfade Ihrer Dateien werden auf den Dateinamen gekürzt; Aufnahmen, Bücher und Stimmen sind nicht enthalten. Hängen Sie die Zip-Datei an einen Fehlerbericht an.",
  "diag.saved": "Diagnosebericht gespeichert:\n{path}",
- "diag.failed": "Der Diagnosebericht konnte nicht gespeichert werden: {err}"
+ "diag.failed": "Der Diagnosebericht konnte nicht gespeichert werden: {err}",
+ "llm.title": "KI-Textmodell (optional)",
+ "llm.ready": "Gemma 4 12B ist geladen. Sie läuft vor dem Vorlesen und wird entladen, bevor die Stimme startet.",
+ "llm.needs": "Separater Download (ca. {size} GB: Gemma 4 12B + llama.cpp). Nicht Teil von „Alles herunterladen“.",
+ "llm.low_vram": "Benötigt eine NVIDIA-Grafikkarte mit etwa {need} GB Grafikspeicher oder mehr.",
+ "llm.unsupported": "Auf diesem System nicht verfügbar.",
+ "llm.literary": "Literarische Übersetzung (KI-Modell, langsamer; wo es scheitert, übernimmt Opus-MT)",
+ "llm.prepare": "Text fürs Vorlesen vorbereiten (Zahlen, Daten und Abkürzungen als Wörter, keine Klammern)",
+ "llm.note": "Beides ist standardmäßig aus. Das Modell kann sich irren: Die Übersetzungsdatei neben dem Hörbuch lässt sich bearbeiten.",
+ "llm.prompts": "Prompts bearbeiten",
+ "llm.prompts_tip": "Öffnet den Ordner mit den Anweisungen für das Modell. Bearbeitete Dateien ersetzen die eingebauten; löschen Sie eine Datei, um das Original zurückzubekommen.",
+ "narr.literary_translating": "Literarische Übersetzung… {pct} %",
+ "narr.llm_preparing": "Text wird vom KI-Modell vorbereitet… {pct} %"
 }

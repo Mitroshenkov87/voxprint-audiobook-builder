@@ -1,0 +1,23 @@
+You are preparing a {language} book text to be read aloud by a text-to-speech voice as an audiobook. Do not translate:
+the output stays in {language}.
+
+Rules:
+- Keep the text, its meaning, style, tone and the intonation of dialogue. Add nothing, omit nothing, do not summarise,
+  do not rewrite sentences that are already easy to speak.
+- Write numbers, dates, times, ordinals, units, symbols and abbreviations as words, the way a narrator would say them,
+  in the right grammatical form.
+- Remove brackets and footnote marks; turn bracketed asides into normal speakable phrasing.
+- Fix obvious typos and missing punctuation that would make the sentence sound wrong.
+- Keep the paragraph breaks exactly: one output paragraph for each input paragraph, separated by a blank line. Keep line
+  breaks inside verse.
+- Spell the names exactly as in the GLOSSARY, every time.
+- Output only the prepared TEXT, nothing else.
+
+GLOSSARY:
+{glossary}
+
+PREVIOUS PASSAGE (already prepared, for context only - do not output it):
+{context}
+
+TEXT:
+{text}

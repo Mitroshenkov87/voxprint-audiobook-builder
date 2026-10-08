@@ -40,7 +40,7 @@ from core import voice_info
 from core.i18n import tr
 from core.languages import language_name
 from core.voice_library import VoiceLibrary
-from infra import features, text_models
+from infra import features, llm_tool, text_models
 from infra import voice_catalog as catalog
 from infra import voice_repository as repo
 from ui.main_window import mark_recommended, open_folder, recommended_text
@@ -127,7 +127,9 @@ class NarrateWindow(SubWindow):
                  fetch: Callable[..., Any] = repo.fetch_index, download: Callable[..., Any] = repo.download_voice,
                  auto_refresh: bool = True, player_backend: Any = None,
                  ask_place: Optional[Callable[[Path, Path], str]] = None,
-                 ask_cleanup: Optional[Callable[[ws.JobFiles], Optional[dict]]] = None) -> None:
+                 ask_cleanup: Optional[Callable[[ws.JobFiles], Optional[dict]]] = None,
+                 llm_status: Callable[[], str] = llm_tool.status, llm_ensure: Callable[..., Any] = llm_tool.ensure,
+                 llm_plan: Callable[[], Any] = llm_tool.make_plan) -> None:
         """Build the window.  ``runner``, the file pickers and the text-model hooks (``model_state(model)``,
         ``model_ensure(model, progress)``, ``plan_builder(rule_steps, neural_steps)``) are injectable (tests);
         ``aac_allowed`` overrides the feature flag; ``ask_place(book, job_dir)`` / ``ask_cleanup(files)`` replace the
@@ -151,6 +153,10 @@ class NarrateWindow(SubWindow):
         self.auto_open_folder = auto_open_folder
         self.model_state, self.model_ensure, self.plan_builder = model_state, model_ensure, plan_builder
         self.translate_plan_builder = translate_plan_builder
+        # the optional AI text model (literary translation / prepare text for narration), see infra/llm_tool.py
+        self.llm_status, self.llm_ensure, self.llm_plan = llm_status, llm_ensure, llm_plan
+        self.llm_worker: Optional[TextModelsDownloadWorker] = None
+        self._llm_msg = ""
         self.tr_worker: Optional[TextModelsDownloadWorker] = None
         self._tr_msg = ""
         self._tr_src_cache: Tuple[int, str] = (0, "")
@@ -345,6 +351,39 @@ class NarrateWindow(SubWindow):
         self.chk_translate.toggled.connect(lambda _c: self._refresh_buttons())
         self.cmb_translate.currentIndexChanged.connect(lambda _i: self._refresh_buttons())
         self.btn_tr_download.clicked.connect(self.download_translate_models)
+        self.body.addWidget(c)
+
+        # --- the optional AI text model: literary translation, prepare text for narration (off by default) ---
+        c = card_frame()
+        v = QVBoxLayout(c)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(6)
+        self.lbl_llm_title = QLabel()
+        self.lbl_llm_title.setObjectName("sectiontitle")
+        v.addWidget(self.lbl_llm_title)
+        lrow = QHBoxLayout()
+        self.lbl_llm_state = QLabel()
+        self.lbl_llm_state.setObjectName("cardnote")
+        self.lbl_llm_state.setWordWrap(True)
+        self.btn_llm_download = QPushButton()
+        lrow.addWidget(self.lbl_llm_state, 1)
+        lrow.addWidget(self.btn_llm_download)
+        v.addLayout(lrow)
+        self.chk_literary = QCheckBox()
+        self.chk_llm_prepare = QCheckBox()
+        v.addWidget(self.chk_literary)
+        v.addWidget(self.chk_llm_prepare)
+        prow = QHBoxLayout()
+        self.lbl_llm_note = hint_label()
+        self.btn_llm_prompts = QPushButton()
+        self.btn_llm_prompts.setObjectName("link")
+        prow.addWidget(self.lbl_llm_note, 1)
+        prow.addWidget(self.btn_llm_prompts)
+        v.addLayout(prow)
+        self.btn_llm_download.clicked.connect(self.download_llm)
+        self.btn_llm_prompts.clicked.connect(self.edit_prompts)
+        self.chk_literary.toggled.connect(lambda _c: self._refresh_buttons())
+        self.chk_llm_prepare.toggled.connect(lambda _c: self._refresh_buttons())
         self.body.addWidget(c)
 
         # --- output format and quality ---
@@ -575,6 +614,13 @@ class NarrateWindow(SubWindow):
             self.cmb_translate.setItemText(i, language_names()[code])
         self.btn_tr_download.setText(tr("prep.model_download"))
         self.lbl_tr_note.setText(tr("narr.translate_note"))
+        self.lbl_llm_title.setText(tr("llm.title"))
+        self.btn_llm_download.setText(tr("prep.model_download"))
+        self.chk_literary.setText(tr("llm.literary"))
+        self.chk_llm_prepare.setText(tr("llm.prepare"))
+        self.lbl_llm_note.setText(tr("llm.note"))
+        self.btn_llm_prompts.setText(tr("llm.prompts"))
+        self.btn_llm_prompts.setToolTip(tr("llm.prompts_tip"))
         self.lbl_format_title.setText(tr("narr.format"))
         self.lbl_quality.setText(tr("narr.quality"))
         self.preset_buttons["compact"].setText(tr("narr.preset_compact"))
@@ -831,7 +877,63 @@ class NarrateWindow(SubWindow):
         """The :class:`core.translate.TranslatePlan` for the job, or ``None`` (off, same language, not possible)."""
         if self._translate_status() != "ready":
             return None
-        return self.translate_plan_builder(self.translate_target(), self.book_source_language())
+        plan = self.translate_plan_builder(self.translate_target(), self.book_source_language())
+        if plan is not None and self.chk_literary.isChecked() and self.chk_literary.isEnabled():
+            plan.llm = self.llm_plan()
+        return plan
+
+    # ------------------------------------------------------------------ the AI text model
+    def _refresh_llm_row(self) -> None:
+        """State text, Download button and the two (greyed until usable) options of the AI text model card."""
+        st = self.llm_status()
+        downloading = bool(self.llm_worker and self.llm_worker.isRunning())
+        msgs = {"ready": tr("llm.ready"), "needs_download": tr("llm.needs", size=round(llm_tool.download_mb() / 1000, 1)),
+                "low_vram": tr("llm.low_vram", need=int(llm_tool.MIN_VRAM_GB + 0.5)), "unsupported": tr("llm.unsupported")}
+        self.lbl_llm_state.setText(self._llm_msg or msgs.get(st, ""))
+        self.btn_llm_download.setVisible(st == "needs_download")
+        self.btn_llm_download.setEnabled(not downloading and not self.busy)
+        usable = st == "ready" and not self.busy
+        self.chk_literary.setEnabled(usable and self._translate_status() == "ready")
+        self.chk_llm_prepare.setEnabled(usable)
+
+    def llm_prepare_plan(self):
+        """The ``LLMPlan`` for "Prepare text for narration", or ``None`` when off / not usable."""
+        if self.chk_llm_prepare.isChecked() and self.chk_llm_prepare.isEnabled():
+            return self.llm_plan()
+        return None
+
+    def download_llm(self) -> bool:
+        """Download llama.cpp + the model (one optional download, ~7 GB); False if nothing was started."""
+        if (self.llm_worker and self.llm_worker.isRunning()) or self.llm_status() != "needs_download":
+            return False
+        from types import SimpleNamespace
+
+        w = TextModelsDownloadWorker([SimpleNamespace(key=llm_tool.KEY)],
+                                     lambda _m, progress: self.llm_ensure(lambda f, msg="": progress(None, f, msg)), parent=self)
+        w.progress.connect(lambda f: (setattr(self, "_llm_msg", tr("prep.model_downloading", pct=int(f * 100))),
+                                      self.lbl_llm_state.setText(self._llm_msg)))
+        w.done.connect(lambda _k: (setattr(self, "_llm_msg", ""), self._refresh_buttons()))
+        w.failed.connect(lambda m: (setattr(self, "_llm_msg", tr("prep.model_failed", error=m)), self._refresh_llm_row()))
+        self.llm_worker = w
+        self._llm_msg = tr("prep.model_downloading", pct=0)
+        w.start()
+        self._refresh_llm_row()
+        return True
+
+    def edit_prompts(self) -> Path:
+        """Copy our prompt files to ``<data folder>/prompts`` (only the missing ones) and open that folder: edited copies
+        there are used instead of ours (core/llm_text.load_prompt); delete a file to get ours back."""
+        import shutil
+
+        from infra import paths
+
+        dest = paths.app_home() / "prompts"
+        dest.mkdir(parents=True, exist_ok=True)
+        for f in sorted((paths.resource_dir() / "prompts").glob("*.txt")):
+            if not (dest / f.name).exists():
+                shutil.copyfile(f, dest / f.name)
+        open_folder(dest)
+        return dest
 
     def _refresh_translate_row(self) -> None:
         """Texts and the Download button of the translation card."""
@@ -1074,7 +1176,7 @@ class NarrateWindow(SubWindow):
             speak_titles=self.chk_titles.isChecked(), allow_aac=self.aac_allowed, pauses=self.pause_profile(),
             prep=self.plan_builder(self.selected_rule_steps(), self.selected_neural_steps()),
             translate=self.translate_plan(), ai_disclosure=self.chk_disclosure.isChecked(),
-            check_chunks=self.chk_check_chunks.isChecked())
+            check_chunks=self.chk_check_chunks.isChecked(), llm_prepare=self.llm_prepare_plan())
 
     # ------------------------------------------------------------------ state
     @property
@@ -1099,6 +1201,7 @@ class NarrateWindow(SubWindow):
                 chk.setEnabled(not busy)
         self._refresh_model_row()
         self._refresh_translate_row()
+        self._refresh_llm_row()
         self._sync_preset()
         self.chk_translate.setEnabled(not busy)
         self.cmb_translate.setEnabled(not busy)

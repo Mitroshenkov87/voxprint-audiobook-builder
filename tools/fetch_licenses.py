@@ -25,6 +25,7 @@ SOURCES = {
     "qwen-tts": ("repo", "QwenLM/Qwen3-TTS"),
     "sage-fredt5": ("spdx", "MIT"),            # the model repository has no LICENSE file; licenses/sage-fredt5.txt carries an explanatory header
     "qwen-asr": ("repo", "QwenLM/Qwen3-ASR"),
+    "llama.cpp": ("repo", "ggml-org/llama.cpp"),
     "qwen-omni-utils": ("repo", "QwenLM/Qwen2-VL"),
     "pytorch": ("repo", "pytorch/pytorch"),
     "torchaudio": ("repo", "pytorch/audio"),

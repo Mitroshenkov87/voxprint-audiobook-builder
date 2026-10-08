@@ -18,6 +18,7 @@
   "imageio-ffmpeg": "https://raw.githubusercontent.com/imageio/imageio-ffmpeg/main/LICENSE",
   "inno-setup": "https://raw.githubusercontent.com/jrsoftware/issrc/main/license.txt",
   "librosa": "https://raw.githubusercontent.com/librosa/librosa/main/LICENSE.md",
+  "llama.cpp": "https://raw.githubusercontent.com/ggml-org/llama.cpp/master/LICENSE",
   "nagisa": "https://raw.githubusercontent.com/taishi-i/nagisa/master/LICENSE.txt",
   "num2words": "https://raw.githubusercontent.com/savoirfairelinux/num2words/master/COPYING",
   "numpy": "https://raw.githubusercontent.com/numpy/numpy/main/LICENSE.txt",
