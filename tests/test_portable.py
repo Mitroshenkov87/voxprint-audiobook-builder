@@ -25,7 +25,7 @@ class St:
 def _zip(path: Path, files: dict) -> Path:
     with zipfile.ZipFile(path, "w") as z:
         for n, b in files.items():
-            z.writestr(n, b)
+            z.writestr(zipfile.ZipInfo(n, (2026, 1, 1, 0, 0, 0)), b)    # fixed time: a rebuilt part keeps its SHA-256 (CI is slow)
     return path
 
 
