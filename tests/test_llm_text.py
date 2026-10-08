@@ -112,7 +112,7 @@ def test_status_gate_and_server_failure(tmp_path):
     assert llm_tool.status(tmp_path, vram_gb=16.0) == "needs_download"
     assert llm_tool.make_plan(tmp_path) is None
     exe = tmp_path / "llama-server"
-    srv = llm_tool.LlamaServer(exe, tmp_path / "m.gguf", log_dir=tmp_path,
+    srv = llm_tool.LlamaServer(exe, tmp_path / "m.gguf", log_dir=tmp_path, run=lambda cmd, **kw: SimpleNamespace(stdout="", stderr=""),
                                popen=lambda cmd, **kw: SimpleNamespace(cmd=cmd, poll=lambda: 1, returncode=1))
     with pytest.raises(RuntimeError, match="exited"):
         srv.start()
@@ -135,3 +135,17 @@ def test_narrate_window_options_are_greyed_until_downloaded(app, lib, tmp_path):
     assert n.options().llm_prepare is None                     # off by default
     n.chk_llm_prepare.setChecked(True)
     assert n.options().llm_prepare.tag == "fake"
+
+
+def test_the_nvidia_vulkan_device_is_chosen_on_hybrid_laptops(tmp_path):
+    listing = ("Available devices:\n  Vulkan0: AMD Radeon(TM) 780M Graphics (16384 MiB, 15000 MiB free)\n"
+               "  Vulkan1: NVIDIA GeForce RTX 4070 Laptop GPU (8188 MiB, 7900 MiB free)\n")
+    run = lambda cmd, **kw: SimpleNamespace(stdout=listing, stderr="")  # noqa: E731
+    assert llm_tool.pick_device(tmp_path / "x", run) == "Vulkan1"
+    assert llm_tool.pick_device(tmp_path / "x", lambda cmd, **kw: SimpleNamespace(stdout="Vulkan0: Intel Arc", stderr="")) is None
+    seen = []
+    srv = llm_tool.LlamaServer(tmp_path / "x", tmp_path / "m.gguf", log_dir=tmp_path, run=run,
+                               popen=lambda cmd, **kw: seen.append(cmd) or SimpleNamespace(poll=lambda: 1, returncode=1))
+    with pytest.raises(RuntimeError):
+        srv.start()
+    assert seen[0][-2:] == ["--device", "Vulkan1"]

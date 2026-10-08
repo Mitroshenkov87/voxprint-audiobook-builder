@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import socket
 import stat
 import subprocess
@@ -162,13 +163,34 @@ def ensure(progress: Callable[[float, str], None] = lambda f, m="": None, models
     return model_path(models_dir)
 
 
+_DEVICE_LINE = re.compile(r"^\s*(Vulkan\d+)\s*:\s*(.+?)\s*(?:\(|$)", re.M)
+_NVIDIA = re.compile(r"NVIDIA|GeForce|RTX|Quadro|Tesla", re.I)
+
+
+def pick_device(exe: Path, run=subprocess.run) -> Optional[str]:
+    """The Vulkan device of the NVIDIA GPU (``Vulkan1`` ...) from ``llama-server --list-devices``, or None = llama.cpp's
+    default.  Hybrid laptops list the integrated GPU too, and the model must not land there."""
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform.startswith("win") else 0
+    try:
+        r = run([str(exe), "--list-devices"], capture_output=True, text=True, timeout=60, creationflags=flags)
+        listing = (r.stdout or "") + "\n" + (r.stderr or "")
+    except (OSError, subprocess.SubprocessError):
+        log.warning("llama-server --list-devices failed; using its default device", exc_info=True)
+        return None
+    devices = _DEVICE_LINE.findall(listing)
+    chosen = next((d for d, name in devices if _NVIDIA.search(name)), None)
+    log.info("AI text model devices: %s -> %s", "; ".join(f"{d}: {n}" for d, n in devices) or "none listed",
+             chosen or "default")
+    return chosen
+
+
 class LlamaServer:
     """``llama-server`` on a free localhost port; :meth:`complete` sends one chat request, :meth:`close` ends the process
     (and frees all of its VRAM)."""
 
     def __init__(self, exe: Path, model: Path, ctx: int = 8192, popen=subprocess.Popen, log_dir: Optional[Path] = None,
-                 start_timeout: float = 300.0) -> None:
-        self.exe, self.model, self.ctx, self._popen = Path(exe), Path(model), ctx, popen
+                 start_timeout: float = 300.0, run=subprocess.run) -> None:
+        self.exe, self.model, self.ctx, self._popen, self._run = Path(exe), Path(model), ctx, popen, run
         self.log_dir, self.start_timeout = log_dir, start_timeout
         self.proc = None
         self.port = 0
@@ -181,6 +203,9 @@ class LlamaServer:
             self.port = s.getsockname()[1]
         cmd = [str(self.exe), "-m", str(self.model), "--host", "127.0.0.1", "--port", str(self.port), "-c", str(self.ctx),
                "-ngl", "999", "-np", "1", "--jinja"]
+        device = pick_device(self.exe, self._run)
+        if device:
+            cmd += ["--device", device]
         if self.log_dir is None:
             from infra import paths
 

@@ -24,7 +24,7 @@ memory):
 * **Prepare text for narration** - the same model rewrites the text in its own language for listening: numbers, dates,
   abbreviations as words, no brackets or footnote marks, obvious typos fixed, nothing added or left out.
 
-The model runs in the pre-built `llama-server` of [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT, Vulkan build, ~33 MB)
+The model runs in the pre-built `llama-server` of [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT, Vulkan build, ~33 MB; on laptops with two GPUs the NVIDIA one is chosen from `--list-devices`, logged)
 as a separate process before the narration and is closed - all of its video memory freed - before the voice model loads.
 Every answer passes a simple guard (same number of paragraphs and verse lines, a sane length ratio, the right language, no
 refusal); a paragraph that fails, or everything after the model fails to start or crashes, is translated by Opus-MT instead
