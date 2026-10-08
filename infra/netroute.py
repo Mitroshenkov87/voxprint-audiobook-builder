@@ -459,6 +459,61 @@ def urlopen(req, timeout: float = 30.0, context: Optional[ssl.SSLContext] = None
     raise last
 
 
+# ----------------------------------------------------------------------------------------------- fastest route
+#: Size of the probe download (a ranged GET) and the longest the whole probe may take.
+SPEED_PROBE_BYTES = 256 * 1024
+SPEED_PROBE_CAP = 4.0
+
+
+def _probe_open(route: Route, req, timeout: float):
+    return _opener(route, None, min(HOP_TIMEOUT, timeout)).open(req, timeout=timeout)
+
+
+def pick_fastest(url: str, routes: Optional[List[Route]] = None, cap: float = SPEED_PROBE_CAP,
+                 nbytes: int = SPEED_PROBE_BYTES, open_fn: Callable = _probe_open) -> Optional[Route]:
+    """Interface probe at download start: the first ``nbytes`` of ``url`` (``Range`` request) through every candidate route at
+    once; the fastest one that answered within ``cap`` seconds is remembered, so :func:`urlopen` uses it first (the others
+    stay the fallback).  Only with the "auto" preference and more than one route; None = nothing to choose or no answer."""
+    host = urllib.parse.urlparse(url).hostname or ""
+    if routes is None:
+        if preference() != "auto" or _is_loopback_host(host):
+            return None
+        routes = candidates(host)
+    if len(routes) < 2:
+        return None
+    speeds: List[Tuple[float, int, Route]] = []
+
+    def one(i: int, route: Route) -> None:
+        t = time.monotonic()
+        try:
+            req = urllib.request.Request(url, headers={"Range": f"bytes=0-{nbytes - 1}", "User-Agent": "voxprint-probe/1"})
+            with open_fn(route, req, cap) as r:
+                n = len(r.read(nbytes))
+            if n:
+                speeds.append((n / max(1e-3, time.monotonic() - t), -i, route))      # -i: equal speed -> earlier route
+        except Exception:  # noqa: BLE001 - an unusable route simply does not win
+            pass
+
+    threads = [threading.Thread(target=one, args=(i, r), daemon=True, name="vx-speed-probe") for i, r in enumerate(routes)]
+    for th in threads:
+        th.start()
+    deadline = time.monotonic() + cap
+    for th in threads:
+        th.join(max(0.0, deadline - time.monotonic()))
+    if not speeds:
+        return None
+    speed, _, best = max(list(speeds), key=lambda x: (x[0], x[1]))
+    if best == DEFAULT:
+        if remembered() not in (None, DEFAULT):
+            forget()                                    # the plain route is the fastest again
+    else:
+        remember(best)
+    log.info("fastest network route for %s: %s (%.1f MB/s; %d of %d routes answered)", host, best.label(), speed / 1e6,
+             len(speeds), len(routes))
+    on_event(f"fastest network route for {host}: {best.label()}")
+    return best
+
+
 # ----------------------------------------------------------------------------------------------- huggingface_hub (requests)
 #: The whole route search before a model download may take this long (seconds); the routes are probed in parallel.
 PROBE_CAP = 5.0

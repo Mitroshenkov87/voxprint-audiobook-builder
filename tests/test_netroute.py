@@ -317,3 +317,30 @@ def test_settings_dialog_network_interface_choice(app, lib, monkeypatch):
         assert nr.preference() == "auto"
     finally:
         s.shutdown()
+
+
+# ------------------------------------------------------------------------------------------------ speed probe
+def test_the_fastest_route_is_picked_by_a_ranged_get_and_sources_are_ranked(two_ifaces, monkeypatch):
+    import io
+    import time as _t
+
+    from tools import online_fetch as of
+
+    delay = {"": 0.25, "192.168.1.20": 0.02}                   # default slow, wlan0 fast, tun0 fails
+    seen = []
+
+    def open_fn(route, req, timeout):
+        seen.append(req.get_header("Range"))
+        if route.ip not in delay:
+            raise OSError("unreachable")
+        _t.sleep(delay[route.ip])
+        return io.BytesIO(b"x" * 1024)
+
+    nr.reset_memory()
+    best = nr.pick_fastest("https://example.org/f.zip", routes=nr.candidates("example.org"), open_fn=open_fn)
+    assert best == Route(*HOP_A, False) and nr.remembered() == best and set(seen) == {"bytes=0-262143"}
+    assert nr.pick_fastest("https://example.org/f.zip", routes=[DEFAULT, Route(*HOP_B, False)],
+                           open_fn=lambda r, q, t: (_ for _ in ()).throw(OSError("down"))) is None
+    monkeypatch.setattr(of, "_SPEED", {"up.example": 1e5, "mirror.example": 9e6, "dead.example": 0.0})
+    assert of.ranked(["https://dead.example/a", "https://up.example/a", "https://mirror.example/a"]) == [
+        "https://mirror.example/a", "https://up.example/a", "https://dead.example/a"]

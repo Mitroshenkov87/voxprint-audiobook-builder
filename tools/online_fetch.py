@@ -225,12 +225,37 @@ def sources(comp: dict) -> List[str]:
     return out
 
 
+_SPEED: Dict[str, float] = {}       # host -> bytes/s of its probe (0 = no answer); measured once per process
+PROBE_BYTES = 256 * 1024
+
+
+def _host_speed(url: str, timeout: float = 5.0) -> float:
+    host = urllib.parse.urlparse(url).hostname or ""
+    if host not in _SPEED:
+        t = time.monotonic()
+        try:
+            with _open(url, {"Range": f"bytes=0-{PROBE_BYTES - 1}"}, timeout=timeout) as r:
+                n = len(r.read(PROBE_BYTES))
+            _SPEED[host] = n / max(1e-3, time.monotonic() - t)
+        except Exception:  # noqa: BLE001 - an unreachable source just goes last
+            _SPEED[host] = 0.0
+    return _SPEED[host]
+
+
+def ranked(urls: List[str]) -> List[str]:
+    """Sources fastest first: a short ranged GET per host (once per run).  The sort is stable, so equally fast (or all
+    failing) sources keep the manifest order - the upstream site first."""
+    if len(urls) < 2:
+        return urls
+    return sorted(urls, key=lambda u: -_host_speed(u))
+
+
 def download(comp: dict, cache: Path, progress: Callable[[int, int], None], sleep: Callable[[float], None] = time.sleep,
              verifying: Optional[Callable[[], None]] = None) -> Path:
     """Download one component into ``cache`` (resumable) and return the verified file path.  Every source is tried in turn (the
     partial file is kept: all sources serve the same bytes, the SHA-256 decides).  ``verifying()`` is called right before the
     SHA-256 of a finished file is computed (it takes a few seconds for a big wheel), so the caller can say so."""
-    srcs = sources(comp)
+    srcs = ranked(sources(comp))
     last: Optional[FetchError] = None
     for i, url in enumerate(srcs):
         try:
@@ -524,6 +549,12 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
         free = None
     if missing and free is not None and free < need * 1.05:
         raise FetchError(f"Not enough free disk space: about {need >> 20} MB needed, {free >> 20} MB free.")
+    need_net = [c for c in fetch if not (portable is not None and _have_size(portable_file(portable, c), c))]
+    if need_net and not offline and _nr is not None and hasattr(_nr, "pick_fastest"):
+        try:                                                     # the fastest network interface for the downloads below
+            _nr.pick_fastest(sources(need_net[0])[0])
+        except Exception as exc:  # noqa: BLE001 - the probe is an optimisation only
+            print(f"network probe failed: {exc}", file=sys.stderr, flush=True)
     weights = [int(c["size"]) * 2 for c in fetch] or [1]      # download + verify/extract
     total_w, base, fetched = float(sum(weights)), 0.0, 0
     if reused:

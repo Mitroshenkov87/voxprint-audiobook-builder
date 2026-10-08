@@ -65,6 +65,10 @@ The flavor we download follows the driver (`nvidia-smi`): CUDA ≥ 12.8 → `cu1
 Finished components are recorded (SHA-256) and skipped next time; a broken one is deleted and fetched again; closing the window or going offline just
 stops (press Download again); the runtime folder can be deleted at any time. A new release has a new manifest — changed files get new hashes, the rest stays.
 
+## Network probe
+
+Before the first download of a run, `voxprint-fetch` (installer and Components window) fetches the first 256 KB of a component (`Range` request) through every network route at once (default, no-proxy, each local interface; `infra/netroute.pick_fastest`, at most 4 s) and remembers the fastest; the others stay the connect fallback. Only with the *Auto* network setting. A component with several sources (`url` + `urls`) has its sources ranked the same way, once per host (`online_fetch.ranked`); equal speeds keep the manifest order.
+
 ## Pinned vs latest components
 
 Every release's manifest is *pinned*: the exact files (size + SHA-256) this release was built and tested with. `modules.json` and the online installer also know the newest release's manifest (`releases/latest/download/...`; `latest_manifest_url`, installer define `LatestManifestUrl`, set by `build_online.ps1` for GitHub builds).
