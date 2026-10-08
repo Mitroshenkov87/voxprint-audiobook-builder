@@ -117,6 +117,10 @@ class NarrationOptions:
     pauses: Optional[pz.PauseProfile] = None   # opt-in: explicit pauses can make the model swallow short words
     #: Machine translation of the book before narration (:mod:`core.translate`); ``None`` = narrate the book as it is.
     translate: Optional[tl.TranslatePlan] = None
+    #: Per-chunk speech-recognition check with regeneration (:mod:`core.chunk_check`); the runner builds the checker.
+    check_chunks: bool = False
+    check_max_cer: float = 0.15
+    check_retries: int = 2
     #: Spoken AI disclosure as the first chunk (:mod:`core.ai_disclosure`); opt-in, the user decides.
     ai_disclosure: bool = False
     disclosure_date: Optional["datetime.date"] = None        # month/year said in the disclosure (None = today; tests)
@@ -148,6 +152,7 @@ class NarrationResult:
     chunks: int = 0
     resumed_chunks: int = 0                   # chunks that were already in the cache
     seconds: float = 0.0                      # length of the whole book
+    chunk_check: Optional[Dict[str, int]] = None   # counts of the per-chunk check (None = not run)
 
 
 ProgressFn = Callable[[NarrationProgress], None]
@@ -220,13 +225,14 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
                       cache: ChunkCache, texts: Dict[int, str], progress: ProgressFn,
                       cancel: CancelToken, pause: PauseToken, on_saved: Optional[Callable[[Chunk], None]] = None,
                       engine_future: Optional[Future] = None,
-                      background_check: Optional[Callable[[], None]] = None) -> Dict[str, int]:
+                      background_check: Optional[Callable[[], None]] = None, checker=None) -> Dict[str, int]:
     """Synthesize every chunk that is not cached yet.  Returns ``{"cached": n, "made": m}``.
 
     ``texts`` maps a chunk index to the prepared text; ``engine_tag`` identifies the engine without creating it.
     ``on_saved(chunk)`` runs (on a writer thread) once a chunk is on disk.  ``engine_future``: an engine already being
     loaded in the background (used instead of calling ``engine_factory``).  ``background_check()`` raises the error of
-    other background work (chapter assembly, encodes) between batches.
+    other background work (chapter assembly, encodes) between batches.  ``checker`` (:class:`core.chunk_check.ChunkChecker`)
+    re-reads each new chunk before it is written and regenerates it when it does not say its text; it is closed at the end.
     """
     total = len(chunks)
     keys = {c.index: cache.key(engine_tag, texts[c.index]) for c in chunks}
@@ -274,6 +280,10 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
             progress(NarrationProgress(done, total, eta, tr("narr.synth_batch", first=first, last=last, total=total)))
             t0 = time.monotonic()
             audios, batch_limit = _synth_group(engine, [texts[c.index] for c in group], [c.index for c in group], batch_limit)
+            if checker is not None:            # on this (GPU) thread, before the writers see the chunk: the cache holds the winner
+                progress(NarrationProgress(done, total, eta, tr("narr.checking", first=first, last=last, total=total)))
+                audios = [checker.check(engine, texts[c.index], keys[c.index], c.index, a, engine.sample_rate)
+                          for c, a in zip(group, audios)]
             spent += time.monotonic() - t0
             for c, audio in zip(group, audios):
                 while not slots.acquire(timeout=0.2):                    # type: ignore[union-attr]
@@ -293,6 +303,8 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
             f.result()
     finally:
         saver.shutdown(wait=True)
+        if checker is not None:
+            checker.close()                                              # the recogniser leaves (V)RAM with the engine
         if engine is None and engine_future is not None:
             close_when_loaded(engine_future)                             # loading meanwhile but never used: free it
         if engine is not None:
@@ -549,12 +561,12 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
                  progress: Optional[ProgressFn] = None, cancel: Optional[CancelToken] = None,
                  pause: Optional[PauseToken] = None, ffmpeg: Optional[str] = None,
                  run: Optional[ex.Run] = None, chapters: Sequence[int] = (),
-                 on_plan: Optional[Callable[[List[Path]], None]] = None) -> NarrationResult:
+                 on_plan: Optional[Callable[[List[Path]], None]] = None, checker=None) -> NarrationResult:
     """Run a complete narration job into ``out_dir / <book name>`` and return its :class:`NarrationResult`.
 
     ``engine_factory`` is called only if some chunk is missing from the cache.  ``chapters`` restricts the job to the
     given 0-based chapter numbers.  ``on_plan`` receives the ordered chunk files (they appear one by one; used by the live
-    player).  ``ffmpeg``/``run`` are injectable for tests.
+    player).  ``ffmpeg``/``run`` are injectable for tests.  ``checker``: the per-chunk check (:mod:`core.chunk_check`), or None.
     """
     options = options or NarrationOptions()
     progress = progress or (lambda p: None)
@@ -625,7 +637,7 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
         handed_over, engine_future = engine_future, None          # from here on synthesize_chunks owns (and closes) it
         counts = synthesize_chunks(chunk_list, engine_factory, engine_tag, cache, texts, progress, cancel, pause,
                                    on_saved=chapters_pipe.chunk_saved, engine_future=handed_over,
-                                   background_check=chapters_pipe.check)
+                                   background_check=chapters_pipe.check, checker=checker)
 
         total = len(chunk_list)
         cancel.check()
@@ -646,7 +658,8 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
         cache.clear()
     progress(NarrationProgress(total, total, 0.0, tr("narr.done"), "done"))
     return NarrationResult(job_dir, result.files, len(chapter_audio), total, counts["cached"],
-                           sum(c.duration for c in chapter_audio))
+                           sum(c.duration for c in chapter_audio),
+                           chunk_check=dict(checker.stats) if checker is not None else None)
 
 
 def _cuda_available() -> bool:

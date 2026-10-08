@@ -39,11 +39,18 @@ def run_narration(job: NarrationJob, progress: Callable[[nr.NarrationProgress], 
     # English book must get "English".  Decided once per book (core.languages.narration_language).
     language = languages.narration_language(job.book, job.voice.language, target)
     factory = tts_engine.make_engine_factory(job.voice, language)
+    checker = None
+    if job.options.check_chunks:      # per-chunk ASR check + regeneration (core/chunk_check.py); None if no recogniser installed
+        from core import chunk_check
+
+        checker = chunk_check.make_default_checker(
+            language, chunk_check.ChunkCheckOptions(job.options.check_max_cer, job.options.check_retries))
     # narrate_book uses its ``language`` for text preparation and the AI disclosure; "" there means "the book's own tag"
     return nr.narrate_book(job.book, factory, tts_engine.engine_tag(job.voice, language), job.out_dir,
                            language="" if language == languages.AUTO else language,
                            narrator=job.voice.name, options=job.options, progress=progress, cancel=cancel,
-                           pause=pause, ffmpeg=ensure_ffmpeg(), chapters=job.chapters, on_plan=job.on_plan)
+                           pause=pause, ffmpeg=ensure_ffmpeg(), chapters=job.chapters, on_plan=job.on_plan,
+                           checker=checker)
 
 
 def default_output_dir() -> Path:

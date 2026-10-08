@@ -139,3 +139,26 @@ or an alignment error still gets the script's text; the recogniser re-reads each
 
 Needs the GPU laptop: how many clips a real recording loses at 12 % (should be a few percent; if far more, the normaliser or the
 threshold is off for that language), the extra time (one recognition per clip), and whether the dropped clips are really bad.
+
+## B3. Every narrated chunk checked by speech recognition (research item 5)
+
+`core/chunk_check.py`, called by `core/narration.synthesize_chunks` on the GPU thread right after a batch is synthesized and before
+the chunks are written, so the chunk cache always holds the accepted attempt. Narrate window check box "Check every fragment by
+speech recognition": switched on by the **High** quality preset, off with Compact / Standard (the user can change it either way;
+`NarrationOptions.check_chunks`). There is no separate synthesis "quality mode"; the High preset is the app's quality choice.
+
+| | Value |
+| --- | --- |
+| Threshold | CER 15 % against the prepared chunk text (`NarrationOptions.check_max_cer`); the recognised text is normalised like the book |
+| Retries | up to 2 (`check_retries`, capped at 5), only for chunks over the threshold; stops at the first attempt that passes |
+| Sampling of retries | temperature 0.8, top_p 0.85, top_k 30 (`RETRY_SAMPLING`); the first attempt keeps the engine defaults |
+| Seeds | `sha256(cache key, attempt)` -> 31 bits (`chunk_seed`), so a rerun of the same job makes the same choices |
+| Kept | the attempt with the lowest CER (the first wins a tie); a failed recognition accepts the chunk as it is |
+| Recogniser | the installed Qwen3-ASR-0.6B (faster), else 1.7B; never downloads; none installed -> no check (logged) |
+| Memory | loaded at the first check, i.e. after the TTS model; on the GPU only if free VRAM >= 1.2 x its weights + 2 GB, else on the CPU; unloaded when synthesis ends |
+| Cache / CPU overlap | the cache key stays `engine tag + text`; cached chunks are never checked again; chapter assembly and encodes start on the written chunks exactly as before |
+| Result | `NarrationResult.chunk_check` (checked / regenerated / fixed / still doubtful); the Narrate window shows a one-line summary |
+
+Needs the GPU laptop: the slowdown (one recognition per chunk plus the retries), whether 0.6B fits on the GPU next to the TTS
+model or falls back to the CPU on 8 GB cards, how many chunks a real book regenerates at 15 % (a high share points at the text
+normaliser rather than at the voice), and whether the retries are audibly better.

@@ -399,6 +399,10 @@ class NarrateWindow(SubWindow):
         v.addLayout(prow)
         self.lbl_preset_info = hint_label()
         v.addWidget(self.lbl_preset_info)
+        # per-chunk speech-recognition check + regeneration (core/chunk_check.py): on with the High preset, off otherwise
+        self.chk_check_chunks = QCheckBox()
+        self.chk_check_chunks.setChecked(ex.DEFAULT_PRESET == "high")
+        v.addWidget(self.chk_check_chunks)
         # other formats (collapsed)
         self.btn_other = QToolButton()
         self.btn_other.setObjectName("expander")
@@ -596,6 +600,8 @@ class NarrateWindow(SubWindow):
         self.lbl_out.setText(str(self.out_dir))
         self.lbl_out_hint.setText(tr("work.folder_hint"))
         self.chk_titles.setText(tr("narr.speak_titles"))
+        self.chk_check_chunks.setText(tr("narr.check_chunks"))
+        self.chk_check_chunks.setToolTip(tr("narr.check_chunks_tip"))
         self.chk_pauses.setText(tr("narr.pauses_enable"))
         self.chk_disclosure.setText(tr("narr.ai_disclosure"))
         self.chk_disclosure.setToolTip(tr("narr.ai_disclosure_tip"))
@@ -660,6 +666,7 @@ class NarrateWindow(SubWindow):
             spn.blockSignals(True)
             spn.setValue(val)
             spn.blockSignals(False)
+        self.chk_check_chunks.setChecked(name == "high")   # the "quality" mode checks every chunk; the user may still change it
         self._sync_preset()
 
     def current_preset(self) -> str:
@@ -1066,7 +1073,8 @@ class NarrateWindow(SubWindow):
             formats=self.selected_formats(), bitrates=self.bitrates(),
             speak_titles=self.chk_titles.isChecked(), allow_aac=self.aac_allowed, pauses=self.pause_profile(),
             prep=self.plan_builder(self.selected_rule_steps(), self.selected_neural_steps()),
-            translate=self.translate_plan(), ai_disclosure=self.chk_disclosure.isChecked())
+            translate=self.translate_plan(), ai_disclosure=self.chk_disclosure.isChecked(),
+            check_chunks=self.chk_check_chunks.isChecked())
 
     # ------------------------------------------------------------------ state
     @property
@@ -1096,6 +1104,7 @@ class NarrateWindow(SubWindow):
         self.cmb_translate.setEnabled(not busy)
         self.cmb_voice.setEnabled(not busy)
         self.chk_disclosure.setEnabled(not busy)
+        self.chk_check_chunks.setEnabled(not busy)
         self.chk_pauses.setEnabled(not busy)
         self.sld_pauses.setEnabled(not busy and self.chk_pauses.isChecked())
         self.btn_pause.setVisible(busy)
@@ -1249,7 +1258,11 @@ class NarrateWindow(SubWindow):
             reminder = "\n" + (tr("narr.done_test_only_reminder") if rec.test_only else tr("narr.done_private_reminder"))
         elif rec is not None and rec.scope == "public_noncommercial":
             reminder = "\n" + tr("narr.done_noncommercial_reminder")
-        self.lbl_status.setText(tr("narr.done_summary", chapters=result.chapters, files=len(result.files)) + reminder)
+        cc = result.chunk_check or {}
+        checked = tr("narr.check_summary", n=cc.get("regenerated", 0), total=cc.get("checked", 0),
+                     bad=cc.get("still_bad", 0)) if cc.get("checked") else ""
+        self.lbl_status.setText(tr("narr.done_summary", chapters=result.chapters, files=len(result.files))
+                                + (" " + checked if checked else "") + reminder)
         self.lbl_ready.show()
         self.btn_open.show()
         kept = self._cleanup_job(result)

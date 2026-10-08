@@ -90,6 +90,12 @@ When a statement ends the recording, up to 60 s of unscripted speech at the end 
 
 Changing a bitrate by hand under *Advanced* switches the quality to "Custom" (no button highlighted).
 
+**Check every fragment by speech recognition** (under the quality buttons; switched on by *High*, off with the other presets):
+after each fragment is spoken, the speech recogniser listens to it; a fragment that skips, repeats or garbles more than 15 % of its
+text is generated again (up to two more times) and the best attempt is kept. Narration takes longer. It needs an installed speech
+recognition model (part of the normal model download); without one the check is skipped. When the book is ready the status line
+says how many fragments were generated again.
+
 ## Prepare the text
 Pipeline: **rules** (deterministic, instant) -> optional **AI clean-up** (small model, on demand) -> **synthesis**. Nothing is shown for review; the original book is never modified, and chapter titles in the output
 files / metadata / cover come from the original, unprepared book. For debugging, the prepared text is written next to the job cache: `<output>\<book>\.debug\prepared_text.txt` and `prep_report.json`

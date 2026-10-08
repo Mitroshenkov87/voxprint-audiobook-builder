@@ -733,5 +733,9 @@
  "progress.clip_check": "Checking {n} clips by speech recognition…",
  "warn.clip_check_dropped": "Speech recognition check: {n} of {total} clips did not match their text (more than {cer} % of the characters differ) and were left out.",
  "warn.clip_check_limited": "Speech recognition check: {n} more doubtful clips were kept so that at least {min} clips remain. Check the recording and the text for differences.",
- "warn.clip_check_no_asr": "The clips were not checked by speech recognition: the recognition model is not installed yet (it comes with the model download)."
+ "warn.clip_check_no_asr": "The clips were not checked by speech recognition: the recognition model is not installed yet (it comes with the model download).",
+ "narr.check_chunks": "Check every fragment by speech recognition and regenerate the ones that do not say their text (slower)",
+ "narr.check_chunks_tip": "After synthesis each fragment is re-read by speech recognition. If more than 15 % of the characters differ from the text (skipped or repeated words, babbling), it is generated again up to two times and the best attempt is kept. Narration takes longer. Switched on with the High preset; fragments already finished are not checked again.",
+ "narr.checking": "Checking fragments {first}–{last} of {total} by speech recognition…",
+ "narr.check_summary": "Speech check: {n} of {total} fragments generated again, {bad} still doubtful."
 }

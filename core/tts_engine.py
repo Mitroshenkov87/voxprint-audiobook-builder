@@ -220,6 +220,19 @@ class Qwen3AdapterEngine:
         self.sample_rate = int(sr)
         return np.asarray(wavs[0], dtype=np.float32).reshape(-1)
 
+    def synthesize_sampled(self, text: str, seed: Optional[int] = None, **sampling) -> np.ndarray:
+        """One chunk with explicit sampling (``temperature``, ``top_p``, ``top_k`` ...) and a fixed seed: the regeneration
+        attempts of the per-chunk check (:mod:`core.chunk_check`) are reproducible."""
+        import torch
+
+        if seed is not None:
+            torch.manual_seed(int(seed))          # seeds the CPU and every CUDA device
+        with torch.inference_mode():
+            wavs, sr = self._q.generate_voice_clone(text=text, language=self.language, voice_clone_prompt=self._prompt,
+                                                    max_new_tokens=max_tokens_for(text), **sampling)
+        self.sample_rate = int(sr)
+        return np.asarray(wavs[0], dtype=np.float32).reshape(-1)
+
     def synthesize_batch(self, texts: Sequence[str]) -> List[np.ndarray]:
         """Several chunks in ONE generate call (the GPU is mostly idle with a single sequence, so a batch is almost free).
 
