@@ -195,7 +195,7 @@ class SettingsDialog(GlassDialog):
         self.backup_job: Callable[..., Any] = backup_runner.run_backup_job
         self.restore_job: Callable[..., Any] = backup_runner.run_restore_job
         self.import_job: Callable[..., Any] = backup_runner.run_import_job
-        self.collect_items: Callable[[bool], list] = backup_runner.collect
+        self.collect_items: Callable[..., list] = backup_runner.collect
         self.backup_worker: Optional[BackupWorker] = None
         # --- projects folder (infra/projects.py): local, not synced; a shortcut in Documents ---
         self.lbl_projects_title = QLabel()
@@ -223,9 +223,20 @@ class SettingsDialog(GlassDialog):
         self.lbl_backup_title = QLabel()
         self.lbl_backup_title.setObjectName("sectiontitle")
         right.addWidget(self.lbl_backup_title)
+        self.chk_models = QCheckBox()
+        self.chk_models.setChecked(True)
         self.chk_voices = QCheckBox()
         self.chk_voices.setChecked(True)
+        self.chk_link = QCheckBox()
+        self.lbl_link_warn = QLabel()
+        self.lbl_link_warn.setWordWrap(True)
+        self.lbl_link_warn.setObjectName("warn")
+        self.lbl_link_warn.setVisible(False)
+        self.chk_link.toggled.connect(self.lbl_link_warn.setVisible)
+        right.addWidget(self.chk_models)
         right.addWidget(self.chk_voices)
+        right.addWidget(self.chk_link)
+        right.addWidget(self.lbl_link_warn)
         brow = QHBoxLayout()
         self.btn_backup = QPushButton()
         self.btn_restore = QPushButton()
@@ -268,6 +279,8 @@ class SettingsDialog(GlassDialog):
         self.lbl_repair_desc.setObjectName("cardnote")
         self.lbl_repair_desc.setWordWrap(True)
         right.addWidget(self.lbl_repair_desc)
+        self.btn_repair_restore = QPushButton()
+        right.addWidget(self.btn_repair_restore)
         self.btn_autorepair = QPushButton()
         self.btn_repair = self.btn_autorepair        # old name kept for callers
         right.addWidget(self.btn_autorepair)
@@ -303,6 +316,7 @@ class SettingsDialog(GlassDialog):
         self.btn_about.clicked.connect(window.open_about)
         self.btn_backup.clicked.connect(self.start_backup)
         self.btn_restore.clicked.connect(self.start_restore)
+        self.btn_repair_restore.clicked.connect(self.start_restore)
         self.btn_backup_cancel.clicked.connect(self.cancel_backup)
         self.btn_existing.clicked.connect(self.choose_existing_folder)
         self.btn_existing_clear.clicked.connect(self.clear_existing_folder)
@@ -357,9 +371,13 @@ class SettingsDialog(GlassDialog):
         self.btn_projects_change.setToolTip(tr("projects.tip"))
         self.render_projects()
         self.lbl_backup_title.setText(tr("backup.title"))
+        self.chk_models.setText(tr("backup.include_models"))
         self.chk_voices.setText(tr("backup.include_voices"))
+        self.chk_link.setText(tr("backup.link_models"))
+        self.lbl_link_warn.setText(tr("backup.link_warn"))
         self.btn_backup.setText(tr("backup.btn_backup"))
         self.btn_restore.setText(tr("backup.btn_restore"))
+        self.btn_repair_restore.setText(tr("backup.btn_restore_folder"))
         self.btn_backup_cancel.setText(tr("ui.cancel"))
         self.lbl_existing_title.setText(tr("existing.title"))
         self.lbl_existing_hint.setText(tr("existing.hint"))
@@ -644,9 +662,10 @@ class SettingsDialog(GlassDialog):
         target = self.pick_folder(tr("backup.choose_target"))
         if not target:
             return False
-        include = self.chk_voices.isChecked()
+        include_voices = self.chk_voices.isChecked()
+        include_models = self.chk_models.isChecked()
         try:
-            items = self.collect_items(include)
+            items = self.collect_items(include_voices, include_models)
         except Exception as exc:  # noqa: BLE001 - unreadable folders must not crash the dialog
             log.exception("collecting the backup items failed")
             self._set_status(tr("backup.err_io", path="", error=str(exc)), False)
@@ -663,7 +682,7 @@ class SettingsDialog(GlassDialog):
         if not self.confirm(tr("backup.btn_backup"), tr("backup.confirm_backup", size=backup.format_size(total), files=files,
                                                         target=str(Path(target)), free=free)):
             return False
-        self._run(lambda prog, cancel: self.backup_job(Path(target), include, prog, cancel, items=items))
+        self._run(lambda prog, cancel: self.backup_job(Path(target), include_voices, prog, cancel, items=items))
         return True
 
     def start_restore(self) -> bool:
@@ -675,6 +694,7 @@ class SettingsDialog(GlassDialog):
         if not src:
             return False
         include = self.chk_voices.isChecked()
+        link = self.chk_link.isChecked()
         root = backup.find_backup(Path(src))
         if root is None:
             self._set_status(tr("backup.err_no_manifest", path=str(src)), False)
@@ -682,14 +702,18 @@ class SettingsDialog(GlassDialog):
             return False
         try:
             items = [i for i in backup.items_from_manifest(backup.read_manifest(root)) if i.complete
-                     and (include or i.kind != backup.KIND_VOICES)]
+                     and (include or i.kind != backup.KIND_VOICES)
+                     and not (link and i.kind == backup.KIND_MODEL)]
         except BackupError as exc:
             self._set_status(exc.user_message, False)
             return False
         size = backup.format_size(sum(i.size for i in items))
-        if not self.confirm(tr("backup.btn_restore"), tr("backup.confirm_restore", size=size, source=str(root))):
+        question = tr("backup.confirm_restore", size=size, source=str(root))
+        if link:
+            question += "\n\n" + tr("backup.link_warn")
+        if not self.confirm(tr("backup.btn_restore"), question):
             return False
-        self._run(lambda prog, cancel: self.restore_job(root, include, prog, cancel))
+        self._run(lambda prog, cancel: self.restore_job(root, include, prog, cancel, link=link))
         return True
 
     def _run(self, job: Callable[..., Any]) -> None:
@@ -725,6 +749,12 @@ class SettingsDialog(GlassDialog):
                   size=backup.format_size(report.copied_bytes))
         if report.conflicts:
             text += " " + tr("backup.done_conflicts", names=", ".join(report.conflicts))
+        problems = list(getattr(report, "problems", ()) or ())
+        if problems:
+            text += " " + tr("backup.done_problems", names=", ".join(problems))
+        external = getattr(report, "external", "") or ""
+        if external:
+            text += " " + tr("backup.linked", path=external)
         self.bar_backup.setValue(100)
         self._finish(text)
 
@@ -760,7 +790,8 @@ class SettingsDialog(GlassDialog):
         self.btn_update.setEnabled(not busy and not self._win.updating)
         self.btn_autorepair.setEnabled(self.autorepair_running or (not busy and not self._win.repairing))
         idle = not busy and not self.backing_up
-        for b in (self.btn_backup, self.btn_restore, self.btn_existing, self.chk_voices):
+        for b in (self.btn_backup, self.btn_restore, self.btn_repair_restore, self.btn_existing,
+                  self.chk_voices, self.chk_models, self.chk_link):
             b.setEnabled(idle)
         self.btn_existing_clear.setEnabled(idle and bool(existing_models.configured_text()))
 

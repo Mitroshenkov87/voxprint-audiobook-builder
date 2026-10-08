@@ -37,11 +37,12 @@ from core import workspace as ws
 from core.appinfo import APP_BUILD, APP_CHANNEL, APP_CODENAME, APP_VERSION
 from core.asr import make_default_asr
 from core.book_parsers import load_book
-from core.errors import CancelledByUser, DatasetMakerError, OutOfMemoryError_
+from core.errors import BackupError, CancelledByUser, DatasetMakerError, OutOfMemoryError_
 from core.events import CancelToken, Stage, overall_percent
 from core.narration import NarrationOptions, NarrationProgress, PauseToken
 from core.voice_info import VOICE_TYPES, normalize_voice_type
 from core.voice_library import VoiceLibrary, VoiceRecord
+from infra import backup as backup_mod
 from infra import denoise_tool, diagnostics, keep_awake, llm_tool, projects, quality_models, text_models
 from infra import model_downloader as md
 from infra import modules as runtime_modules
@@ -53,6 +54,7 @@ from infra.asr_choice import ready as asr_ready
 from infra.model_downloader import ALIGNER_REPO
 from infra.model_release import ReleaseError
 from infra.vram_optimizer import MODEL_0_6B, MODEL_1_7B, detect_gpu, plan_training
+from workers.backup_runner import collect as collect_backup
 from workers.narration_runner import NarrationJob, format_eta, run_narration
 from workers.pipeline_runner import KIND_LORA, TaskRequest, plan_for, run_task
 
@@ -91,7 +93,7 @@ FORMAT_ALIASES = {
 }
 
 USER_COMMANDS = frozenset({
-    "narrate", "train", "voices", "diag", "status", "capabilities", "models", "revoice",
+    "narrate", "train", "voices", "diag", "status", "capabilities", "models", "revoice", "backup", "restore",
 })
 
 CORE_MODULE_IDS = (
@@ -352,6 +354,8 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint train --help\n"
             "  voxprint models list --json\n"
             "  voxprint diag --out report.zip\n"
+            "  voxprint backup --out E:\\ --json\n"
+            "  voxprint restore --from E:\\ --json\n"
         ),
     )
     sub = ap.add_subparsers(dest="command", required=True)
@@ -462,6 +466,39 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     st.set_defaults(_handler="status")
+
+    b = sub.add_parser(
+        "backup", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
+        help="Copy models and voices to a folder (resumable, with a manifest)",
+        description="Copy the models and the voice library into <DIR>/Voxprint-backup/ with a SHA-256 manifest. "
+                    "Files already there with the same size and hash are skipped, so a second run continues.",
+        epilog=(
+            "Examples:\n"
+            "  voxprint backup --out E:\\\n"
+            "  voxprint backup --out /mnt/usb --no-voices --json\n"
+        ),
+    )
+    b.add_argument("--out", required=True, type=Path, metavar="DIR", help="Folder the backup is written into")
+    b.add_argument("--no-models", action="store_true", help="Leave models out")
+    b.add_argument("--no-voices", action="store_true", help="Leave the voice library out")
+    b.set_defaults(_handler="backup")
+
+    r = sub.add_parser(
+        "restore", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
+        help="Restore a backup into the normal folders, or use its models in place",
+        description="Copy a backup back and check every file against the manifest and the pinned hashes. "
+                    "A damaged or missing file is reported and left for the normal download.",
+        epilog=(
+            "Examples:\n"
+            "  voxprint restore --from E:\\\n"
+            "  voxprint restore --from E:\\ --link --json\n"
+        ),
+    )
+    r.add_argument("--from", dest="src", required=True, type=Path, metavar="DIR",
+                   help="Folder that contains the backup (or the Voxprint-backup folder itself)")
+    r.add_argument("--link", action="store_true",
+                   help="Use models from this folder (don't copy). The drive must stay connected.")
+    r.set_defaults(_handler="restore")
 
     m = sub.add_parser(
         "models", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -757,6 +794,76 @@ def cmd_diag(args) -> int:
         )
 
     return _run("diag", args, body)
+
+
+def _report_payload(report) -> dict:
+    """JSON-friendly summary of a backup or restore report."""
+    return {
+        "target": str(report.target),
+        "copied_files": report.copied_files,
+        "skipped_files": report.skipped_files,
+        "copied_bytes": report.copied_bytes,
+        "problems": list(getattr(report, "problems", ()) or ()),
+        "conflicts": list(report.conflicts),
+        "external_models": getattr(report, "external", "") or "",
+    }
+
+
+def _report_lines(payload: dict) -> list[str]:
+    if payload["external_models"]:
+        lines = [f"Models stay in {payload['external_models']} (not copied)."]
+        if payload["problems"]:
+            lines.append("Damaged or missing: " + ", ".join(payload["problems"]))
+        lines.append("The drive must stay connected. If it is missing, models are downloaded into the usual folder.")
+        return lines
+    lines = [f"Copied {payload['copied_files']} files, skipped {payload['skipped_files']}."]
+    if payload["problems"]:
+        lines.append("Damaged or missing (downloaded as usual): " + ", ".join(payload["problems"]))
+    if payload["conflicts"]:
+        lines.append("Not overwritten: " + ", ".join(payload["conflicts"]))
+    return lines
+
+
+def _backup_error(exc: BackupError) -> CliError:
+    hint = "Free space on the drive or choose another folder." if exc.code == "space" else \
+        "Check that the folder exists and is readable or writable."
+    return CliError(EXIT_INPUT, exc.user_message, hint=hint, details=exc.details or "")
+
+
+def cmd_backup(args) -> int:
+    """``backup --out DIR [--no-models|--no-voices]``."""
+
+    def body(json_mode: bool, started: float) -> int:
+        items = collect_backup(include_voices=not args.no_voices, include_models=not args.no_models)
+        if not items:
+            raise CliError(EXIT_INPUT, "nothing to back up", hint="Download models or create a voice first.")
+        try:
+            report = backup_mod.run_backup(items, args.out, cancel=CancelToken())
+        except BackupError as exc:
+            raise _backup_error(exc) from exc
+        payload = _report_payload(report)
+        return _ok(json_mode, "backup", started, outputs=[report.target], human=_report_lines(payload), extra=payload)
+
+    return _run("backup", args, body)
+
+
+def cmd_restore(args) -> int:
+    """``restore --from DIR [--link]``. Damaged files are reported; the app downloads those later."""
+
+    def body(json_mode: bool, started: float) -> int:
+        try:
+            if args.link:
+                report = backup_mod.run_link(args.src, cancel=CancelToken())
+            else:
+                report = backup_mod.run_restore(args.src, strict=False, cancel=CancelToken())
+        except BackupError as exc:
+            raise _backup_error(exc) from exc
+        payload = _report_payload(report)
+        warnings = [f"damaged or missing: {p}" for p in payload["problems"]]
+        return _ok(json_mode, "restore", started, outputs=[report.target], warnings=warnings,
+                   human=_report_lines(payload), extra=payload)
+
+    return _run("restore", args, body)
 
 
 def cmd_version(json_mode: bool) -> int:
@@ -1204,6 +1311,10 @@ def main(argv: Optional[Sequence[str]] = None, *,
         return cmd_models_download(args, download_fn=download_fn, installed_fn=installed_fn)
     if handler == "revoice":
         return cmd_revoice(args, transcribe_fn=transcribe_fn)
+    if handler == "backup":
+        return cmd_backup(args)
+    if handler == "restore":
+        return cmd_restore(args)
     ap.error(f"unknown command: {handler}")
     return EXIT_BAD_ARGS
 

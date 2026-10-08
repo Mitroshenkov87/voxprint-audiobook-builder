@@ -49,13 +49,17 @@ def test_section_texts_in_every_language(dlg):
     for lang in i18n.LANGS:
         i18n.set_language(lang)
         dlg.retranslate()
-        for w in (dlg.lbl_backup_title, dlg.chk_voices, dlg.btn_backup, dlg.btn_restore, dlg.lbl_existing_title,
+        for w in (dlg.lbl_backup_title, dlg.chk_models, dlg.chk_voices, dlg.chk_link, dlg.lbl_link_warn,
+                  dlg.btn_backup, dlg.btn_restore, dlg.btn_repair_restore, dlg.lbl_existing_title,
                   dlg.lbl_existing_hint, dlg.btn_existing, dlg.btn_existing_clear):
             assert w.text().strip(), (lang, w)
     i18n.set_language("en")
     dlg.retranslate()
-    assert dlg.btn_backup.text().startswith("Back up models and voices") and dlg.btn_restore.text().startswith("Restore from backup")
-    assert dlg.chk_voices.isChecked() and not dlg.bar_backup.isVisibleTo(dlg) and not dlg.btn_backup_cancel.isVisibleTo(dlg)
+    assert dlg.btn_backup.text().startswith("Back up models") and "voices" in dlg.btn_backup.text()
+    assert dlg.btn_restore.text().startswith("Restore from backup")
+    assert dlg.btn_repair_restore.text() == "Restore from backup folder"
+    assert dlg.chk_models.isChecked() and dlg.chk_voices.isChecked() and not dlg.chk_link.isChecked()
+    assert not dlg.bar_backup.isVisibleTo(dlg) and not dlg.btn_backup_cancel.isVisibleTo(dlg)
 
 
 def test_backup_asks_shows_sizes_runs_and_reports(dlg, tmp_path):
@@ -123,6 +127,7 @@ def test_buttons_are_locked_while_a_task_runs(dlg, monkeypatch):
     monkeypatch.setattr(type(dlg._win), "busy", property(lambda self: True))
     dlg.refresh()
     assert not dlg.btn_backup.isEnabled() and not dlg.btn_restore.isEnabled() and not dlg.btn_existing.isEnabled()
+    assert not dlg.btn_repair_restore.isEnabled() and not dlg.chk_models.isEnabled() and not dlg.chk_link.isEnabled()
     assert not dlg.start_backup() and "Wait until" in dlg.notices[-1]
     assert not dlg.start_restore()
 

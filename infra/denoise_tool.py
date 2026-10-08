@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Callable, Dict, Optional
 
 from core.i18n import tr
-from infra import model_release
+from infra import external_models, model_release
 
 log = logging.getLogger("voxprint.denoise")
 
@@ -60,11 +60,18 @@ def tool_path(models_dir: Optional[Path] = None, key: Optional[str] = None) -> O
     a = asset(key)
     if a is None:
         return None
-    if models_dir is None:
-        from infra import paths
+    if models_dir is not None:
+        return Path(models_dir) / "deepfilternet" / str(a["name"])
+    from infra import paths
 
-        models_dir = paths.models_dir()
-    return Path(models_dir) / "deepfilternet" / str(a["name"])
+    local = paths.models_dir() / "deepfilternet" / str(a["name"])
+    try:
+        if local.is_file() and local.stat().st_size == int(a["size"]):
+            return local
+    except OSError:
+        pass
+    ext = external_models.verified_file("deepfilternet/" + str(a["name"]))
+    return ext if ext is not None else local
 
 
 def ready(models_dir: Optional[Path] = None, key: Optional[str] = None) -> Optional[Path]:

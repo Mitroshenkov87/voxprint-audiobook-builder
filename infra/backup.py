@@ -16,8 +16,8 @@ Properties
 ----------
 * **Resumable**: every file is written as ``<name>.part`` and renamed when complete; finished files are skipped on the
   next run, so Cancel / a crash / pulling the cable loses at most the file that was being written.
-* **Skips identical files**: same size and the same modification time (a backup preserves it), or - when the time differs -
-  the same SHA-256.  ``verify=True`` always compares hashes.
+* **Skips identical files**: same size and the same SHA-256 (a preserved modification time is not enough).
+  ``verify=True`` still reads the copy back after writing.
 * **Clear free-space check before anything is written** (:func:`check_space`): only bytes that really need copying count.
 * **Hash-verified**: the SHA-256 is computed while the source is read and stored in the manifest; restoring and importing
   compare the copy with it (read-back), a mismatch removes the copy and raises ``BackupError(code="hash")``.
@@ -52,6 +52,9 @@ MTIME_TOLERANCE = 2.0                       # FAT / exFAT keep modification time
 SPACE_MARGIN = 64 * 1024 * 1024             # free space we insist on besides the bytes to copy
 SKIP_SUFFIXES = (".part", ".partial", ".incomplete", ".lock", ".tmp")
 KIND_MODEL, KIND_TOOLS, KIND_VOICES = "model", "tools", "voices"
+#: Trees under the models folder that are not ``Owner--Name`` Hugging Face snapshots: the Gemma GGUF and the
+#: unpacked llama.cpp runtime live in ``llm/``, DeepFilterNet in ``deepfilternet/``, DNSMOS in ``dnsmos/``.
+HEAVY_DIRS = ("llm", "deepfilternet", "dnsmos")
 
 #: progress(fraction 0..1, message)
 Progress = Callable[[float, str], None]
@@ -130,6 +133,8 @@ class Report:
     copied_bytes: int = 0
     items: int = 0
     conflicts: List[str] = field(default_factory=list)      # voices that exist with other content and were left alone
+    problems: List[str] = field(default_factory=list)       # relative paths that were corrupt or missing (not installed)
+    external: str = ""                                      # set when models are used in place instead of copied
     seconds: float = 0.0
 
 
@@ -199,16 +204,14 @@ def _mtime(p: Path) -> float:
     return os.stat(p).st_mtime
 
 
-def _is_identical(src_size: int, src_mtime: float, src_sha: Callable[[], str], dst: Path, verify: bool) -> bool:
-    """Same size and (same modification time, or - or if ``verify`` - the same SHA-256)."""
+def _is_identical(src_size: int, _src_mtime: float, src_sha: Callable[[], str], dst: Path, _verify: bool) -> bool:
+    """Same size and the same SHA-256. Timestamp and ``verify`` do not skip the hash."""
     try:
         st = os.stat(dst)
     except OSError:
         return False
     if st.st_size != src_size:
         return False
-    if not verify and abs(st.st_mtime - src_mtime) <= MTIME_TOLERANCE:
-        return True
     try:
         return sha256_file(dst) == src_sha()
     except OSError:
@@ -240,9 +243,22 @@ def _is_model_dir(p: Path) -> bool:
     return p.is_dir() and (p / "config.json").exists() and (any(p.glob("*.safetensors")) or any(p.glob("*.bin")))
 
 
+def _heavy_dir_names(models_root: Path) -> List[str]:
+    """Folder names of the small / non-snapshot models (``llm``, ``deepfilternet``, ``dnsmos``, a loose ``llama.cpp*``)."""
+    names = list(HEAVY_DIRS)
+    try:
+        for d in models_root.iterdir():
+            if d.is_dir() and (d.name.startswith("llama.cpp") or d.name.startswith("llama-cpp")):
+                names.append(d.name)
+    except OSError:
+        pass
+    return names
+
+
 def collect_items(include_voices: bool = True, repos: Iterable[str] = (), models_root: Optional[Path] = None,
                   voices_root: Optional[Path] = None, tools_root: Optional[Path] = None,
-                  locate: Optional[Callable[[str], Optional[Tuple[Path, str]]]] = None) -> List[Item]:
+                  locate: Optional[Callable[[str], Optional[Tuple[Path, str]]]] = None,
+                  include_models: bool = True) -> List[Item]:
     """The folders a backup contains.
 
     ``repos`` are model repositories the app uses; one that is not in Voxprint's own models folder is taken from the
@@ -259,6 +275,8 @@ def collect_items(include_voices: bool = True, repos: Iterable[str] = (), models
                      and not d.name.endswith((".partial", ".importing", ".restoring", ".old")))
     except OSError:
         own = []
+    if not include_models:
+        own = []
     for d in own:
         if _is_model_dir(d):
             rev = ""
@@ -268,14 +286,26 @@ def collect_items(include_voices: bool = True, repos: Iterable[str] = (), models
                 pass
             items.append(Item(KIND_MODEL, d.name, d, revision=rev))
             seen.add(d.name)
-    for repo in repos:
-        name = repo.replace("/", "--")
-        if name in seen:
-            continue
-        found = (locate or _default_locate)(repo)
-        if found and _is_model_dir(found[0]):
-            items.append(Item(KIND_MODEL, name, found[0], revision=found[1] or ""))
-            seen.add(name)
+    if include_models:
+        for repo in repos:
+            name = repo.replace("/", "--")
+            if name in seen:
+                continue
+            found = (locate or _default_locate)(repo)
+            if found and _is_model_dir(found[0]):
+                items.append(Item(KIND_MODEL, name, found[0], revision=found[1] or ""))
+                seen.add(name)
+    if include_models:
+        for name in _heavy_dir_names(models_root):
+            if name in seen:
+                continue
+            d = models_root / name
+            try:
+                if d.is_dir():
+                    items.append(Item(KIND_MODEL, name, d))
+                    seen.add(name)
+            except OSError:
+                pass
     tools = tools_root or assets.tools_dir()
     try:
         if tools.is_dir() and any(tools.iterdir()):
@@ -332,9 +362,23 @@ def read_manifest(root: Path) -> dict:
         raise BackupError(tr("backup.err_no_manifest", path=str(root)), code="no_manifest", details=str(exc)) from exc
 
 
+def app_version_build() -> Tuple[str, int]:
+    """``("0.1.1-beta", 665)`` from :mod:`core.appinfo` (build ``0`` on a developer checkout)."""
+    from core import appinfo
+
+    version = f"{appinfo.APP_VERSION}-{appinfo.APP_CHANNEL}" if appinfo.APP_CHANNEL else appinfo.APP_VERSION
+    return version, int(appinfo.APP_BUILD)
+
+
 def write_manifest(root: Path, items: List[Item]) -> None:
-    """Atomically write the manifest of the given items."""
-    data = {"schema": SCHEMA, "app": "Voxprint", "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    """Atomically write the manifest of the given items.
+
+    ``files`` is the flat list (path relative to the backup root, size, SHA-256). ``items`` keeps the folder grouping
+    older readers use. ``version`` / ``build`` are the app that wrote the backup."""
+    version, build = app_version_build()
+    data = {"schema": SCHEMA, "app": "Voxprint", "version": version, "build": build,
+            "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "files": [{"path": f"{i.rel}/{f.p}", "size": f.size, "sha256": f.sha256} for i in items for f in i.files],
             "items": [{"kind": i.kind, "name": i.name, "rel": i.rel, "revision": i.revision, "complete": i.complete,
                        "files": [{"p": f.p, "size": f.size, "sha256": f.sha256, "mtime": f.mtime} for f in i.files]}
                       for i in items]}
@@ -357,6 +401,18 @@ def _safe_rel(p: str) -> bool:
     """A manifest path must stay inside its item folder (no absolute paths, no ``..``)."""
     parts = Path(p.replace("\\", "/")).parts
     return bool(parts) and not Path(p).is_absolute() and ".." not in parts and not p.startswith(("/", "\\"))
+
+
+def _contained(root: Path, rel: str) -> Optional[Path]:
+    """``root/rel`` when ``rel`` cannot leave the backup folder, else ``None`` (a manifest is untrusted input)."""
+    if not _safe_rel(rel):
+        return None
+    path = root.joinpath(*rel.replace("\\", "/").split("/"))
+    try:
+        path.resolve().relative_to(Path(root).resolve())
+    except (OSError, ValueError):
+        return None
+    return path
 
 
 # ----------------------------------------------------------------------------------------------------- space
@@ -535,7 +591,7 @@ class RestorePlan:
 
 def plan_restore(folder: Path, include_voices: bool = True, models_root: Optional[Path] = None,
                  voices_root: Optional[Path] = None, tools_root: Optional[Path] = None,
-                 cancel: Optional[CancelToken] = None) -> RestorePlan:
+                 cancel: Optional[CancelToken] = None, kinds: Optional[Iterable[str]] = None) -> RestorePlan:
     """Read the backup in ``folder`` and decide what has to be copied.  ``BackupError(code="no_manifest")`` if it is no backup."""
     from infra import assets, paths
 
@@ -545,7 +601,8 @@ def plan_restore(folder: Path, include_voices: bool = True, models_root: Optiona
     models_root = models_root or paths.models_dir()
     voices_root = voices_root or paths.voices_dir()
     tools_root = tools_root or assets.tools_dir()
-    items = [i for i in items_from_manifest(read_manifest(root)) if i.complete and i.kind in (KIND_MODEL, KIND_TOOLS, KIND_VOICES)]
+    allowed = set(kinds) if kinds is not None else {KIND_MODEL, KIND_TOOLS, KIND_VOICES}
+    items = [i for i in items_from_manifest(read_manifest(root)) if i.complete and i.kind in allowed]
     if not include_voices:
         items = [i for i in items if i.kind != KIND_VOICES]
     plan = RestorePlan(root)
@@ -574,7 +631,9 @@ def plan_restore(folder: Path, include_voices: bool = True, models_root: Optiona
 
 def run_restore(folder: Path, include_voices: bool = True, progress: Progress = _noop, cancel: Optional[CancelToken] = None,
                 models_root: Optional[Path] = None, voices_root: Optional[Path] = None, tools_root: Optional[Path] = None,
-                usage: Optional[Callable[[Path], object]] = None, plan: Optional[RestorePlan] = None) -> Report:
+                usage: Optional[Callable[[Path], object]] = None, plan: Optional[RestorePlan] = None,
+                strict: bool = True, pins: Optional[Dict[str, Tuple[int, str]]] = None,
+                kinds: Optional[Iterable[str]] = None) -> Report:
     """Copy the backup in ``folder`` back into the app's folders (hash-verified, resumable, nothing valuable is overwritten)."""
     from infra import assets, paths
 
@@ -583,7 +642,8 @@ def run_restore(folder: Path, include_voices: bool = True, progress: Progress = 
     models_root = models_root or paths.models_dir()
     voices_root = voices_root or paths.voices_dir()
     tools_root = tools_root or assets.tools_dir()
-    plan = plan or plan_restore(folder, include_voices, models_root, voices_root, tools_root, cancel)
+    pins = default_pins() if pins is None else pins
+    plan = plan or plan_restore(folder, include_voices, models_root, voices_root, tools_root, cancel, kinds)
     check_space(plan.bytes_to_copy, models_root, usage)
     report = Report(plan.root, items=len(plan.todo), conflicts=list(plan.conflicts))
     total = max(1, plan.bytes_to_copy)
@@ -596,27 +656,45 @@ def run_restore(folder: Path, include_voices: bool = True, progress: Progress = 
             progress(min(1.0, done[0] / total), tr("backup.restoring", name=it.name, done=format_size(done[0]), total=format_size(total)))
 
         if it.kind == KIND_TOOLS:
-            _copy_item(it, dest, cancel, on_bytes, report)
+            try:
+                _copy_item(it, dest, cancel, on_bytes, report, pins)
+            except BackupError as exc:
+                if strict or exc.code not in ("hash", "missing"):
+                    raise
+                report.problems.append(exc.details or it.name)
             continue
         stage = dest.with_name(dest.name + ".restoring")         # a half-restored folder is never mistaken for a model / voice
-        _copy_item(it, stage, cancel, on_bytes, report)
-        old = dest.with_name(dest.name + ".old")
-        if dest.exists():
+        try:
+            _copy_item(it, stage, cancel, on_bytes, report, pins)
+            old = dest.with_name(dest.name + ".old")
+            if dest.exists():
+                shutil.rmtree(old, ignore_errors=True)
+                os.replace(dest, old)
+            os.replace(stage, dest)
             shutil.rmtree(old, ignore_errors=True)
-            os.replace(dest, old)
-        os.replace(stage, dest)
-        shutil.rmtree(old, ignore_errors=True)
+        except BackupError as exc:
+            shutil.rmtree(stage, ignore_errors=True)
+            if strict or exc.code not in ("hash", "missing"):
+                raise
+            report.problems.append(exc.details or it.name)
     progress(1.0, tr("backup.restored_msg"))
     report.seconds = time.time() - t0
     return report
 
 
-def _copy_item(it: Item, dest: Path, cancel: CancelToken, on_bytes: Callable[[int], None], report: Report) -> None:
-    """Copy all files of ``it`` from the backup to ``dest``, verifying each against the manifest hash."""
+def _copy_item(it: Item, dest: Path, cancel: CancelToken, on_bytes: Callable[[int], None], report: Report,
+               pins: Optional[Dict[str, Tuple[int, str]]] = None) -> None:
+    """Copy all files of ``it`` from the backup to ``dest``, verifying each against the manifest hash and any pin."""
+    pins = pins or {}
     for f in it.files:
         if cancel:
             cancel.check()
+        rel = f"{it.rel}/{f.p}"
         src, dst = it.src / f.p, dest / f.p
+        if not src.is_file():
+            raise BackupError(tr("backup.err_missing", name=f.p), code="missing", details=rel)
+        if _pinned_bad(rel, f.size, f.sha256, pins):
+            raise BackupError(tr("backup.err_hash", name=f.p), code="hash", details=rel)
         if dst.is_file() and dst.stat().st_size == f.size and f.sha256 and sha256_file(dst, cancel) == f.sha256:
             report.skipped_files += 1                    # copied before an interruption (or already identical)
             on_bytes(f.size)
@@ -630,6 +708,173 @@ def _copy_item(it: Item, dest: Path, cancel: CancelToken, on_bytes: Callable[[in
                 dst.unlink()
             except OSError:
                 pass
-            raise BackupError(tr("backup.err_hash", name=f.p), code="hash", details=f"{src}: {digest} != {f.sha256}")
+            raise BackupError(tr("backup.err_hash", name=f.p), code="hash", details=rel)
+        if _pinned_bad(rel, f.size, digest, pins):
+            try:
+                dst.unlink()
+            except OSError:
+                pass
+            raise BackupError(tr("backup.err_hash", name=f.p), code="hash", details=rel)
         report.copied_files += 1
         report.copied_bytes += f.size
+
+
+def _pinned_bad(rel: str, size: int, digest: str, pins: Dict[str, Tuple[int, str]]) -> bool:
+    """True when ``rel`` is a pinned file and the size or SHA-256 is not the pinned one."""
+    pin = pins.get(rel)
+    if not pin:
+        return False
+    want_size, want_sha = pin
+    if size != want_size:
+        return True
+    return bool(want_sha) and digest != want_sha
+
+
+def default_pins() -> Dict[str, Tuple[int, str]]:
+    """``{path inside the backup: (size, sha256)}`` for files with a published pin.
+
+    Paths look like ``models/Qwen--Qwen3-TTS-.../model.safetensors``. An empty hash means "size only"
+    (a ``KNOWN_SIZES`` entry that the mirror manifest does not list). Card files are skipped."""
+    from core.model_locator import KNOWN_SIZES
+    from infra import model_mirrors
+    from infra.denoise_tool import ASSETS as DENOISE_ASSETS
+    from infra.llm_tool import MODEL as LLM_MODEL
+    from infra.quality_models import DNSMOS_FILE, DNSMOS_META
+
+    out: Dict[str, Tuple[int, str]] = {}
+    for repo, entry in model_mirrors.load().items():
+        folder = "models/" + repo.replace("/", "--")
+        for rel, meta in entry.files.items():
+            if meta.get("card"):
+                continue
+            sha = str(meta.get("sha256") or "")
+            if len(sha) == 64:
+                out[f"{folder}/{rel}"] = (int(meta["size"]), sha)
+    for repo, (_rev, sizes) in KNOWN_SIZES.items():
+        folder = "models/" + repo.replace("/", "--")
+        for rel, size in sizes.items():
+            out.setdefault(f"{folder}/{rel}", (int(size), ""))
+    out[f"models/dnsmos/{DNSMOS_FILE}"] = (int(DNSMOS_META["size"]), str(DNSMOS_META["sha256"]))
+    for asset in DENOISE_ASSETS.values():
+        out[f"models/deepfilternet/{asset['name']}"] = (int(asset["size"]), str(asset["sha256"]))
+    out[f"models/llm/{LLM_MODEL['file']}"] = (int(LLM_MODEL["size"]), str(LLM_MODEL["sha256"]))
+    return out
+
+
+def manifest_index(root: Path) -> Dict[str, Tuple[int, str]]:
+    """``{path relative to the backup: (size, sha256)}`` from ``files``, or from ``items`` on an older manifest."""
+    data = read_manifest(root)
+    out: Dict[str, Tuple[int, str]] = {}
+    for f in data.get("files") or []:
+        if isinstance(f, dict) and f.get("path") and _safe_rel(str(f["path"])):
+            out[str(f["path"])] = (int(f["size"]), str(f.get("sha256") or ""))
+    if out:
+        return out
+    for it in data.get("items") or []:
+        base = str(it.get("rel") or "")
+        if not _safe_rel(base):
+            continue
+        for f in it.get("files") or []:
+            rel = f"{base}/{f['p']}"
+            if _safe_rel(rel) and _safe_rel(str(f.get("p", ""))):
+                out[rel] = (int(f["size"]), str(f.get("sha256") or ""))
+    return out
+
+
+def _backup_root_of_file(path: Path) -> Optional[Path]:
+    """The backup folder that contains ``path`` (the one with the manifest), or ``None``."""
+    p = path if path.is_dir() else path.parent
+    for _ in range(8):
+        try:
+            if (p / MANIFEST_NAME).is_file():
+                return p
+        except OSError:
+            return None
+        if p == p.parent:
+            break
+        p = p.parent
+    return None
+
+
+def linked_model_problem(model_dir: Path) -> Optional[str]:
+    """Why ``model_dir`` must not be used in place, or ``None`` when every listed file matches the manifest and the pins."""
+    root = _backup_root_of_file(model_dir)
+    if root is None:
+        return "no manifest"
+    try:
+        idx = manifest_index(root)
+        prefix = model_dir.resolve().relative_to(root.resolve()).as_posix()
+    except (BackupError, OSError, ValueError):
+        return "manifest"
+    listed = [k for k in idx if k == prefix or k.startswith(prefix + "/")]
+    if not listed:
+        return "not in manifest"
+    pins = default_pins()
+    for rel in listed:
+        size, sha = idx[rel]
+        path = _contained(root, rel)
+        try:
+            if path is None or not path.is_file() or path.stat().st_size != size:
+                return rel
+            digest = sha256_file(path) if sha or pins.get(rel, (0, ""))[1] else ""
+            if sha and digest != sha:
+                return rel
+        except OSError:
+            return rel
+        if _pinned_bad(rel, size, digest if sha else (sha256_file(path) if pins.get(rel, (0, ""))[1] else ""), pins):
+            return rel
+    return None
+
+
+def _scan_model_problems(root: Path, pins: Dict[str, Tuple[int, str]], cancel: Optional[CancelToken],
+                         progress: Progress) -> List[str]:
+    """Relative paths under ``models/`` that are missing, the wrong size, or the wrong hash."""
+    idx = manifest_index(root)
+    rels = sorted(p for p in idx if p.startswith("models/"))
+    problems: List[str] = []
+    total = max(1, len(rels))
+    for n, rel in enumerate(rels):
+        if cancel:
+            cancel.check()
+        progress(min(0.2, n / total * 0.2), tr("backup.scanning"))
+        size, sha = idx[rel]
+        path = _contained(root, rel)
+        try:
+            if path is None or not path.is_file() or path.stat().st_size != size:
+                problems.append(rel)
+                continue
+            digest = sha256_file(path, cancel) if (sha or pins.get(rel, (0, ""))[1]) else ""
+            if sha and digest != sha:
+                problems.append(rel)
+                continue
+        except OSError:
+            problems.append(rel)
+            continue
+        if _pinned_bad(rel, size, digest, pins):
+            problems.append(rel)
+    return problems
+
+
+def run_link(folder: Path, include_voices: bool = True, progress: Progress = _noop, cancel: Optional[CancelToken] = None,
+             models_root: Optional[Path] = None, voices_root: Optional[Path] = None, tools_root: Optional[Path] = None,
+             usage: Optional[Callable[[Path], object]] = None,
+             pins: Optional[Dict[str, Tuple[int, str]]] = None) -> Report:
+    """Use the backup's models folder in place (no model copy) and copy voices and tools into the normal folders.
+
+    The chosen path is remembered (:mod:`infra.external_models`). Files that do not match the manifest or a pinned
+    hash are listed on :attr:`Report.problems` and are not treated as installed; the caller downloads those."""
+    from infra import external_models
+
+    root = find_backup(folder)
+    if root is None:
+        raise BackupError(tr("backup.err_no_manifest", path=str(folder)), code="no_manifest")
+    pins = default_pins() if pins is None else pins
+    cancel = cancel or CancelToken()
+    problems = _scan_model_problems(root, pins, cancel, progress)
+    dest = root / "models" if (root / "models").is_dir() else root
+    external_models.set_folder(dest)
+    rep = run_restore(folder, include_voices, progress, cancel, models_root, voices_root, tools_root, usage,
+                      strict=False, pins=pins, kinds=(KIND_VOICES, KIND_TOOLS))
+    rep.problems = list(dict.fromkeys([*problems, *rep.problems]))
+    rep.external = str(dest)
+    return rep
