@@ -10,6 +10,7 @@ The main window only keeps "choose audio / choose text / create voice".  Service
 * backup / restore of the models and voices to any folder or drive, and the "existing models folder" that is imported
   before anything is downloaded (:mod:`infra.backup`, :mod:`infra.existing_models`),
 * "Preload models into memory at startup" (:mod:`infra.preload`; off by default, offered only with enough RAM),
+* the speech recognition model (:mod:`infra.asr_choice`: automatic by VRAM, 0.6B, 1.7B or both downloaded),
 * "About".
 
 The dialog owns no business logic.  Every button calls back into the :class:`ui.main_window.MainWindow` that created
@@ -27,7 +28,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QHBox
 from core import i18n
 from core.errors import BackupError
 from core.i18n import tr
-from infra import backup, existing_models, modules as runtime_modules, netroute, preload, sysinfo
+from infra import asr_choice, backup, existing_models, modules as runtime_modules, netroute, preload, sysinfo
 from workers import backup_runner
 from workers.auto_repair_worker import AutoRepairWorker
 from workers.backup_worker import BackupWorker
@@ -93,6 +94,24 @@ class SettingsDialog(QDialog):
         prow.addWidget(self.lbl_preload, 1)
         lay.addLayout(prow)
         self.chk_preload.toggled.connect(self._on_preload_toggled)
+
+        # --- speech recognition model (infra/asr_choice.py): automatic by VRAM / 0.6B / 1.7B / both downloaded ---
+        self.asr_resolve: Callable[[str], str] = lambda choice: asr_choice.preferred_repo(choice)   # injectable (tests)
+        self.asr_missing: Callable[[], list] = self._default_asr_missing                            # injectable (tests)
+        arow = QHBoxLayout()
+        self.lbl_asr = QLabel()
+        self.cmb_asr = QComboBox()
+        for choice in asr_choice.CHOICES:
+            self.cmb_asr.addItem("", choice)
+        arow.addWidget(self.lbl_asr)
+        arow.addStretch(1)
+        arow.addWidget(self.cmb_asr)
+        lay.addLayout(arow)
+        self.lbl_asr_note = QLabel()
+        self.lbl_asr_note.setObjectName("cardnote")
+        self.lbl_asr_note.setWordWrap(True)
+        lay.addWidget(self.lbl_asr_note)
+        self.cmb_asr.currentIndexChanged.connect(self._on_asr_changed)
 
         # --- service buttons ---
         self.btn_update = QPushButton()
@@ -228,6 +247,12 @@ class SettingsDialog(QDialog):
         self._render_existing()
         self.chk_preload.setText(tr("preload.option"))
         self.refresh_preload()
+        self.lbl_asr.setText(tr("asrmodel.label"))
+        for i, text in enumerate((tr("asrmodel.auto"), tr("asrmodel.small"), tr("asrmodel.large"), tr("asrmodel.both"))):
+            self.cmb_asr.setItemText(i, text)              # same order as asr_choice.CHOICES
+        self.cmb_asr.setToolTip(tr("asrmodel.tip"))
+        self.lbl_asr.setToolTip(tr("asrmodel.tip"))
+        self.refresh_asr()
 
     # ------------------------------------------------------------------ preload models at startup
     def preload_availability(self) -> preload.Availability:
@@ -274,6 +299,44 @@ class SettingsDialog(QDialog):
         else:
             preload.set_enabled(on)
         self.refresh_preload()
+
+    # ------------------------------------------------------------------ speech recognition model
+    @staticmethod
+    def _default_asr_missing() -> list:
+        from workers.pipeline_runner import models_missing
+
+        return [r for r in models_missing() if r in (asr_choice.SMALL, asr_choice.LARGE)]
+
+    def refresh_asr(self) -> None:
+        """Select the saved choice and say which model is used and whether it still has to be downloaded."""
+        choice = asr_choice.preference()
+        self.cmb_asr.blockSignals(True)
+        self.cmb_asr.setCurrentIndex(max(0, self.cmb_asr.findData(choice)))
+        self.cmb_asr.blockSignals(False)
+        try:
+            repo, missing = self.asr_resolve(choice), self.asr_missing()
+        except Exception:  # noqa: BLE001 - GPU detection / a broken models folder must not break the dialog
+            log.warning("could not resolve the speech recognition model", exc_info=True)
+            self.lbl_asr_note.setText("")
+            return
+        name = repo.split("/")[-1]
+        self.lbl_asr_note.setText(tr("asrmodel.note_missing", model=name) if missing else tr("asrmodel.note_ready", model=name))
+
+    def _on_asr_changed(self, _index: int = 0) -> None:
+        """Remember the choice; a model that is not installed yet is fetched right away by the normal "download all" step
+        (visible progress in the main window), never later in the middle of a task."""
+        choice = self.cmb_asr.currentData()
+        if choice not in asr_choice.CHOICES:
+            return
+        asr_choice.set_preference(choice)
+        try:
+            missing = self.asr_missing()
+        except Exception:  # noqa: BLE001
+            missing = []
+        start = getattr(self._win, "start_prefetch", None)
+        if missing and start is not None and not self._win.busy:
+            start()
+        self.refresh_asr()
 
     # ------------------------------------------------------------------ runtime modules (thin build)
     def open_components(self) -> None:
@@ -516,6 +579,7 @@ class SettingsDialog(QDialog):
         """Enable/disable controls according to the main window's busy state."""
         busy = self._win.busy
         self.cmb_lang.setEnabled(not busy)           # switching language mid-task would relabel a running job
+        self.cmb_asr.setEnabled(not busy)            # a running task keeps the recogniser it started with
         self.btn_update.setEnabled(not busy and not self._win.updating)
         self.btn_repair.setEnabled(not busy and not self._win.repairing and not self.autorepair_running)
         self.btn_autorepair.setEnabled(self.autorepair_running or (not busy and not self._win.repairing))

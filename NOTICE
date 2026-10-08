@@ -10,7 +10,8 @@ Not covered by that licence (each has its own terms):
     audio generated with them, no commercial use.
     The voice published with the project (voices-v1 release): "Open universal voice" (trained on the public-domain LJ Speech
     dataset) is CC0-1.0. Voices you train yourself are personal use only by default (custom/personal-only).
-  * The models downloaded at run time (for example Qwen3-TTS, Qwen3-ASR) - see their model cards for their licences.
+  * The models downloaded at run time (for example Qwen3-TTS, Qwen3-ASR-0.6B / 1.7B: Apache-2.0, (c) Alibaba Cloud / Qwen team) -
+    see their model cards for their licences.
   * DNSMOS P.835 (sig_bak_ovr.onnx), downloaded for the automatic voice check: (c) Microsoft Corporation, from
     https://github.com/microsoft/DNS-Challenge (commit 591184a9), licensed under CC BY 4.0
     (https://creativecommons.org/licenses/by/4.0/), used unmodified. Reddy, Gopal, Cutler: "DNSMOS P.835: a non-intrusive

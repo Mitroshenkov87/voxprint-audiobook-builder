@@ -719,5 +719,13 @@
  "pick.tip": "About 5% of the clips are kept out of training. Afterwards the last passes are tried at several voice strengths on those unseen sentences and scored by speech recognition, similarity to your voice and predicted sound quality; the best one is kept, the other checkpoints are deleted. Adds a few minutes on a fast graphics card.",
  "progress.pick": "Choosing the best checkpoint: candidate {i} of {n}…",
  "progress.pick_done": "Best checkpoint: pass {epoch}, voice strength {scale}",
- "warn.pick_failed": "The automatic checkpoint pick did not run; the voice uses the last pass."
+ "warn.pick_failed": "The automatic checkpoint pick did not run; the voice uses the last pass.",
+ "asrmodel.label": "Speech recognition model",
+ "asrmodel.auto": "Automatic (by video memory)",
+ "asrmodel.small": "Qwen3-ASR-0.6B (fast, 1.9 GB)",
+ "asrmodel.large": "Qwen3-ASR-1.7B (more accurate, 4.7 GB)",
+ "asrmodel.both": "Download both (use automatic choice)",
+ "asrmodel.tip": "Speech recognition checks recordings and samples. Automatic: the more accurate 1.7B model on NVIDIA graphics cards with 8 GB of video memory or more, otherwise the 0.6B model. A model that is not installed yet is downloaded right away with the other models.",
+ "asrmodel.note_ready": "In use: {model}",
+ "asrmodel.note_missing": "{model} is not installed yet; it is downloaded with the other models (until then the installed model is used)."
 }

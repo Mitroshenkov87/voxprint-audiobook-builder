@@ -1,8 +1,8 @@
 # Voice quality: mechanisms and what still needs a GPU run
 
-Voxprint's voice-quality batch 1 (October 2026). The mechanisms below were built and tested on a CPU-only machine with fakes
-and tiny randomly initialised models; the **defaults are research-based and must be validated on a real GPU** with real voices.
-Every new behaviour can be switched off.
+Voxprint's voice-quality batches 1 and 2 (October 2026). The mechanisms below were built and tested on a CPU-only machine with
+fakes and tiny randomly initialised models; the **defaults are research-based and must be validated on a real GPU** with real
+voices. Every new behaviour can be switched off. Batch 1: sections 1-8; batch 2: sections B1-B5 at the end.
 
 ## 1. Voice strength (adapter scale at inference)
 
@@ -105,3 +105,18 @@ A/B for the GPU run (one voice, 10-15 min recording, same seed / preset / everyt
    listen blind to 3-4 chapters (fine timbre, hiss / metallic artefacts, babbling).
 3. Repeat B at half the learning rate if B over-fits (validation loss rising early, artefacts). Make it the default only if B
    wins on both scores and listening.
+
+## B1. Speech recognition: Qwen3-ASR-1.7B on GPUs with ~8 GB, 0.6B otherwise
+
+`infra/asr_choice.py`. Qwen3-ASR-1.7B (Apache-2.0, 4.70 GB, revision `7278e1e7`) makes clearly fewer errors on Russian and German
+than the 0.6B model (Qwen's tables: ru Fleurs 9.9 -> 6.0 % WER, CommonVoice 14.1 -> 8.3 %; de Fleurs 6.5 -> 3.9 %), at the same API.
+
+| | Value |
+| --- | --- |
+| Automatic choice | 1.7B with a CUDA GPU reporting >= 7.5 GiB (an "8 GB" card), else 0.6B; "CPU only" tasks use 0.6B |
+| Override | Settings -> *Speech recognition model*: automatic / 0.6B / 1.7B / download both (`state/asr_model.json`) |
+| Download | only in the download-all step (first run, Components step 2, `--prefetch`, the setup folder); every file verified by size + SHA-256 (`infra/model_mirrors.json`, hashes-only entry: no backup mirror yet) |
+| At run time | the preferred model if installed, else the other variant (never a download in the middle of a task) |
+
+Needs the GPU laptop: VRAM and load time of 1.7B next to the TTS model (the preview estimate still assumes the 8 s load of 0.6B,
+`preview_runner.ASR_LOAD_SEC`), and whether 1.7B really lowers the CER on our own recordings / samples.

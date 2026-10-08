@@ -32,10 +32,12 @@ log = logging.getLogger("voxprint.models")
 
 ALIGNER_REPO = "Qwen/Qwen3-ForcedAligner-0.6B"
 ASR_REPO = "Qwen/Qwen3-ASR-0.6B"   # speech recognition (first-run / --prefetch download-all; also voice check, A/B, spoken consent, no-transcript)
+ASR_LARGE_REPO = "Qwen/Qwen3-ASR-1.7B"   # the same on GPUs with ~8 GB of VRAM or more (which one: infra/asr_choice.py)
 #: Approximate download size in GB (for the free-disk-space check; an estimate, not an exact value).
 APPROX_SIZE_GB = {
     ALIGNER_REPO: 2.0,
     ASR_REPO: 1.9,
+    ASR_LARGE_REPO: 4.7,
     "Qwen/Qwen3-TTS-12Hz-1.7B-Base": 4.5,
     "Qwen/Qwen3-TTS-12Hz-0.6B-Base": 2.5,
     "ai-forever/sage-fredt5-distilled-95m": 0.5,         # Russian text clean-up (first-run download-all; see infra/text_models.py)

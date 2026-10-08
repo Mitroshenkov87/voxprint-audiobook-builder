@@ -24,6 +24,14 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 * Status: downloaded on first start
 * Licence text: [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt)
 
+### Qwen3-ASR-1.7B / 0.6B
+
+* Purpose: Speech recognition: transcribes recordings without a text and checks recordings, samples and the spoken consent (1.7B on GPUs with 8 GB of video memory or more, else 0.6B)
+* Licence: Apache-2.0
+* Project: <https://huggingface.co/Qwen/Qwen3-ASR-1.7B>
+* Status: downloaded on first start
+* Licence text: [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt)
+
 ### MMS-300M forced aligner (MahmoudAshraf/mms-300m-1130-forced-aligner)
 
 * Purpose: Optional backup aligner model (only if the optional ctc-forced-aligner package is installed). NON-COMMERCIAL licence!
@@ -76,7 +84,7 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 
 ### qwen-asr
 
-* Purpose: Runs the Qwen3 forced aligner
+* Purpose: Runs the Qwen3 forced aligner and Qwen3-ASR speech recognition
 * Licence: Apache-2.0
 * Project: <https://github.com/QwenLM/Qwen3-ASR>
 * Status: bundled

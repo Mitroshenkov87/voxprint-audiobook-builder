@@ -29,7 +29,7 @@ read it as "about".
 
 ## No transcript? (audio only)
 
-Tick **I have no transcript** in the Train window and the program recognises the speech itself (Qwen3-ASR, offline; the model, ~1.9 GB, is part of the first-run / installer download-all).
+Tick **I have no transcript** in the Train window and the program recognises the speech itself (Qwen3-ASR, offline; the model is part of the first-run / installer download-all: Qwen3-ASR-1.7B, ~4.7 GB, on NVIDIA graphics cards with 8 GB of video memory or more, else Qwen3-ASR-0.6B, ~1.9 GB; **Settings -> Speech recognition model** can force one of them or keep both).
 You can choose **many audio files at once**, add a **folder** (searched recursively) or drag and drop them; each file is recognised separately. Long recordings are cut at pauses
 into pieces of at most 14 s, short clips are used as they are, and everything is merged into **one dataset** (volume-normalised to about -20 dBFS).
 Skipped automatically: clips under 1.5 s or over 20 s, empty or **implausible recognition** (looping text, absurd speaking rate, wrong script - a score computed from the clip

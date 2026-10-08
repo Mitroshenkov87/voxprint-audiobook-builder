@@ -719,5 +719,13 @@
  "pick.tip": "Etwa 5 % der Clips werden nicht trainiert. Danach werden die letzten Durchgänge mit mehreren Stimmstärken an diesen unbekannten Sätzen ausprobiert und per Spracherkennung, Ähnlichkeit mit Ihrer Stimme und vorhergesagter Klangqualität bewertet; der beste bleibt, die anderen Zwischenstände werden gelöscht. Dauert auf einer schnellen Grafikkarte einige Minuten länger.",
  "progress.pick": "Auswahl des besten Zwischenstands: Kandidat {i} von {n}…",
  "progress.pick_done": "Bester Zwischenstand: Durchgang {epoch}, Stimmstärke {scale}",
- "warn.pick_failed": "Die automatische Auswahl des Zwischenstands lief nicht; die Stimme nutzt den letzten Durchgang."
+ "warn.pick_failed": "Die automatische Auswahl des Zwischenstands lief nicht; die Stimme nutzt den letzten Durchgang.",
+ "asrmodel.label": "Spracherkennungsmodell",
+ "asrmodel.auto": "Automatisch (nach Grafikspeicher)",
+ "asrmodel.small": "Qwen3-ASR-0.6B (schnell, 1,9 GB)",
+ "asrmodel.large": "Qwen3-ASR-1.7B (genauer, 4,7 GB)",
+ "asrmodel.both": "Beide herunterladen (automatische Wahl)",
+ "asrmodel.tip": "Die Spracherkennung prüft Aufnahmen und Proben. Automatisch: das genauere 1.7B-Modell auf NVIDIA-Grafikkarten mit mindestens 8 GB Grafikspeicher, sonst das 0.6B-Modell. Ein noch nicht installiertes Modell wird sofort mit den anderen Modellen heruntergeladen.",
+ "asrmodel.note_ready": "Verwendet: {model}",
+ "asrmodel.note_missing": "{model} ist noch nicht installiert; es wird mit den anderen Modellen heruntergeladen (bis dahin wird das installierte Modell verwendet)."
 }

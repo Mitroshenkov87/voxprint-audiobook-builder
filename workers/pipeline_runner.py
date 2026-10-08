@@ -239,13 +239,14 @@ def _asr_for_check(req: TaskRequest, asr_factory, progress=None):
         if asr_factory is not None:
             return asr_factory()
         from core.asr import make_default_asr
+        from infra import asr_choice
 
-        path = md.ready_model_path(md.ASR_REPO)
-        if path is None:
+        found = asr_choice.ready(force_cpu=req.force_cpu)
+        if found is None:
             log.warning("no ASR for the voice check: %s is not downloaded yet "
-                        "(expected from the first-run / --prefetch download-all)", md.ASR_REPO)
+                        "(expected from the first-run / --prefetch download-all)", asr_choice.preferred_repo(force_cpu=req.force_cpu))
             return None
-        return make_default_asr(str(path), "cpu" if req.force_cpu else "auto")
+        return make_default_asr(str(found[1]), "cpu" if req.force_cpu else "auto")
     except Exception as exc:  # noqa: BLE001 - WER is a bonus, never a reason to fail
         log.warning("no ASR for the voice check: %s", exc)
         return None
@@ -371,11 +372,13 @@ def _consent_block(req: TaskRequest, res: TaskResult, progress: ProgressCallback
         if asr_factory is not None:
             asr = asr_factory()
         else:
-            path = md.ready_model_path(md.ASR_REPO)
-            if path is None:
-                raise RuntimeError(f"{md.ASR_REPO} is not downloaded yet "
+            from infra import asr_choice
+
+            found = asr_choice.ready(force_cpu=req.force_cpu)
+            if found is None:
+                raise RuntimeError(f"{asr_choice.preferred_repo(force_cpu=req.force_cpu)} is not downloaded yet "
                                    "(expected from the first-run / --prefetch download-all)")
-            asr = make_default_asr(str(path), "cpu" if req.force_cpu else "auto")
+            asr = make_default_asr(str(found[1]), "cpu" if req.force_cpu else "auto")
         parsed, clip = consent_runner.detect_from_recording(files[-1], asr, req.asr_language)
         cancel.check()
     except DatasetMakerError:
@@ -442,8 +445,12 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
         if asr_factory is not None:
             asr = asr_factory()
         else:
-            # intentional feature: download with visible progress if the first-run prefetch was skipped
-            asr = make_default_asr(str(md.ensure_model(md.ASR_REPO, progress)), "cpu" if req.force_cpu else "auto")
+            from infra import asr_choice
+
+            found = asr_choice.ready(force_cpu=req.force_cpu)
+            # intentional feature: download with visible progress if the first-run prefetch was skipped (and no variant is there)
+            path = found[1] if found is not None else md.ensure_model(asr_choice.preferred_repo(force_cpu=req.force_cpu), progress)
+            asr = make_default_asr(str(path), "cpu" if req.force_cpu else "auto")
         script_text = None
         if req.text:   # an optional script next to the audio: matched tolerantly (stumbles / re-read lines), see core.script_match
             from core.text_utils import read_text_file
@@ -508,11 +515,13 @@ def required_model_repos() -> List[str]:
     Features that need them later (voice check, A/B, spoken consent, narrate prep) then use the local copy
     instead of surprise-downloading in the background.
     """
-    from infra import text_models
+    from infra import asr_choice, text_models
     from infra.vram_optimizer import detect_gpu, plan_training
 
-    plan = plan_training(detect_gpu(), 100)
-    repos = [md.ALIGNER_REPO, plan.base_model, md.ASR_REPO]
+    gpu = detect_gpu()
+    plan = plan_training(gpu, 100)
+    # speech recognition: Qwen3-ASR-1.7B from ~8 GB of VRAM, else 0.6B (Settings may override or ask for both)
+    repos = [md.ALIGNER_REPO, plan.base_model, *asr_choice.download_repos(gpu=gpu)]
     sage = text_models.get("sage-ru")
     if sage.integrated and sage.repo:
         repos.append(sage.repo)

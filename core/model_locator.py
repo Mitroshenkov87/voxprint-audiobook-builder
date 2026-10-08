@@ -98,6 +98,11 @@ KNOWN_SIZES: Dict[str, Tuple[str, Dict[str, int]]] = {
         "speech_tokenizer/config.json": 2336, "speech_tokenizer/configuration.json": 76,
         "speech_tokenizer/model.safetensors": 682293092, "speech_tokenizer/preprocessor_config.json": 234,
         "tokenizer_config.json": 7344, "vocab.json": 2776833}),
+    "Qwen/Qwen3-ASR-1.7B": ("7278e1e70fe206f11671096ffdd38061171dd6e5", {
+        "chat_template.json": 1161, "config.json": 6194, "generation_config.json": 142, "merges.txt": 1671853,
+        "model-00001-of-00002.safetensors": 4220320824, "model-00002-of-00002.safetensors": 478200688,
+        "model.safetensors.index.json": 64821, "preprocessor_config.json": 330, "tokenizer_config.json": 12487,
+        "vocab.json": 2776833}),
 }
 #: Files that may be absent (ModelScope copies drop the model card / tooling files).
 _OPTIONAL_FILES = {"speech_tokenizer/configuration.json"}

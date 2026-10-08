@@ -18,8 +18,8 @@ There is no command line, no browser and no account. Recordings, texts, voices a
 | Operating system | Windows 11 24H2 (build 26100), 64-bit | Windows 11 26H2 |
 | Graphics card | NVIDIA with about 6 GB video memory (VRAM) | NVIDIA with 16 GB VRAM or more |
 | Without an NVIDIA card | The dataset can still be created; training runs on the processor and takes many hours (the program warns you) | – |
-| Disk space | about 12 GB (models about 10 GB + program) plus about 4.2 GB if you build the optional universal model | an SSD |
-| Internet | once, to download the models (about 10 GB) | – |
+| Disk space | about 14 GB (models up to about 12 GB + program) plus about 4.2 GB if you build the optional universal model | an SSD |
+| Internet | once, to download the models (up to about 12 GB; 1.7B speech recognition on GPUs with 8 GB of video memory or more) | – |
 
 ## How it works in five steps
 
@@ -43,7 +43,7 @@ Silent installation for administrators: `Voxprint-Setup.exe /VERYSILENT /ModelsD
 
 ## First start
 
-On the first start Voxprint prepares itself. With the online installer the **{{modules.title}}** window opens and works without a click: one line shows what is being downloaded right now (*{{modules.now_download}}*), then the checksum check, and a bar shows the overall progress. Step 1 brings the program components together with the SAGE text clean-up model, step 2 right after it ALL models (voice, alignment, speech recognition) into your models folder. Otherwise the status line says *{{ui.prefetch_start}}* and downloads the models it needs (about 10 GB, once). If Hugging Face is slow or unreachable, Voxprint switches to the ModelScope mirror automatically. The download can be interrupted and continues where it stopped. Models already present on the computer (for example from the Hugging Face cache or Alexandria/Pinokio) are reused without downloading them again, read-only.
+On the first start Voxprint prepares itself. With the online installer the **{{modules.title}}** window opens and works without a click: one line shows what is being downloaded right now (*{{modules.now_download}}*), then the checksum check, and a bar shows the overall progress. Step 1 brings the program components together with the SAGE text clean-up model, step 2 right after it ALL models (voice, alignment, speech recognition) into your models folder. Otherwise the status line says *{{ui.prefetch_start}}* and downloads the models it needs (up to about 12 GB, once). If Hugging Face is slow or unreachable, Voxprint switches to the ModelScope mirror automatically. The download can be interrupted and continues where it stopped. Models already present on the computer (for example from the Hugging Face cache or Alexandria/Pinokio) are reused without downloading them again, read-only.
 
 When it is done, the status shows *{{ui.prefetch_done}}* A privacy notice is shown on the first start; a short reminder (*{{ui.footer_privacy}}*) stays at the bottom of the windows.
 

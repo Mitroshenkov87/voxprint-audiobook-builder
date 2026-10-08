@@ -48,6 +48,7 @@ TRACKED_MODELS = (
     "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
     "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
     "Qwen/Qwen3-ASR-0.6B",
+    "Qwen/Qwen3-ASR-1.7B",
     "ai-forever/sage-fredt5-distilled-95m",
 )
 CHANNEL_VERIFIED = "verified"

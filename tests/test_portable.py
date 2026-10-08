@@ -214,7 +214,8 @@ def test_flavor_rules(monkeypatch):
     assert pt.detect_cuda() is None and pt.detect_vram_mb() == 0
     assert pt.models_for("none", 0) == [] and pt.models_for("auto", 24000)[1] == pt.TTS_LARGE and pt.models_for("auto", 6000)[1] == pt.TTS_SMALL
     auto = pt.models_for("auto", 24000)
-    assert pt.ASR in auto and pt.SAGE in auto
+    assert pt.ASR_LARGE in auto and pt.SAGE in auto                       # Qwen3-ASR-1.7B from ~8 GB of VRAM
+    assert pt.ASR in pt.models_for("auto", 6000)
     assert pt.TTS_LARGE in pt.models_for("all", 0)
 
 

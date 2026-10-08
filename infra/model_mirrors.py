@@ -8,6 +8,10 @@ if the hash matches, otherwise it is deleted and the download counts as failed (
 
 Only models with permissive licences (Apache-2.0, MIT, CC0, CC-BY ...) are mirrored.  ``README.md`` of a mirror is a
 model card written for the mirror (flag ``card``), so it is not downloaded.
+
+An entry without ``mirror_repo`` is *hashes only* (e.g. Qwen3-ASR-1.7B, not mirrored yet): its file list still verifies a
+download from the original repository (:func:`infra.model_downloader.manifest_bad_files`, auto-repair, the setup folder), but
+:func:`entry_for` returns None for it, so no mirror download is ever attempted.
 """
 from __future__ import annotations
 
@@ -43,6 +47,11 @@ class MirrorEntry:
     mirror_repo: str
     mirror_revision: str
     files: Dict[str, Dict[str, Any]]      # relative posix path -> {"size", "sha256", ["card"]}
+
+    @property
+    def has_mirror(self) -> bool:
+        """False for a hashes-only entry (no backup copy exists)."""
+        return bool(self.mirror_repo and self.mirror_revision)
 
     def downloadable(self, patterns: Optional[Iterable[str]] = None) -> Dict[str, Dict[str, Any]]:
         """Files that make up the model (the mirror's own model card is left out).
@@ -84,8 +93,8 @@ def load(path: Optional[Path] = None) -> Dict[str, MirrorEntry]:
             files = e["files"]
             if not files or not all(_safe_name(n) and len(m["sha256"]) == 64 for n, m in files.items()):
                 raise ValueError(f"bad file list for {src}")
-            out[src] = MirrorEntry(src, e["source_revision"], e.get("license", ""), e["mirror_repo"],
-                                   e["mirror_revision"], files)
+            out[src] = MirrorEntry(src, e["source_revision"], e.get("license", ""), e.get("mirror_repo", ""),
+                                   e.get("mirror_revision", ""), files)
         return out
     except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
         log.warning("model mirror manifest unusable: %s", exc)
@@ -94,7 +103,8 @@ def load(path: Optional[Path] = None) -> Dict[str, MirrorEntry]:
 
 def entry_for(repo_id: str, path: Optional[Path] = None) -> Optional[MirrorEntry]:
     """Mirror entry of a model, or None (not mirrored / mirror disabled / manifest unusable)."""
-    return load(path).get(repo_id) if enabled() else None
+    e = load(path).get(repo_id) if enabled() else None
+    return e if e is not None and e.has_mirror else None
 
 
 def sha256_file(path: Path) -> str:

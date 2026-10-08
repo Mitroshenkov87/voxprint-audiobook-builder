@@ -40,6 +40,22 @@
    }
   },
   {
+   "id": "qwen3-asr",
+   "name": "Qwen3-ASR-1.7B / 0.6B",
+   "kind": "model",
+   "ship": "download",
+   "license": "Apache-2.0",
+   "license_files": [
+    "Apache-2.0"
+   ],
+   "url": "https://huggingface.co/Qwen/Qwen3-ASR-1.7B",
+   "purpose": {
+    "en": "Speech recognition: transcribes recordings without a text and checks recordings, samples and the spoken consent (1.7B on GPUs with 8 GB of video memory or more, else 0.6B)",
+    "de": "Spracherkennung: transkribiert Aufnahmen ohne Text und prüft Aufnahmen, Proben und die gesprochene Einwilligung (1.7B auf Grafikkarten ab 8 GB Grafikspeicher, sonst 0.6B)",
+    "ru": "Распознавание речи: расшифровывает записи без текста и проверяет записи, образцы и устное согласие (1.7B на видеокартах от 8 ГБ видеопамяти, иначе 0.6B)"
+   }
+  },
+  {
    "id": "mms-aligner",
    "name": "MMS-300M forced aligner (MahmoudAshraf/mms-300m-1130-forced-aligner)",
    "kind": "model",
@@ -148,9 +164,9 @@
    ],
    "url": "https://github.com/QwenLM/Qwen3-ASR",
    "purpose": {
-    "en": "Runs the Qwen3 forced aligner",
-    "de": "Führt den Qwen3-Forced-Aligner aus",
-    "ru": "Запуск выравнивателя Qwen3"
+    "en": "Runs the Qwen3 forced aligner and Qwen3-ASR speech recognition",
+    "de": "Führt den Qwen3-Forced-Aligner und die Qwen3-ASR-Spracherkennung aus",
+    "ru": "Запуск выравнивателя Qwen3 и распознавания речи Qwen3-ASR"
    }
   },
   {

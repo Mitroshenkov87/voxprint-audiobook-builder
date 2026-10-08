@@ -113,10 +113,14 @@ def find_targets(base_repo: str, cuda: bool, ready: Optional[Callable[[str], Opt
     ready = ready or md.ready_model_path
     sage_dir = sage_dir or _sage_dir
     found = []
-    for kind, repo in (("tts", base_repo), ("asr", md.ASR_REPO)):
-        path = ready(repo) if repo else None
-        if path is not None:
-            found.append((kind, Path(path)))
+    from infra import asr_choice
+
+    path = ready(base_repo) if base_repo else None
+    if path is not None:
+        found.append(("tts", Path(path)))
+    asr = asr_choice.ready(ready)            # the recogniser this PC uses (1.7B / 0.6B), whichever is installed
+    if asr is not None:
+        found.append(("asr", Path(asr[1])))
     sage = sage_dir()
     if sage is not None:
         found.append(("sage", Path(sage)))

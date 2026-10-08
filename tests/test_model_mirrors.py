@@ -56,9 +56,12 @@ def test_bundled_manifest_is_valid_and_permissive():
                             "ai-forever/sage-fredt5-distilled-95m"}
     for repo, e in entries.items():
         assert e.license in ("Apache-2.0", "MIT", "CC0-1.0", "CC-BY-4.0"), repo
-        assert e.mirror_repo.startswith("Mitroshenkov87/voxprint-mirror-")
-        assert len(e.source_revision) == 40 and len(e.mirror_revision) == 40
-        assert ("model.safetensors" in e.files or "pytorch_model.bin" in e.files) and "config.json" in e.files
+        assert len(e.source_revision) == 40
+        if e.has_mirror:
+            assert e.mirror_repo.startswith("Mitroshenkov87/voxprint-mirror-") and len(e.mirror_revision) == 40
+        else:                                    # hashes only (no mirror yet): only Qwen3-ASR-1.7B for now
+            assert repo == "Qwen/Qwen3-ASR-1.7B" and not e.mirror_repo
+        assert (any(n.endswith(".safetensors") for n in e.files) or "pytorch_model.bin" in e.files) and "config.json" in e.files
         assert all(len(m["sha256"]) == 64 and m["size"] > 0 for m in e.files.values())
 
 

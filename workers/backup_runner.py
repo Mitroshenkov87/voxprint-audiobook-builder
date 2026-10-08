@@ -14,7 +14,7 @@ from infra import backup, existing_models, model_downloader as md, text_models, 
 def backup_repos() -> List[str]:
     """Model repositories the app uses (looked up in Voxprint's folder and in other programs' caches): aligner, both TTS
     bases and the integrated text clean-up models.  Whatever is not present anywhere is simply not part of the backup."""
-    repos = [md.ALIGNER_REPO, md.ASR_REPO, vram_optimizer.MODEL_1_7B, vram_optimizer.MODEL_0_6B]
+    repos = [md.ALIGNER_REPO, md.ASR_REPO, md.ASR_LARGE_REPO, vram_optimizer.MODEL_1_7B, vram_optimizer.MODEL_0_6B]
     repos += [m.repo for m in text_models.REGISTRY if m.integrated and m.repo]
     return repos
 

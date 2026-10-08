@@ -46,6 +46,9 @@ STATE_FILE = "portable_dir.txt"          # <app home>/state/: the folder the ins
 ENV_DIR = "VOXPRINT_PORTABLE_DIR"
 
 ALIGNER, ASR = "Qwen/Qwen3-ForcedAligner-0.6B", "Qwen/Qwen3-ASR-0.6B"
+ASR_LARGE = "Qwen/Qwen3-ASR-1.7B"
+#: Qwen3-ASR-1.7B from an "8 GB" card on (nvidia-smi reports ~8188 MB; the program's rule: infra/asr_choice.py), else 0.6B.
+ASR_LARGE_MIN_VRAM_MB = 7500
 TTS_LARGE, TTS_SMALL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base", "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
 SAGE = "ai-forever/sage-fredt5-distilled-95m"
 #: The 1.7B base model from this much VRAM on (the planner of the program: >= 10 GB), else the 0.6B one.
@@ -297,13 +300,14 @@ def model_dir(folder: Path, repo: str) -> Path:
 
 
 def models_for(mode: str, vram_mb: int, entries: Optional[Dict[str, Any]] = None) -> List[str]:
-    """Models for the setup folder: ``none``; ``auto`` = what this PC needs (aligner, the TTS base model its VRAM allows, speech
-    recognition, SAGE text clean-up); ``all`` = every model with a pinned file list (a folder for other PCs)."""
+    """Models for the setup folder: ``none``; ``auto`` = what this PC needs (aligner, the TTS base model and the speech
+    recognition model its VRAM allows, SAGE text clean-up); ``all`` = every model with a pinned file list (a folder for other PCs)."""
     if mode == "none":
         return []
     if mode == "all":
         return sorted(entries if entries is not None else model_mirrors.load())
-    return [ALIGNER, TTS_LARGE if vram_mb >= LARGE_MIN_VRAM_MB else TTS_SMALL, ASR, SAGE]
+    return [ALIGNER, TTS_LARGE if vram_mb >= LARGE_MIN_VRAM_MB else TTS_SMALL,
+            ASR_LARGE if vram_mb >= ASR_LARGE_MIN_VRAM_MB else ASR, SAGE]
 
 
 _EN = {
@@ -372,6 +376,8 @@ def fetch_models(folder: Path, repos: List[str], progress: Callable[[float, str]
         order = (["gh"] if rel is not None else [])
         fast = hf_fast if hf_fast is not None else modelscope_mirror.hf_is_fast(repo)
         order += ["hf", "hfm", "ms"] if fast else ["ms", "hf", "hfm"]
+        if not entry.has_mirror:                     # hashes-only entry: there is no backup mirror to try
+            order = [o for o in order if o != "hfm"]
         names = {"gh": "GitHub", "hf": "Hugging Face", "hfm": "Hugging Face mirror", "ms": "ModelScope"}
         done_src = ""
         for src in order:
