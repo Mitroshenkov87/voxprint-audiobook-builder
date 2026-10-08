@@ -127,6 +127,11 @@ def gpu_info(import_torch: bool = True) -> Dict[str, object]:
             import torch  # noqa: F811
         except Exception:  # noqa: BLE001
             torch = None
+    if torch is None and not import_torch:
+        # a command-line start skips PyTorch on purpose (it would delay every command): "unknown", not "no CUDA" - the
+        # 667 log said cuda_available false on every CLI start while the narration then ran on the GPU
+        out["cuda_available"] = None
+        out["cuda_note"] = "not checked (PyTorch not loaded at start-up)"
     if torch is not None:
         try:
             out["torch"] = torch.__version__
@@ -223,7 +228,7 @@ def summary_lines(info: Dict[str, object]) -> List[str]:
     assert isinstance(g, dict)
     lines = [f"Voxprint {info.get('app_version')}" + (f" build {info['build']}" if info.get("build") else "") + (f" \"{info['codename']}\"" if info.get("codename") else "") + f" | {info.get('os')} | Python {info.get('python')}",
              f"PyTorch {g.get('torch', 'not found')} (CUDA build {g.get('cuda_build')}) | CUDA available: "
-             f"{'yes' if g.get('cuda_available') else 'no'}" + (f" | {g.get('gpu')} {g.get('vram_total_gb')} GB" if g.get("gpu") else "")
+             f"{'not checked' if g.get('cuda_available') is None and g.get('cuda_note') else ('yes' if g.get('cuda_available') else 'no')}" + (f" | {g.get('gpu')} {g.get('vram_total_gb')} GB" if g.get("gpu") else "")
              + (f" | driver {g.get('driver')}" if g.get("driver") else "")]
     if g.get("error"):
         lines.append(f"GPU probe error: {g['error']}")

@@ -132,6 +132,9 @@ class NarrationOptions:
     #: Spoken AI disclosure as the first chunk (:mod:`core.ai_disclosure`); opt-in, the user decides.
     ai_disclosure: bool = False
     disclosure_date: Optional["datetime.date"] = None        # month/year said in the disclosure (None = today; tests)
+    #: Ordinal numbers by context ("глава 2" -> "глава вторая", "3-го" -> "третьего", "21st"), :mod:`core.ordinals`;
+    #: Settings -> Narration / ``--no-ordinals``.  On by default.
+    ordinals: bool = True
 
 
 @dataclass
@@ -188,11 +191,44 @@ class ChunkCache:
         return p.is_file() and p.stat().st_size > 0
 
     def save(self, key: str, audio: np.ndarray, sr: int) -> None:
-        """Write atomically (temporary file, then rename)."""
+        """Write atomically (temporary file, then rename).
+
+        The temporary name is unique per write: two chunks with the same text (a repeated verse or refrain) have the same
+        key and may be written by two writer threads at once - with one shared ``<key>.part.flac`` the second writer held
+        the file the first one was renaming (Windows ``WinError 32``, build 667).  The rename is retried with backoff
+        while Windows reports the file as in use (an antivirus scan, a reader); if the finished file is already there
+        (the twin chunk won the race) that copy is kept.  Only when the file stays locked does a clear
+        :class:`NarrationError` stop the job (the cache keeps every finished chunk, so a new start resumes)."""
         self.dir.mkdir(parents=True, exist_ok=True)
-        tmp = self.dir / f"{key}.part.flac"
-        sf.write(str(tmp), np.asarray(audio, dtype=np.float32), sr, format="FLAC", subtype="PCM_16")
-        os.replace(tmp, self.path(key))
+        tmp = self.dir / f"{key}.{os.getpid()}-{threading.get_ident()}-{time.monotonic_ns()}.part.flac"
+        dst = self.path(key)
+        try:
+            sf.write(str(tmp), np.asarray(audio, dtype=np.float32), sr, format="FLAC", subtype="PCM_16")
+            replace_with_retry(tmp, dst)
+        except PermissionError as exc:
+            if self.has(key):                       # the twin chunk (same key = same text and engine) is on disk
+                log.info("chunk %s is already cached by a parallel write - keeping that copy", key)
+                return
+            raise NarrationError(tr("err.narration_file_in_use", name=dst.name), details=repr(exc)) from exc
+        finally:
+            try:
+                tmp.unlink(missing_ok=True)            # gone after a successful rename; a leftover after a failure
+            except OSError:
+                pass
+
+    def sweep_partial(self, min_age: float = 600.0) -> int:
+        """Delete ``*.part.flac`` leftovers of an interrupted write that are older than ``min_age`` seconds (a younger
+        one may belong to a job that is still writing).  Returns how many were removed."""
+        n = 0
+        now = time.time()
+        for p in self.dir.glob("*.part.flac") if self.dir.is_dir() else []:
+            try:
+                if now - p.stat().st_mtime >= min_age:
+                    p.unlink()
+                    n += 1
+            except OSError:
+                pass
+        return n
 
     def load(self, key: str) -> Optional[tuple]:
         """``(samples float32, sample rate)`` or ``None`` if missing/corrupt (the corrupt file is removed)."""
@@ -208,11 +244,66 @@ class ChunkCache:
         shutil.rmtree(self.dir, ignore_errors=True)
 
 
+#: A file that Windows reports as in use (WinError 32 / 5) is retried this many times, the pause doubling from
+#: ``LOCKED_FIRST_PAUSE`` seconds (0.2 + 0.4 + 0.8 + 1.6 + 3.2 = about 6 s in total).
+LOCKED_RETRIES = 5
+LOCKED_FIRST_PAUSE = 0.2
+
+
+def _is_locked(exc: BaseException) -> bool:
+    """Windows "file in use" / "access denied" (another handle holds the file for a moment); POSIX never sets winerror."""
+    return isinstance(exc, PermissionError) and getattr(exc, "winerror", None) in (5, 32, None)
+
+
+def replace_with_retry(src: Path, dst: Path, retries: Optional[int] = None, pause: Optional[float] = None,
+                       sleep: Callable[[float], None] = time.sleep) -> None:
+    """``os.replace(src, dst)``, retried with exponential backoff while the file is in use; the last error is raised."""
+    retries = LOCKED_RETRIES if retries is None else retries
+    delay = LOCKED_FIRST_PAUSE if pause is None else pause
+    for attempt in range(retries + 1):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError as exc:
+            if not _is_locked(exc) or attempt >= retries:
+                raise
+            log.info("%s is in use (%s) - retrying in %.1f s", Path(dst).name, exc, delay)
+            sleep(delay)
+            delay *= 2
+
+
 def prepare_text(text: str, options: NarrationOptions, normalizer: Optional[Callable[[str], str]] = None) -> str:
     """Text actually sent to the engine: preprocessors (extension hook) then the optional language normalizer."""
     for fn in options.preprocessors:
         text = fn(text)
     return normalizer(text) if normalizer else text
+
+
+def chain_steps(*steps: Optional[Callable[[str], str]]) -> Optional[Callable[[str], str]]:
+    """One ``text -> text`` function running ``steps`` in order (``None`` entries skipped); ``None`` if there is none."""
+    fns = [f for f in steps if f is not None]
+    if not fns:
+        return None
+    if len(fns) == 1:
+        return fns[0]
+
+    def run(text: str) -> str:
+        for fn in fns:
+            text = fn(text)
+        return text
+    return run
+
+
+def text_steps(language: Optional[str], book_language: Optional[str], options: NarrationOptions,
+               numbers_spelled: bool = False) -> Optional[Callable[[str], str]]:
+    """The normalization run on every chunk before synthesis: ordinals by context first (they need the digits and the
+    noun next to them), then the language normalizer that reads the remaining numbers and abbreviations."""
+    from core import ordinals
+
+    spoken = language if (language or "").strip().lower() not in ("", "auto") else book_language
+    ordinal = ordinals.ordinal_step(spoken) if options.ordinals else None
+    base = None if numbers_spelled else default_normalizer(language)
+    return chain_steps(ordinal, base)
 
 
 def default_normalizer(language: str) -> Optional[Callable[[str], str]]:
@@ -635,18 +726,19 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
         chunk_list = ai_disclosure.prepend(chunk_list, ai_disclosure.phrase(
             language or book.language, narrator, options.disclosure_date))
     cache = ChunkCache(job_dir / ".cache")
+    cache.sweep_partial()                  # leftovers of an interrupted write would count as "cached" below
     # A fresh job (nothing cached yet) certainly needs the model: start loading it now, on its own thread, so the
     # loading (disk + GPU upload) overlaps with the text normalisation below.  With any cached chunk the load stays
     # lazy - a fully cached job must never load the model.
     loader: Optional[ThreadPoolExecutor] = None
     engine_future: Optional[Future] = None
-    if not (cache.dir.is_dir() and any(cache.dir.glob("*.flac"))):
+    if not (cache.dir.is_dir() and any(not p.name.endswith(".part.flac") for p in cache.dir.glob("*.flac"))):
         loader = ThreadPoolExecutor(max_workers=1, thread_name_prefix="engine-load")
         engine_future = loader.submit(engine_factory)
     budget = cpu_budget.plan(use_cuda=_cuda_available())
     pool = ThreadPoolExecutor(max_workers=budget.workers, thread_name_prefix="narration-cpu")
     try:
-        normalizer = None if (plan is not None and plan.spells_out_numbers) else default_normalizer(language)
+        normalizer = text_steps(language, book.language, options, bool(plan is not None and plan.spells_out_numbers))
         texts = {c.index: prepare_text(c.text, options, normalizer) for c in chunk_list}
         if on_plan is not None:
             on_plan([cache.path(cache.key(engine_tag, texts[c.index])) for c in chunk_list])

@@ -340,14 +340,54 @@ def default_run(cmd: List[str]) -> Tuple[int, str]:
 
 # --------------------------------------------------------------------------- the export
 
-def _run_checked(run: Run, cmd: List[str], out: Path) -> None:
-    """Run ffmpeg and raise :class:`NarrationError` (with the stderr tail as details) if it fails."""
+#: An output file another program holds open (a player with last run's MP3, an antivirus scan) is waited for this many
+#: times, the pause doubling from ``IN_USE_FIRST_PAUSE`` seconds (about 6 s in total), before the job stops with a clear
+#: "close the file" message instead of ffmpeg's bare failure.
+IN_USE_RETRIES = 5
+IN_USE_FIRST_PAUSE = 0.2
+
+
+def file_in_use(path: Path) -> bool:
+    """True if ``path`` exists but cannot be opened for writing (Windows: another process holds it, WinError 32 / 5)."""
+    try:
+        if not path.is_file():
+            return False
+        with open(path, "r+b"):
+            return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def _run_checked(run: Run, cmd: List[str], out: Path, sleep: Optional[Callable[[float], None]] = None) -> None:
+    """Run ffmpeg and raise :class:`NarrationError` (with the stderr tail as details) if it fails.
+
+    While the output file is held by another program the encode is retried with backoff; if it stays locked the error
+    names the file and says to close it (``err.narration_file_in_use``)."""
     import time
 
-    t0 = time.monotonic()
-    rc, text = run(cmd)
-    log.info("encode %s: %.1f s (exit %s)", out.name, time.monotonic() - t0, rc)
-    if rc != 0 or not out.exists():
+    sleep = sleep or time.sleep
+    delay = IN_USE_FIRST_PAUSE
+    for attempt in range(IN_USE_RETRIES + 1):
+        last = attempt >= IN_USE_RETRIES
+        if file_in_use(out) and not last:
+            log.info("%s is in use by another program - retrying in %.1f s", out.name, delay)
+            sleep(delay)
+            delay *= 2
+            continue
+        t0 = time.monotonic()
+        rc, text = run(cmd)
+        log.info("encode %s: %.1f s (exit %s)", out.name, time.monotonic() - t0, rc)
+        if rc == 0 and out.exists():
+            return
+        if file_in_use(out):
+            if last:
+                raise NarrationError(tr("err.narration_file_in_use", name=out.name), details=text[-1500:])
+            log.info("%s is in use by another program - retrying in %.1f s", out.name, delay)
+            sleep(delay)
+            delay *= 2
+            continue
         raise NarrationError(tr("err.narration_export", name=out.name), details=text[-1500:])
 
 
