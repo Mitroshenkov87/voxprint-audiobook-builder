@@ -639,6 +639,17 @@ def _prefetch_dnsmos(progress: ProgressCallback) -> None:
         log.warning("DNSMOS download failed: %s", exc)
 
 
+def _prefetch_text_extras(progress: ProgressCallback) -> None:
+    """The translator models (and SAGE) of :data:`infra.text_models.COMPONENT_EXTRAS` that step 1 of the Components window did
+    not get (full builds have no step 1).  Pinned revision + SHA-256 per file; best effort, translation can fetch them later."""
+    from infra import text_models
+
+    try:
+        text_models.ensure_component_extras(lambda s, f, m="": progress(Stage.MODEL, float(f), m))
+    except Exception as exc:  # noqa: BLE001 - never block the first-run model step
+        log.warning("translator / text model download failed: %s", exc)
+
+
 def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[List[str]] = None,
                     ensure=None) -> List[str]:
     """First run: download ALL required models automatically (TTS, aligner, speech recognition, SAGE, the small DNSMOS file of
@@ -662,6 +673,7 @@ def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[
         base += size
     if ensure is md.ensure_model:
         _prefetch_dnsmos(progress)
+        _prefetch_text_extras(progress)
     if ensure is md.ensure_model and sys.platform == "win32":
         from infra import assets   # system ffmpeg, else the pinned LGPL build (best effort, never blocks)
 

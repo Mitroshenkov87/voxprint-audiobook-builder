@@ -132,10 +132,11 @@ def test_component_extras_are_sage_and_only_missing_ones_are_fetched(monkeypatch
         progress(Stage.MODEL, 1.0, "done")
         ready.add(model.key)
 
-    assert text_models.ensure_component_extras(lambda s, f, m="": seen.append(f), ensure_fn=fake_ensure) == ["sage-ru"]
-    assert fetched == ["sage-ru"] and seen[-1] == pytest.approx(1.0) and seen == sorted(seen)
+    keys = list(text_models.COMPONENT_EXTRAS)
+    assert text_models.ensure_component_extras(lambda s, f, m="": seen.append(f), ensure_fn=fake_ensure) == keys
+    assert fetched == keys and seen[-1] == pytest.approx(1.0) and seen == sorted(seen)
     assert text_models.missing_component_extras() == []
-    assert text_models.ensure_component_extras(ensure_fn=fake_ensure) == [] and fetched == ["sage-ru"]
+    assert text_models.ensure_component_extras(ensure_fn=fake_ensure) == [] and fetched == keys
 
 
 # ------------------------------------------------------------------------------------------------ the window

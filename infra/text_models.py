@@ -49,6 +49,8 @@ class TextModel:
     #: Glob patterns of the files to download ("" = the whole repository).
     files: Tuple[str, ...] = ()
     pair: Tuple[str, str] = ("", "")   # translation models: (source, target) language
+    #: multi-target Opus-MT tc-big models need the target language as a token in front of every sentence (``>>rus<<``)
+    target_token: str = ""
 
     @property
     def local_dir(self) -> Path:
@@ -57,6 +59,9 @@ class TextModel:
 
 
 #: Files of an Opus-MT repository that are needed (the repositories also hold TF / Rust / Flax copies of the weights).
+#: Files of an Opus-MT tc-big model (safetensors only: the repositories also carry pytorch_model.bin and tf_model.h5)
+TC_BIG_FILES: Tuple[str, ...] = ("config.json", "generation_config.json", "tokenizer_config.json", "vocab.json",
+                                 "special_tokens_map.json", "source.spm", "target.spm", "model.safetensors")
 OPUS_FILES: Tuple[str, ...] = ("config.json", "generation_config.json", "tokenizer_config.json", "vocab.json", "source.spm",
                                "target.spm", "pytorch_model.bin")
 
@@ -69,6 +74,52 @@ REGISTRY: Tuple[TextModel, ...] = (
     TextModel("spell-de", KIND_CLEANUP, STEP_SPELLFIX, "German spelling correction", ("de",),
               "oliverguhr/spelling-correction-german-base", "", 950, "Apache-2.0", False),
     TextModel("stress-ru", KIND_STRESS, STEP_STRESS, "Russian stress marks and the letter yo", ("ru",), "", "", 0, "", False),
+    # Opus-MT tc-big (2022-23, same Marian architecture): preferred; listed BEFORE the 2020 models of the same direction,
+    # which stay as a fallback for installs that already have them (make_translator takes the first installed one).
+    TextModel("opus-big-en-ru", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT tc-big en -> ru", ("en", "ru"), "Helsinki-NLP/opus-mt-tc-big-en-zle",
+              "708be1d372fe4c358a352f404e6dc9ca0126ba48", 483, "CC-BY-4.0", True,
+              (("config.json", "962d235879c9def4cfdf140be81436d4fb9da25271dd69079df2c90b459f1332"),
+               ("generation_config.json", "d851d84c804c745d92dae5659bd2d8e8b976b664dd0fbc39b82ee88340147802"),
+               ("tokenizer_config.json", "41deeedfc0e3ce366d6bde180dee025a8ca1bcd62b1451889301e8ea4bcbb609"),
+               ("vocab.json", "41dbdff4a0b5a6ab125715c3342c5ce6516e93ffd49608813240403f036c5efb"),
+               ("special_tokens_map.json", "09059cedc26bc46bc09a52f05b92d4922e11917e87f3b92059bb1a63a59ab2c4"),
+               ("model.safetensors", "e68caa9a233c177a3489257b69c18cece6da97767ab2581918ce3fc3c3899416"),
+               ("source.spm", "3612abfe04bf08344ba91115f0e15e228a7a15a621ea856bfd548097dbaeb43c"),
+               ("target.spm", "22940e744b3a9fd166a04880938fb61f7dfa8ba4b5d2d3f6371a6c4ba8f3b019"),),
+              TC_BIG_FILES, ("en", "ru"), ">>rus<<"),
+    TextModel("opus-big-ru-en", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT tc-big ru -> en", ("ru", "en"), "Helsinki-NLP/opus-mt-tc-big-zle-en",
+              "09a40f722d6d8b76aaad6fe51a06c914622a13d1", 482, "CC-BY-4.0", True,
+              (("config.json", "c3a0d99762cd5009ab0d9e793fab27b02a8362bb366191a58af677ea712c1263"),
+               ("generation_config.json", "aeafe756fb795970bccbb7c16391b79f42a4f9c1d5f32bc6e36b45f17cfa5a35"),
+               ("tokenizer_config.json", "1c99d6f6250779f482836b8380d5fdcaa3ab8c7b6f332a6fcec1d8040eeb6c00"),
+               ("vocab.json", "92148daf001ba378588442dfcdc7c4529210f2f28635ebc092faecf508190680"),
+               ("special_tokens_map.json", "09059cedc26bc46bc09a52f05b92d4922e11917e87f3b92059bb1a63a59ab2c4"),
+               ("model.safetensors", "78608083ed48db06dd4b0afdb58b1ac7e2a3648b295fac58449c131c7bf0cc2c"),
+               ("source.spm", "a982dbb9362861151e36b0db1595b324cd1ce09acf46ce1f4d6d624e11c5807f"),
+               ("target.spm", "e69faed7f1e60eec38c64cceba35cc4fb05ec6478082f4c8a14b141fd6596e9e"),),
+              TC_BIG_FILES, ("ru", "en")),
+    TextModel("opus-big-ru-de", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT tc-big ru -> de", ("ru", "de"), "Helsinki-NLP/opus-mt-tc-big-zle-de",
+              "b2e247f0c413ca6aa51a32f2f2be8666cf72405e", 482, "CC-BY-4.0", True,
+              (("config.json", "3365e8a0008b014e8360cfb8a48c21bcc250490e623d9fb38ba57372a9d4975a"),
+               ("generation_config.json", "3e5f85e6a764107acbf215671ce7b6a18b21cfb52f13892ff01498c71d4baf50"),
+               ("tokenizer_config.json", "9946907fad1e49a4ff5e493feaaf3af386211feac30e9d883aaaea61cf822a14"),
+               ("vocab.json", "768fd9a234ab432101826b4fd77ebea6aff67b1e461bc242d81877442db9fcfc"),
+               ("special_tokens_map.json", "09059cedc26bc46bc09a52f05b92d4922e11917e87f3b92059bb1a63a59ab2c4"),
+               ("model.safetensors", "cab19ba28674308c4e51bc05ebf19dd8f2b9cacbc339a350ec389c47cf591a96"),
+               ("source.spm", "ce6c0b9887274cbaef5320aec5db60c5afab66f983723ac4051aa68523f9032f"),
+               ("target.spm", "7c23b510033f9329f8f2c6200a5c8f2cedc03133690dbde920c0f4f14e6a8bda"),),
+              TC_BIG_FILES, ("ru", "de")),
+    TextModel("opus-big-de-ru", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT tc-big de -> ru", ("de", "ru"), "Helsinki-NLP/opus-mt-tc-big-de-zle",
+              "d4db2a2cbaa6c2f1ea57d0ed40924d35767b05f9", 482, "CC-BY-4.0", True,
+              (("config.json", "87339bacf38f0f193b9f3b79c1cc0e4de4ed8fcdbd886b87f2be69caa1236a71"),
+               ("generation_config.json", "5c3d58c11c2cf673224cd7bb9c7ad3fac618ffb185c4478144a96623940bd3ef"),
+               ("tokenizer_config.json", "4cd738433f516c1205d9619098efdb383cde555fafd035f5410601908553f306"),
+               ("vocab.json", "1afcad767fa7863a9a935f5b3e0efa0afa6a6918909b1fbffb14c5e2c07f3ff3"),
+               ("special_tokens_map.json", "09059cedc26bc46bc09a52f05b92d4922e11917e87f3b92059bb1a63a59ab2c4"),
+               ("model.safetensors", "2af78d2ff8d53c73e88dd032506c0dff28d17fb6a828f8b572afe128dbe1647e"),
+               ("source.spm", "dde526685600b958138d2b3863bf9b8be10774bf8a99573aede7db619c9b5eb0"),
+               ("target.spm", "3341e4c42304e509ef8068c1b0726be116a8ad90b513c62638db210bf47b4fb6"),),
+              TC_BIG_FILES, ("de", "ru"), ">>rus<<"),
     TextModel("opus-ru-en", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT ru -> en", ("ru", "en"), "Helsinki-NLP/opus-mt-ru-en",
               "fbd6dc73284f95536648512cc21d57f19191961a", 300, "CC-BY-4.0", True,
               (("pytorch_model.bin", "535450eb5613f3cc912f9ca3e54cfef6c14d201b319c24a88faf776a65538b5d"),), OPUS_FILES, ("ru", "en")),
@@ -145,7 +196,10 @@ def ensure(model: TextModel, progress: ProgressCallback = noop_progress, **kw) -
 #: Text models that the thin build's Components window downloads in the same pass as the runtime libraries (no separate click
 #: in the Narrate window).  The first-run model download (``workers.pipeline_runner.prefetch_models``) lists them too, as a
 #: fallback for full builds and for a Components pass whose extra download failed.
-COMPONENT_EXTRAS: Tuple[str, ...] = ("sage-ru",)
+COMPONENT_EXTRAS: Tuple[str, ...] = ("sage-ru",
+                                     # the translator: every direction between ru / en / de (ru <-> de direct, no pivot)
+                                     "opus-big-en-ru", "opus-big-ru-en", "opus-big-ru-de", "opus-big-de-ru",
+                                     "opus-de-en", "opus-en-de")
 
 
 def missing_component_extras() -> List[TextModel]:
@@ -214,11 +268,14 @@ def build_plan(rule_steps, neural_steps=frozenset()):
 
 # --------------------------------------------------------------------------- translation (Opus-MT)
 def translate_model(source: str, target: str) -> Optional[TextModel]:
-    """The integrated Opus-MT model of one direction, or ``None``."""
-    for m in REGISTRY:
-        if m.kind == KIND_TRANSLATE and m.integrated and m.pair == (source, target):
-            return m
-    return None
+    """The preferred integrated Opus-MT model of one direction (the one to download), or ``None``."""
+    cands = translate_candidates(source, target)
+    return cands[0] if cands else None
+
+
+def translate_candidates(source: str, target: str) -> List[TextModel]:
+    """Integrated models of one direction, preferred first (tc-big, then the 2020 model kept as a fallback)."""
+    return [m for m in REGISTRY if m.kind == KIND_TRANSLATE and m.integrated and m.pair == (source, target)]
 
 
 def translate_models(source: str, target: str) -> List[TextModel]:
@@ -236,10 +293,10 @@ def make_translator(source: str, target: str, device: str = ""):
     """Translator of one direction if its model is downloaded, else ``None``."""
     from core.translate import MarianEngine
 
-    m = translate_model(source, target)
-    if m is None or state(m) != STATE_READY:
+    m = next((c for c in translate_candidates(source, target) if state(c) == STATE_READY), None)
+    if m is None:
         return None
-    return MarianEngine(m.local_dir, m.revision, source, target, device)
+    return MarianEngine(m.local_dir, m.revision, source, target, device, prefix=m.target_token)
 
 
 def build_translate_plan(target: str, source: str = ""):

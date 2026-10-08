@@ -27,7 +27,7 @@ sha256sum -c Voxprint-Setup-online.exe.sha256                    # with the .sha
 ```
 
 ## Online installer
-`Voxprint-Setup-online.exe` installs only our program shell and then downloads the rest from the developers' own sites, every file verified by a pinned SHA-256 (see the table above and [THIN-INSTALLER.md](THIN-INSTALLER.md)). A broken or interrupted download is resumed, components already on your PC (a compatible PyTorch, ffmpeg, the Visual C++ runtime) are reused after a check, and your data (models, voices, logs) stays in `%LOCALAPPDATA%\Voxprint`. It asks for administrator rights **once** (UAC). Silent install: `Voxprint-Setup-online.exe /VERYSILENT /DIR="C:\Voxprint"`; `/Manifest=<url or file>` uses another manifest (a mirror, a test). It needs the internet during setup (about 3 GB of libraries, then up to about 12 GB of models on the first start). Source: `tools/online_fetch.py`, `tools/make_online_payload.py`, `installer/Voxprint.iss /DONLINE`, `installer/build_online.ps1`.
+`Voxprint-Setup-online.exe` installs only our program shell and then downloads the rest from the developers' own sites, every file verified by a pinned SHA-256 (see the table above and [THIN-INSTALLER.md](THIN-INSTALLER.md)). A broken or interrupted download is resumed, components already on your PC (a compatible PyTorch, ffmpeg, the Visual C++ runtime) are reused after a check, and your data (models, voices, logs) stays in `%LOCALAPPDATA%\Voxprint`. It asks for administrator rights **once** (UAC). Silent install: `Voxprint-Setup-online.exe /VERYSILENT /DIR="C:\Voxprint"`; `/Manifest=<url or file>` uses another manifest (a mirror, a test). It needs the internet during setup (about 3 GB of libraries, then up to about 15 GB of models on the first start). Source: `tools/online_fetch.py`, `tools/make_online_payload.py`, `installer/Voxprint.iss /DONLINE`, `installer/build_online.ps1`.
 
 **Shortcuts.** The installers create no desktop shortcut (on purpose): Voxprint is in the Start menu (folder *Voxprint AI Audiobook Builder*) and in *Settings -> Apps*, where it is uninstalled. An upgrade over an older install removes a desktop shortcut that an earlier version created.
 
@@ -39,7 +39,7 @@ sha256sum -c Voxprint-Setup-online.exe.sha256                    # with the .sha
 | OS | Windows 11 24H2 (build 26100) x64 (Linux: experimental, Ubuntu 24.04 or newer, x86-64) | Windows 11 26H2 |
 | GPU | NVIDIA with ~6 GB VRAM (0.6B model, 8-bit Adam) | NVIDIA with 16 GB VRAM (1.7B model); a 4090 peaked at 6.1 GB whole-GPU usage for a 170 s recording |
 | Without NVIDIA | dataset only; training on the CPU is possible but very slow | - |
-| Disk | ~16 GB (models up to ~12 GB, program 3.6 GB installed) + ~4.2 GB for the optional universal model | SSD |
+| Disk | ~19 GB (models up to ~15 GB, program 3.6 GB installed) + ~4.2 GB for the optional universal model | SSD |
 | Network | needed once for the model download (Hugging Face, or the ModelScope mirror) | - |
 | Driver | NVIDIA driver with CUDA 11.8+ (PyTorch flavor cu118-cu130 is picked from `nvidia-smi`) | current driver |
 

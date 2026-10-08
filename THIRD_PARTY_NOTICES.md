@@ -64,9 +64,9 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 * Status: downloaded on first start
 * Licence text: [`licenses/deepfilternet.txt`](licenses/deepfilternet.txt)
 
-### Opus-MT translation models (Helsinki-NLP/opus-mt-ru-en, en-ru, de-en, en-de)
+### Opus-MT translation models (Helsinki-NLP/opus-mt-tc-big-en-zle, tc-big-zle-en, tc-big-zle-de, tc-big-de-zle; opus-mt-de-en, en-de, ru-en, en-ru)
 
-* Purpose: Optional offline machine translation of a book before narration (English, Russian, German; downloaded on request, about 300 MB per direction). Credit: OPUS-MT, University of Helsinki / Helsinki-NLP (Tiedemann and Thottingal, 2020). Machine translation quality varies.
+* Purpose: Offline machine translation of a book before narration (English, Russian, German; Russian <-> German directly). Opus-MT tc-big models, CC-BY-4.0, about 480 MB per direction; the 2020 Opus-MT models (about 300 MB) for English <-> German and as a fallback. Credit: OPUS-MT, University of Helsinki / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: "Democratizing neural machine translation with OPUS-MT", Language Resources and Evaluation 58 (2024); Tiedemann and Thottingal (2020). Machine translation quality varies.
 * Licence: CC-BY-4.0 / Apache-2.0
 * Project: <https://huggingface.co/Helsinki-NLP>
 * Status: downloaded on first start

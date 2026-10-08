@@ -45,6 +45,10 @@ APPROX_SIZE_GB = {
     "Helsinki-NLP/opus-mt-en-ru": 0.4,
     "Helsinki-NLP/opus-mt-de-en": 0.4,
     "Helsinki-NLP/opus-mt-en-de": 0.4,
+    "Helsinki-NLP/opus-mt-tc-big-en-zle": 0.48,           # Opus-MT tc-big (safetensors only): en->ru, ru->en, ru->de, de->ru
+    "Helsinki-NLP/opus-mt-tc-big-zle-en": 0.48,
+    "Helsinki-NLP/opus-mt-tc-big-zle-de": 0.48,
+    "Helsinki-NLP/opus-mt-tc-big-de-zle": 0.48,
 }
 
 

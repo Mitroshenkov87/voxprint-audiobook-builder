@@ -122,7 +122,7 @@
   },
   {
    "id": "opus-mt",
-   "name": "Opus-MT translation models (Helsinki-NLP/opus-mt-ru-en, en-ru, de-en, en-de)",
+   "name": "Opus-MT translation models (Helsinki-NLP/opus-mt-tc-big-en-zle, tc-big-zle-en, tc-big-zle-de, tc-big-de-zle; opus-mt-de-en, en-de, ru-en, en-ru)",
    "kind": "model",
    "ship": "download",
    "license": "CC-BY-4.0 / Apache-2.0",
@@ -132,9 +132,9 @@
    ],
    "url": "https://huggingface.co/Helsinki-NLP",
    "purpose": {
-    "en": "Optional offline machine translation of a book before narration (English, Russian, German; downloaded on request, about 300 MB per direction). Credit: OPUS-MT, University of Helsinki / Helsinki-NLP (Tiedemann and Thottingal, 2020). Machine translation quality varies.",
-    "de": "Optionale Offline-Maschinenübersetzung eines Buchs vor dem Vorlesen (Englisch, Russisch, Deutsch; auf Wunsch geladen, ca. 300 MB je Richtung). Quelle: OPUS-MT, Universität Helsinki / Helsinki-NLP (Tiedemann und Thottingal, 2020). Die Qualität maschineller Übersetzung schwankt.",
-    "ru": "Необязательный офлайн-машинный перевод книги перед озвучиванием (английский, русский, немецкий; загружается по запросу, около 300 МБ на направление). Авторы: OPUS-MT, Хельсинкский университет / Helsinki-NLP (Tiedemann и Thottingal, 2020). Качество машинного перевода бывает разным."
+    "en": "Offline machine translation of a book before narration (English, Russian, German; Russian <-> German directly). Opus-MT tc-big models, CC-BY-4.0, about 480 MB per direction; the 2020 Opus-MT models (about 300 MB) for English <-> German and as a fallback. Credit: OPUS-MT, University of Helsinki / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: \"Democratizing neural machine translation with OPUS-MT\", Language Resources and Evaluation 58 (2024); Tiedemann and Thottingal (2020). Machine translation quality varies.",
+    "de": "Offline-Maschinenübersetzung eines Buchs vor dem Vorlesen (Englisch, Russisch, Deutsch; Russisch <-> Deutsch direkt). Opus-MT-tc-big-Modelle, CC-BY-4.0, ca. 480 MB je Richtung; die Opus-MT-Modelle von 2020 (ca. 300 MB) für Englisch <-> Deutsch und als Rückfall. Quelle: OPUS-MT, Universität Helsinki / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: \"Democratizing neural machine translation with OPUS-MT\", Language Resources and Evaluation 58 (2024); Tiedemann und Thottingal (2020). Die Qualität maschineller Übersetzung schwankt.",
+    "ru": "Офлайн-машинный перевод книги перед озвучиванием (английский, русский, немецкий; русский <-> немецкий напрямую). Модели Opus-MT tc-big, CC-BY-4.0, около 480 МБ на направление; модели Opus-MT 2020 года (около 300 МБ) для английского <-> немецкого и как запасной вариант. Авторы: OPUS-MT, Хельсинкский университет / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: \"Democratizing neural machine translation with OPUS-MT\", Language Resources and Evaluation 58 (2024); Tiedemann и Thottingal (2020). Качество машинного перевода бывает разным."
    }
   },
   {

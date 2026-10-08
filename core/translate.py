@@ -36,7 +36,7 @@ log = logging.getLogger("voxprint.translate")
 #: Languages the UI offers as a target (and the detector can tell apart).
 LANGUAGES: Tuple[str, ...] = ("en", "ru", "de")
 #: Directions for which an Opus-MT model exists (see ``infra.text_models``).
-DIRECT_PAIRS: frozenset = frozenset({("ru", "en"), ("en", "ru"), ("de", "en"), ("en", "de")})
+DIRECT_PAIRS: frozenset = frozenset({("ru", "en"), ("en", "ru"), ("de", "en"), ("en", "de"), ("ru", "de"), ("de", "ru")})
 #: Language names as the TTS engine and the narration code write them.
 LANGUAGE_NAMES: Dict[str, str] = {"en": "English", "ru": "Russian", "de": "German"}
 MAX_SENTENCE_CHARS = 450        # longer sentences are cut at clause boundaries (Marian is trained on single sentences)
@@ -412,9 +412,9 @@ class MarianEngine:
     The weights are loaded on first use.  The folder must hold ``config.json``, ``pytorch_model.bin`` (or safetensors),
     ``source.spm``, ``target.spm`` and ``vocab.json`` (see ``infra.text_models``)."""
 
-    def __init__(self, model_dir: Path, revision: str, source: str, target: str, device: str = "") -> None:
-        """Remember where the model is; nothing is loaded yet."""
-        self.dir, self.device_name = Path(model_dir), device
+    def __init__(self, model_dir: Path, revision: str, source: str, target: str, device: str = "", prefix: str = "") -> None:
+        """Remember where the model is; nothing is loaded yet.  ``prefix``: target-language token of a multi-target model."""
+        self.dir, self.device_name, self.prefix = Path(model_dir), device, prefix
         self.tag = f"opus-mt-{source}-{target}@{(revision or 'local')[:12]}"
         self._model = None
         self._tok = None
@@ -446,7 +446,8 @@ class MarianEngine:
         if self._model is None:
             self._load()
         torch, dev = self._torch, self.device
-        enc = self._tok(list(sentences), return_tensors="pt", padding=True, truncation=True, max_length=512).to(dev)
+        src = [f"{self.prefix} {t}" for t in sentences] if self.prefix else list(sentences)
+        enc = self._tok(src, return_tensors="pt", padding=True, truncation=True, max_length=512).to(dev)
         longest = int(enc["input_ids"].shape[1])
         with torch.inference_mode():
             gen = self._model.generate(**enc, num_beams=4 if dev == "cuda" else 3, max_new_tokens=min(512, int(longest * 1.6) + 16))

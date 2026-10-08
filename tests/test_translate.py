@@ -58,13 +58,17 @@ def test_language_detection_tells_en_de_ru_and_refuses_the_rest():
     assert tl.detect_book_language(Book("x", "", "de", [Chapter("c", "123")])) == "de"
 
 
-def test_routes_are_direct_or_through_english():
+def test_routes_are_direct_or_through_english(monkeypatch):
     assert tl.route("ru", "en") == [("ru", "en")] and tl.route("de", "en") == [("de", "en")]
-    assert tl.route("ru", "de") == [("ru", "en"), ("en", "de")] and tl.route("de", "ru") == [("de", "en"), ("en", "ru")]
+    assert tl.route("ru", "de") == [("ru", "de")] and tl.route("de", "ru") == [("de", "ru")]      # tc-big: direct
+    monkeypatch.setattr(tl, "DIRECT_PAIRS", frozenset({("ru", "en"), ("en", "de")}))
+    assert tl.route("ru", "de") == [("ru", "en"), ("en", "de")]
+    monkeypatch.undo()
     assert tl.route("en", "en") == []
     with pytest.raises(tl.TranslateError):
         tl.route("uk", "en")
-    assert [m.key for m in text_models.translate_models("ru", "de")] == ["opus-ru-en", "opus-en-de"]
+    assert [m.key for m in text_models.translate_models("ru", "de")] == ["opus-big-ru-de"]
+    assert [m.key for m in text_models.translate_models("en", "de")] == ["opus-en-de"]       # no tc-big en<->de: 2020 model
     with pytest.raises(ValueError):
         text_models.translate_models("fr", "de")
 
@@ -99,7 +103,8 @@ def test_chapter_selection_translates_only_the_chosen_chapters():
     assert not any("Белеет" in s for s in log)
 
 
-def test_a_pair_through_english_uses_two_models_one_after_another():
+def test_a_pair_through_english_uses_two_models_one_after_another(monkeypatch):
+    monkeypatch.setattr(tl, "DIRECT_PAIRS", frozenset({("ru", "en"), ("en", "de")}))   # pivoting stays for future pairs
     log, made = [], []
     plan = tl.TranslatePlan("de", "", lambda s, d: made.append((s, d)) or FakeTranslator(s, d, log))
     out = tl.translate_book(Book("T", "", "ru", [Chapter("c", "Привет мир. Как дела?")]), plan, "ru", tl.TranslationCache(None))
@@ -289,12 +294,12 @@ def test_translate_card_states_download_and_the_plan(app, lib, tmp_path):
     assert not n.btn_start.isEnabled() and n.translate_plan() is None            # the model must be downloaded first
     assert n.download_translate_models()
     assert wait_for(lambda: not n.btn_tr_download.isVisibleTo(n))
-    assert ensured == ["opus-ru-en"] and "downloaded" in n.lbl_tr_state.text() and n.btn_start.isEnabled()
+    assert ensured == ["opus-big-ru-en"] and "downloaded" in n.lbl_tr_state.text() and n.btn_start.isEnabled()
     plan = n.translate_plan()
     assert plan.target == "en" and plan.source == "ru" and n.options().translate.target == "en"
-    # ru -> de goes through English: both models, a note about it
+    # ru -> de is direct (tc-big): one model, no detour through English
     n.cmb_translate.setCurrentIndex(n.cmb_translate.findData("de"))
-    assert [m.key for m in n.translate_models_needed()] == ["opus-ru-en", "opus-en-de"] and "English" in n.lbl_tr_state.text()
+    assert [m.key for m in n.translate_models_needed()] == ["opus-big-ru-de"] and "English" not in n.lbl_tr_state.text()
     assert not n.btn_start.isEnabled()
     # same language: nothing to do, the start button works
     n.cmb_translate.setCurrentIndex(n.cmb_translate.findData("ru"))
@@ -452,3 +457,26 @@ def test_opus_mirror_can_be_switched_off_and_needs_every_pattern(tmp_path, monke
     with pytest.raises(mir.MirrorError):
         entry.downloadable(["config.json", "nonexistent.bin"])
     assert set(entry.downloadable(["*.spm"])) == {"source.spm", "target.spm"}
+
+
+def test_tc_big_is_preferred_the_2020_model_is_the_fallback_and_the_target_token_is_prepended(monkeypatch):
+    ready = {"opus-ru-en"}
+    monkeypatch.setattr(text_models, "state", lambda m: text_models.STATE_READY if m.key in ready else text_models.STATE_NEEDS_DOWNLOAD)
+    eng = text_models.make_translator("ru", "en")
+    assert eng is not None and str(eng.dir).endswith("opus-mt-ru-en") and eng.prefix == ""                 # only the old one installed
+    ready.add("opus-big-ru-en")
+    assert "tc-big-zle-en" in str(text_models.make_translator("ru", "en").dir)
+    ready.add("opus-big-en-ru")
+    eng = text_models.make_translator("en", "ru")
+    assert eng.prefix == ">>rus<<"
+    seen = []
+
+    class Tok:
+        def __call__(self, texts, **kw):
+            seen.extend(texts)
+            raise RuntimeError("stop")       # only the tokenizer input matters here
+
+    eng._tok, eng._model, eng.device_name = Tok(), object(), "cpu"
+    with pytest.raises(RuntimeError):
+        eng.translate(["Hello."])
+    assert seen == [">>rus<< Hello."]
