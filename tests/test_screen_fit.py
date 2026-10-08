@@ -101,3 +101,59 @@ def test_transparency_switched_back_on_gives_a_shown_window_its_blur(app, monkey
         ui_prefs.set_transparency("more")
         main_window.apply_look(w)                         # switched back on: the backdrop is applied now
     assert calls and w.backdrop == "acrylic" and main_window.ROOT_GLASS_MORE in w.styleSheet()
+
+
+def test_a_narrow_combo_elides_with_the_full_text_as_tooltip(app, tmp_path):
+    from ui.settings_dialog import SettingsDialog
+
+    i18n.set_language("en")
+    s = make_studio(VoiceLibrary(tmp_path / "voices"))
+    d = SettingsDialog(s)
+    combo = d.cmb_asr
+    assert isinstance(combo, screen_fit.ElidedCombo)
+    combo.addItem("Download both (use automatic choice)")
+    combo.setCurrentIndex(combo.count() - 1)
+    combo.resize(120, combo.sizeHint().height())          # what 150 % left of the row
+    shown = combo.elided_text()
+    assert shown != combo.currentText() and shown.endswith("\u2026")      # elided, not cut off mid-letter
+    assert combo.toolTip() == combo.currentText() == "Download both (use automatic choice)"
+    combo.grab()                                          # paints without errors
+    combo.resize(combo.fontMetrics().horizontalAdvance(combo.currentText()) + 120, combo.height())
+    assert combo.elided_text() == combo.currentText()     # wide enough: the whole text
+    s.shutdown()
+
+
+def test_the_try_latest_check_box_text_wraps_and_toggles(app):
+    from ui.modules_dialog import ModulesDialog
+
+    i18n.set_language("de")
+    d = ModulesDialog(manifest_fn=lambda: {"modules": []})
+    assert d.lbl_latest.wordWrap() and d.chk_latest.text() == "" and d.lbl_latest.text()
+    d.row_latest.setFixedWidth(220)                       # narrower than the sentence: it wraps instead of being cut
+    d.row_latest.layout().activate()
+    assert d.lbl_latest.heightForWidth(d.lbl_latest.width()) > d.lbl_latest.fontMetrics().height() * 1.5
+    before = d.chk_latest.isChecked()
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+    QTest.mouseClick(d.lbl_latest, Qt.MouseButton.LeftButton, pos=QPoint(5, 5))
+    assert d.chk_latest.isChecked() != before             # a click on the text toggles the box, like a check box text
+    d.chk_latest.setChecked(before)
+    i18n.set_language("en")
+
+
+def test_a_version_never_breaks_mid_word(app):
+    from PySide6.QtGui import QTextLayout
+
+    text = screen_fit.nobreak('0.1.1-beta \u00b7 build 665 "Tikkun"')
+    assert text.replace("\u2060", "").replace("\u00a0", " ") == '0.1.1-beta \u00b7 build 665 "Tikkun"'
+    lay = QTextLayout("see " + text + " now", app.font())
+    lay.beginLayout()
+    lines = []
+    while True:
+        line = lay.createLine()
+        if not line.isValid():
+            break
+        line.setLineWidth(1)                              # as narrow as possible: break wherever allowed
+        lines.append(lay.text()[line.textStart():line.textStart() + line.textLength()].strip())
+    lay.endLayout()
+    assert text in lines, lines                           # the version stays on one line

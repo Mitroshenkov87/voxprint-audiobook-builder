@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 
 from core.i18n import tr
 from infra import modules as mods
+from ui import screen_fit
 from ui.glass import GlassDialog, fit_height
 
 log = logging.getLogger("voxprint.ui.modules")
@@ -181,9 +182,10 @@ class ModulesDialog(GlassDialog):
         # pinned (tested with this release) by default; "try latest" = the newest release's manifest, pinned as the fallback
         self.chk_latest = QCheckBox()
         self.chk_latest.setChecked(mods.prefer_latest())
-        self.chk_latest.setVisible(bool(mods.latest_url()))
         self.chk_latest.toggled.connect(mods.set_prefer_latest)
-        for w in (self.lbl_title, self.lbl_hint, self.lbl_status, self.bar, self.lbl_overall, self.chk_latest):
+        self.row_latest, self.lbl_latest = screen_fit.wrapped_check(self.chk_latest)   # a long text wraps at 150 %
+        self.row_latest.setVisible(bool(mods.latest_url()))
+        for w in (self.lbl_title, self.lbl_hint, self.lbl_status, self.bar, self.lbl_overall, self.row_latest):
             lay.addWidget(w)
         brow = QHBoxLayout()
         brow.addStretch(1)
@@ -209,7 +211,7 @@ class ModulesDialog(GlassDialog):
         self.lbl_hint.setText(hint)
         self.btn_cancel.setText(tr("ui.cancel"))
         self.btn_close.setText(tr("modules.btn_close"))
-        self.chk_latest.setText(tr("modules.try_latest"))
+        self.lbl_latest.setText(tr("modules.try_latest"))
         self._render()
 
     @property
@@ -265,6 +267,7 @@ class ModulesDialog(GlassDialog):
         self.btn_cancel.setVisible(self.busy)                # the model download of step 2 has no cancel: it can be closed
         self.btn_close.setEnabled(not self.busy)
         self.chk_latest.setEnabled(not working)
+        self.lbl_latest.setEnabled(not working)
         fit_height(self)                                      # wrapped texts at 150 % never get cut off
 
     # ---------------------------------------------------------------- list
@@ -292,7 +295,8 @@ class ModulesDialog(GlassDialog):
                 pass
         if names and miss and all(m.update for m in miss) and not self.extras_missing():
             old, new = self._versions
-            return tr("modules.updates", names=", ".join(names), size=_gb(size), old=old or "?", new=new or "?")
+            return tr("modules.updates", names=", ".join(names), size=_gb(size), old=screen_fit.nobreak(old or "?"),
+                      new=screen_fit.nobreak(new or "?"))   # "0.1.1-beta · build 665" never breaks mid-word
         return tr("modules.to_download", names=", ".join(names), size=_gb(size)) if names else tr("modules.all_ready")
 
     def _on_listed(self, res) -> None:

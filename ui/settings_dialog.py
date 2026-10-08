@@ -123,7 +123,7 @@ class SettingsDialog(GlassDialog):
 
         # --- language ---
         self.lbl_language = QLabel()
-        self.cmb_lang = QComboBox()
+        self.cmb_lang = screen_fit.ElidedCombo()   # elided + tooltip when too narrow (150 %)
         for code in i18n.LANGS:
             self.cmb_lang.addItem(i18n.LANG_NAMES[code], code)
         self.cmb_lang.setCurrentIndex(max(0, self.cmb_lang.findData(i18n.get_language())))
@@ -131,7 +131,7 @@ class SettingsDialog(GlassDialog):
 
         # --- window transparency (infra/ui_prefs.py): default / more / off ---
         self.lbl_transparency = QLabel()
-        self.cmb_transparency = QComboBox()
+        self.cmb_transparency = screen_fit.ElidedCombo()   # elided + tooltip when too narrow (150 %)
         for level in ui_prefs.TRANSPARENCY_LEVELS:
             self.cmb_transparency.addItem("", level)
         self.cmb_transparency.setCurrentIndex(max(0, self.cmb_transparency.findData(ui_prefs.transparency())))
@@ -140,7 +140,7 @@ class SettingsDialog(GlassDialog):
 
         # --- network interface (infra/netroute.py): Auto / system default / a specific adapter ---
         self.lbl_net = QLabel()
-        self.cmb_net = QComboBox()
+        self.cmb_net = screen_fit.ElidedCombo()   # elided + tooltip when too narrow (150 %)
         add_row(self.lbl_net, self.cmb_net)
         self._fill_net()
         self.cmb_net.currentIndexChanged.connect(self._on_net_changed)
@@ -162,7 +162,7 @@ class SettingsDialog(GlassDialog):
         self.asr_resolve: Callable[[str], str] = lambda choice: asr_choice.preferred_repo(choice)   # injectable (tests)
         self.asr_missing: Callable[[], list] = self._default_asr_missing                            # injectable (tests)
         self.lbl_asr = QLabel()
-        self.cmb_asr = QComboBox()
+        self.cmb_asr = screen_fit.ElidedCombo()   # elided + tooltip when too narrow (150 %)
         for choice in asr_choice.CHOICES:
             self.cmb_asr.addItem("", choice)
         add_row(self.lbl_asr, self.cmb_asr)

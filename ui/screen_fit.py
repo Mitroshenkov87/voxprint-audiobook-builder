@@ -9,7 +9,17 @@ from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtCore import QEvent, QObject, QRect, Qt
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QStyle,
+    QStyleOptionComboBox,
+    QStylePainter,
+    QWidget,
+)
 
 #: Share of the work area a window takes at most when it opens (the rest stays visible around it).
 MAX_W, MAX_H = 0.94, 0.90
@@ -67,3 +77,65 @@ def install(app: QApplication) -> ScreenClamp:
     f = ScreenClamp(app)
     app.installEventFilter(f)
     return f
+
+
+def nobreak(text: str) -> str:
+    """``text`` that never wraps inside (a version like ``0.1.1-beta · build 665``): word joiners around the hyphens,
+    no-break spaces for the spaces - the visible characters stay the same."""
+    return text.replace("-", "\u2060-\u2060").replace(" ", "\u00a0")
+
+
+class ElidedCombo(QComboBox):
+    """A combo box that elides a current text too long for its width ("Download both (use…") instead of cutting it
+    off; the full text is its tooltip and the open list is as wide as the longest entry."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.currentTextChanged.connect(self.setToolTip)
+
+    def showPopup(self) -> None:
+        fm = self.view().fontMetrics()
+        widest = max((fm.horizontalAdvance(self.itemText(i)) for i in range(self.count())), default=0)
+        self.view().setMinimumWidth(widest + 40)            # (room for the scroll bar and the item padding)
+        super().showPopup()
+
+    def elided_text(self) -> str:
+        """The current text as painted: elided to the text field of the box."""
+        opt = QStyleOptionComboBox()
+        self.initStyleOption(opt)
+        field = self.style().subControlRect(QStyle.ComplexControl.CC_ComboBox, opt,
+                                            QStyle.SubControl.SC_ComboBoxEditField, self)
+        return self.fontMetrics().elidedText(self.currentText(), Qt.TextElideMode.ElideRight, field.width())
+
+    def paintEvent(self, event) -> None:
+        p = QStylePainter(self)
+        opt = QStyleOptionComboBox()
+        self.initStyleOption(opt)
+        p.drawComplexControl(QStyle.ComplexControl.CC_ComboBox, opt)
+        opt.currentText = self.elided_text()
+        p.drawControl(QStyle.ControlElement.CE_ComboBoxLabel, opt)
+
+
+class _ToggleLabel(QLabel):
+    def __init__(self, box: QCheckBox) -> None:
+        super().__init__()
+        self._box = box
+
+    def mouseReleaseEvent(self, event) -> None:
+        if self._box.isEnabled() and event.button() == Qt.MouseButton.LeftButton:
+            self._box.toggle()
+        super().mouseReleaseEvent(event)
+
+
+def wrapped_check(box: QCheckBox) -> tuple[QWidget, QLabel]:
+    """A check box whose text wraps (a QCheckBox text never does): ``box`` without text plus a word-wrapped label
+    that toggles it.  Returns the row to lay out and the label to set the text on."""
+    row = QWidget()
+    lay = QHBoxLayout(row)
+    lay.setContentsMargins(0, 0, 0, 0)
+    lay.setSpacing(6)
+    label = _ToggleLabel(box)
+    label.setWordWrap(True)
+    lay.addWidget(box, 0, Qt.AlignmentFlag.AlignTop)
+    lay.addWidget(label, 1)
+    return row, label
