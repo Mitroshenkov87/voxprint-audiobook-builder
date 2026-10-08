@@ -106,6 +106,7 @@ class RepoVoice:
     size_bytes: int = 0
     names: dict = field(default_factory=dict)       # optional localized display names {"ru": "...", "en": "..."}
     descriptions: dict = field(default_factory=dict)   # optional localized descriptions
+    bundled: bool = False     # an open voice that comes with Voxprint (infra/bundled_voices.py): installed read-only
 
     @property
     def display_name(self) -> str:
@@ -236,7 +237,8 @@ def parse_index(data: Any) -> List[RepoVoice]:
             organization=voice_info.clean_line(str(e.get("organization", "")), voice_info.MAX_ORGANIZATION_CHARS),
             project_url=voice_info.clean_project_url(str(e.get("project_url", ""))),
             base_model=str(e.get("base_model", "")), size_bytes=size, names=voice_info.clean_names(e.get("names")),
-            descriptions=voice_info.clean_names(e.get("descriptions"), voice_info.clean_description)))
+            descriptions=voice_info.clean_names(e.get("descriptions"), voice_info.clean_description),
+            bundled=e.get("bundled") is True))
     return out
 
 
@@ -322,7 +324,8 @@ def download_voice(entry: RepoVoice, library: VoiceLibrary, opener: Opener = net
                      "age_group": entry.age_group, "speaker": entry.speaker, "prepared_by": entry.prepared_by,
                      "organization": entry.organization, "project_url": entry.project_url,
                      "description": entry.description, "language": entry.language, "base_model": entry.base_model,
-                     "names": entry.names or None, "descriptions": entry.descriptions or None, "repo_id": entry.id}
+                     "names": entry.names or None, "descriptions": entry.descriptions or None, "repo_id": entry.id,
+                     "bundled": True if entry.bundled else None}
         rec = library.import_zip(tmp, overrides=overrides)
         tmp.unlink(missing_ok=True)
         return rec

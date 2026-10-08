@@ -24,6 +24,54 @@
         "de": "Offene Universalstimme: nur mit gemeinfreier Sprache trainiert (LJ Speech 1.1, Sprecherin Linda Johnson, LibriVox). Frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht: LJ Speech, Keith Ito, https://keithito.com/LJ-Speech-Dataset/"
       },
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "boaz",
+      "name": "Boaz",
+      "language": "ru",
+      "author": "Mark Chulsky (LibriVox) - public domain",
+      "license": "CC0-1.0",
+      "voice_type": "male",
+      "description": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Аграфена (Agrafena)' by Boris Zaytsev, read by Mark Chulsky (https://librivox.org/agrafena-by-boris-zaytsev/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Boaz is Voxprint's own and does not imply the reader's endorsement.",
+      "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/boaz.zip",
+      "sha256": "138acc6aeeeeb31de5ee31a3adc8320cf60446f17c5178ba83a37e47741638cc",
+      "size_bytes": 53177559,
+      "descriptions": {
+        "en": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Аграфена (Agrafena)' by Boris Zaytsev, read by Mark Chulsky (https://librivox.org/agrafena-by-boris-zaytsev/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Boaz is Voxprint's own and does not imply the reader's endorsement.",
+        "ru": "Встроенный открытый мужской русский голос, обучен только на записи LibriVox из общественного достояния «Аграфена (Agrafena)» (Борис Зайцев), читает Mark Chulsky (https://librivox.org/agrafena-by-boris-zaytsev/). Свободен для любого использования, в том числе коммерческого (CC0-1.0). Атрибуция приветствуется. Имя Boaz дано Voxprint и не означает одобрения чтеца.",
+        "de": "Mitgelieferte offene männliche russische Stimme, nur mit der gemeinfreien LibriVox-Aufnahme 'Аграфена (Agrafena)' von Boris Zaytsev trainiert, gelesen von Mark Chulsky (https://librivox.org/agrafena-by-boris-zaytsev/). Frei für jede Nutzung, auch kommerziell (CC0-1.0). Namensnennung erwünscht. Der Name Boaz stammt von Voxprint und bedeutet keine Billigung durch die Sprecher."
+      },
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "gender": "male",
+      "speaker": "Mark Chulsky",
+      "prepared_by": "Voxprint",
+      "project_url": "https://librivox.org/agrafena-by-boris-zaytsev/",
+      "bundled": true
+    },
+    {
+      "id": "tirzah",
+      "name": "Tirzah",
+      "language": "ru",
+      "author": "Anastasiia Solokha (LibriVox) - public domain",
+      "license": "CC0-1.0",
+      "voice_type": "female",
+      "description": "Bundled open female Russian voice, trained only from the public-domain LibriVox recording 'Степные сказки (Stepnyia skazki)' by Grigory Danilevsky, read by Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Tirzah is Voxprint's own and does not imply the reader's endorsement.",
+      "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/tirzah.zip",
+      "sha256": "aef7c849298ec6e3f2aac1114b993ca111b6297bfd9fef0bf1634527be7ab95f",
+      "size_bytes": 53274433,
+      "descriptions": {
+        "en": "Bundled open female Russian voice, trained only from the public-domain LibriVox recording 'Степные сказки (Stepnyia skazki)' by Grigory Danilevsky, read by Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Tirzah is Voxprint's own and does not imply the reader's endorsement.",
+        "ru": "Встроенный открытый женский русский голос, обучен только на записи LibriVox из общественного достояния «Степные сказки (Stepnyia skazki)» (Григорий Данилевский), читает Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Свободен для любого использования, в том числе коммерческого (CC0-1.0). Атрибуция приветствуется. Имя Tirzah дано Voxprint и не означает одобрения чтеца.",
+        "de": "Mitgelieferte offene weibliche russische Stimme, nur mit der gemeinfreien LibriVox-Aufnahme 'Степные сказки (Stepnyia skazki)' von Grigory Danilevsky trainiert, gelesen von Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Frei für jede Nutzung, auch kommerziell (CC0-1.0). Namensnennung erwünscht. Der Name Tirzah stammt von Voxprint und bedeutet keine Billigung durch die Sprecher."
+      },
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "gender": "female",
+      "speaker": "Anastasiia Solokha",
+      "prepared_by": "Voxprint",
+      "project_url": "https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/",
+      "bundled": true
     }
   ]
 }

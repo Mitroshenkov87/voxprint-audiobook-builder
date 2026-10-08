@@ -302,6 +302,8 @@ def normalize_info(data: Dict[str, Any], fallback_id: str = "") -> Dict[str, Any
         out["adapter_scale"] = scale      # LoRA strength at inference; missing = 1.0 (core/adapter_strength.py)
     if data.get("repo_id"):
         out["repo_id"] = clean_line(str(data["repo_id"]))   # id in the online voices index: the voice was downloaded from there
+    if data.get("bundled") is True:
+        out["bundled"] = True      # an open voice that comes with Voxprint (infra/bundled_voices.py): read-only in the library
     names = clean_names(data.get("names"))
     if names:
         out["names"] = names       # shown instead of ``name`` when the UI language has an entry (e.g. a different name per UI language)

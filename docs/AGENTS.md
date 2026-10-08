@@ -99,6 +99,23 @@ voxprint train recording.wav --text script.txt --name Anna --type female --json
 
 On exit code 5, retry with `--force-cpu` (slow). When it finishes, `voices list --json` shows the new id. A second train creates another voice.
 
+`--out DIR` is the parent folder: each voice gets its own work folder `<DIR>/<voice name>_Voxprint`, so two voices trained with the same `--out` never overwrite each other's `report.json`.
+
+Licence, consent and language (all optional):
+
+```
+voxprint train ./clips --name Boaz --type male --language ru --consent commercial --speaker "Reader Name" --license CC0-1.0 --json
+```
+
+| Option | Meaning |
+|---|---|
+| `--consent none` | Default. Consent method `none`, scope `private_only`, licence `custom/personal-only` |
+| `--consent auto` | Read the speaker's spoken consent statement at the end of the recording (falls back to `private_only`) |
+| `--consent commercial \| public_noncommercial \| private_only` | Consent confirmed manually (method `manual`) with that scope. Use it only when the speaker agreed, or the recording is public domain |
+| `--speaker NAME` | Name of the person whose voice it is (consent block and `speaker` field) |
+| `--license ID` | `CC0-1.0`, `CC-BY-4.0`, `CC-BY-SA-4.0`, `CC-BY-NC-4.0`, `CC-BY-NC-SA-4.0`, `custom/personal-only`, `custom/test-use-only`. Default: from the consent scope. A licence never allows more than the consent: a commercial licence needs `--consent commercial`, an `-NC` licence at least `public_noncommercial` (exit code 3 otherwise) |
+| `--language CODE` | Language of the recording (`ru`, `en`, `de` or a name such as `Russian`); default: detected |
+
 ### Narrate
 
 ```
@@ -243,7 +260,7 @@ Voxprint stays on this computer. There is no account and no telemetry. The netwo
 
 Only train and re-voice speech you have the right to use. Do not commit recordings or someone else's voice into git.
 
-A voice trained with this CLI is marked consent method `none` and scope `private_only` (licence `custom/personal-only`): the narration stays on that computer. `voices list --json` shows `license` and `consent_scope` for every voice. Obey them. Wider scopes (`public_noncommercial`, `commercial`) are confirmed in the app by the speaker, not by a CLI flag. This file is not legal advice. Terms: [EULA](legal/EULA-audiobook-builder.md). Voices: [VOICES.md](VOICES.md).
+By default a voice trained with this CLI is marked consent method `none` and scope `private_only` (licence `custom/personal-only`): the narration stays on that computer. `voices list --json` shows `license` and `consent_scope` for every voice. Obey them. Pass a wider `--consent` scope (and `--license`) only when the speaker agreed or the recording is public domain. This file is not legal advice. Terms: [EULA](legal/EULA-audiobook-builder.md). Voices: [VOICES.md](VOICES.md).
 
 ## Troubleshooting
 

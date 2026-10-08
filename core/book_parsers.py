@@ -146,11 +146,24 @@ def parse_txt(text: str, title: str = "") -> Book:
             cur_lines.append(line)
     flush()
     chapters = [c for c in chapters if c.text.strip()]
+    lead = ""
+    if len(chapters) > 1 and not chapters[0].title and _title_only(chapters[0].text):
+        # a short title line before the first heading ("Бытие" above "Глава 1") is the opening line of chapter 1,
+        # not a separate "Chapter 1"
+        lead = chapters[0].text.strip()
+        chapters = chapters[1:]
+        chapters[0].text = lead + "\n\n" + chapters[0].text
     if not chapters:
         raise BookParseError(tr("err.book_empty"))
     if len(chapters) == 1 and not chapters[0].title:
         chapters[0].title = title
-    return Book(title=title or chapters[0].title, chapters=_with_default_title(chapters))
+    return Book(title=title or lead or chapters[0].title, chapters=_with_default_title(chapters))
+
+
+def _title_only(text: str) -> bool:
+    """One short line without a sentence end: a book title, not prose."""
+    t = text.strip()
+    return "\n" not in t and len(t) <= 100 and len(t.split()) <= 10 and t[-1:] not in ".!?\u2026,;:"
 
 
 def _paragraphs_from_lines(lines: List[str]) -> str:

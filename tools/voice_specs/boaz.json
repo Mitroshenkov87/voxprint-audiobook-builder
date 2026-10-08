@@ -1,0 +1,25 @@
+{
+  "id": "boaz",
+  "name": "Boaz",
+  "language": "ru",
+  "author": "Mark Chulsky (LibriVox) - public domain",
+  "speaker": "Mark Chulsky",
+  "prepared_by": "Voxprint",
+  "project_url": "https://librivox.org/agrafena-by-boris-zaytsev/",
+  "gender": "male",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "description": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Аграфена (Agrafena)' by Boris Zaytsev, read by Mark Chulsky (https://librivox.org/agrafena-by-boris-zaytsev/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Boaz is Voxprint's own and does not imply the reader's endorsement.",
+  "descriptions": {
+    "en": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Аграфена (Agrafena)' by Boris Zaytsev, read by Mark Chulsky (https://librivox.org/agrafena-by-boris-zaytsev/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Boaz is Voxprint's own and does not imply the reader's endorsement.",
+    "ru": "Встроенный открытый мужской русский голос, обучен только на записи LibriVox из общественного достояния «Аграфена (Agrafena)» (Борис Зайцев), читает Mark Chulsky (https://librivox.org/agrafena-by-boris-zaytsev/). Свободен для любого использования, в том числе коммерческого (CC0-1.0). Атрибуция приветствуется. Имя Boaz дано Voxprint и не означает одобрения чтеца.",
+    "de": "Mitgelieferte offene männliche russische Stimme, nur mit der gemeinfreien LibriVox-Aufnahme 'Аграфена (Agrafena)' von Boris Zaytsev trainiert, gelesen von Mark Chulsky (https://librivox.org/agrafena-by-boris-zaytsev/). Frei für jede Nutzung, auch kommerziell (CC0-1.0). Namensnennung erwünscht. Der Name Boaz stammt von Voxprint und bedeutet keine Billigung durch die Sprecher."
+  },
+  "consent": {
+    "scope": "commercial",
+    "name": "Mark Chulsky (LibriVox reader, recording in the public domain)",
+    "method": "manual",
+    "confirmed": true
+  },
+  "bundled": true
+}

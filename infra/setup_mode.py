@@ -51,7 +51,7 @@ def auto_download(state_dir: Optional[Path] = None) -> bool:
 
 def full_sizes(flavor: str = "cu128", platform: str = "win-x64") -> Dict[str, int]:
     """Bytes of the complete download from the pinned sizes: ``models``, ``runtime`` and ``total``."""
-    from infra import denoise_tool, llm_tool, model_mirrors, quality_models, text_models
+    from infra import bundled_voices, denoise_tool, llm_tool, model_mirrors, quality_models, text_models
 
     models = sum(int(m["size"]) for e in model_mirrors.load().values() for m in e.downloadable().values())
     mirrored = set(model_mirrors.load())
@@ -59,7 +59,7 @@ def full_sizes(flavor: str = "cu128", platform: str = "win-x64") -> Dict[str, in
                   if m.integrated and m.repo and m.repo not in mirrored)
     pinned = (llm_tool.MODEL["size"], llm_tool.SERVER_ASSETS[platform]["size"], denoise_tool.ASSETS[platform]["size"],
               quality_models.DNSMOS_META["size"])
-    models += sum(int(str(n)) for n in pinned)
+    models += sum(int(str(n)) for n in pinned) + bundled_voices.total_bytes()
     here = Path(__file__).resolve().parent
     assets = json.loads((here / "assets_manifest.json").read_text(encoding="utf-8"))
     models += int(assets["assets"]["ffmpeg"]["platforms"].get("win32" if platform.startswith("win") else "linux", {}).get("size", 0))

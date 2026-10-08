@@ -161,6 +161,11 @@ class RemoteCard(QFrame):
             self.lbl_note.setObjectName("hint")
             self.lbl_note.setWordWrap(True)
             lay.addWidget(self.lbl_note)
+        elif item.entry is not None and item.entry.bundled:      # comes with Voxprint: licence stated before the download
+            self.lbl_note = QLabel(tr("voices.bundled_note", license=item.license))
+            self.lbl_note.setObjectName("hint")
+            self.lbl_note.setWordWrap(True)
+            lay.addWidget(self.lbl_note)
         row = QHBoxLayout()
         self.lbl_state = QLabel(tr("voices.remote_state"))
         self.lbl_state.setObjectName("carddesc")
@@ -215,6 +220,11 @@ class VoiceCard(QFrame):
             self.lbl_note.setObjectName("hint")
             self.lbl_note.setWordWrap(True)
             lay.addWidget(self.lbl_note)
+        elif rec.bundled:      # an open voice that comes with Voxprint: read-only, licence stated
+            self.lbl_note = QLabel(tr("voices.bundled_note", license=rec.license))
+            self.lbl_note.setObjectName("hint")
+            self.lbl_note.setWordWrap(True)
+            lay.addWidget(self.lbl_note)
         row = QHBoxLayout()
         self.btn_preview = QPushButton(("\u25a0 " + tr("voices.stop")) if playing else ("\u25b6 " + tr("voices.preview")))
         self.btn_preview.setEnabled(rec.preview_path is not None)
@@ -224,6 +234,10 @@ class VoiceCard(QFrame):
         self.btn_delete = QPushButton(tr("voices.delete"))
         self.btn_export = QPushButton(tr("voices.export"))
         self.btn_folder = QPushButton(tr("voices.open_folder"))
+        if rec.bundled:
+            for b in (self.btn_edit, self.btn_delete):
+                b.setEnabled(False)
+                b.setToolTip(tr("voices.bundled_tip"))
         for b in (self.btn_preview, self.btn_narrate, self.btn_edit, self.btn_export, self.btn_folder, self.btn_delete):
             row.addWidget(b)
         row.addStretch(1)
@@ -723,7 +737,7 @@ class VoicesWindow(SubWindow):
     def edit_voice(self, voice_id: str) -> None:
         """Open the edit dialog and save the changes."""
         rec = self.library.get(voice_id)
-        if rec is None:
+        if rec is None or rec.bundled:
             return
         dlg = VoiceEditDialog(rec, self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
@@ -782,7 +796,7 @@ class VoicesWindow(SubWindow):
     def delete_voice(self, voice_id: str) -> None:
         """Delete a voice after asking for confirmation."""
         rec = self.library.get(voice_id)
-        if rec is None:
+        if rec is None or rec.bundled:
             return
         if not self._ask(tr("voices.delete_title"), tr("voices.delete_confirm", name=rec.name)):
             return

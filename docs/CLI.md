@@ -92,17 +92,22 @@ Running the same narrate command again skips chunks that are already cached.
 ## Train a voice
 
 ```
-voxprint train AUDIO [--text SCRIPT] [--name NAME] [--type male|female|child|other] [--out DIR] [--force-cpu] [--json]
+voxprint train AUDIO [--text SCRIPT] [--name NAME] [--type male|female|child|other] [--out DIR]
+               [--consent none|auto|commercial|public_noncommercial|private_only] [--speaker NAME]
+               [--license ID] [--language CODE] [--force-cpu] [--json]
 ```
 
 Omit `--text` to train from a folder of clips, or from one recording, in no-transcript mode (speech recognition builds the dataset). With `--text` and a single file, the aligner path is used.
 
-A voice trained from this command is stored with consent method `none` and scope `private_only` (the narration stays on that computer). Confirm a wider scope in the app only when the speaker agreed. Only train a voice you have the right to use.
+`--out DIR` is the parent folder; the work folder is `<DIR>/<voice name>_Voxprint` (one per voice).
+
+By default the voice is stored with consent method `none` and scope `private_only` (the narration stays on that computer). `--consent auto` reads the spoken statement; `--consent commercial|public_noncommercial|private_only` records a manually confirmed scope, `--speaker` the speaker's name, `--license` the voice licence (never more than the consent allows) and `--language` the recording's language. Details: [AGENTS.md](AGENTS.md#train-from-a-folder-of-clips). Only train a voice you have the right to use.
 
 ```
 voxprint train recording.wav --text script.txt --name Anna --type female
 voxprint train ./clips --name Anna --type female --out ./voices --json
 voxprint train recording.wav --text script.txt --name Anna --force-cpu
+voxprint train ./clips --name Boaz --language ru --consent commercial --speaker "Reader Name" --license CC0-1.0
 ```
 
 `--force-cpu` is the retry after exit code 5. A second train creates another voice; it is not a no-op.

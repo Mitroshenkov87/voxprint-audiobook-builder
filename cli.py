@@ -402,6 +402,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint train recording.wav --text script.txt --name Anna --type female\n"
             "  voxprint train ./clips --name Anna --type female --out ./voices --json\n"
             "  voxprint train recording.wav --text script.txt --name Anna --force-cpu --yes\n"
+            "  voxprint train ./clips --name Boaz --language ru --consent commercial --speaker \"Reader Name\" --license CC0-1.0\n"
         ),
     )
     t.add_argument("audio", type=Path, help="Recording file, or a folder of clips when --text is omitted")
@@ -411,7 +412,16 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--type", dest="voice_type", default="", choices=("",) + VOICE_TYPES,
                    help="Voice type stored in voice.json: male | female | child | other")
     t.add_argument("--out", type=Path, default=None, metavar="DIR",
-                   help="Result root folder (default: next to the recording)")
+                   help="Parent folder of the work folder <voice name>_Voxprint (default: next to the recording); "
+                        "two voices never share a work folder")
+    t.add_argument("--license", dest="voice_license", default="", metavar="ID",
+                   help="Licence stored in voice.json, e.g. CC0-1.0, CC-BY-4.0, CC-BY-NC-4.0 (default: from --consent)")
+    t.add_argument("--consent", default="none", choices=TRAIN_CONSENT,
+                   help="Voice owner's consent: none (private only, default) | auto (read the spoken statement at the end) | "
+                        "commercial | public_noncommercial | private_only (confirmed manually)")
+    t.add_argument("--speaker", default="", metavar="NAME", help="Name of the person whose voice it is (consent and voice.json)")
+    t.add_argument("--language", default="", metavar="LANG",
+                   help="Language of the recording, e.g. ru, en, de (default: detected)")
     t.add_argument("--force-cpu", action="store_true", help="Train on CPU even when a GPU is present")
     t.set_defaults(_handler="train")
 
@@ -682,6 +692,37 @@ def cmd_narrate(args: argparse.Namespace, *,
     return _run("narrate", args, body)
 
 
+TRAIN_CONSENT = ("none", "auto", "commercial", "public_noncommercial", "private_only")
+
+
+def _train_meta(args: argparse.Namespace) -> dict:
+    """TaskRequest fields from ``--consent / --speaker / --license / --language`` (checked: a licence never allows more than the
+    consent, e.g. CC0-1.0 needs ``--consent commercial``)."""
+    from core import consent, languages, voice_info
+
+    mode = args.consent if args.consent in ("none", "auto") else "manual"
+    scope = args.consent if mode == "manual" else consent.PRIVATE
+    meta = {"consent_mode": mode, "consent_scope": scope, "consent_name": args.speaker or "", "speaker": args.speaker or ""}
+    lic = (args.voice_license or "").strip()
+    if lic:
+        if lic not in voice_info.LICENSES:
+            raise CliError(EXIT_INPUT, f"unknown licence: {lic}", hint="Use one of: " + ", ".join(voice_info.LICENSES) + ".")
+        if mode != "auto" and (voice_info.license_allows_commercial(lic) and scope != consent.COMMERCIAL
+                               or "-NC" in lic and scope == consent.PRIVATE):
+            raise CliError(EXIT_INPUT, f"licence {lic} allows more than --consent {args.consent}",
+                           hint="Pass --consent commercial for a licence that allows commercial use "
+                                "(public_noncommercial for -NC licences).")
+        meta["license"] = lic
+    lang = (args.language or "").strip()
+    if lang:
+        code = languages.language_code(lang)
+        if code not in languages.NAMES:
+            raise CliError(EXIT_INPUT, f"unknown language: {lang}", hint="Use a code or name, e.g. ru, en, de, Russian.")
+        meta["language"] = code
+        meta["asr_language"] = languages.language_name(code)
+    return meta
+
+
 def cmd_train(args: argparse.Namespace, *,
               run_fn: Callable[..., object] = run_task) -> int:
     """``train AUDIO [--text SCRIPT]``: build a LoRA voice via ``run_task``."""
@@ -701,6 +742,7 @@ def cmd_train(args: argparse.Namespace, *,
                 hint="Point --text at the transcript file, or omit --text for no-transcript mode.",
             )
         vtype = normalize_voice_type(args.voice_type)
+        meta = _train_meta(args)
         if audio.is_dir() or text is None:
             req = TaskRequest(
                 kind=KIND_LORA,
@@ -711,7 +753,7 @@ def cmd_train(args: argparse.Namespace, *,
                 voice_display_name=args.name or "",
                 voice_type=vtype,
                 force_cpu=bool(args.force_cpu),
-                consent_mode="none",
+                **meta,
             )
         else:
             req = TaskRequest(
@@ -722,8 +764,10 @@ def cmd_train(args: argparse.Namespace, *,
                 voice_display_name=args.name or "",
                 voice_type=vtype,
                 force_cpu=bool(args.force_cpu),
-                consent_mode="none",
+                **meta,
             )
+        if args.out is not None:      # one work folder per voice: a second voice must not overwrite the first one's report.json
+            req.out_root = Path(args.out) / f"{req.voice_name()}_Voxprint"
         with keep_awake.keep_awake():
             result = run_fn(req, _train_progress(json_mode), CancelToken())
         voice_id = getattr(result, "voice_id", "") or ""

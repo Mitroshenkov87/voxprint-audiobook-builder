@@ -74,6 +74,8 @@ class TaskRequest:
     consent_scope: str = "private_only"  # manual: commercial / public_noncommercial / private_only
     consent_name: str = ""               # manual: the speaker's name
     consent_save_clip: bool = True       # auto: keep the recorded statement next to the adapter
+    license: str = ""                    # explicit voice.json licence (CLI --license); "" = derived from the consent scope
+    language: str = ""                   # voice.json language code (CLI --language); "" = detected from the data
     compare: bool = False                # KIND_PREVIEW: two variants to compare
     quality_check: bool = False          # LoRA: synthesize a sample after training and judge it (core/voice_check.py)
     preset: str = "balanced"             # training preset: fast / balanced / maximum / manual (core.train_presets)
@@ -212,6 +214,9 @@ def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech
 
         extra = dict(license=consent_mod.license_for_scope(consent_block["scope"]), consent=consent_block,
                      author=consent_block.get("name", ""))
+    if req.license:
+        extra["license"] = req.license
+    language = req.language or language
     info = voice_info.build_voice_info(req.voice_display_name.strip() or req.voice_name(), language, speech_seconds, epochs, base_model,
                                        req.voice_type, req.voice_description, gender=req.gender, age_group=req.age_group,
                                        speaker=req.speaker, prepared_by=req.prepared_by, organization=req.organization,
@@ -684,7 +689,7 @@ def all_model_repos() -> List[str]:
 
 def _prefetch_small_optional(progress: ProgressCallback) -> None:
     """Small optional models are part of the standard download (decided 2026-10-08): OpenVoice V2 (~130 MB, Re-voice
-    recording) and the DeepFilterNet program (~27 MB, noise clean-up).  Best effort: their windows can fetch them later."""
+    recording), the DeepFilterNet program (~27 MB, noise clean-up) and the bundled open voices.  Best effort: their windows can fetch them later."""
     from infra import denoise_tool, vc_model
 
     for name, ready, ensure in (("OpenVoice V2", vc_model.ready, vc_model.ensure),
@@ -694,6 +699,12 @@ def _prefetch_small_optional(progress: ProgressCallback) -> None:
                 ensure(lambda f, m="": progress(Stage.MODEL, float(f), m))
         except Exception as exc:  # noqa: BLE001 - never block the first-run model step
             log.warning("%s download failed: %s", name, exc)
+    try:   # the bundled open voices Boaz and Tirzah (~2 x 53 MB, infra/bundled_voices.py), installed read-only
+        from infra import bundled_voices
+
+        bundled_voices.ensure(lambda f, n: progress(Stage.MODEL, float(f), n))
+    except Exception as exc:  # noqa: BLE001
+        log.warning("bundled voices download failed: %s", exc)
 
 
 def _prefetch_big_optional(progress: ProgressCallback) -> None:
@@ -709,9 +720,9 @@ def _prefetch_big_optional(progress: ProgressCallback) -> None:
 
 def everything_missing() -> bool:
     """True while anything of the complete set (:func:`all_model_repos` + the optional modules) is not on the disk."""
-    from infra import denoise_tool, llm_tool, quality_models, text_models, vc_model
+    from infra import bundled_voices, denoise_tool, llm_tool, quality_models, text_models, vc_model
 
-    return bool(models_missing(all_model_repos()) or text_models.missing_component_extras()
+    return bool(models_missing(all_model_repos()) or bundled_voices.missing() or text_models.missing_component_extras()
                 or text_models.missing_other_integrated() or not vc_model.ready()
                 or (denoise_tool.platform_key() is not None and denoise_tool.ready() is None)
                 or not quality_models.dnsmos_ready()

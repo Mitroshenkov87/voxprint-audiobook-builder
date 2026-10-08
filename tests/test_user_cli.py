@@ -206,7 +206,7 @@ def test_train_calls_runner_with_text(tmp_path):
          "--out", str(tmp_path / "out")],
         run_task_fn=fake_task,
     )
-    assert code == 0 and seen["req"].out_root == tmp_path / "out"
+    assert code == 0 and seen["req"].out_root == tmp_path / "out" / "Anna_Voxprint"      # one work folder per voice
 
 
 def test_train_no_transcript_without_text(tmp_path):

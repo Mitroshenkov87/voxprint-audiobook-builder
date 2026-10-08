@@ -524,3 +524,66 @@ def test_pin_tool_takes_lfs_hashes_and_hashes_small_files_without_the_weights():
     assert not [u for u in fetched if u.endswith("model.safetensors")]      # the weights are never downloaded
     with pytest.raises(SystemExit):
         pin.pin("Org/M", "r" * 40, ["config.json"], lambda u: json.dumps(tree).encode() if "/api/" in u else b"tampered")
+
+
+# --------------------------------------------------------------------------- added scope: train CLI, title block, work dir
+
+def _train(tmp_path, *extra):
+    import cli as user_cli
+
+    audio = tmp_path / "clips"
+    audio.mkdir(exist_ok=True)
+    seen = []
+
+    def fake_task(req, progress, cancel=None, **_kw):
+        seen.append(req)
+        return type("R", (), {"voice_id": "v", "adapter_path": None, "root_dir": req.out_root, "warnings": []})()
+    code = user_cli.main(["train", str(audio), *extra], run_task_fn=fake_task)
+    return code, seen
+
+
+def test_train_cli_license_consent_language(tmp_path):
+    code, seen = _train(tmp_path, "--name", "Boaz", "--license", "CC0-1.0", "--consent", "commercial",
+                        "--speaker", "Mark Chulsky", "--language", "Russian")
+    req = seen[0]
+    assert code == 0 and req.license == "CC0-1.0" and req.consent_mode == "manual" and req.consent_scope == "commercial"
+    assert req.consent_name == req.speaker == "Mark Chulsky" and req.language == "ru" and req.asr_language == "Russian"
+    code, seen = _train(tmp_path, "--consent", "auto")
+    assert code == 0 and seen[0].consent_mode == "auto" and seen[0].license == "" and seen[0].language == ""
+    code, seen = _train(tmp_path)
+    assert code == 0 and seen[0].consent_mode == "none"
+
+
+@pytest.mark.parametrize("extra", [["--license", "CC0-1.0"], ["--license", "CC-BY-NC-4.0", "--consent", "private_only"],
+                                   ["--license", "WTFPL", "--consent", "commercial"], ["--language", "klingon"]])
+def test_train_cli_rejects_inconsistent_options(tmp_path, extra):
+    code, seen = _train(tmp_path, *extra)
+    assert code != 0 and not seen
+
+
+def test_voice_json_takes_cli_license_and_language(tmp_path):
+    from workers import pipeline_runner as pr
+
+    req = pr.TaskRequest(kind=pr.KIND_LORA, audio=tmp_path / "a.wav", voice_display_name="Boaz", license="CC0-1.0",
+                         language="ru", consent_mode="manual", consent_scope="commercial", consent_name="Reader")
+    block = {"scope": "commercial", "name": "Reader", "method": "manual", "confirmed": True}
+    info = pr._write_voice_json(req, tmp_path, "en", 60.0, block)
+    assert info["license"] == "CC0-1.0" and info["language"] == "ru" and info["commercial_use"]
+
+
+def test_train_work_dir_is_per_voice(tmp_path):
+    out = tmp_path / "out"
+    _, a = _train(tmp_path, "--name", "Boaz", "--out", str(out))
+    _, b = _train(tmp_path, "--name", "Tirzah", "--out", str(out))
+    assert a[0].out_root == out / "Boaz_Voxprint" and b[0].out_root == out / "Tirzah_Voxprint"
+
+
+def test_title_block_before_first_heading_opens_chapter_one():
+    from core.book_parsers import parse_txt
+
+    book = parse_txt("Бытие\n\nГлава 1\n\nВ начале сотворил Бог небо и землю.\n\nГлава 2\n\nИ совершил Бог к седьмому дню.")
+    assert [c.title for c in book.chapters] == ["Глава 1", "Глава 2"]
+    assert book.chapters[0].text.startswith("Бытие\n\nВ начале") and book.title == "Бытие"
+    intro = parse_txt("Это длинное вступление к книге, а не заголовок.\n\nГлава 1\n\nТекст.")
+    assert len(intro.chapters) == 2                        # real prose before the first heading stays its own part
+    assert len(parse_txt("Бытие\n\nВ начале сотворил Бог небо и землю.").chapters) == 1

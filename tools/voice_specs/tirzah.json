@@ -1,0 +1,25 @@
+{
+  "id": "tirzah",
+  "name": "Tirzah",
+  "language": "ru",
+  "author": "Anastasiia Solokha (LibriVox) - public domain",
+  "speaker": "Anastasiia Solokha",
+  "prepared_by": "Voxprint",
+  "project_url": "https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/",
+  "gender": "female",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "description": "Bundled open female Russian voice, trained only from the public-domain LibriVox recording 'Степные сказки (Stepnyia skazki)' by Grigory Danilevsky, read by Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Tirzah is Voxprint's own and does not imply the reader's endorsement.",
+  "descriptions": {
+    "en": "Bundled open female Russian voice, trained only from the public-domain LibriVox recording 'Степные сказки (Stepnyia skazki)' by Grigory Danilevsky, read by Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Tirzah is Voxprint's own and does not imply the reader's endorsement.",
+    "ru": "Встроенный открытый женский русский голос, обучен только на записи LibriVox из общественного достояния «Степные сказки (Stepnyia skazki)» (Григорий Данилевский), читает Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Свободен для любого использования, в том числе коммерческого (CC0-1.0). Атрибуция приветствуется. Имя Tirzah дано Voxprint и не означает одобрения чтеца.",
+    "de": "Mitgelieferte offene weibliche russische Stimme, nur mit der gemeinfreien LibriVox-Aufnahme 'Степные сказки (Stepnyia skazki)' von Grigory Danilevsky trainiert, gelesen von Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Frei für jede Nutzung, auch kommerziell (CC0-1.0). Namensnennung erwünscht. Der Name Tirzah stammt von Voxprint und bedeutet keine Billigung durch die Sprecher."
+  },
+  "consent": {
+    "scope": "commercial",
+    "name": "Anastasiia Solokha (LibriVox reader, recording in the public domain)",
+    "method": "manual",
+    "confirmed": true
+  },
+  "bundled": true
+}

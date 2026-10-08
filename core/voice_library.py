@@ -82,6 +82,11 @@ class VoiceRecord:
         return self._localized("descriptions", str(self.info.get("description") or ""))
 
     @property
+    def bundled(self) -> bool:
+        """True for an open voice that comes with Voxprint: read-only (no edit, no delete)."""
+        return self.info.get("bundled") is True
+
+    @property
     def test_only(self) -> bool:
         """True for test-only voices: test/demo use only, no public release of the audio, no commercial use."""
         return self.license == voice_info.LICENSE_TEST_ONLY
@@ -315,6 +320,8 @@ class VoiceLibrary:
         rec = self.get(voice_id)
         if rec is None:
             raise VoiceLibraryError(tr("err.voice_not_found"), details=voice_id)
+        if rec.bundled and set(k for k, v in fields.items() if v is not None) - {"adapter_scale"}:
+            raise VoiceLibraryError(tr("err.voice_bundled"), details=voice_id)
         info = dict(rec.info)
         for key in ("name", "author", "speaker", "prepared_by", "organization", "project_url", "license", "license_url",
                     "gender", "age_group", "voice_type", "description", "consent", "adapter_scale"):
@@ -374,5 +381,8 @@ class VoiceLibrary:
             raise VoiceLibraryError(tr("err.voice_not_found"), details=voice_id)
         if folder.resolve().parent != self.root.resolve():
             raise VoiceLibraryError(tr("err.voice_not_found"), details=voice_id)
+        rec = self.get(voice_id)
+        if rec is not None and rec.bundled:
+            raise VoiceLibraryError(tr("err.voice_bundled"), details=voice_id)
         shutil.rmtree(folder)
         log.info("voice deleted: %s", voice_id)

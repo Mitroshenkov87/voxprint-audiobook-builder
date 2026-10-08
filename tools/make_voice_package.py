@@ -50,7 +50,21 @@ def index_entry(info: Dict[str, Any], zip_path: Path, url: str) -> Dict[str, Any
     for key in ("names", "descriptions", "license_url") + DETAIL_FIELDS:
         if info.get(key):
             entry[key] = info[key]
+    if info.get("bundled"):
+        entry["bundled"] = True        # comes with Voxprint (infra/bundled_voices.py)
     return entry
+
+
+def scrub_training_meta(path: Path) -> None:
+    """Keep only the file name of the reference clip in ``training_meta.json`` (no local paths in a published package)."""
+    try:
+        meta = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    ref = meta.get("ref_sample_audio")
+    if isinstance(ref, str) and ref:
+        meta["ref_sample_audio"] = "ref_sample.wav"
+        path.write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 #: Optional schema-3 details copied into the index entry and the model card when set.
@@ -121,6 +135,7 @@ def build(adapter: Path, spec: Dict[str, Any], out: Path, url: str, typed_names:
     for name in PACKAGE_FILES:
         if (adapter / name).is_file():
             shutil.copy2(adapter / name, folder / name)
+    scrub_training_meta(folder / "training_meta.json")
     voice_info.write_voice_json(folder, info)
     (folder / "README.md").write_text(model_card(info, url), encoding="utf-8")
     zip_path = out / f"{base}.zip"
