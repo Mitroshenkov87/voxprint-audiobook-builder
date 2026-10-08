@@ -115,6 +115,8 @@ def _decline_ordinal_word(word: str, case: str, gender: str) -> str:
         table, stem = _SOFT, word[:-2]
     elif word.endswith("ой") or word.endswith("ый"):
         stem = word[:-2]
+        if word.endswith("ой") and gender == "m" and case in ("nom", "acc"):
+            return word                        # stressed ending: "второй", "шестой", "сороковой" (not "вторый")
     else:
         return word
     return stem + table[(gender, case)]

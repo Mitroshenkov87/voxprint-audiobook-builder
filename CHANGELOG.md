@@ -5,6 +5,15 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Added
+- **Ordinal numbers by context** before synthesis: Russian "день 1" -> "день первый", "в главе 3" -> "в главе третьей", "псалом 22", "Глава IV", written endings ("3-го", "в 5-м томе", "90-х"); English "21st", heading "Chapter IV"; German "am 3. Oktober" -> "am dritten Oktober". The rules are data (`core/ordinal_rules.py`, [docs/ORDINALS.md](docs/ORDINALS.md)). On by default; Settings -> Narration or `--no-ordinals`.
+
+### Fixed
+- Narration stopped with `WinError 32` on a chunk `.part.flac` -> `.flac` rename (build 667 log): two chunks with the same text (a repeated verse) were written to one temporary file by two writer threads. Every write now has its own temporary file, a locked rename is retried with backoff, a twin already on disk is kept, and a file that stays locked stops the job with a clear message (finished parts are kept). An output file held by a player is waited for in the same way before ffmpeg writes it. Stale `.part.flac` files are swept at the next start.
+- Model downloads left an empty `.<model>.lock` file per model in the models folder; the lock is deleted after a successful download and Check & repair removes stale ones (a lock held by a running download is kept).
+- Russian ordinals with a stressed ending were built as "вторый", "шестый", "сороковый" in the nominative masculine (used by dates and the AI disclosure).
+- Diagnostics: a command-line start logged `"cuda_available": false` although PyTorch is not loaded there yet; it now says "not checked".
+
 ## [0.1.3-beta] - 2026-10-08 - build 667 "Menuchah"
 
 Codename *Menuchah* (Biblical Hebrew: rest, calm - Genesis 49:15). Fixes from the clean Full install of build 666 on a real PC (about 25 GB downloaded from zero): downloads now let go of their files, retry a single failed file and count every byte once. Plus two bundled open voices, narrated samples, pauses that follow punctuation and structure, and a reading speed that adapts to the text.

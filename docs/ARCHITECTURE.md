@@ -44,6 +44,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `text_cleanup.py` | optional neural clean-up: `CleanupEngine` protocol (`correct`), the **validator** (`validate`: only close spelling fixes, `е`->`ё`, inserted commas; everything else rejected), `BlockCache` (JSON per paragraph), `cleanup_book` (progress / cancel / resume), `SageEngine` (lazy transformers, **not run on real hardware**) |
 | `book_prep.py` | `PrepPlan` (rule options + neural step keys + `engine_factory`) and `run_preparation`: rules -> clean-up -> `.debug/prepared_text.txt` + `prep_report.json` |
 | `chunker.py` | chapter text -> sentence-sized chunks (reuses the clause splitter), pause lengths |
+| `ordinals.py`, `ordinal_rules.py` | ordinal numbers by context before synthesis ("глава 2" -> "глава вторая", "21st", "3. Kapitel"); the rules are data ([ORDINALS.md](ORDINALS.md)) |
 | `asr.py` | speech recognition interface (`Qwen3ASR`, `FakeASR`), `plausibility()` (confidence proxy), `split_at_pauses()` |
 | `revoice.py` | Re-voice text path: audio files -> recognised chapters -> a `.txt` the narrator loads; Opus storage of a dictaphone recording |
 | `voice_convert.py` | direct voice conversion: `VoiceConverter` protocol, `convert_file` (PCM in memory, Opus out), `make_converter` (the only place a model is chosen) |

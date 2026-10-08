@@ -71,7 +71,7 @@ voxprint capabilities
 voxprint narrate BOOK --voice ID_OR_NAME --out DIR
     [--format NAME] [--no-pauses|--pauses] [--pause-comma SEC] [--pause-mid SEC] [--pause-sentence SEC]
     [--pause-paragraph SEC] [--pause-chapter SEC] [--speed X] [--style auto|scripture|fiction|dialogue]
-    [--ai-disclosure] [--work-dir DIR] [--json]
+    [--ordinals|--no-ordinals] [--ai-disclosure] [--work-dir DIR] [--json]
 ```
 
 | Argument | Meaning |
@@ -89,6 +89,7 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 | `--pause-chapter SEC` | After a chapter title, at the end of a chapter and at a scene break (default 2.0) |
 | `--speed X` | Global reading speed 0.7-1.3 (1 = the voice's own speed) |
 | `--style NAME` | `auto` (detected), `scripture` (solemn, a little slower), `fiction`, `dialogue` |
+| `--no-ordinals` / `--ordinals` | Read numbers after words like chapter / day / verse as ordinals by context ("день 1" -> "день первый", "21st", "3. Kapitel"); default: Settings (on). See [ORDINALS.md](ORDINALS.md) |
 | `--ai-disclosure` | Speak a short AI note at the start (opt-in) |
 | `--work-dir DIR` | Remember this folder as the app working folder |
 

@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (QSlider, QCheckBox, QComboBox, QFileDialog, QFram
 from core import audiobook_export as ex
 from core import narration as nr
 from core import pauses as pz
+from core import ordinals
 from core import pace as pc
 from core import ai_disclosure
 from core import text_prep
@@ -1184,7 +1185,8 @@ class NarrateWindow(SubWindow):
             pause_lengths=pz.load_lengths(), pace=pc.load(),      # Settings: pause lengths, reading speed and style
             prep=self.plan_builder(self.selected_rule_steps(), self.selected_neural_steps()),
             translate=self.translate_plan(), ai_disclosure=self.chk_disclosure.isChecked(),
-            check_chunks=self.chk_check_chunks.isChecked(), llm_prepare=self.llm_prepare_plan())
+            check_chunks=self.chk_check_chunks.isChecked(), llm_prepare=self.llm_prepare_plan(),
+            ordinals=ordinals.load_enabled())                    # Settings: ordinal numbers by context
 
     # ------------------------------------------------------------------ state
     @property

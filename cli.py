@@ -32,6 +32,7 @@ from typing import Callable, Optional, Sequence, Set
 
 from core import audiobook_export as ex
 from core import pauses as pz
+from core import ordinals
 from core import pace as pc
 from core import revoice
 from core import workspace as ws
@@ -395,6 +396,13 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"Global reading speed {pc.MIN_SPEED:g}-{pc.MAX_SPEED:g} (1 = the voice's own; default: Settings)")
     n.add_argument("--style", default=None, choices=pc.STYLES,
                    help="Reading style: auto (detected) | scripture (solemn, slower) | fiction | dialogue (default: Settings)")
+    ords = n.add_mutually_exclusive_group()
+    ords.add_argument("--ordinals", dest="ordinals", action="store_true", default=None,
+                      help="Read ordinal numbers by context (Russian 'глава 2' -> 'глава вторая', '21st', German '3. Kapitel'); "
+                           "default: Settings (on)")
+    ords.add_argument("--no-ordinals", dest="ordinals", action="store_false",
+                      help="Read every number as written (cardinal)")
+    n.set_defaults(ordinals=None)
     n.add_argument("--ai-disclosure", action="store_true",
                    help="Speak a short AI disclosure at the start (opt-in)")
     n.add_argument("--work-dir", type=Path, default=None, metavar="DIR",
@@ -687,6 +695,7 @@ def cmd_narrate(args: argparse.Namespace, *,
             pauses=pz.PauseProfile(lengths=lengths) if args.pauses else None,
             pause_lengths=lengths, pace=pace,
             ai_disclosure=bool(args.ai_disclosure),
+            ordinals=ordinals.load_enabled() if getattr(args, "ordinals", None) is None else bool(args.ordinals),
         )
         job = NarrationJob(book=book, voice=voice, out_dir=out_dir, options=options)
         with keep_awake.keep_awake():

@@ -43,6 +43,8 @@ class ChunkCheckOptions:
     max_cer: float = DEFAULT_MAX_CER
     retries: int = DEFAULT_RETRIES
     sampling: Dict[str, float] = field(default_factory=lambda: dict(RETRY_SAMPLING))
+    #: Read ordinals in the recognised text the way the chunk text was prepared (``NarrationOptions.ordinals``).
+    ordinals: bool = True
 
 
 def chunk_seed(key: str, attempt: int) -> int:
@@ -146,7 +148,8 @@ def make_default_checker(language: str, options: Optional[ChunkCheckOptions] = N
     Prefers the fast Qwen3-ASR-0.6B when it is installed (speed matters here more than the last percent), else the 1.7B model.
     The device is decided when the recogniser is first needed, i.e. after the TTS model is on the GPU."""
     from core.asr import make_default_asr
-    from core.narration import default_normalizer
+    from core.narration import chain_steps, default_normalizer
+    from core import ordinals
     from infra import asr_choice, preload
 
     found = asr_choice.ready(ready, choice=asr_choice.USE_SMALL)
@@ -162,4 +165,7 @@ def make_default_checker(language: str, options: Optional[ChunkCheckOptions] = N
         return make_default_asr(str(path), dev)
 
     name = (language or "").strip()
-    return ChunkChecker(factory, name if name and name.lower() != "auto" else None, options, default_normalizer(language))
+    # the recogniser writes "глава 2" where the chunk text says "глава вторая": prepare its output the same way
+    ordinal = ordinals.ordinal_step(language) if (options is None or options.ordinals) else None
+    return ChunkChecker(factory, name if name and name.lower() != "auto" else None, options,
+                        chain_steps(ordinal, default_normalizer(language)))

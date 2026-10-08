@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
 )
 
 from core import i18n
+from core import ordinals
 from core import pace as pc
 from core import pauses as pz
 from core.errors import BackupError
@@ -219,6 +220,11 @@ class SettingsDialog(GlassDialog):
         r = ngrid.rowCount()
         ngrid.addWidget(self.lbl_style, r, 0)
         ngrid.addWidget(self.cmb_style, r, 1)
+        self.chk_ordinals = QCheckBox()               # core/ordinals.py: "глава 2" -> "глава вторая"
+        self.chk_ordinals.setChecked(ordinals.load_enabled())
+        r = ngrid.rowCount()
+        ngrid.addWidget(self.chk_ordinals, r, 0, 1, 2)
+        self.chk_ordinals.toggled.connect(self._on_ordinals_toggled)
         self.lbl_narr_hint = QLabel()
         self.lbl_narr_hint.setObjectName("cardnote")
         self.lbl_narr_hint.setWordWrap(True)
@@ -405,12 +411,18 @@ class SettingsDialog(GlassDialog):
         pc.save(pc.Pace(self.sld_speed.value() / 100, self.cmb_style.currentData()))
         self.lbl_speed_value.setText(tr("narrset.speed_value", pct=self.sld_speed.value()))
 
+    def _on_ordinals_toggled(self, on: bool) -> None:
+        """Save "read ordinal numbers by context" (used by the next narration)."""
+        ordinals.save_enabled(on)
+
     def reset_narration(self) -> None:
-        """Back to the default pause lengths, speed 100 % and automatic style."""
+        """Back to the default pause lengths, speed 100 %, automatic style and ordinals on."""
         for kind, ms in pz.DEFAULT_LENGTHS_MS.items():
             self.spn_pause[kind].setValue(ms / 1000)
         self.sld_speed.setValue(100)
         self.cmb_style.setCurrentIndex(max(0, self.cmb_style.findData(pc.AUTO)))
+        self.chk_ordinals.setChecked(True)
+        ordinals.save_enabled(True)
         self._on_pause_changed()
         self._on_pace_changed()
 
@@ -480,6 +492,8 @@ class SettingsDialog(GlassDialog):
         for i, text in enumerate((tr("narrset.style_auto"), tr("narrset.style_scripture"), tr("narrset.style_fiction"),
                                   tr("narrset.style_dialogue"))):
             self.cmb_style.setItemText(i, text)              # same order as pace.STYLES
+        self.chk_ordinals.setText(tr("narrset.ordinals"))
+        self.chk_ordinals.setToolTip(tr("narrset.ordinals_tip"))
         self.lbl_narr_hint.setText(tr("narrset.hint"))
         self.btn_narr_defaults.setText(tr("narrset.defaults"))
 
