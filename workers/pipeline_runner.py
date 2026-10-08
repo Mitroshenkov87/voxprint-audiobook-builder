@@ -253,6 +253,7 @@ def _denoise_inputs(req: TaskRequest, root: Path, progress: ProgressCallback, ca
         files = expand_inputs(req.audio_files)          # folders of clips -> the clips (each cleaned on its own)
     else:
         files = [req.audio]
+    log.info("noise clean-up requested: %d file(s) with %s", len(files), Path(tool).name)
     out, failed = [], 0
     for i, src in enumerate(files):
         cancel.check()

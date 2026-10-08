@@ -17,18 +17,10 @@ import sys
 
 
 def _setup_logging() -> None:
-    """Log to ``logs/voxprint.log`` (rotating); fall back to the console if the file cannot be opened."""
-    try:
-        from infra import paths
+    """Rotating ``logs/voxprint.log`` (5 MB x 6) with exception hooks (infra/diagnostics.py); the console if the file fails."""
+    from infra import diagnostics
 
-        h = logging.handlers.RotatingFileHandler(paths.logs_dir() / "voxprint.log", maxBytes=2_000_000,
-                                                 backupCount=3, encoding="utf-8")
-        logging.basicConfig(level=logging.INFO, handlers=[h],
-                            format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    except OSError:
-        logging.basicConfig(level=logging.INFO)
-    for handler in logging.getLogger().handlers:
-        handler.addFilter(_drop_sox_warning)
+    diagnostics.setup_logging(filters=(_drop_sox_warning,))
 
 
 def _drop_sox_warning(record: logging.LogRecord) -> bool:
@@ -267,6 +259,9 @@ def main(argv=None) -> int:
         user_cli_main = None  # type: ignore[assignment]
         is_user_cli = lambda _a: False  # noqa: E731
     if user_cli_main is not None and is_user_cli(argv):
+        from infra import diagnostics
+
+        diagnostics.log_startup(import_torch=False)       # quick: a headless command must not wait for PyTorch here
         return user_cli_main(argv[1:])
     if "--auto-repair" in argv:          # same job as Settings -> Auto-repair (infra/auto_repair.py)
         from infra import auto_repair
@@ -310,6 +305,13 @@ def main(argv=None) -> int:
     from ui.studio import StudioWindow
 
     app = QApplication.instance() or QApplication(argv)
+    import threading
+
+    from infra import diagnostics
+
+    diagnostics.install_qt_message_handler()
+    # system / GPU / settings block of the log; the GPU probe imports PyTorch, so it runs beside the UI
+    threading.Thread(target=diagnostics.log_startup, name="diag-startup", daemon=True).start()
     app.setApplicationName("Voxprint")
     app.setDesktopFileName("voxprint")      # Linux: ties the window to voxprint.desktop (icon / Wayland app-id); ignored elsewhere
     try:   # window / taskbar icon (the file ships in assets/, next to the other resources in a build)

@@ -161,8 +161,10 @@ def fetch_file(url: str, target: Path, meta: Dict[str, Any], on_bytes: Callable[
         raise ReleaseError(f"{target.name}: incomplete ({part.stat().st_size} of {size} bytes)")
     if sha256_file(part) != meta["sha256"]:
         part.unlink()
+        log.warning("%s from %s: SHA-256 mismatch, deleted", target.name, url.split("/")[2] if "//" in url else url)
         raise ReleaseError(f"{target.name}: SHA-256 mismatch with the manifest")
     os.replace(part, target)
+    log.info("%s (%d bytes) from %s: SHA-256 OK", target.name, size, url.split("/")[2] if "//" in url else url)
 
 
 def download(entry: ReleaseEntry, dest: Path, progress: Callable[[float], None] = lambda f: None,

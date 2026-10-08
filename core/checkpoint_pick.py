@@ -168,6 +168,8 @@ def run_pick(adapter_dir: Path, language: str, *, engine_factory: Callable[[Path
 def apply_pick(adapter_dir: Path, result: Dict[str, Any], delete_losers: bool = True) -> None:
     """Make the winner the voice's adapter, record the pick, and delete the other epoch checkpoints."""
     adapter_dir = Path(adapter_dir)
+    log.info("checkpoint pick: winner epoch %s strength %s; candidates %s", result.get("best_epoch"), result.get("best_scale"),
+             json.dumps(result.get("candidates", []), ensure_ascii=False, default=str))
     folders = dict(epoch_folders(adapter_dir))
     win = folders.get(int(result["best_epoch"]))
     if win is None:

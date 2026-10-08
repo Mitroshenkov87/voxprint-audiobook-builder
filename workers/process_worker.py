@@ -78,6 +78,8 @@ class ProcessWorker(QThread):
             log.exception("task failed")
             self.failed.emit(*classify_exception(exc))
             return
+        for w in getattr(result, "warnings", None) or []:      # every warning the user sees is in the log too
+            log.warning("task warning: %s", w)
         self.progress.emit(100, Stage.SAVE.label, tr("ui.ready"))
         self.done.emit(result)
 

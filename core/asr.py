@@ -13,6 +13,7 @@ import abc
 import logging
 import re
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
@@ -62,12 +63,17 @@ class Qwen3ASR(BaseASR):
         from core import model_cache
 
         cuda = torch.cuda.is_available() and self.device in ("auto", "cuda")
+        t0 = time.monotonic()
         pre = model_cache.take(model_cache.key("asr", self.model_path, cuda))      # "Preload models at startup"
         if pre is not None:
             self._m = model_cache.to_device(pre, "cuda:0") if cuda else pre
             return
         self._m = Qwen3ASRModel.from_pretrained(self.model_path, dtype=torch.bfloat16 if cuda else torch.float32,
                                                 device_map="cuda:0" if cuda else "cpu")
+        from infra.diagnostics import cuda_memory
+
+        log.info("ASR %s loaded on %s in %.1f s; %s", Path(self.model_path).name, "cuda" if cuda else "cpu",
+                 time.monotonic() - t0, cuda_memory())
 
     def unload(self) -> None:
         self._m = None

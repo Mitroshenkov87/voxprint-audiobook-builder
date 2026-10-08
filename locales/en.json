@@ -747,5 +747,9 @@
  "denoise.download_failed": "The noise clean-up could not be downloaded: {err}",
  "progress.denoise": "Cleaning up noise: {name}…",
  "warn.denoise_missing": "Noise clean-up was requested but is not downloaded; the original recording was used.",
- "warn.denoise_failed": "Noise clean-up failed for {n} file(s); the original audio was used for them."
+ "warn.denoise_failed": "Noise clean-up failed for {n} file(s); the original audio was used for them.",
+ "diag.button": "Save diagnostic report…",
+ "diag.tip": "Saves the program's log files, information about this computer (system, GPU, memory) and the settings as one zip file. Names of your files are cut to the file name; no recordings, books or voices are included. Attach the zip to a bug report.",
+ "diag.saved": "Diagnostic report saved:\n{path}",
+ "diag.failed": "The diagnostic report could not be saved: {err}"
 }

@@ -852,8 +852,12 @@ def _ensure_model(
             elif src == "ms" and errors:
                 log.warning("download of %s from Hugging Face failed - trying ModelScope", repo_id)
             log.info("downloading %s from %s", repo_id, label)
+            t_dl = time.monotonic()
             download_watch.run_watched(funcs[src], partial, meter, cur["cancel"], on_tick=tick, idle_ok=complete)
             ok_source = src
+            spent = time.monotonic() - t_dl
+            got = sum(f.stat().st_size for f in partial.rglob("*") if f.is_file())
+            log.info("%s from %s: %.0f MB in %.0f s (%.1f MB/s)", repo_id, label, got / 1e6, spent, got / 1e6 / max(spent, 0.1))
             if src == "hf" and mirror_ok:
                 modelscope_mirror.remember_hf(True)
             break
@@ -955,6 +959,8 @@ def _verify_or_repair(partial: Path, repo_id: str, revision: Optional[str], mirr
     if not bad:
         if bad is None:
             log.info("%s: no verified hashes for revision %s - structural check only", repo_id, (revision or "?")[:8])
+        else:
+            log.info("%s: every file matches its pinned size + SHA-256", repo_id)
         return
     log.warning("%s: %d file(s) failed the size / SHA-256 check after the download: %s", repo_id, len(bad), ", ".join(bad))
     for name in bad:

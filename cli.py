@@ -48,7 +48,7 @@ FORMAT_ALIASES = {
     "wav_chapters": ex.FORMAT_WAV_CHAPTERS,
 }
 
-USER_COMMANDS = frozenset({"narrate", "train", "voices"})
+USER_COMMANDS = frozenset({"narrate", "train", "voices", "diag"})
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -99,6 +99,11 @@ def build_parser() -> argparse.ArgumentParser:
     ve.add_argument("voice", metavar="VOICE", help="Voice id or display name (example: [model_voice])")
     ve.add_argument("--out", required=True, type=Path, metavar="ZIP", help="Destination .zip path")
     ve.set_defaults(_handler="voices_export")
+
+    d = sub.add_parser("diag", help="Save a diagnostic report (logs + system information) as a zip")
+    d.add_argument("--out", type=Path, default=None, metavar="ZIP",
+                   help="Destination .zip (default: voxprint-diagnostics-<date>.zip in the current folder)")
+    d.set_defaults(_handler="diag")
 
     return ap
 
@@ -283,6 +288,22 @@ def cmd_voices_export(args: argparse.Namespace, *, library: Optional[VoiceLibrar
     return 0
 
 
+def cmd_diag(args) -> int:
+    """``diag``: zip the logs, system information and a settings snapshot (infra/diagnostics.py)."""
+    import time
+
+    from infra import diagnostics
+
+    out = args.out or Path.cwd() / time.strftime("voxprint-diagnostics-%Y%m%d-%H%M%S.zip")
+    try:
+        path = diagnostics.write_report(out)
+    except OSError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+    print(f"Diagnostic report: {path}")
+    return 0
+
+
 def main(argv: Optional[Sequence[str]] = None, *,
          run_narration_fn: Callable[..., object] = run_narration,
          run_task_fn: Callable[..., object] = run_task,
@@ -299,6 +320,8 @@ def main(argv: Optional[Sequence[str]] = None, *,
         return cmd_voices_list(args, library=library)
     if handler == "voices_export":
         return cmd_voices_export(args, library=library)
+    if handler == "diag":
+        return cmd_diag(args)
     ap.error(f"unknown command: {handler}")
     return 2
 

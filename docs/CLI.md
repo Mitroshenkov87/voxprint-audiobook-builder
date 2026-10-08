@@ -61,3 +61,13 @@ python main.py voices export VOICE --out ZIP
 ```
 python main.py voices export [model_voice] --out model_voice.zip
 ```
+
+## Diagnostic report
+
+```
+python main.py diag [--out ZIP]
+```
+
+Writes the log files, `system_info.json` and a settings snapshot (paths cut to names, secrets dropped) into one zip
+(default: `voxprint-diagnostics-<date>.zip` in the current folder). Same as Settings -> *Save diagnostic report...*.
+

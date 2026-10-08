@@ -999,6 +999,8 @@ class MainWindow(QWidget):
 
         self.noise_bak = bak
         show = denoise.should_suggest(bak)
+        if bak is not None:
+            log.info("recording background score (DNSMOS BAK) %.2f: clean-up %s", bak, "offered" if show else "not offered")
         if not show:
             self.chk_denoise.setChecked(False)
         else:

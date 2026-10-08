@@ -49,6 +49,7 @@ from core.teacher_forcing import build_assistant_text, build_teacher_forcing_inp
 from infra import model_downloader as md
 from infra.vram_optimizer import (LOSS_WARN_BELOW, TrainPlan, VramMonitor, detect_gpu, plan_training,
                                   reduce_after_oom)
+from infra import diagnostics as _diag
 
 log = logging.getLogger("voxprint.lora")
 
@@ -419,7 +420,8 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
                          tr("progress.training", epoch=epoch, epochs=plan.epochs, k=k, n=n, vram=vram))
         avg = acc_loss / max(1, count)
         epoch_losses.append(avg)
-        log.info("epoch %d/%d avg_loss=%.4f", epoch, plan.epochs, avg)
+        log.info("epoch %d/%d avg_loss=%.4f lr=%.3g %s", epoch, plan.epochs, avg, float(opt.param_groups[0]["lr"]),
+                 _diag.cuda_memory())
         if val_samples:
             val_losses.append(validation_loss(val_samples, hf_model, peft_talker, base_talker, device, plan.language, fix_sub))
             log.info("epoch %d/%d val_loss=%.4f", epoch, plan.epochs, val_losses[-1])
@@ -427,6 +429,8 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
         save_adapter_folder(peft_talker, output_dir / "checkpoints" / f"epoch_{epoch:02d}")
 
     progress(Stage.SAVE, 0.0, tr("progress.saving_adapter"))
+    log.info("training finished: %d samples, %d epochs, %.0f s, %s", n, plan.epochs, time.time() - started,
+             _diag.cuda_memory())
     final_loss = epoch_losses[-1]
     warnings.extend(loss_warnings(final_loss, epoch_losses[0]))
     meta = {

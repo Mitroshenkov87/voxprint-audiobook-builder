@@ -120,8 +120,10 @@ class SettingsDialog(QDialog):
         self.btn_repair = QPushButton()
         self.btn_about = QPushButton()
         self.btn_components = QPushButton()          # thin build only: the runtime modules (infra/modules.py)
-        for b in (self.btn_update, self.btn_models, self.btn_data, self.btn_components):
+        self.btn_diag = QPushButton()                # logs + system information as one zip (infra/diagnostics.py)
+        for b in (self.btn_update, self.btn_models, self.btn_data, self.btn_diag, self.btn_components):
             lay.addWidget(b)
+        self.btn_diag.clicked.connect(self.save_diagnostics)
         self.btn_components.setVisible(runtime_modules.is_thin())
         self.btn_components.clicked.connect(self.open_components)
 
@@ -228,6 +230,8 @@ class SettingsDialog(QDialog):
         self.btn_components.setText(tr("modules.title"))
         self.btn_models.setText(tr("ui.settings_models_folder"))
         self.btn_data.setText(tr("ui.settings_data_folder"))
+        self.btn_diag.setText(tr("diag.button"))
+        self.btn_diag.setToolTip(tr("diag.tip"))
         self.btn_repair.setText(tr("ui.settings_repair"))
         self.btn_repair.setToolTip(tr("ui.settings_repair_tip"))
         self.btn_autorepair.setText(tr("autorepair.stop") if self.autorepair_running else tr("autorepair.button"))
@@ -429,6 +433,28 @@ class SettingsDialog(QDialog):
         self.refresh()
 
     # ------------------------------------------------------------------ backup / restore
+    def _default_pick_save(self, title: str, name: str) -> str:
+        """Save-as chooser for the diagnostic report (replaced in tests)."""
+        return QFileDialog.getSaveFileName(self, title, str(Path.home() / name), "Zip (*.zip)")[0]
+
+    def save_diagnostics(self) -> Optional[Path]:
+        """Settings -> *Save diagnostic report...*: zip the logs, system information and settings to a chosen file."""
+        import time
+
+        from infra import diagnostics
+
+        name = time.strftime("voxprint-diagnostics-%Y%m%d-%H%M%S.zip")
+        target = (getattr(self, "pick_save", None) or self._default_pick_save)(tr("diag.button"), name)
+        if not target:
+            return None
+        try:
+            path = diagnostics.write_report(Path(target))
+        except OSError as exc:
+            self.notify(tr("diag.button"), tr("diag.failed", err=str(exc)))
+            return None
+        self.notify(tr("diag.button"), tr("diag.saved", path=str(path)))
+        return path
+
     def _default_pick_folder(self, title: str) -> str:
         """Folder chooser (replaced in tests)."""
         return QFileDialog.getExistingDirectory(self, title)

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Sequence
 
@@ -134,6 +135,7 @@ class Qwen3AdapterEngine:
         torch.set_num_threads(cpu_budget.plan(use_cuda).torch_threads)
         self._q = None
         self.attn = ""
+        _t_load = time.monotonic()
         # "Preload models at startup" (infra/preload.py) may hold this base model in RAM already: take it over instead of
         # reading it from disk again (it was loaded on the CPU in the right dtype; only the move to the GPU is left).
         pre = model_cache.take(model_cache.key("tts", base_dir, use_cuda)) if attn == "auto" else None
@@ -160,6 +162,10 @@ class Qwen3AdapterEngine:
                 self._q = None
         if self._q is None:
             raise NarrationError(tr("err.voice_invalid"), details="the model could not be loaded")
+        from infra.diagnostics import cuda_memory
+
+        log.info("TTS model %s loaded on %s (%s) in %.1f s; %s", Path(base_dir).name, "cuda" if use_cuda else "cpu", self.attn,
+                 time.monotonic() - _t_load, cuda_memory())
         peft_talker = PeftModel.from_pretrained(self._q.model.talker, str(voice.path))
         if not adapter_strength.is_full(self.adapter_scale):       # 1.0 = as loaded; older voices take exactly the old path
             adapter_strength.apply(peft_talker, self.adapter_scale)  # before the merge: the merged delta carries the scale

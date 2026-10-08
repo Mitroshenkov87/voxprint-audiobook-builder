@@ -326,6 +326,8 @@ class DatasetBuilder:
                     dropped_clips.append({"start": round(sg.start, 3), "end": round(sg.end, 3), "text": sg.text,
                                           "heard": heard, "cer": round(c, 3) if c is not None else None})
             clip_summary["dropped_clips"] = dropped_clips
+            log.info("clip check (CER > %.0f %%): %d of %d dropped, %d doubtful kept, %d failed", cfg.clip_max_cer * 100,
+                     crep.dropped, len(segments), crep.kept_over, crep.failed)
             if crep.dropped:
                 warnings.append(tr("warn.clip_check_dropped", n=crep.dropped, total=len(segments),
                                    cer=int(round(cfg.clip_max_cer * 100))))

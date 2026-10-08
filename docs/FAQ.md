@@ -44,3 +44,12 @@ Choose manually in *Settings -> Network interface* (Automatic / System default o
 
 ## Where do I find the manual?
 PDF manuals in English, Russian and German are in [`manual/`](manual/); recording scripts in [`recording-scripts/`](recording-scripts/).
+
+## Something went wrong. How do I send a diagnostic report?
+Open **Settings** (gear button) -> **Save diagnostic report...** and choose where to save the zip (headless: `voxprint diag --out report.zip`,
+or `python main.py diag`). It contains the program's log files (`logs/` in the data folder, `%LOCALAPPDATA%\Voxprint\logs` on
+Windows; the main log `voxprint.log` rotates at 5 MB and keeps 6 files, about 30 MB at most), `system_info.json` (version, OS,
+Python, CPU, RAM, GPU, driver, CUDA, VRAM) and `settings.json` (the settings, with paths cut to the last folder or file name and
+anything that looks like a token or password left out). No recordings, books or voices are included. Attach the zip to a
+[GitHub issue](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/issues) and describe what you did.
+

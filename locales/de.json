@@ -747,5 +747,9 @@
  "denoise.download_failed": "Die Rauschunterdrückung konnte nicht heruntergeladen werden: {err}",
  "progress.denoise": "Rauschen wird entfernt: {name}…",
  "warn.denoise_missing": "Rauschunterdrückung war gewählt, ist aber nicht heruntergeladen; die Originalaufnahme wurde verwendet.",
- "warn.denoise_failed": "Rauschunterdrückung für {n} Datei(en) fehlgeschlagen; dafür wurde der Originalton verwendet."
+ "warn.denoise_failed": "Rauschunterdrückung für {n} Datei(en) fehlgeschlagen; dafür wurde der Originalton verwendet.",
+ "diag.button": "Diagnosebericht speichern…",
+ "diag.tip": "Speichert die Protokolle des Programms, Angaben zu diesem Computer (System, Grafikkarte, Speicher) und die Einstellungen in einer Zip-Datei. Pfade Ihrer Dateien werden auf den Dateinamen gekürzt; Aufnahmen, Bücher und Stimmen sind nicht enthalten. Hängen Sie die Zip-Datei an einen Fehlerbericht an.",
+ "diag.saved": "Diagnosebericht gespeichert:\n{path}",
+ "diag.failed": "Der Diagnosebericht konnte nicht gespeichert werden: {err}"
 }

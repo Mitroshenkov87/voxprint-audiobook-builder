@@ -342,7 +342,11 @@ def default_run(cmd: List[str]) -> Tuple[int, str]:
 
 def _run_checked(run: Run, cmd: List[str], out: Path) -> None:
     """Run ffmpeg and raise :class:`NarrationError` (with the stderr tail as details) if it fails."""
+    import time
+
+    t0 = time.monotonic()
     rc, text = run(cmd)
+    log.info("encode %s: %.1f s (exit %s)", out.name, time.monotonic() - t0, rc)
     if rc != 0 or not out.exists():
         raise NarrationError(tr("err.narration_export", name=out.name), details=text[-1500:])
 

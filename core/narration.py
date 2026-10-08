@@ -569,6 +569,8 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
     player).  ``ffmpeg``/``run`` are injectable for tests.  ``checker``: the per-chunk check (:mod:`core.chunk_check`), or None.
     """
     options = options or NarrationOptions()
+    t_job = time.monotonic()
+    stage_s: Dict[str, float] = {}
     progress = progress or (lambda p: None)
     cancel = cancel or CancelToken()
     pause = pause or PauseToken()
@@ -639,13 +641,16 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
                                    on_saved=chapters_pipe.chunk_saved, engine_future=handed_over,
                                    background_check=chapters_pipe.check, checker=checker)
 
+        stage_s["synthesis"] = time.monotonic() - t_job
         total = len(chunk_list)
         cancel.check()
         progress(NarrationProgress(total, total, 0.0, tr("narr.assembling"), "assemble"))
         chapter_audio = chapters_pipe.finish()
+        stage_s["assembly_wait"] = time.monotonic() - t_job - stage_s["synthesis"]
         cancel.check()
         result = exporter.finish(
             chapter_audio, progress=lambda f, m: progress(NarrationProgress(total, total, 0.0, tr("narr.exporting"), "export")))
+        stage_s["export_wait"] = time.monotonic() - t_job - stage_s["synthesis"] - stage_s["assembly_wait"]
     finally:
         # On an error or cancel: queued background jobs are dropped, running ones (a chapter, one ffmpeg) end first
         pool.shutdown(wait=True, cancel_futures=True)
@@ -657,6 +662,9 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
     if not options.keep_cache:
         cache.clear()
     progress(NarrationProgress(total, total, 0.0, tr("narr.done"), "done"))
+    log.info("narration done: %d chunks (%d cached), %d chapters, %.0f s of audio, %.0f s total, stages %s, chunk check %s",
+             total, counts["cached"], len(chapter_audio), sum(c.duration for c in chapter_audio), time.monotonic() - t_job,
+             {k: round(v, 1) for k, v in stage_s.items()}, checker.stats if checker is not None else "off")
     return NarrationResult(job_dir, result.files, len(chapter_audio), total, counts["cached"],
                            sum(c.duration for c in chapter_audio),
                            chunk_check=dict(checker.stats) if checker is not None else None)
