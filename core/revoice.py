@@ -1,0 +1,78 @@
+"""Re-voice: turn recorded or imported speech into editable text, then narrate it with one of your voices (Qt-free part).
+
+Phase 1 reuses what the app already has: the audio is decoded by ffmpeg (:func:`core.audio_utils.load_audio`: MP3, WAV, M4B,
+M4A, FLAC, Opus ...), cut at pauses into pieces the recogniser handles well (:func:`core.asr.split_at_pauses`), recognised by
+the installed Qwen3-ASR model, and written as a plain-text book: one chapter per file (``# <file name>`` headings, which
+:mod:`core.book_parsers` reads as chapters).  The user edits that text before it goes to the normal "Narrate a book" flow.
+"""
+from __future__ import annotations
+
+import logging
+import re
+from pathlib import Path
+from typing import Callable, List, Optional, Sequence, Tuple
+
+from core import asr as asr_mod
+from core import audio_utils as au
+from core.events import CancelToken
+
+log = logging.getLogger("voxprint.revoice")
+
+#: Pieces of at most this length go to the recogniser (Qwen3-ASR is reliable well past this; pauses keep words whole).
+PIECE_S = 25.0
+#: Audio files offered by the import dialog.
+AUDIO_EXTENSIONS = (".mp3", ".wav", ".m4b", ".m4a", ".flac", ".ogg", ".opus", ".aac")
+
+
+def chapter_title(path: Path) -> str:
+    """``01 - The beginning.mp3`` -> ``The beginning`` (leading track numbers dropped, the stem otherwise kept)."""
+    t = re.sub(r"^\s*\d+\s*[-._ )]\s*", "", Path(path).stem).replace("_", " ").strip()
+    return t or Path(path).stem
+
+
+def transcribe_file(path: Path, asr: asr_mod.BaseASR, language: Optional[str] = None,
+                    progress: Optional[Callable[[float], None]] = None, cancel: Optional[CancelToken] = None) -> str:
+    """The recognised text of one audio file (the pieces joined with spaces; narration pauses come from the punctuation)."""
+    cancel = cancel or CancelToken()
+    x, sr = au.load_audio(path, asr_mod.ASR_SR)
+    pieces = asr_mod.split_at_pauses(x, sr, max_s=PIECE_S)
+    texts: List[str] = []
+    for i, (a, b) in enumerate(pieces):
+        cancel.check()
+        if au.voiced_seconds(x[a:b], sr) >= 0.3:                # silence only: nothing to recognise
+            t = asr.transcribe(x[a:b], sr, language).text.strip()
+            if t:
+                texts.append(t)
+        if progress is not None:
+            progress((i + 1) / len(pieces))
+    return " ".join(texts)
+
+
+def transcribe_files(files: Sequence[Path], asr: asr_mod.BaseASR, language: Optional[str] = None,
+                     progress: Optional[Callable[[float, str], None]] = None,
+                     cancel: Optional[CancelToken] = None) -> List[Tuple[str, str]]:
+    """``[(chapter title, text)]``, one entry per file in the given order."""
+    out: List[Tuple[str, str]] = []
+    n = max(1, len(files))
+    for k, f in enumerate(files):
+        title = chapter_title(Path(f))
+        text = transcribe_file(Path(f), asr, language,
+                               (lambda fr, k=k, title=title: progress((k + fr) / n, title)) if progress else None, cancel)
+        log.info("re-voice: %s -> %d characters", Path(f).name, len(text))
+        out.append((title, text))
+    return out
+
+
+def to_text(chapters: Sequence[Tuple[str, str]]) -> str:
+    """The editable text: ``# title`` then the chapter text, chapters separated by a blank line."""
+    return "\n\n".join(f"# {t}\n\n{body.strip()}" for t, body in chapters) + "\n"
+
+
+def save_text(text: str, folder: Path, name: str) -> Path:
+    """Write the (edited) text as ``<folder>/<name>.txt`` for the narrator; returns the path."""
+    from core.audiobook_export import safe_filename
+
+    folder.mkdir(parents=True, exist_ok=True)
+    p = folder / f"{safe_filename(name, 80, fallback='re-voice')}.txt"
+    p.write_text(text, encoding="utf-8")
+    return p

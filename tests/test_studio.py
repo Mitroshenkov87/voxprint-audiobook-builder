@@ -93,8 +93,9 @@ def make_studio(lib, **kw):
                             aac_allowed=kw.pop("aac_allowed", True), auto_open_folder=False,
                             model_state=kw.pop("model_state", lambda m: "needs_download"),
                             model_ensure=kw.pop("model_ensure", lambda m, progress: None),
-                            plan_builder=kw.pop("plan_builder", text_models.build_plan))
-    return StudioWindow(library=lib, trainer=trainer, voices=voices, narrate=narrate)
+                            plan_builder=kw.pop("plan_builder", text_models.build_plan),
+                            llm_status=kw.pop("llm_status", lambda: "needs_download"))
+    return StudioWindow(library=lib, trainer=trainer, voices=voices, narrate=narrate, revoice=kw.pop("revoice", None))
 
 
 # ----------------------------------------------------------------------------- Studio

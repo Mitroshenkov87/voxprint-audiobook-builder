@@ -3,10 +3,11 @@
 * **Narrate a book** (primary) -> :class:`ui.narrate_window.NarrateWindow`
 * **Train your voice**         -> the training window (:class:`ui.main_window.MainWindow`, unchanged workflow)
 * **My voices**                -> :class:`ui.voices_window.VoicesWindow`
+* **Re-voice**                 -> :class:`ui.revoice_window.RevoiceWindow` (speech -> text -> narrated with a chosen voice)
 * the gear (top right) opens the Settings dialog: language, updates, model/data folders, repair, About.
 
 The Studio owns the other windows and shows exactly one at a time.  A window asks for navigation with its ``go`` signal
-(``"studio" | "train" | "voices" | "narrate"``); background jobs keep running while another window is shown (the Studio
+(``"studio" | "train" | "voices" | "narrate" | "revoice"``); background jobs keep running while another window is shown (the Studio
 cards show "training in progress" / "narration in progress").  Closing any window ends the application, after cancelling
 running jobs (:meth:`StudioWindow.shutdown`).
 
@@ -29,11 +30,12 @@ from core.voice_library import VoiceLibrary
 from infra import hard_exit, preload
 from ui.main_window import APP_TITLE, MainWindow
 from ui.narrate_window import NarrateWindow
+from ui.revoice_window import RevoiceWindow
 from ui.settings_dialog import SettingsDialog
 from ui.voices_window import VoicesWindow
 from ui.window_base import SubWindow, fit_to_screen
 
-PAGES = ("studio", "train", "voices", "narrate")
+PAGES = ("studio", "train", "voices", "narrate", "revoice")
 
 
 class ActionCard(QPushButton):
@@ -76,7 +78,7 @@ class StudioWindow(SubWindow):
 
     def __init__(self, library: Optional[VoiceLibrary] = None, trainer: Optional[MainWindow] = None,
                  voices: Optional[VoicesWindow] = None, narrate: Optional[NarrateWindow] = None,
-                 **trainer_kwargs: Any) -> None:
+                 revoice: Optional[RevoiceWindow] = None, **trainer_kwargs: Any) -> None:
         """Create the Studio and its sub-windows.  ``trainer_kwargs`` go to :class:`MainWindow` (autocheck, prefetch ...)."""
         super().__init__(with_back=False, with_gear=True)
         self.library = library or VoiceLibrary()
@@ -84,8 +86,9 @@ class StudioWindow(SubWindow):
         self.trainer.library = self.library      # the Train window confirms the voice-owner consent in the same library
         self.voices_window = voices or VoicesWindow(self.library)
         self.narrate_window = narrate or NarrateWindow(self.library)
+        self.revoice_window = revoice or RevoiceWindow()
         self.pages: Dict[str, QWidget] = {"studio": self, "train": self.trainer, "voices": self.voices_window,
-                                          "narrate": self.narrate_window}
+                                          "narrate": self.narrate_window, "revoice": self.revoice_window}
         self.current_page = "studio"
         self._settings: Optional[SettingsDialog] = None
         self._about = None
@@ -113,7 +116,8 @@ class StudioWindow(SubWindow):
         self.card_narrate = ActionCard(primary=True)
         self.card_train = ActionCard()
         self.card_voices = ActionCard()
-        for c in (self.card_narrate, self.card_train, self.card_voices):
+        self.card_revoice = ActionCard()
+        for c in (self.card_narrate, self.card_train, self.card_voices, self.card_revoice):
             self.body.addWidget(c)
         self.lbl_status = QLabel()
         self.lbl_status.setObjectName("status")
@@ -134,6 +138,8 @@ class StudioWindow(SubWindow):
         self.card_narrate.clicked.connect(lambda: self.navigate("narrate"))
         self.card_train.clicked.connect(lambda: self.navigate("train"))
         self.card_voices.clicked.connect(lambda: self.navigate("voices"))
+        self.card_revoice.clicked.connect(lambda: self.navigate("revoice"))
+        self.revoice_window.narrate_file.connect(self.narrate_file)
         assert self.btn_gear is not None
         self.btn_gear.clicked.connect(self.open_settings)
         for name, w in self.pages.items():
@@ -189,6 +195,7 @@ class StudioWindow(SubWindow):
                                   tr("studio.train_running") if training else "")
         self.card_voices.set_texts(tr("studio.voices_title"), tr("studio.voices_desc"),
                                    tr("studio.voices_count", n=n) if n else "")
+        self.card_revoice.set_texts(tr("studio.revoice_title"), tr("studio.revoice_desc"))
         self.progress.setVisible(self.progress.value() > 0 and (training or self.trainer.updating
                                                                  or self.trainer.repairing))
         self.preloader.tick(busy=self.busy or self.trainer.updating or self.trainer.repairing)
@@ -205,7 +212,7 @@ class StudioWindow(SubWindow):
     @property
     def busy(self) -> bool:
         """True while a training run / download or a narration job runs."""
-        return bool(self.trainer.busy or self.narrate_window.busy)
+        return bool(self.trainer.busy or self.narrate_window.busy or self.revoice_window.busy)
 
     def _mirror_status(self, text: str) -> None:
         """Show the training window's status line (updates, repair, first-run download) on the home screen."""
@@ -247,6 +254,11 @@ class StudioWindow(SubWindow):
         """"Narrate with this voice" on a voice card: open the narrator with that voice selected."""
         self.navigate("narrate")
         self.narrate_window.select_voice(voice_id)
+
+    def narrate_file(self, path: str) -> None:
+        """Re-voice handed over its edited text: open the narrator with it loaded."""
+        self.navigate("narrate")
+        self.narrate_window.load_book_file(Path(path))
 
     def show_studio(self) -> None:
         """Show the home window (application start)."""
@@ -336,8 +348,9 @@ class StudioWindow(SubWindow):
         self.preloader.free("exit")
         self.narrate_window.shutdown()
         self.voices_window.shutdown()
+        self.revoice_window.shutdown()
         self.trainer.close()
-        for w in (self.voices_window, self.narrate_window):
+        for w in (self.voices_window, self.narrate_window, self.revoice_window):
             w.hide()
 
     def _on_child_closed(self) -> None:
