@@ -1,17 +1,17 @@
 # Downloads and verification
 
-The current pre-release is **[v0.1.2-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.2-beta)** (build 666 "Zahav", marked *pre-release*). Planned installer channels are listed in the [Roadmap](ROADMAP.md).
+The current pre-release is **[v0.1.3-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.3-beta)** (build 667 "Menuchah", marked *pre-release*). Planned installer channels are listed in the [Roadmap](ROADMAP.md).
 
-**Right now only the small online installer is offered** (`Voxprint-Setup-online.exe`, 35,227,403 bytes). A full offline installer may return later. The Linux version is temporarily unavailable (see the end).
+**Right now only the small online installer is offered** (`Voxprint-Setup-online.exe`, 35,235,971 bytes). A full offline installer may return later. The Linux version is temporarily unavailable (see the end).
 
-## Current download: SHA-256 (v0.1.2-beta, build 666 "Zahav", 2026-10-08)
+## Current download: SHA-256 (v0.1.3-beta, build 667 "Menuchah", 2026-10-08)
 
 | File | SHA-256 |
 |---|---|
-| `Voxprint-Setup-online.exe` (recommended, about 34 MB; 35,227,403 bytes; v0.1.2-beta build 666, version info 0.1.2.666, same file as `Voxprint-Setup-online-0.1.2-build666.exe`) | `f31c670dae0688f09358792c8ff4f05e6504112d0616bd4d91176b59214244c0` |
-| `Voxprint-shell-01.zip` (our program shell, 78,616,151 bytes; fetched by the installer) | `ded40cb58cd60e0995fb39c3ad9d192cf9d1963133ed68476400cdf1a850c7a5` |
-| `manifest-thin-beta.json` (the list of everything the installer downloads, 40,907 bytes) | `99345ebafa0b1fddf1b3945e607004af7b4567eddf1adb480402158d3b428de4` |
-| `docopt-0.6.2-...whl`, `eng_to_ipa-0.0.2-...whl`, `sox-1.5.0-...whl` (tiny pure-Python packages that have no wheel upstream; built in CI) | `db9e0098...adc3`, `85dfeff2...2a08`, `90937d00...af81c` |
+| `Voxprint-Setup-online.exe` (recommended, about 34 MB; 35,235,971 bytes; v0.1.3-beta build 667, version info 0.1.3.667, same file as `Voxprint-Setup-online-0.1.3-build667.exe`) | `c145a9fc84c736d655fbbe9bfd5c1cc94794b1be7fb8e9a5eec293e6f1578e42` |
+| `Voxprint-shell-01.zip` (our program shell, 78,665,942 bytes; fetched by the installer) | `a889eba72f037a779e5cc4eac37885162f99d46123744ef8c4fc5ce20da51b97` |
+| `manifest-thin-beta.json` (the list of everything the installer downloads, 40,910 bytes) | `d05132e1f9ab9d1b7459635e54db4a015fccfee79a2df7133bc7527c4c35baa0` |
+| `docopt-0.6.2-...whl`, `eng_to_ipa-0.0.2-...whl`, `sox-1.5.0-...whl` (tiny pure-Python packages that have no wheel upstream; built in CI) | `e9023069...f8948`, `2c0b45d9...5c41`, `18b5ef2d...420b` |
 
 The installer downloads the PyTorch libraries from **download.pytorch.org**, the other ~70 Python libraries from **PyPI**, the Visual C++ runtime from **Microsoft** (skipped if already present) and ffmpeg from its official build host - each file is verified against a SHA-256 pinned in the manifest. Only our own small files come from this release. Details: [THIN-INSTALLER.md](THIN-INSTALLER.md). You only need to check the `.exe` you start. If the numbers here and in the release differ, the release (its `.sha256` file and the digest shown by GitHub) is authoritative and this page is out of date - please open an issue.
 

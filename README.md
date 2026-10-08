@@ -33,9 +33,9 @@ More: [all features and screenshots](docs/FEATURES.md) · [how it works](docs/HO
 ## Download
 | Build | File | Size |
 |---|---|---|
-| **Online installer (Windows 11 x64, NVIDIA GPU)** | [`Voxprint-Setup-online.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.1.2-beta/Voxprint-Setup-online.exe) | 35,227,403 bytes (about 34 MB, build 666 "Zahav"; downloads the libraries from PyTorch/PyPI during setup) |
+| **Online installer (Windows 11 x64, NVIDIA GPU)** | [`Voxprint-Setup-online.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.1.3-beta/Voxprint-Setup-online.exe) | 35,235,971 bytes (about 34 MB, build 667 "Menuchah"; downloads the libraries from PyTorch/PyPI during setup) |
 
-SHA-256: `f31c670dae0688f09358792c8ff4f05e6504112d0616bd4d91176b59214244c0` - release page: [v0.1.2-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.2-beta) (pre-release). The installer is **not code-signed**: Windows SmartScreen will warn - choose *More info -> Run anyway* only after the SHA-256 matches ([how to check](docs/DOWNLOADS.md)). Setup type **Full** (default) downloads all models (about 28 GB with the components) on the first start; **Quick** installs only the program and offers the same download in the Components window.
+SHA-256: `c145a9fc84c736d655fbbe9bfd5c1cc94794b1be7fb8e9a5eec293e6f1578e42` - release page: [v0.1.3-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.3-beta) (pre-release). The installer is **not code-signed**: Windows SmartScreen will warn - choose *More info -> Run anyway* only after the SHA-256 matches ([how to check](docs/DOWNLOADS.md)). Setup type **Full** (default) downloads all models (about 28 GB with the components) on the first start; **Quick** installs only the program and offers the same download in the Components window.
 A full offline installer may return later; the Linux version is temporarily unavailable.
 
 ## Quick start
