@@ -41,7 +41,7 @@ def sha256_of(path: Path) -> str:
 
 def _fetch(url: str, dest: Path) -> None:
     req = urllib.request.Request(url, headers={"User-Agent": "voxprint-build/1"})
-    with urllib.request.urlopen(req, timeout=120) as r, open(dest, "wb") as f:
+    with urllib.request.urlopen(req, timeout=120) as r, open(dest, "wb") as f:  # nosec B310 - dev tool, https URLs from our own lists
         while True:
             b = r.read(1 << 20)
             if not b:

@@ -114,7 +114,7 @@ def build_modules(site: Path, out: Path, base_url: str, limit_mib: int = 1800) -
             nonlocal cur, cur_path, raw, markers
             if cur is not None and cur_path is not None:
                 cur.close()
-                parts.append({"path": cur_path, "raw": raw, "markers": markers})
+                parts.append({"path": cur_path, "raw": raw, "markers": markers})  # noqa: B023 - called in-loop
             cur, cur_path, raw, markers = None, None, 0, []
 
         for rel in files:

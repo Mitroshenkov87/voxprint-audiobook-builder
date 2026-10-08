@@ -38,3 +38,5 @@ six               # needed by nagisa/qwen-asr (without it the PyInstaller build 
 nagisa            # soynlp (GPLv3) is deliberately NOT installed: qwen-asr imports it lazily, for Korean only
 sox
 qwen-omni-utils
+# build/packaging tool pulled in by PyTorch: at least the release with the PackageIndex path-traversal fix (PYSEC-2025-49)
+setuptools>=78.1.1

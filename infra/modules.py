@@ -341,7 +341,8 @@ def install(module_ids: Optional[List[str]] = None, progress: Optional[Progress]
         # a setup folder (installer option "Keep a portable setup folder") is used first: valid files there need no download,
         # newly downloaded ones are kept in it; without internet its own manifest is used
         n, used = of.run_channel(src, latest, runtime_dir(), cache_dir(), st, "latest" if prefer_latest() else "pinned",
-                                 modules=[m.id for m in chosen], portable=setup_folder(), flavor=flavor_for(man) or "auto")
+                                 modules=[m.id for m in chosen], portable=setup_folder(), flavor=flavor_for(man) or "auto",
+                                 prune=True)
     except of.FetchError as exc:
         if st.was_cancelled:
             raise Cancelled("cancelled") from exc

@@ -62,7 +62,7 @@ def _selftest_imports(argv=()) -> int:
                  "from qwen_asr import Qwen3ASRModel", "from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForceAlignProcessor", "from qwen_tts import Qwen3TTSModel", "import requests.compat"):
         t = time.time()
         try:
-            exec(stmt, {})
+            exec(stmt, {})  # nosec B102 - constant import statements of the self-test above
             lines.append(f"OK    {stmt} ({time.time() - t:.1f}s)")
         except Exception as exc:  # noqa: BLE001
             bad += 1

@@ -262,7 +262,7 @@ def test_update_success_swaps_and_reports(tmp_path):
     assert (paths.packages_dir() / "qwen_asr" / "NEW").exists()
     assert (paths.packages_dir() / "old_pkg" / "f").exists()  # earlier updates are preserved
     assert list(paths.app_home().glob("packages.bak-*"))
-    assert "0.0.6 → 0.0.7" in res.summary_ru()
+    assert "0.0.6 → 0.0.7" in res.summary()
     assert "--no-deps" in log["pip"][0] and "qwen-asr==0.0.7" in log["pip"][0]
     assert not list(paths.staging_dir().glob("pkgs-*"))
     text = (paths.logs_dir() / "updater.log").read_text(encoding="utf-8")
@@ -319,7 +319,7 @@ def test_update_rolls_back_on_failed_compat(tmp_path):
     assert res.rolled_back and not res.needs_restart and res.after == {}
     assert (paths.packages_dir() / "old_pkg").exists() and not (paths.packages_dir() / "qwen_asr").exists()
     assert not list(paths.staging_dir().glob("pkgs-*"))
-    assert "прежняя" in res.summary_ru() or "прежн" in res.summary_ru()
+    assert "прежняя" in res.summary() or "прежн" in res.summary()
 
 
 def test_update_pip_failure(tmp_path):
@@ -371,7 +371,7 @@ def test_offline_check_and_apply(tmp_path):
         raise OSError("offline")
     u = Updater(fetch_json=fetch, python_exe="python", installed_fn=lambda n: "1", packages={"a": ""}, models=())
     rep, res = u.check_and_apply()
-    assert not rep.network_ok and "интернет" in res.summary_ru()
+    assert not rep.network_ok and "интернет" in res.summary()
     assert u.should_autocheck()  # a failed check does not reset the timer
 
 

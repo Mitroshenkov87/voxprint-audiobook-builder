@@ -76,7 +76,7 @@ SOURCES = {
 def get(url: str) -> str | None:
     """GET a URL and return the decoded text, or None on any network error."""
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "voxprint"}), timeout=30) as r:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "voxprint"}), timeout=30) as r:  # nosec B310 - dev tool, https URLs from our own lists
             return r.read().decode("utf-8", "replace")
     except (urllib.error.URLError, OSError):
         return None

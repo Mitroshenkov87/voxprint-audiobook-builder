@@ -168,9 +168,9 @@ def download(entry: MirrorEntry, dest: Path, progress: Callable[[float], None] =
                 size = int(meta["size"])
                 base = done
 
-                def on_bytes(n: int, _b=[0]) -> None:  # noqa: B006
+                def on_bytes(n: int, _b=[0]) -> None:  # noqa: B006 - per-file counter
                     _b[0] += n
-                    progress(min(1.0, (base + _b[0]) / total))
+                    progress(min(1.0, (base + _b[0]) / total))  # noqa: B023 - called within this iteration
 
                 if fetch is _default_fetch or fetch is None:
                     _default_fetch(entry.mirror_repo, name, entry.mirror_revision, dest,

@@ -296,7 +296,7 @@ def _score_alignment(words: Sequence[WordTiming], chunk: np.ndarray, sr: int) ->
     return float(score)
 
 
-def _pick_cut(audio: np.ndarray, sr: int, start_s: float, lo_s: float, hi_s: float) -> float:
+def _pick_cut(audio: np.ndarray, sr: int, lo_s: float, hi_s: float) -> float:
     """Pick a cut point inside ``[lo_s, hi_s]`` (absolute seconds): the centre of the longest pause (or the quietest frame)."""
     s0, s1 = int(lo_s * sr), int(hi_s * sr)
     seg = audio[s0:s1]
@@ -364,7 +364,7 @@ def align_long(
             words_all.extend(ws)
             break
 
-        cut = _pick_cut(audio, sr, t0, t0 + 0.6 * max_chunk_sec, t0 + max_chunk_sec)
+        cut = _pick_cut(audio, sr, t0 + 0.6 * max_chunk_sec, t0 + max_chunk_sec)
         chunk = audio[int(t0 * sr): int(cut * sr)]
         voiced_chunk = au.voiced_seconds(chunk, sr)
         voiced_rest = max(1e-6, au.voiced_seconds(audio[int(t0 * sr):], sr))

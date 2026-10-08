@@ -64,7 +64,7 @@ def _safe_xml(data: bytes) -> ET.Element:
     if re.search(rb"<!ENTITY", data[:200_000], re.IGNORECASE):
         raise BookParseError(tr("err.book_unsafe"))
     try:
-        return ET.fromstring(data)
+        return ET.fromstring(data)  # nosec B314 - entity declarations rejected above; expat does not fetch external DTDs
     except ET.ParseError as exc:
         raise BookParseError(tr("err.book_read"), details=str(exc)) from exc
 
@@ -286,7 +286,7 @@ class _HtmlText(HTMLParser):
         self._in_heading = False
         self._heading_buf: List[str] = []
 
-    def handle_starttag(self, tag: str, attrs) -> None:  # noqa: D401
+    def handle_starttag(self, tag: str, _attrs) -> None:  # noqa: D401
         """Track skipped regions, headings and paragraph breaks."""
         if tag in self.SKIP:
             self._skip += 1

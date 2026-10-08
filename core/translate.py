@@ -452,8 +452,8 @@ class MarianEngine:
 
         self._torch = torch
         dev = self.device
-        self._tok = MarianTokenizer.from_pretrained(str(self.dir))
-        model = MarianMTModel.from_pretrained(str(self.dir)).eval()
+        self._tok = MarianTokenizer.from_pretrained(str(self.dir))  # nosec B615 - local, hash-verified folder
+        model = MarianMTModel.from_pretrained(str(self.dir)).eval()  # nosec B615
         if dev == "cuda":
             model = model.half()
         self._model = model.to(dev)

@@ -72,7 +72,7 @@ def fetch_file(src: str, rev: str, rel: str, meta: dict, dest: Path) -> None:
         have = 0
     if have < int(meta["size"]):
         req = urllib.request.Request(url, headers={"User-Agent": "voxprint-release-tool", **({"Range": f"bytes={have}-"} if have else {})})
-        with urllib.request.urlopen(req, timeout=60) as r, open(part, "ab" if have and r.status == 206 else "wb") as f:
+        with urllib.request.urlopen(req, timeout=60) as r, open(part, "ab" if have and r.status == 206 else "wb") as f:  # nosec B310 - dev tool, https URLs from our own lists
             shutil.copyfileobj(r, f, 1 << 20)
     if model_release.sha256_file(part) != meta["sha256"]:
         part.unlink()

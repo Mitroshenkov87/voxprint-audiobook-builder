@@ -327,9 +327,9 @@ def download_listed(files: Dict[str, int], dest: Path, url_for: Callable[[str], 
         lock = threading.Lock()
 
         def on_bytes(n: int, _b=[0]) -> None:  # noqa: B006 - per-file counter
-            with lock:
+            with lock:  # noqa: B023 - called within this iteration
                 _b[0] += n
-                progress(min(1.0, (base + _b[0]) / total))
+                progress(min(1.0, (base + _b[0]) / total))  # noqa: B023
 
         download_file(url_for(name), target, size, opener=opener, on_bytes=on_bytes,
                       cancel=cancel, timeout=timeout)

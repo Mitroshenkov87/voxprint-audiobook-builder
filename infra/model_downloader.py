@@ -361,7 +361,7 @@ def partial_is_complete(partial: Path, repo_id: str, revision: Optional[str], mi
                 return False
         except OSError:
             return False
-    for root, _dirs, files in os.walk(partial):
+    for _root, _dirs, files in os.walk(partial):
         if any(f.endswith(".incomplete") for f in files):
             return False
     return True
@@ -715,9 +715,9 @@ def _ensure_model(
         if allow_patterns:
             kwargs["allow_patterns"] = list(allow_patterns)
         try:
-            sd(tqdm_class=tracker.make_tqdm_class(), **kwargs)
+            sd(tqdm_class=tracker.make_tqdm_class(), **kwargs)  # nosec B615 - pinned revision when known; files verified after
         except TypeError:
-            sd(**kwargs)
+            sd(**kwargs)  # nosec B615
 
     def _from_hf() -> None:
         """Download from Hugging Face; fall back once to the latest revision if the pinned one is unavailable."""

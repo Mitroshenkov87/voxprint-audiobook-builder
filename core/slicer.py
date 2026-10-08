@@ -177,7 +177,7 @@ def slice_words(words: Sequence[WordTiming], text: str, total_duration: float,
     groups.reverse()
 
     kept: List[Segment] = []
-    for gi, (i, j) in enumerate(groups):
+    for i, j in groups:
         ws = [w for k in range(i, j + 1) for w in phrases[k].words]
         prev_end = phrases[i - 1].end if i > 0 else 0.0
         next_start = phrases[j + 1].start if j + 1 < n else total_duration

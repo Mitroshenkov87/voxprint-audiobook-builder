@@ -219,7 +219,7 @@ def load_sage(path: Path, cuda: bool) -> Any:
     """SAGE tokenizer + model on the CPU (as :meth:`core.text_cleanup.SageEngine._load` loads them)."""
     from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-    return AutoTokenizer.from_pretrained(str(path)), AutoModelForSeq2SeqLM.from_pretrained(str(path))
+    return AutoTokenizer.from_pretrained(str(path)), AutoModelForSeq2SeqLM.from_pretrained(str(path))  # nosec B615 - local folder
 
 
 LOADERS: Dict[str, Callable[[Path, bool], Any]] = {"tts": load_tts, "asr": load_asr, "sage": load_sage}

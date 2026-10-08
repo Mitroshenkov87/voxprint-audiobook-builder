@@ -16,7 +16,7 @@ LOCK = Path(__file__).resolve().parent.parent / "infra" / "runtime_lock.json"
 
 def head(url: str) -> int:
     req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "voxprint-check/1"})
-    with urllib.request.urlopen(req, timeout=60) as r:
+    with urllib.request.urlopen(req, timeout=60) as r:  # nosec B310 - dev tool, https URLs from our own lists
         return int(r.headers.get("Content-Length", "-1"))
 
 

@@ -162,7 +162,7 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
                 try:
                     def on_bytes(n: int, _b=[0]) -> None:  # noqa: B006
                         _b[0] += n
-                        progress(min(1.0, (done + _b[0]) / total))
+                        progress(min(1.0, (done + _b[0]) / total))  # noqa: B023 - called within this iteration
                     parallel_download.download_file(url, target, size, opener=opener, on_bytes=on_bytes,
                                                     timeout=timeout)
                     done += size

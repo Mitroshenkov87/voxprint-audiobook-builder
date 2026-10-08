@@ -170,9 +170,6 @@ class UpdateResult:
         return "\n".join(lines)
 
 
-UpdateResult.summary_ru = UpdateResult.summary  # old name (compatibility)
-
-
 class Updater:
     """Checks for and applies updates of packages and models (see the module docstring for the scheme)."""
     def __init__(self, fetch_json=http_fetch_json, pip_runner: Optional[Runner] = None,

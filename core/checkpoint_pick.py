@@ -185,6 +185,6 @@ def apply_pick(adapter_dir: Path, result: Dict[str, Any], delete_losers: bool = 
         log.warning("training_meta.json not updated after the checkpoint pick")
     (adapter_dir / "checkpoints" / PICK_FILE).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     if delete_losers:
-        for epoch, folder in folders.items():
+        for folder in folders.values():
             if folder != win:
                 shutil.rmtree(folder, ignore_errors=True)

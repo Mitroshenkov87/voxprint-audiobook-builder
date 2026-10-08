@@ -80,3 +80,19 @@ def test_splash_shows_a_status_and_closes_with_the_main_window(app):
     w.show()
     s.finish(w)
     assert not s.isVisible()
+
+
+def test_transparency_switched_back_on_gives_a_shown_window_its_blur(app, monkeypatch):
+    calls = []
+    monkeypatch.setattr(main_window.platform_win, "apply_backdrop", lambda hwnd: calls.append(hwnd) or "acrylic")
+    w = QWidget()
+    w.backdrop = "plain"
+    w.show()
+    ui_prefs.set_transparency("off")
+    with monkeypatch.context() as m:
+        m.setattr(main_window.sys, "platform", "win32")
+        main_window.apply_look(w)                         # shown while "off": no backdrop, solid look
+        assert not calls and w.styleSheet() == main_window.build_style(False)
+        ui_prefs.set_transparency("more")
+        main_window.apply_look(w)                         # switched back on: the backdrop is applied now
+    assert calls and w.backdrop == "acrylic" and main_window.ROOT_GLASS_MORE in w.styleSheet()

@@ -69,10 +69,10 @@ def ensure_dnsmos(progress: Callable[[float, str], None] = lambda f, m="": None,
     for url in DNSMOS_URLS:
         done = [0]
 
-        def on_bytes(n: int) -> None:
-            done[0] += n
-            progress(min(0.99, done[0] / size), tr("progress.downloading", short=DNSMOS_LABEL,
-                                                    pct=int(100 * min(1.0, done[0] / size))))
+        def on_bytes(n: int) -> None:  # called within this iteration (late binding of ``done`` is fine)
+            done[0] += n  # noqa: B023
+            progress(min(0.99, done[0] / size), tr("progress.downloading", short=DNSMOS_LABEL,  # noqa: B023
+                                                    pct=int(100 * min(1.0, done[0] / size))))  # noqa: B023
         try:
             model_release.fetch_file(url, target, DNSMOS_META, on_bytes, opener, timeout)
             progress(1.0, tr("progress.model_verifying", short=DNSMOS_LABEL))

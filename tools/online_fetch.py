@@ -122,7 +122,7 @@ def _open(url: str, headers: Optional[Dict[str, str]] = None, timeout: float = 3
     req = urllib.request.Request(url, headers={"User-Agent": UA, **(headers or {})})
     if _nr is not None:       # short connect timeout, then the other network interfaces (VPN / odd adapters)
         return _nr.urlopen(req, timeout=timeout)
-    return urllib.request.urlopen(req, timeout=timeout)
+    return urllib.request.urlopen(req, timeout=timeout)  # nosec B310 - check_url above allows https only
 
 
 def read_manifest(source: str, attempts: int = 4) -> dict:
@@ -341,8 +341,8 @@ def _safe_target(dest: Path, name: str) -> Path:
     return target
 
 
-def extract(zip_path: Path, dest: Path, progress: Callable[[int, int], None]) -> int:
-    """Extract ``zip_path`` into ``dest``; returns the number of files."""
+def extract(zip_path: Path, dest: Path, progress: Callable[[int, int], None], files: Optional[List[str]] = None) -> int:
+    """Extract ``zip_path`` into ``dest``; returns the number of files (their paths are appended to ``files``)."""
     n = 0
     with zipfile.ZipFile(zip_path) as z:
         infos = z.infolist()
@@ -363,10 +363,12 @@ def extract(zip_path: Path, dest: Path, progress: Callable[[int, int], None]) ->
                     done += len(b)
                     progress(done, total)
             n += 1
+            if files is not None:
+                files.append(info.filename)
     return n
 
 
-def extract_wheel(whl: Path, dest: Path, progress: Callable[[int, int], None]) -> int:
+def extract_wheel(whl: Path, dest: Path, progress: Callable[[int, int], None], files: Optional[List[str]] = None) -> int:
     """Install a wheel into ``dest`` (a site-packages-like folder): files as they are, ``*.data/purelib|platlib`` merged into the root,
     scripts / headers / data skipped.  Zip-slip protected.  The ``.dist-info`` stays, so ``importlib.metadata`` sees the package."""
     n = 0
@@ -394,6 +396,31 @@ def extract_wheel(whl: Path, dest: Path, progress: Callable[[int, int], None]) -
                     done += len(b)
                     progress(done, total)
             n += 1
+            if files is not None:
+                files.append(name)
+    return n
+
+
+FILES_INDEX = "voxprint-files.json"      # component id -> files it unpacked (only where run(prune=True) installs)
+
+
+def _prune(dest: Path, index: Dict[str, List[str]], stale_ids: List[str], replaced: Dict[str, List[str]]) -> int:
+    """Delete the files of the old version: those of a re-installed component that its new archive no longer has, and those of
+    components the manifest no longer lists.  Only files recorded in the index, inside ``dest``, and owned by no other
+    component are removed.  Returns the number of files deleted."""
+    gone: set = set()
+    for cid, old in replaced.items():
+        gone |= set(old) - set(index.get(cid, []))
+    for cid in stale_ids:
+        gone |= set(index.pop(cid, []))
+    owned = {f for fl in index.values() for f in fl}
+    n = 0
+    for rel in sorted(gone - owned):
+        try:
+            _safe_target(dest, rel).unlink()
+            n += 1
+        except (OSError, FetchError):
+            pass
     return n
 
 
@@ -476,7 +503,7 @@ def _have_size(path: Path, comp: dict) -> bool:
 def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Optional[List[str]] = None,
         sleep: Callable[[float], None] = time.sleep, roles: Optional[List[str]] = None,
         portable: Optional[Path] = None, keep_all: bool = False, offline: bool = False, flavor: str = "auto",
-        modules: Optional[List[str]] = None) -> int:
+        modules: Optional[List[str]] = None, prune: bool = False) -> int:
     """Install the components of the manifest into ``dest``; returns the number of components fetched.
 
     ``portable``: a *portable setup folder* (docs/THIN-INSTALLER.md).  Every selected component is also kept there
@@ -488,6 +515,8 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
     ``modules``: only the components of these runtime modules (the manifest's ``modules`` lists; of the ``flavor`` when one is
     named) - unlike
     ``only`` this selects the same modules in any release's manifest (the number of parts may differ).
+    ``prune`` (the app's runtime folder): record the files of every component (``voxprint-files.json``) and, after an update
+    or a switch to another release's manifest, delete the files the new version no longer has (see :func:`_prune`).
     Without internet a folder that has a manifest is used automatically.  When the folder was made from an older manifest, only the
     parts whose SHA-256 changed are fetched and the files of the old version are removed at the end."""
     pm = _portable_mod() if portable is not None else None
@@ -532,6 +561,13 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
             status.write("running", 0.0, d.text(), force=True)
     dest.mkdir(parents=True, exist_ok=True)
     state = load_state(dest)
+    index: Dict[str, List[str]] = {}
+    replaced: Dict[str, List[str]] = {}
+    if prune:
+        try:
+            index = {str(k): list(v) for k, v in json.loads((dest / FILES_INDEX).read_text(encoding="utf-8")).items()}
+        except (OSError, ValueError, AttributeError):
+            index = {}
     todo = [c for c in comps if not installed_ok(c, state, dest)]
     fetch = keep if portable is not None else todo
     for c in todo:                                               # not yet in the install folder: it must come from somewhere
@@ -592,13 +628,29 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
             def ex(done: int, total: int, c=c, name=name, w=w, base=base) -> None:
                 _say(status, (base + w / 2 * done / max(1, total)) / total_w, f"Unpacking {name}", "unpack", c, name, done, total)
 
-            (extract_wheel if c.get("kind") == "wheel" else extract)(zpath, dest, ex)
+            files: List[str] = []
+            (extract_wheel if c.get("kind") == "wheel" else extract)(zpath, dest, ex, files)
+            if prune:
+                if c["id"] in index:
+                    replaced[c["id"]] = index[c["id"]]
+                index[c["id"]] = files
+                (dest / FILES_INDEX).write_text(json.dumps(index), encoding="utf-8")
             state[c["id"]] = c["sha256"]
             save_state(dest, state, str(man.get("app_version", "")))
             fetched += 1
         base += w / 2
         if portable is None:
             zpath.unlink(missing_ok=True)
+    if prune:
+        listed = {c["id"] for c in man["components"]}
+        stale = [cid for cid in index if cid not in listed]
+        removed = _prune(dest, index, stale, replaced)
+        for cid in stale:
+            state.pop(cid, None)
+        (dest / FILES_INDEX).write_text(json.dumps(index), encoding="utf-8")
+        save_state(dest, state, str(man.get("app_version", "")))
+        if removed:
+            print(f"removed {removed} file(s) of the previous version", file=sys.stderr, flush=True)
     if not todo:
         save_state(dest, state, str(man.get("app_version", "")))
     if portable is not None and not offline:
@@ -622,12 +674,16 @@ def run_channel(pinned: str, latest: str, dest: Path, cache: Path, status: Statu
     always used as a whole (the parts of two releases must not be mixed).  Returns ``(components fetched, manifest used)``."""
     order = [src for src in ((latest, pinned) if prefer == "latest" else (pinned, latest)) if src]
     order = list(dict.fromkeys(order))
+    first: Optional[FetchError] = None
     for i, src in enumerate(order):
         try:
             return run(src, dest, cache, status, **kw), src
         except FetchError as exc:
-            if str(exc) == "cancelled" or i + 1 == len(order):
+            if str(exc) == "cancelled":
                 raise
+            first = first or exc
+            if i + 1 == len(order):
+                raise first from exc        # the error of the first choice is the one worth showing
             which = "latest" if order[i + 1] == latest else "pinned (verified)"
             status.write("running", 0.0, f"{exc} - trying the {which} components", force=True)
             print(f"{exc} - trying the {which} manifest {order[i + 1]}", file=sys.stderr, flush=True)

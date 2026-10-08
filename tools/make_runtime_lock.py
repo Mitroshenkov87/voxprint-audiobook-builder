@@ -60,7 +60,7 @@ def norm(n: str) -> str:
 
 def get(url: str, binary: bool = False, method: str = "GET"):
     req = urllib.request.Request(url, headers={"User-Agent": UA}, method=method)
-    with urllib.request.urlopen(req, timeout=60) as r:
+    with urllib.request.urlopen(req, timeout=60) as r:  # nosec B310 - dev tool, https URLs from our own lists
         return r if method == "HEAD" else (r.read() if binary else r.read().decode("utf-8"))
 
 

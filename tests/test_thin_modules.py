@@ -331,3 +331,15 @@ def test_a_newer_pinned_set_is_offered_as_an_update_in_the_components_window(thi
     assert dlg.updates() and dlg.lbl_status.text().startswith("Updates available: ") and "0.0.9 \u2192" in dlg.lbl_status.text()
     assert dlg.btn_download.isEnabled()
     dlg.shutdown()
+    # the update removes the files the new version no longer has (recorded ones only, inside the runtime folder)
+    rd = mods.runtime_dir()
+    idx = json.loads((rd / of.FILES_INDEX).read_text(encoding="utf-8"))
+    (rd / "old_only.py").write_text("x")
+    (rd / "gone_part.py").write_text("x")
+    idx[cid].append("old_only.py")
+    idx["rt-audio-99"] = ["gone_part.py"]                              # a part the manifest no longer lists
+    (rd / of.FILES_INDEX).write_text(json.dumps(idx), encoding="utf-8")
+    assert mods.install(["audio"]) >= 1
+    assert not (rd / "old_only.py").exists() and not (rd / "gone_part.py").exists()
+    assert all(m.installed for m in mods.modules(mods.load_manifest()) if m.id == "audio")
+    assert "rt-audio-99" not in json.loads((rd / of.FILES_INDEX).read_text(encoding="utf-8"))

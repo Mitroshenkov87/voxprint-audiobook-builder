@@ -188,9 +188,9 @@ def download(entry: ReleaseEntry, dest: Path, progress: Callable[[float], None] 
             target.unlink()
         base = done
 
-        def on_bytes(n: int, _b=[0]) -> None:
+        def on_bytes(n: int, _b=[0]) -> None:  # noqa: B006 - per-file counter (a new function per file)
             _b[0] += n
-            progress(min(1.0, (base + _b[0]) / total))
+            progress(min(1.0, (base + _b[0]) / total))  # noqa: B023 - called within this iteration
 
         fetch_file(entry.url(name), target, meta, on_bytes, opener, timeout)
         done += int(meta["size"])

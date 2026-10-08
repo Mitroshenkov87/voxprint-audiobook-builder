@@ -28,7 +28,6 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from core import audiobook_export as ex  # noqa: E402
 from core import narration as nr  # noqa: E402
 from core.book_parsers import Book, Chapter  # noqa: E402
 

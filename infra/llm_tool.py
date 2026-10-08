@@ -120,10 +120,10 @@ def _unpack(archive: Path, dest: Path) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     if archive.name.endswith(".zip"):
         with zipfile.ZipFile(archive) as z:
-            z.extractall(dest)
+            z.extractall(dest)  # nosec B202 - zipfile drops absolute / '..' parts; the archive is SHA-256 pinned
     else:
         with tarfile.open(archive) as t:
-            t.extractall(dest, filter="data")
+            t.extractall(dest, filter="data")  # nosec B202 - the "data" filter rejects unsafe members; SHA-256 pinned
     if os.name != "nt":
         for p in dest.rglob("llama-server"):
             p.chmod(p.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
