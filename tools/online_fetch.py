@@ -485,7 +485,8 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
     ``keep_all``: keep ALL components of the manifest (those of the PyTorch ``flavor`` this PC gets: ``auto``, a flavor name or
     ``all``) in the folder, not only the ones installed now (``roles`` / ``only``); the installer uses it to keep the runtime too.
     ``offline``: never touch the network; the manifest is ``<portable>/manifest.json`` and every needed file must be in the folder.
-    ``modules``: only the components of these runtime modules (field ``module``; of the ``flavor`` when one is named) - unlike
+    ``modules``: only the components of these runtime modules (the manifest's ``modules`` lists; of the ``flavor`` when one is
+    named) - unlike
     ``only`` this selects the same modules in any release's manifest (the number of parts may differ).
     Without internet a folder that has a manifest is used automatically.  When the folder was made from an older manifest, only the
     parts whose SHA-256 changed are fetched and the files of the old version are removed at the end."""
@@ -521,7 +522,9 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
              and (portable is None or flavored(c))]
     if modules is not None:
         named = flavor if flavor not in ("auto", "all", "") else ""
-        comps = [c for c in comps if c.get("module") in modules and (not named or not c.get("flavor") or c["flavor"] == named)]
+        ids = {i for m in man.get("modules", []) if m.get("id") in modules for i in m.get("components", [])}
+        comps = [c for c in comps if (c["id"] in ids or c.get("module") in modules)
+                 and (not named or not c.get("flavor") or c["flavor"] == named)]
     keep = [c for c in man["components"] if flavored(c)] if (portable is not None and keep_all) else (comps if portable is not None else [])
     if old_man is not None and not offline and pm is not None and old_man["components"] != man["components"]:
         d = pm.diff(old_man, man, fl or "all")
