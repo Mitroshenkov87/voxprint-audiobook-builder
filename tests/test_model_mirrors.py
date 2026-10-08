@@ -59,9 +59,10 @@ def test_bundled_manifest_is_valid_and_permissive():
         assert len(e.source_revision) == 40
         if e.has_mirror:
             assert e.mirror_repo.startswith("Mitroshenkov87/voxprint-mirror-") and len(e.mirror_revision) == 40
-        else:                                    # hashes only (no mirror yet): only Qwen3-ASR-1.7B for now
-            assert repo == "Qwen/Qwen3-ASR-1.7B" and not e.mirror_repo
-        assert (any(n.endswith(".safetensors") for n in e.files) or "pytorch_model.bin" in e.files) and "config.json" in e.files
+        else:                                    # hashes only (no mirror yet)
+            assert repo in {"Qwen/Qwen3-ASR-1.7B", "myshell-ai/OpenVoiceV2"} and not e.mirror_repo
+        assert any(n.endswith((".safetensors", ".bin", ".pth")) for n in e.files)
+        assert any(n == "config.json" or n.endswith("/config.json") for n in e.files)
         assert all(len(m["sha256"]) == 64 and m["size"] > 0 for m in e.files.values())
 
 

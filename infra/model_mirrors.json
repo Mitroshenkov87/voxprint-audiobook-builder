@@ -538,6 +538,21 @@
    "mirror_revision": "0293029610771bb7310ce5b4b210f40ac8c024f7",
    "source_repo": "ai-forever/sage-fredt5-distilled-95m",
    "source_revision": "ed51b4a46603931380951a3d8456685c9215864f"
+  },
+  "myshell-ai/OpenVoiceV2": {
+   "files": {
+    "converter/checkpoint.pth": {
+     "sha256": "9652c27e92b6b2a91632590ac9962ef7ae2b712e5c5b7f4c34ec55ee2b37ab9e",
+     "size": 131320490
+    },
+    "converter/config.json": {
+     "sha256": "9dfff60350b8c63f2c664efd92a61b2516efb22671466960f0e5dfebd881fa47",
+     "size": 838
+    }
+   },
+   "license": "MIT",
+   "source_repo": "myshell-ai/OpenVoiceV2",
+   "source_revision": "f36e7edfe1684461a8343844af60babc2efbb727"
   }
  },
  "name": "Voxprint model mirrors (Hugging Face backup)",

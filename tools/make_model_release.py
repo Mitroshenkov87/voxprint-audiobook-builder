@@ -43,6 +43,8 @@ def plan(entries: dict, small_max: int = model_release.SMALL_MODEL_MAX) -> dict:
     """``{source_repo: entry}`` of the small models (large ones are left out)."""
     out = {}
     for repo, e in sorted(entries.items()):
+        if not e.has_mirror:
+            continue                     # hashes only: not a GitHub release asset (OpenVoice V2 is optional and fetched in the app)
         files = e.downloadable()
         total = sum(int(m["size"]) for m in files.values())
         if total <= small_max and all(int(m["size"]) < GITHUB_ASSET_MAX for m in files.values()):

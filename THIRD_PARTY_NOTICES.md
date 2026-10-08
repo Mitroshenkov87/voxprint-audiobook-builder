@@ -64,6 +64,14 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 * Status: downloaded on first start
 * Licence text: [`licenses/deepfilternet.txt`](licenses/deepfilternet.txt)
 
+### OpenVoice V2 tone-colour converter (myshell-ai/OpenVoice)
+
+* Purpose: Optional direct re-voice: converts a recording into a library voice while keeping timing and intonation (downloaded on request from the Re-voice window, about 125 MB, NVIDIA GPU when CUDA is available). MyShell OpenVoice V2; inference code and weights used unmodified
+* Licence: MIT
+* Project: <https://github.com/myshell-ai/OpenVoice>
+* Status: downloaded on first start
+* Licence text: [`licenses/openvoice.txt`](licenses/openvoice.txt)
+
 ### Gemma 4 12B Instruct (GGUF Q4_K_M, unsloth/gemma-4-12b-it-GGUF, base google/gemma-4-12B-it)
 
 * Purpose: Optional AI text model for literary translation and preparing the text for narration (downloaded on request from the Narrate window, about 7.1 GB, needs about 10 GB of video memory). Gemma 4 by Google DeepMind; quantized GGUF by Unsloth; used unmodified

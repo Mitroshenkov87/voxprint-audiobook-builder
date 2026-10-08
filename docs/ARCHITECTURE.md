@@ -45,6 +45,9 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `book_prep.py` | `PrepPlan` (rule options + neural step keys + `engine_factory`) and `run_preparation`: rules -> clean-up -> `.debug/prepared_text.txt` + `prep_report.json` |
 | `chunker.py` | chapter text -> sentence-sized chunks (reuses the clause splitter), pause lengths |
 | `asr.py` | speech recognition interface (`Qwen3ASR`, `FakeASR`), `plausibility()` (confidence proxy), `split_at_pauses()` |
+| `revoice.py` | Re-voice text path: audio files -> recognised chapters -> a `.txt` the narrator loads; Opus storage of a dictaphone recording |
+| `voice_convert.py` | direct voice conversion: `VoiceConverter` protocol, `convert_file` (PCM in memory, Opus out), `make_converter` (the only place a model is chosen) |
+| `vc_openvoice.py` | OpenVoice V2 implementation of that protocol (torch and the vendored package load only when a conversion starts) |
 | `asr_dataset.py` | no-transcript mode: many audio files -> ASR -> gates -> the same dataset files as `DatasetBuilder` (clips are recognised individually, no forced alignment) |
 | `train_presets.py` | Fast/Balanced/Maximum/Manual `TrainPlan`s on top of `plan_training`, `estimate_seconds` (4090-calibrated, scaled per GPU) |
 | `consent.py` | spoken-consent templates, rule-based `parse_statement` (scope/name/date), `consent` block of voice.json, scope -> licence mapping |
@@ -63,6 +66,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `voice_repository.py` | online voice index (`index.json`, URL configurable, placeholder default) and verified downloads (HTTPS, size cap, SHA-256); never raises to the UI |
 | `voice_catalog.py` | the voices the user sees: local library + index voices that are not installed (`repo:<id>` keys, matched by `repo_id`), `ensure_local` (download on first use), scope derived from the licence |
 | `text_models.py` | registry of the on-demand text models (`TextModel`, `REGISTRY`: SAGE integrated; RUPunct, en/de spelling, stress, translation, roles = placeholders), `state()` (ready / needs_download / planned), `ensure()` (pinned revision via `model_downloader`), `make_engine`, `build_plan(rule_steps, neural_steps)` |
+| `vc_model.py` | optional OpenVoice V2 converter (not in the first-run download): pins from `model_mirrors.json`, folder `models/openvoice-v2`, `ensure()` on the user's request |
 | `backup.py` | backup / restore of models, the ffmpeg tool and voices: `collect_items`, `plan_backup` / `run_backup` (resumable `.part` files, manifest `voxprint-backup.json` with SHA-256, skip identical, `check_space`), `plan_restore` / `run_restore` (staging `.restoring`, hash verification, voices never overwritten); disk usage is injectable |
 | `auto_repair.py` | Settings -> *Check & repair* / `--auto-repair`: `verify_install` (+ `repair_install` for a venv install), thin runtime modules, ffmpeg, then every known model file by size + SHA-256 (`model_mirrors.json`); bad files deleted, folder -> `.partial`, `ensure_model(root=...)` completes it; `Report.summary()` |
 | `existing_models.py` | the "existing models folder" (`state/existing_models_dir.txt`, env `VOXPRINT_EXISTING_MODELS`): `find` (model locator roots with `ignore_disabled`), `import_model` (hard link on the same drive, else verified copy through `<name>.importing`), `import_available`, `pending` (start-up); a Voxprint backup as source: `adopt_backup_choice` (a `models_dir.txt` that points at a backup becomes the source, the models folder goes back to the default), `backup_source`, `restore_pending`, `restore_backup` (whole backup restored once into the live folders) |
@@ -85,8 +89,8 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 (`RepoIndexWorker`, `RepoDownloadWorker`). Training registers the finished voice in the library (`pipeline_runner._register_voice`, `TaskResult.voice_id`).
 
 ### `ui/`
-`studio.py` (**`StudioWindow`**: the first window, owns the other three), `main_window.py` (the *Train your voice* window + theme constants), `voices_window.py` (*My voices*, voice cards, edit dialog, repository dialog),
-`narrate_window.py` (*Narrate a book*), `window_base.py` (`SubWindow`: backdrop, back button / gear, common cards), `audio_preview.py` (QtMultimedia `Previewer`), `mini_player.py` (play / pause / seek over a growing list of files; `core/play_queue.py` is its Qt-free playlist), `settings_dialog.py` (gear), `about_dialog.py`, `upgrade_dialog.py`.
+`studio.py` (**`StudioWindow`**: the first window, owns the other windows), `main_window.py` (the *Train your voice* window + theme constants), `voices_window.py` (*My voices*, voice cards, edit dialog, repository dialog),
+`narrate_window.py` (*Narrate a book*), `revoice_window.py` (*Re-voice*: record or choose a file, then convert to text or convert the recording directly), `window_base.py` (`SubWindow`: backdrop, back button / gear, common cards), `audio_preview.py` (QtMultimedia `Previewer`), `mini_player.py` (play / pause / seek over a growing list of files; `core/play_queue.py` is its Qt-free playlist), `settings_dialog.py` (gear), `about_dialog.py`, `upgrade_dialog.py`.
 
 ## 3. Data flow of voice training
 ```

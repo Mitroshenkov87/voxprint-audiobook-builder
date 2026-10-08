@@ -123,6 +123,22 @@
    }
   },
   {
+   "id": "openvoice",
+   "name": "OpenVoice V2 tone-colour converter (myshell-ai/OpenVoice)",
+   "kind": "model",
+   "ship": "download",
+   "license": "MIT",
+   "license_files": [
+    "openvoice"
+   ],
+   "url": "https://github.com/myshell-ai/OpenVoice",
+   "purpose": {
+    "en": "Optional direct re-voice: converts a recording into a library voice while keeping timing and intonation (downloaded on request from the Re-voice window, about 125 MB, NVIDIA GPU when CUDA is available). MyShell OpenVoice V2; inference code and weights used unmodified",
+    "de": "Optionales direktes Neuvertonen: wandelt eine Aufnahme in eine Bibliotheksstimme um und behält Timing und Betonung (auf Wunsch im Fenster Neu vertonen geladen, ca. 125 MB, NVIDIA-GPU wenn CUDA verfügbar ist). MyShell OpenVoice V2; Inferenzcode und Gewichte unverändert verwendet",
+    "ru": "Необязательное прямое переозвучивание: преобразует запись в голос из библиотеки, сохраняя время и интонацию (скачивается по запросу в окне переозвучивания, около 125 МБ, GPU NVIDIA при наличии CUDA). MyShell OpenVoice V2; код и веса используются без изменений"
+   }
+  },
+  {
    "id": "gemma-4-12b",
    "name": "Gemma 4 12B Instruct (GGUF Q4_K_M, unsloth/gemma-4-12b-it-GGUF, base google/gemma-4-12B-it)",
    "kind": "model",

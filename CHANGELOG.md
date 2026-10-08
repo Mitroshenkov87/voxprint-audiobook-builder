@@ -5,6 +5,12 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Added
+- **Re-voice a recording directly.** On the Re-voice screen, *Re-voice recording* converts the recording into the chosen library voice without a text step, keeping the speaker's timing and intonation. The model is OpenVoice V2 (MIT code and MIT weights, commercial use allowed), optional and downloaded only from that screen (about 125 MB, NVIDIA GPU when CUDA is present). *Convert to text* is the other action: recognise, edit, then *Voice this text*.
+
+### Changed
+- **Re-voice screen.** One audio source (record or choose a file), a voice from the library, and the two actions side by side with a one-line explanation under each. Advanced options (chapter title, several files) stay collapsed.
+
 ### Fixed
 - **Settings and the other dialogs were not translucent** (build 665 on Windows 11): the Settings content sat on an opaque grey block (`QScrollArea.setWidget` turns on the palette fill of the scrolled widget; the windows avoid it with the transparent `QWidget#content`), and a `QDialog#root` rule painted every dialog in the solid colour instead of the window tint. Dialogs now use the same tint, transparent scroll content and text browser, take their look from their own native window instead of copying the (possibly hidden, still plain) Train window's stylesheet, and ask for the Acrylic backdrop again once the fade-in has ended (the first request is made while the window is layered) or when Qt re-created the native window. Tests: `tests/test_dialog_glass.py`.
 

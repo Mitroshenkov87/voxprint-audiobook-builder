@@ -1,9 +1,10 @@
-"""Re-voice: turn recorded or imported speech into editable text, then narrate it with one of your voices (Qt-free part).
+"""Re-voice, text path: turn recorded or imported speech into editable text, then narrate it with one of your voices.
 
-Phase 1 reuses what the app already has: the audio is decoded by ffmpeg (:func:`core.audio_utils.load_audio`: MP3, WAV, M4B,
-M4A, FLAC, Opus ...), cut at pauses into pieces the recogniser handles well (:func:`core.asr.split_at_pauses`), recognised by
-the installed Qwen3-ASR model, and written as a plain-text book: one chapter per file (``# <file name>`` headings, which
-:mod:`core.book_parsers` reads as chapters).  The user edits that text before it goes to the normal "Narrate a book" flow.
+The audio is decoded by ffmpeg (:func:`core.audio_utils.load_audio`: MP3, WAV, M4B, M4A, FLAC, Opus ...), cut at pauses into
+pieces the recogniser handles well (:func:`core.asr.split_at_pauses`), recognised by the installed Qwen3-ASR model, and written
+as a plain-text book: one chapter per file (``# <file name>`` headings, which :mod:`core.book_parsers` reads as chapters).
+The user edits that text before it goes to the normal "Narrate a book" flow. Direct conversion (no text step) is
+:mod:`core.voice_convert`.
 """
 from __future__ import annotations
 

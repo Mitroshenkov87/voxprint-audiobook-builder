@@ -36,7 +36,7 @@ DEFAULT_REPO = "Mitroshenkov87/voxprint-audiobook-builder"
 
 TOP_FILES = ["main.py", "credits.json", "requirements.txt", "requirements-verified.txt", "requirements-nodeps.txt",
              "requirements-torch.txt", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"]
-TOP_DIRS = ["core", "infra", "ui", "workers", "locales", "prompts", "licenses"]
+TOP_DIRS = ["core", "infra", "ui", "workers", "locales", "prompts", "licenses", "third_party"]
 EXTRA = ["assets/voxprint.png", "assets/voxprint.svg", "assets/voxprint.ico", "assets/check.png", "assets/splash.jpg", "assets/ICON-LICENSE.txt",
          "installer/linux/voxprint.desktop", "installer/linux/voxprint-256.png", "installer/linux/" + SCRIPT_NAME,
          "docs/LINUX-TEST-CHECKLIST.md"]

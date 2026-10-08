@@ -61,7 +61,7 @@ if /I "%~1"=="onedir" set MODE=--onedir
 echo === Build (%MODE%) ===
 pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --icon "assets\voxprint.ico" --add-data "assets\voxprint.ico;assets" --add-data "assets\check.png;assets" --add-data "assets\splash.jpg;assets" ^
-  --paths . ^
+  --paths . --paths third_party ^
   --add-data "infra\verified_manifest.json;infra" --add-data "infra\assets_manifest.json;infra" --add-data "infra\model_mirrors.json;infra" --add-data "infra\model_release.json;infra" ^
   --add-data "locales;locales" --add-data "prompts;prompts" --add-data "credits.json;." --add-data "licenses;licenses" ^
   --add-data "build\notices\THIRD_PARTY_NOTICES.md;." ^
@@ -70,6 +70,11 @@ pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --hidden-import core.audio_utils --hidden-import core.lora_trainer --hidden-import core.teacher_forcing ^
   --hidden-import core.normalizer --hidden-import core.quality ^
   --hidden-import core.text_utils --hidden-import core.events --hidden-import core.errors --hidden-import core.types ^
+  --hidden-import core.revoice --hidden-import core.voice_convert --hidden-import core.vc_openvoice ^
+  --hidden-import infra.vc_model ^
+  --hidden-import openvoice --hidden-import openvoice.models --hidden-import openvoice.modules ^
+  --hidden-import openvoice.attentions --hidden-import openvoice.commons ^
+  --hidden-import openvoice.mel_processing --hidden-import openvoice.transforms ^
   --hidden-import infra.version_manager --hidden-import infra.vram_optimizer --hidden-import infra.model_downloader ^
   --hidden-import infra.updater --hidden-import infra.paths --hidden-import infra.platform_win ^
   --hidden-import infra.verified_manifest --hidden-import core.model_locator --hidden-import infra.modelscope_mirror ^
