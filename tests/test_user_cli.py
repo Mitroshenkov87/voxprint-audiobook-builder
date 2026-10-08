@@ -10,8 +10,9 @@ import pytest
 import cli as user_cli
 from core import audiobook_export as ex
 from core import voice_info
-from core.errors import DatasetMakerError
-from core.narration import NarrationOptions
+from core.errors import CancelledByUser, DatasetMakerError, ModelDownloadError, OutOfMemoryError_
+from core.events import Stage
+from core.narration import NarrationOptions, NarrationProgress
 from core.voice_library import VoiceLibrary
 from workers.narration_runner import NarrationJob
 from workers.pipeline_runner import KIND_LORA, TaskRequest
@@ -79,14 +80,23 @@ def test_parse_formats_aliases_and_unknown():
     assert user_cli.parse_formats([]) == set(ex.DEFAULT_FORMATS)
     assert user_cli.parse_formats(["mp3", "opus_single"]) == {ex.FORMAT_MP3_CHAPTERS, ex.FORMAT_OPUS_SINGLE}
     assert user_cli.parse_formats(["flac,wav"]) == {ex.FORMAT_FLAC_CHAPTERS, ex.FORMAT_WAV_CHAPTERS}
-    with pytest.raises(SystemExit):
+    with pytest.raises(BaseException) as ei:
         user_cli.parse_formats(["bogus"])
+    assert getattr(ei.value, "code", None) == user_cli.EXIT_BAD_ARGS
 
 
 def test_is_user_cli():
     assert user_cli.is_user_cli(["main.py", "narrate", "b.txt", "--voice", "v", "--out", "o"])
     assert user_cli.is_user_cli(["Voxprint.exe", "voices", "list"])
+    assert user_cli.is_user_cli(["Voxprint.exe", "--version"])
+    assert user_cli.is_user_cli(["Voxprint.exe", "--json", "status"])
+    assert user_cli.is_user_cli(["Voxprint.exe", "capabilities"])
+    assert user_cli.is_user_cli(["Voxprint.exe", "models", "download", "denoise"])
+    assert user_cli.is_user_cli(["Voxprint.exe", "revoice", "clip.wav"])
+    assert user_cli.is_user_cli(["Voxprint.exe", "--json"])
     assert not user_cli.is_user_cli(["main.py", "--selftest"])
+    assert not user_cli.is_user_cli(["main.py", "--install-modules"])
+    assert not user_cli.is_user_cli(["main.py", "--modules-status"])
     assert not user_cli.is_user_cli(["main.py"])
 
 
@@ -99,8 +109,9 @@ def test_resolve_voice_by_id_and_name(tmp_path):
     assert by_id.id == "model-voice"
     by_name = user_cli.resolve_voice(lib, "Model Voice")
     assert by_name.id == by_id.id
-    with pytest.raises(SystemExit):
+    with pytest.raises(BaseException) as ei:
         user_cli.resolve_voice(lib, "missing")
+    assert getattr(ei.value, "code", None) == user_cli.EXIT_INPUT
 
 
 def test_voices_list_and_export(tmp_path, capsys):
@@ -200,13 +211,14 @@ def test_train_no_transcript_without_text(tmp_path):
     assert seen["req"].text is None
 
 
-def test_narrate_missing_book_returns_2(tmp_path, capsys):
+def test_narrate_missing_book_returns_input_code(tmp_path, capsys):
     lib = _make_voice(tmp_path)
     code = user_cli.main(
         ["narrate", str(tmp_path / "missing.txt"), "--voice", "model-voice", "--out", str(tmp_path / "o")],
         library=lib, run_narration_fn=lambda *a, **k: None,
     )
-    assert code == 2 and "ERROR" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert code == user_cli.EXIT_INPUT and "ERROR" in err and "Fix:" in err
 
 
 def test_narrate_runner_error_is_friendly(tmp_path, capsys):
@@ -222,7 +234,7 @@ def test_narrate_runner_error_is_friendly(tmp_path, capsys):
         library=lib, run_narration_fn=boom,
     )
     err = capsys.readouterr().err
-    assert code == 2 and "no gpu" in err and "oom" in err
+    assert code == user_cli.EXIT_INTERNAL and "no gpu" in err and "oom" in err
 
 
 def test_main_dispatches_user_cli(monkeypatch):
@@ -244,3 +256,311 @@ def test_main_dispatches_user_cli(monkeypatch):
     # easiest: call the branch logic via main with voices list; activate_overlay is light.
     code = app_main.main(["main.py", "voices", "list"])
     assert code == 0 and called["argv"] == ["voices", "list"]
+
+
+def _json_lines(text: str):
+    return [json.loads(line) for line in text.splitlines() if line.strip()]
+
+
+def test_exit_codes_are_stable():
+    assert user_cli.EXIT_OK == 0
+    assert user_cli.EXIT_INTERNAL == 1
+    assert user_cli.EXIT_BAD_ARGS == 2
+    assert user_cli.EXIT_INPUT == 3
+    assert user_cli.EXIT_MISSING == 4
+    assert user_cli.EXIT_GPU == 5
+    assert user_cli.EXIT_CANCELLED == 6
+
+
+def test_version_prints_build_json_codename(capsys):
+    meta = json.loads(Path("BUILD.json").read_text(encoding="utf-8"))
+    assert user_cli.main(["--version"]) == 0
+    out = capsys.readouterr().out
+    info = user_cli.version_payload()
+    assert info["codename"] == meta["codename"]
+    assert meta["codename"] in out
+    assert str(info["build"]) in out
+    assert info["version"].split("-")[0] in out
+    assert "build" in out
+
+
+def test_version_codename_prefers_build_json(monkeypatch):
+    import core.appinfo as appinfo
+
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "NotFromFile")
+    meta = json.loads(Path("BUILD.json").read_text(encoding="utf-8"))
+    assert user_cli.version_payload()["codename"] == meta["codename"]
+
+
+def test_version_json(capsys):
+    assert user_cli.main(["--json", "--version"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    info = user_cli.version_payload()
+    assert data["ok"] is True and data["command"] == "version"
+    assert data["codename"] == info["codename"]
+    assert data["build"] == info["build"] and isinstance(data["build"], int)
+    assert data["version"] == info["version"]
+
+
+def test_help_is_layered_and_has_examples(capsys):
+    assert user_cli.main(["--help"]) == 0
+    top = capsys.readouterr().out
+    assert "Examples:" in top and "--json" in top and "--version" in top
+    assert "narrate" in top and "status" in top
+    assert "--voice" not in top
+    assert user_cli.main(["narrate", "--help"]) == 0
+    narrate = capsys.readouterr().out
+    assert "Examples:" in narrate and "--voice" in narrate and "--json" in narrate
+    assert "voxprint narrate" in narrate
+    assert user_cli.main(["models", "download", "--help"]) == 0
+    download = capsys.readouterr().out
+    assert "Examples:" in download and "denoise" in download
+
+
+def test_bad_args_exit_and_json(capsys):
+    assert user_cli.main(["narrate"]) == user_cli.EXIT_BAD_ARGS
+    assert user_cli.main(["--json", "narrate"]) == user_cli.EXIT_BAD_ARGS
+    data = _json_lines(capsys.readouterr().out)[-1]
+    assert data["ok"] is False and data["exit_code"] == user_cli.EXIT_BAD_ARGS
+    assert data["hint"]
+
+
+def test_yes_is_accepted_without_a_prompt(tmp_path, capsys):
+    lib = _make_voice(tmp_path)
+    assert user_cli.main(["--yes", "voices", "list"], library=lib) == 0
+    assert "model-voice" in capsys.readouterr().out
+
+
+def test_voices_list_json(tmp_path, capsys):
+    lib = _make_voice(tmp_path)
+    assert user_cli.main(["voices", "list", "--json"], library=lib) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["ok"] is True and data["command"] == "voices list"
+    voice = data["voices"][0]
+    assert voice["id"] == "model-voice" and voice["license"]
+    assert "consent_scope" in voice and "duration_s" in data
+
+
+def test_narrate_json_progress_and_result(tmp_path, capsys):
+    lib = _make_voice(tmp_path)
+    book = tmp_path / "story.txt"
+    book.write_text("Hello world.\n", encoding="utf-8")
+    out = tmp_path / "audiobooks"
+    target = out / "story" / "story.mp3"
+
+    def fake_run(job, progress, cancel, pause):
+        progress(NarrationProgress(1, 2, 12.0, "chapter", "synth"))
+        return SimpleNamespace(out_dir=out / "story", files=[target])
+
+    code = user_cli.main(
+        ["--json", "narrate", str(book), "--voice", "model-voice", "--out", str(out), "--format", "mp3"],
+        run_narration_fn=fake_run, library=lib,
+    )
+    assert code == 0
+    lines = _json_lines(capsys.readouterr().out)
+    assert lines[0]["type"] == "progress" and lines[0]["stage"] == "synth"
+    assert 0 <= lines[0]["percent"] <= 100
+    result = lines[-1]
+    assert result["type"] == "result" and result["ok"] is True
+    assert str(target) in result["outputs"]
+    assert "duration_s" in result and result["warnings"] == []
+
+
+def test_train_json_progress(tmp_path, capsys):
+    audio = tmp_path / "rec.wav"
+    audio.write_bytes(b"RIFFdata")
+
+    def fake_task(req, progress, cancel=None, **_kw):
+        progress(Stage.TRAIN, 0.4, "epoch 1")
+        return SimpleNamespace(voice_id="anna", adapter_path=tmp_path / "adapter",
+                               root_dir=tmp_path / "root", warnings=["check the clips"])
+
+    code = user_cli.main(["train", str(audio), "--json"], run_task_fn=fake_task)
+    assert code == 0
+    lines = _json_lines(capsys.readouterr().out)
+    assert lines[0]["type"] == "progress" and lines[0]["stage"] == "train"
+    assert 0 <= lines[0]["percent"] <= 100
+    result = lines[-1]
+    assert result["voice_id"] == "anna" and result["warnings"] == ["check the clips"]
+    assert "duration_s" in result
+
+
+def test_classified_exit_codes(tmp_path, capsys):
+    lib = _make_voice(tmp_path)
+    book = tmp_path / "b.txt"
+    book.write_text("Hi.\n", encoding="utf-8")
+    out = str(tmp_path / "o")
+    base = ["narrate", str(book), "--voice", "model-voice", "--out", out]
+
+    def run(exc):
+        return user_cli.main(base, library=lib, run_narration_fn=lambda *_a, **_k: (_ for _ in ()).throw(exc))
+
+    assert run(OutOfMemoryError_("Not enough video memory (VRAM).", details="cuda")) == user_cli.EXIT_GPU
+    err = capsys.readouterr().err
+    assert "status" in err
+    assert run(CancelledByUser()) == user_cli.EXIT_CANCELLED
+    assert run(ModelDownloadError("model missing", details="tts")) == user_cli.EXIT_MISSING
+    assert "models download" in capsys.readouterr().err
+    assert run(RuntimeError("boom")) == user_cli.EXIT_INTERNAL
+    assert "diag" in capsys.readouterr().err
+
+
+def test_missing_voice_names_the_fix(tmp_path, capsys):
+    lib = _make_voice(tmp_path)
+    book = tmp_path / "b.txt"
+    book.write_text("Hi.\n", encoding="utf-8")
+    code = user_cli.main(
+        ["narrate", str(book), "--voice", "no-such-voice", "--out", str(tmp_path / "o"), "--json"],
+        library=lib, run_narration_fn=lambda *_a, **_k: None,
+    )
+    assert code == user_cli.EXIT_INPUT
+    captured = capsys.readouterr()
+    assert "voices list" in captured.err
+    data = _json_lines(captured.out)[-1]
+    assert data["exit_code"] == user_cli.EXIT_INPUT and data["hint"]
+
+
+def test_status_and_capabilities_json(tmp_path, capsys):
+    lib = _make_voice(tmp_path)
+    assert user_cli.main(["status", "--json"], library=lib) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["command"] == "status" and data["ok"] is True
+    assert data["codename"] == user_cli.version_payload()["codename"]
+    assert isinstance(data["gpu"]["cuda_available"], bool)
+    assert any(v["id"] == "model-voice" for v in data["voices"])
+    ids = {m["id"] for m in data["modules"]}
+    assert {"aligner", "denoise", "llm", "dnsmos", "tts-1.7b"} <= ids
+    assert "opus_single" in data["formats"]
+    assert data["format_aliases"]["mp3"]
+    assert user_cli.main(["capabilities"], library=lib) == 0
+    again = json.loads(capsys.readouterr().out)
+    assert again["command"] == "capabilities" and again["modules"]
+
+
+def test_models_list_json(capsys):
+    assert user_cli.main(["models", "list", "--json"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    ids = {m["id"] for m in data["modules"]}
+    assert "denoise" in ids and "sage-ru" in ids
+    assert all("installed" in m and "optional" in m for m in data["modules"])
+
+
+def test_models_download_unknown_names_choices(capsys):
+    code = user_cli.main(["models", "download", "not-a-module"])
+    assert code == user_cli.EXIT_BAD_ARGS
+    err = capsys.readouterr().err
+    assert "denoise" in err and "Example:" in err
+
+
+def test_models_download_json_and_idempotent(tmp_path, capsys):
+    seen = {}
+
+    def fake_download(module_id, progress):
+        seen["id"] = module_id
+        progress(0.4, "fetch")
+        return str(tmp_path / "deep-filter")
+
+    code = user_cli.main(
+        ["models", "download", "deepfilternet", "--json"],
+        download_fn=fake_download,
+    )
+    assert code == 0 and seen["id"] == "denoise"
+    lines = _json_lines(capsys.readouterr().out)
+    assert lines[0]["type"] == "progress" and "percent" in lines[0] and lines[0]["stage"] == "download"
+    assert lines[-1]["downloaded"] is True and lines[-1]["ok"] is True
+
+    def boom(*_a, **_k):
+        raise AssertionError("must not download twice")
+
+    code = user_cli.main(
+        ["--json", "models", "download", "denoise", "--yes"],
+        download_fn=boom, installed_fn=lambda _module: True,
+    )
+    assert code == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["downloaded"] is False and data["installed"] is True
+
+
+def test_fetch_module_dispatches_without_network(monkeypatch, tmp_path):
+    import infra.denoise_tool as denoise_tool
+    import infra.text_models as text_models
+
+    def ensure(progress, **_kwargs):
+        progress(1.0, "ok")
+        return tmp_path / "deep-filter"
+
+    monkeypatch.setattr(denoise_tool, "ensure", ensure)
+    info = user_cli.fetch_module("denoise", lambda _f, _m: None)
+    assert info["module"] == "denoise" and info["downloaded"] is True
+
+    def already(*_a, **_k):
+        return tmp_path / "deep-filter"
+
+    monkeypatch.setattr(denoise_tool, "ready", already)
+
+    def fail_ensure(*_a, **_k):
+        raise AssertionError("already installed")
+
+    monkeypatch.setattr(denoise_tool, "ensure", fail_ensure)
+    again = user_cli.fetch_module("denoise", lambda _f, _m: None)
+    assert again["downloaded"] is False and again["installed"] is True
+
+    def fetch_text(model, progress, **_kw):
+        assert model.key == "sage-ru"
+        progress(None, 1.0, "done")
+        return tmp_path / "sage"
+
+    monkeypatch.setattr(text_models, "state", lambda _model: text_models.STATE_NEEDS_DOWNLOAD)
+    monkeypatch.setattr(text_models, "ensure", fetch_text)
+    got = user_cli.fetch_module("sage-ru", lambda _f, _m: None)
+    assert got["downloaded"] is True and got["module"] == "sage-ru"
+
+
+def test_revoice_writes_a_book(tmp_path, capsys):
+    audio = tmp_path / "01 - Intro.wav"
+    audio.write_bytes(b"not-a-real-wav")
+    out = tmp_path / "revoice"
+
+    def fake(files, language, progress, cancel):
+        assert files[0] == audio and language is None
+        progress(1.0, "Intro")
+        return [("Intro", "Hello from the recording.")]
+
+    code = user_cli.main(
+        ["revoice", str(audio), "--out", str(out), "--json"],
+        transcribe_fn=fake,
+    )
+    assert code == 0
+    lines = _json_lines(capsys.readouterr().out)
+    assert lines[0]["stage"] == "transcribe"
+    text_path = Path(lines[-1]["outputs"][0])
+    assert text_path.is_file()
+    body = text_path.read_text(encoding="utf-8")
+    assert body.startswith("# Intro") and "Hello from the recording." in body
+
+
+def test_diag_json_and_human(tmp_path, monkeypatch, capsys):
+    import infra.diagnostics as dg
+
+    made = []
+    monkeypatch.setattr(dg, "system_info", lambda **_kw: {"app_version": "x", "gpu": {}})
+    monkeypatch.setattr(dg, "summary_lines", lambda _info: ["Voxprint x"])
+    monkeypatch.setattr(dg, "write_report", lambda p, **_kw: made.append(Path(p)) or Path(p))
+    dest = tmp_path / "d.zip"
+    assert user_cli.main(["diag", "--out", str(dest)]) == 0
+    assert made == [dest]
+    assert "Diagnostic report" in capsys.readouterr().out
+    assert user_cli.main(["diag", "--out", str(dest), "--json"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["ok"] is True and data["command"] == "diag"
+    assert str(dest) in data["outputs"]
+    assert data["summary"] == ["Voxprint x"]
+
+
+def test_revoice_missing_audio(tmp_path, capsys):
+    code = user_cli.main(
+        ["revoice", str(tmp_path / "missing.wav"), "--out", str(tmp_path / "out")],
+        transcribe_fn=lambda *_a, **_k: [],
+    )
+    assert code == user_cli.EXIT_INPUT
+    assert "Fix:" in capsys.readouterr().err
