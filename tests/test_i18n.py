@@ -53,7 +53,7 @@ def test_every_key_used_in_code_exists():
     used |= {f"preset.{c}" for c in ("fast", "balanced", "maximum", "manual")} | {f"preset.desc_{c}" for c in ("fast", "balanced", "maximum", "manual")}
     used |= {f"consent.{k}_{c}" for k in ("scope", "badge", "tip") for c in ("commercial", "public_noncommercial", "private_only")}
     used |= {f"consent.mode_{c}" for c in ("auto", "manual", "none")} | {f"consent.hint_{c}" for c in ("auto", "manual", "none")}
-    used |= {f"check.sugg_{c}" for c in ("no_stop", "quiet", "wer", "pitch")} | {f"check.verdict_{c}" for c in ("good", "warn", "bad")}
+    used |= {f"check.sugg_{c}" for c in ("no_stop", "quiet", "wer", "pitch", "sim", "mos")} | {f"check.verdict_{c}" for c in ("good", "warn", "bad")}
     used |= {f"preset.adv_{c}" for c in ("epochs", "rank", "alpha", "lr", "accum")}     # dynamic keys of the Train window presets
     from infra.install_state import ALL_CODES
     used |= {f"health.{c}" for c in ALL_CODES}          # install-check reason codes (dynamic key)

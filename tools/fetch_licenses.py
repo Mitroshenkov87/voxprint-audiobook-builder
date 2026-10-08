@@ -42,6 +42,7 @@ SOURCES = {
     "imageio-ffmpeg": ("repo", "imageio/imageio-ffmpeg"),
     "einops": ("repo", "arogozhnikov/einops"),
     "onnxruntime": ("repo", "microsoft/onnxruntime"),
+    "dnsmos-code": ("url", "https://raw.githubusercontent.com/microsoft/DNS-Challenge/591184a9fcb2cbdec02520fed81a32bbbf9d73ff/LICENSE-CODE"),   # DNSMOS reference code (MIT); the model itself is CC-BY-4.0
     "nagisa": ("repo", "taishi-i/nagisa"),
     "sox": ("repo", "rabitt/pysox"),
     "ru-normalizr": ("repo", "NickZaitsev/ru-normalizr"),

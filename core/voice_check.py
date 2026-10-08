@@ -4,6 +4,11 @@ Used by the automatic post-training check and by the quick previews.  Metrics: w
 (babbling to the token limit was the failure of the strong-learning-rate runs), recognition error rate (WER) of the sample
 against the text it should say, and the median pitch (F0) compared with the reference, in semitones - a male voice that
 comes out 4+ semitones higher sounds female.  The verdict is only a hint; the ear has the last word.
+
+Optional extra metrics, computed by the caller and only able to raise a *warning* (their thresholds are first guesses that
+NEED VALIDATION ON A GPU run with real voices): speaker similarity (cosine of the Qwen3-TTS speaker-encoder embeddings of the
+sample and of the voice's reference, see :func:`cosine`) and a predicted MOS (DNSMOS OVRL, :mod:`core.mos`).  The character
+error rate (CER) is reported next to the WER; the automatic checkpoint pick scores by it (finer than words on short phrases).
 """
 from __future__ import annotations
 
@@ -18,6 +23,10 @@ GOOD, WARN, BAD = "good", "warn", "bad"
 SEMITONES_WARN, SEMITONES_BAD = 3.0, 6.0
 WER_WARN, WER_BAD = 0.25, 0.5
 MIN_RMS_DBFS = -45.0
+#: Speaker similarity below this warns (same-speaker clips of the Qwen encoder agree at ~0.7 cosine, a centroid at 0.85+).
+SIM_WARN = 0.65
+#: DNSMOS OVRL below this warns (clean read speech scores ~3-3.5 on the 1-5 scale).
+MOS_WARN = 2.6
 
 
 @dataclass
@@ -30,12 +39,18 @@ class Check:
     semitones: Optional[float]
     rms_dbfs: float
     verdict: str = GOOD
-    issues: List[str] = field(default_factory=list)      # codes: no_stop, quiet, wer, pitch, no_pitch
+    issues: List[str] = field(default_factory=list)      # codes: no_stop, quiet, wer, pitch, no_pitch, sim, mos
+    cer: Optional[float] = None
+    sim: Optional[float] = None                          # speaker similarity to the voice's reference (cosine)
+    mos: Optional[float] = None                          # predicted MOS (DNSMOS OVRL, 1-5)
 
     def as_dict(self) -> dict:
         return {"seconds": round(self.seconds, 1), "wer": None if self.wer is None else round(self.wer, 2),
+                "cer": None if self.cer is None else round(self.cer, 3),
                 "f0_hz": round(self.f0, 1), "ref_f0_hz": round(self.ref_f0, 1),
                 "semitones": None if self.semitones is None else round(self.semitones, 1),
+                "sim": None if self.sim is None else round(self.sim, 3),
+                "mos": None if self.mos is None else round(self.mos, 2),
                 "verdict": self.verdict, "issues": list(self.issues)}
 
 
@@ -90,12 +105,40 @@ def wer(ref: str, hyp: str) -> float:
     return d[len(h)] / max(1, len(r))
 
 
+def _chars(s: str) -> str:
+    return "".join(_words(s))
+
+
+def cer(ref: str, hyp: str) -> float:
+    """Character error rate (edit distance over letters and digits, spaces and punctuation ignored / reference length)."""
+    r, h = _chars(ref), _chars(hyp)
+    d = list(range(len(h) + 1))
+    for i in range(1, len(r) + 1):
+        prev, d[0] = d[0], i
+        for j in range(1, len(h) + 1):
+            cur = d[j]
+            d[j] = min(d[j] + 1, d[j - 1] + 1, prev + (r[i - 1] != h[j - 1]))
+            prev = cur
+    return d[len(h)] / max(1, len(r))
+
+
+def cosine(a, b) -> Optional[float]:
+    """Cosine similarity of two embeddings; ``None`` when either is missing or zero."""
+    if a is None or b is None:
+        return None
+    x, y = np.asarray(a, dtype=np.float64).reshape(-1), np.asarray(b, dtype=np.float64).reshape(-1)
+    n = float(np.linalg.norm(x) * np.linalg.norm(y))
+    return float(np.dot(x, y) / n) if n > 0 and x.shape == y.shape else None
+
+
 def check_sample(audio: np.ndarray, sr: int, text: str, ref_audio: np.ndarray, ref_sr: int, *, asr=None,
-                 language: Optional[str] = None, max_seconds: float = 0.0, asr_text: Optional[str] = None) -> Check:
+                 language: Optional[str] = None, max_seconds: float = 0.0, asr_text: Optional[str] = None,
+                 sim: Optional[float] = None, mos: Optional[float] = None) -> Check:
     """Check one synthesized ``audio`` that should say ``text``.
 
     ``max_seconds`` is the generation cap used for it (``tts_engine.max_tokens_for(text) / 12.5``): a sample that reaches the
     cap never stopped.  ``asr`` (a :class:`core.asr.BaseASR`) or a ready ``asr_text`` provides the recognised text for the WER.
+    ``sim`` (speaker similarity) and ``mos`` (DNSMOS OVRL) are optional extra metrics measured by the caller.
     """
     secs = len(audio) / sr
     rms = 20 * math.log10(max(float(np.sqrt(np.mean(np.square(audio)))) if len(audio) else 0.0, 1e-9))
@@ -103,7 +146,7 @@ def check_sample(audio: np.ndarray, sr: int, text: str, ref_audio: np.ndarray, r
     w = wer(text, hyp) if hyp is not None else None
     f0, ref_f0 = f0_median(audio, sr), f0_median(ref_audio, ref_sr)
     st = semitones(f0, ref_f0)
-    c = Check(secs, max_seconds, w, f0, ref_f0, st, rms)
+    c = Check(secs, max_seconds, w, f0, ref_f0, st, rms, cer=cer(text, hyp) if hyp is not None else None, sim=sim, mos=mos)
     bad = warn = False
     if max_seconds and secs >= max_seconds - 0.6:
         c.issues.append("no_stop"); bad = True
@@ -115,5 +158,9 @@ def check_sample(audio: np.ndarray, sr: int, text: str, ref_audio: np.ndarray, r
         c.issues.append("no_pitch")
     elif abs(st) > SEMITONES_WARN:
         c.issues.append("pitch"); bad |= abs(st) > SEMITONES_BAD; warn = True
+    if sim is not None and sim < SIM_WARN:
+        c.issues.append("sim"); warn = True
+    if mos is not None and mos < MOS_WARN:
+        c.issues.append("mos"); warn = True
     c.verdict = BAD if bad else (WARN if warn else GOOD)
     return c

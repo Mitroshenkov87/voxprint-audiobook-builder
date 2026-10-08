@@ -72,6 +72,23 @@
    }
   },
   {
+   "id": "dnsmos",
+   "name": "DNSMOS P.835 (microsoft/DNS-Challenge, sig_bak_ovr.onnx)",
+   "kind": "model",
+   "ship": "download",
+   "license": "CC-BY-4.0 (model) / MIT (reference code)",
+   "license_files": [
+    "CC-BY-4.0",
+    "dnsmos-code"
+   ],
+   "url": "https://github.com/microsoft/DNS-Challenge/tree/master/DNSMOS",
+   "purpose": {
+    "en": "Predicts the perceived quality (MOS) of a voice sample for the automatic voice check (about 1.2 MB, runs on the CPU). Credit: Reddy, Gopal, Cutler, \"DNSMOS P.835\", ICASSP 2022, Microsoft; used unmodified",
+    "de": "Sagt die wahrgenommene Qualität (MOS) eines Stimmbeispiels für die automatische Stimmprüfung voraus (ca. 1,2 MB, läuft auf der CPU). Quelle: Reddy, Gopal, Cutler, \"DNSMOS P.835\", ICASSP 2022, Microsoft; unverändert verwendet",
+    "ru": "Предсказывает воспринимаемое качество (MOS) образца голоса для автоматической проверки голоса (около 1,2 МБ, работает на процессоре). Авторы: Reddy, Gopal, Cutler, «DNSMOS P.835», ICASSP 2022, Microsoft; используется без изменений"
+   }
+  },
+  {
    "id": "opus-mt",
    "name": "Opus-MT translation models (Helsinki-NLP/opus-mt-ru-en, en-ru, de-en, en-de)",
    "kind": "model",

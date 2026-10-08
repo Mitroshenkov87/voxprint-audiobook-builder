@@ -282,23 +282,26 @@ def _quality_check(req, res, build, asr_factory, deps, cancel) -> None:
         adapter = Path(res.adapter_path)
         lang = build.training_language
         text = preview_runner.SAMPLE_TEXT.get(lang, preview_runner.SAMPLE_TEXT["english"])
+        ref, ref_sr = au.load_audio(adapter / "ref_sample.wav", 24000)
         eng = (deps["engine_factory"](adapter, lang) if deps.get("engine_factory")
                else preview_runner._default_engine(adapter, lang, merge=True))
         try:
             audio = np.asarray(eng.synthesize(text), dtype=np.float32).reshape(-1)
             sr = int(getattr(eng, "sample_rate", 24000))
+            # speaker similarity with the model's own encoder, while the engine is still loaded
+            sim = preview_runner.sample_similarity(eng, audio, sr, preview_runner.reference_embedding(eng, adapter, ref, ref_sr))
         finally:
             try:
                 eng.close()
             except Exception:  # noqa: BLE001
                 pass
+        mos = preview_runner.mos_of(preview_runner.resolve_mos(deps.get("mos", preview_runner.AUTO)), audio, sr)
         asr = _asr_for_check(req, asr_factory)
         if asr is not None:
             asr.load()
         try:
-            ref, ref_sr = au.load_audio(adapter / "ref_sample.wav", 24000)
             chk = voice_check.check_sample(audio, sr, text, ref, ref_sr, asr=asr, language=lang.capitalize(),
-                                           max_seconds=max_tokens_for(text) / FRAMES_PER_SECOND)
+                                           max_seconds=max_tokens_for(text) / FRAMES_PER_SECOND, sim=sim, mos=mos)
         finally:
             if asr is not None:
                 asr.unload()
@@ -505,9 +508,21 @@ def _restore_backup_source(progress: ProgressCallback) -> None:
         log.warning("restoring the backup source failed: %s", exc)
 
 
+def _prefetch_dnsmos(progress: ProgressCallback) -> None:
+    """The 1.2 MB MOS model of the voice check (:mod:`infra.quality_models`), when step 1 of the Components window did not get
+    it.  Best effort: without it the check simply has no MOS value."""
+    from infra import quality_models
+
+    try:
+        quality_models.ensure_dnsmos(lambda f, m="": progress(Stage.MODEL, 1.0, m))
+    except Exception as exc:  # noqa: BLE001 - never block the first-run model step
+        log.warning("DNSMOS download failed: %s", exc)
+
+
 def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[List[str]] = None,
                     ensure=None) -> List[str]:
-    """First run: download ALL required models automatically (TTS, aligner, speech recognition, SAGE), with no "quality"
+    """First run: download ALL required models automatically (TTS, aligner, speech recognition, SAGE, the small DNSMOS file of
+    the voice check), with no "quality"
     button in between.  A Voxprint backup chosen as models source is restored first, copies in the chosen models folder /
     other programs are used as they are, and only what is still missing is downloaded (multi-connection, hash-checked).
     Returns the list of repositories that were downloaded."""
@@ -525,6 +540,8 @@ def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[
     for repo, size in zip(todo, sizes):
         ensure(repo, lambda s, f, m, b=base, sz=size: progress(Stage.MODEL, min(1.0, (b + sz * float(f)) / total), m))
         base += size
+    if ensure is md.ensure_model:
+        _prefetch_dnsmos(progress)
     if ensure is md.ensure_model and sys.platform == "win32":
         from infra import assets   # system ffmpeg, else the pinned LGPL build (best effort, never blocks)
 

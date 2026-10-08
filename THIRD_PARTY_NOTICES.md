@@ -40,6 +40,14 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 * Status: downloaded on first start
 * Licence text: [`licenses/sage-fredt5.txt`](licenses/sage-fredt5.txt)
 
+### DNSMOS P.835 (microsoft/DNS-Challenge, sig_bak_ovr.onnx)
+
+* Purpose: Predicts the perceived quality (MOS) of a voice sample for the automatic voice check (about 1.2 MB, runs on the CPU). Credit: Reddy, Gopal, Cutler, "DNSMOS P.835", ICASSP 2022, Microsoft; used unmodified
+* Licence: CC-BY-4.0 (model) / MIT (reference code)
+* Project: <https://github.com/microsoft/DNS-Challenge/tree/master/DNSMOS>
+* Status: downloaded on first start
+* Licence text: [`licenses/CC-BY-4.0.txt`](licenses/CC-BY-4.0.txt), [`licenses/dnsmos-code.txt`](licenses/dnsmos-code.txt)
+
 ### Opus-MT translation models (Helsinki-NLP/opus-mt-ru-en, en-ru, de-en, en-de)
 
 * Purpose: Optional offline machine translation of a book before narration (English, Russian, German; downloaded on request, about 300 MB per direction). Credit: OPUS-MT, University of Helsinki / Helsinki-NLP (Tiedemann and Thottingal, 2020). Machine translation quality varies.

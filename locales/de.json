@@ -711,5 +711,8 @@
  "preview.strength_full": "{scale} (wie trainiert)",
  "preview.chosen_scale": "Variante {v} mit Stimmstärke {scale} gewählt: Ihre Einstellungen stehen jetzt unter „Manuell“, und die Stärke wird mit der Stimme gespeichert. Drücken Sie die Trainingsschaltfläche für den vollständigen Lauf.",
  "voices.field_strength": "Stimmstärke",
- "voices.strength_note": "Stimmstärke (0,10–1,00): wie stark der trainierte Adapter die Stimme beim Vorlesen prägt. 1.00 ist genau wie trainiert (Stimmen, die vor dieser Einstellung trainiert wurden, nutzen 1.00); kleinere Werte klingen oft ruhiger und natürlicher. Nach einer Änderung werden Kapitel mit der neuen Stärke neu synthetisiert."
+ "voices.strength_note": "Stimmstärke (0,10–1,00): wie stark der trainierte Adapter die Stimme beim Vorlesen prägt. 1.00 ist genau wie trainiert (Stimmen, die vor dieser Einstellung trainiert wurden, nutzen 1.00); kleinere Werte klingen oft ruhiger und natürlicher. Nach einer Änderung werden Kapitel mit der neuen Stärke neu synthetisiert.",
+ "check.sugg_sim": "Das Beispiel klingt Ihrer Aufnahme weniger ähnlich als erwartet: Versuchen Sie eine andere Stimmstärke oder eine längere, gleichmäßigere Aufnahme.",
+ "check.sugg_mos": "Die vorhergesagte Klangqualität ist niedrig (Rauschen oder Verzerrung): Versuchen Sie eine geringere Stimmstärke oder eine sauberere Aufnahme.",
+ "preview.row_extra": "Ähnlichkeit mit Ihrer Stimme {sim} (1.00 = identisch), vorhergesagte Qualität {mos} von 5"
 }

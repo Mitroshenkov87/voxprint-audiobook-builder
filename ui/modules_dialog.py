@@ -8,8 +8,8 @@ libraries are imported lazily, no restart).
 
 Flow on the first start (``autostart=True``, see ``main._offer_components``):
 
-1. step 1 "program components": the missing modules, then :data:`infra.text_models.COMPONENT_EXTRAS` (a failed extra is not
-   fatal: the model download of step 2 lists it again);
+1. step 1 "program components": the missing modules, then :data:`infra.text_models.COMPONENT_EXTRAS` and the DNSMOS file of
+   the voice check (a failed extra is not fatal: the model download of step 2 lists it again);
 2. step 2 "models": ``models_start(hook)`` starts the main window's first-run model download (TTS, alignment, speech recognition
    ...: :func:`workers.pipeline_runner.prefetch_models`, which honours the chosen models folder, existing copies and a backup)
    and the window mirrors its progress.  The download keeps running in the main window if this window is closed.
@@ -33,17 +33,25 @@ Progress = Callable[[float, str], None]
 
 
 def default_extras(progress: Progress) -> List[str]:
-    """Step 1 extras: the text models of :data:`infra.text_models.COMPONENT_EXTRAS` (SAGE), progress ``(fraction, message)``."""
-    from infra import text_models
+    """Step 1 extras: the text models of :data:`infra.text_models.COMPONENT_EXTRAS` (SAGE), then the voice-check MOS model
+    (DNSMOS, 1.2 MB, :mod:`infra.quality_models`); progress ``(fraction, message)``."""
+    from infra import quality_models, text_models
 
-    return text_models.ensure_component_extras(lambda _stage, f, m="": progress(float(f), m))
+    text_bytes = sum(m.size_mb for m in text_models.missing_component_extras()) * 1024 ** 2
+    mos_bytes = quality_models.missing_bytes()
+    share = text_bytes / float(text_bytes + mos_bytes) if text_bytes + mos_bytes else 1.0
+    done = text_models.ensure_component_extras(lambda _stage, f, m="": progress(share * float(f), m))
+    if mos_bytes:
+        quality_models.ensure_dnsmos(lambda f, m="": progress(share + (1.0 - share) * float(f), m))
+        done.append("dnsmos")
+    return done
 
 
 def default_extras_bytes() -> int:
     """Download size of the extras that are still missing (0 = nothing to do)."""
-    from infra import text_models
+    from infra import quality_models, text_models
 
-    return sum(m.size_mb for m in text_models.missing_component_extras()) * 1024 ** 2
+    return sum(m.size_mb for m in text_models.missing_component_extras()) * 1024 ** 2 + quality_models.missing_bytes()
 
 
 class ModulesWorker(QThread):

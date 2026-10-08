@@ -144,6 +144,55 @@ def best_scale(entries: List[dict]) -> Optional[float]:
     return order[int(recommend(pseudo))]["scale"]
 
 
+AUTO = "auto"     # ``mos=AUTO``: the DNSMOS scorer if it is downloaded (core.mos.default_mos), never a download
+
+
+def resolve_mos(mos):
+    """``AUTO`` -> the downloaded DNSMOS scorer or ``None``; anything else is returned as it is (``None`` = no MOS)."""
+    if mos == AUTO:
+        from core.mos import default_mos
+
+        return default_mos()
+    return mos
+
+
+def reference_embedding(eng, adapter_dir: Path, ref: np.ndarray, ref_sr: int):
+    """The speaker embedding samples are compared with: the encoder's embedding of the reference clip; ``None`` when the
+    engine has no speaker encoder (test fakes) or it failed."""
+    fn = getattr(eng, "speaker_embedding", None)
+    if not callable(fn):
+        return None
+    try:
+        return fn(ref, ref_sr)
+    except Exception as exc:  # noqa: BLE001 - an extra metric must never break the check
+        log.warning("reference speaker embedding failed: %s", exc)
+        return None
+
+
+def sample_similarity(eng, audio: np.ndarray, sr: int, ref_emb) -> Optional[float]:
+    """Speaker similarity of ``audio`` to ``ref_emb`` with the engine's own speaker encoder (0 MB extra; the same encoder
+    that conditions the voice, so it "judges itself" - good for ranking, not an independent verdict)."""
+    if ref_emb is None:
+        return None
+    try:
+        return voice_check.cosine(eng.speaker_embedding(audio, sr), ref_emb)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("speaker similarity failed: %s", exc)
+        return None
+
+
+def mos_of(mos_model, audio: np.ndarray, sr: int) -> Optional[float]:
+    """DNSMOS OVRL of ``audio`` or ``None``."""
+    if mos_model is None:
+        return None
+    try:
+        r = mos_model.score(audio, sr)
+        return None if not r else float(r["ovrl"])
+    except Exception as exc:  # noqa: BLE001
+        log.warning("MOS prediction failed: %s", exc)
+        return None
+
+
 def subset(dataset_dir: Path, out: Path, n_max: int = MAX_CLIPS) -> int:
     """Copy up to ``n_max`` evenly spaced clips (and ref.wav / ref_text.txt) into ``out``; returns the count."""
     rows = read_metadata_jsonl(Path(dataset_dir) / "metadata.jsonl")
@@ -174,7 +223,7 @@ def clips_for_time_cap(plan: TrainPlan, gpu: GpuInfo, n: int, cap: float = MAX_S
 def run_previews(dataset_dir, out_dir, base_plan: TrainPlan, *, compare: bool, language: str, gpu: GpuInfo,
                  progress: ProgressCallback = noop_progress, cancel: Optional[CancelToken] = None,
                  train_fn: Optional[Callable] = None, engine_factory: Optional[Callable] = None, asr=None,
-                 force_cpu: bool = False) -> List[PreviewItem]:
+                 force_cpu: bool = False, mos=AUTO) -> List[PreviewItem]:
     """Train the quick variants on a subset, synthesize the sample of each and check it.
 
     ``train_fn(dataset, out, progress, cancel, force_cpu, plan=..., language=...) -> adapter folder`` defaults to
@@ -182,6 +231,8 @@ def run_previews(dataset_dir, out_dir, base_plan: TrainPlan, *, compare: bool, l
     ``synthesize(text) -> samples`` and ``sample_rate`` (and ``close()``), defaulting to the real Qwen3 engine.  When the
     engine also has ``set_adapter_scale(scale)``, every variant is synthesized at each of
     :data:`core.adapter_strength.PREVIEW_SCALES` and the best-checking strength is pre-selected (the user can switch).
+    An engine with ``speaker_embedding(audio, sr)`` adds the speaker similarity; ``mos`` (default: DNSMOS if downloaded) the
+    predicted MOS.
     """
     import time
 
@@ -196,6 +247,7 @@ def run_previews(dataset_dir, out_dir, base_plan: TrainPlan, *, compare: bool, l
     variants = make_variants(base_plan, compare)
     items: List[PreviewItem] = []
     ref, ref_sr = au.load_audio(Path(dataset_dir) / "ref.wav", 24000)
+    mos = resolve_mos(mos)
     for vi, v in enumerate(variants):
         cancel.check()
         base_f = vi / len(variants)
@@ -213,6 +265,7 @@ def run_previews(dataset_dir, out_dir, base_plan: TrainPlan, *, compare: bool, l
         eng = engine_factory(adapter, language) if engine_factory else _default_engine(adapter, language)
         entries: List[dict] = []
         try:
+            ref_emb = reference_embedding(eng, adapter, ref, ref_sr)
             scalable = callable(getattr(eng, "set_adapter_scale", None))
             for scale in (adapter_strength.PREVIEW_SCALES if scalable else (None,)):
                 cancel.check()
@@ -224,7 +277,8 @@ def run_previews(dataset_dir, out_dir, base_plan: TrainPlan, *, compare: bool, l
                 au.write_wav(wav, audio, sr)
                 chk = voice_check.check_sample(audio, sr, text, ref, ref_sr, asr=asr,
                                                language=(language or "").capitalize() or None,
-                                               max_seconds=max_tokens_for(text) / FRAMES_PER_SECOND)
+                                               max_seconds=max_tokens_for(text) / FRAMES_PER_SECOND,
+                                               sim=sample_similarity(eng, audio, sr, ref_emb), mos=mos_of(mos, audio, sr))
                 entries.append({"scale": scale, "wav": wav, "seconds": len(audio) / sr, "check": chk.as_dict()})
         finally:
             try:

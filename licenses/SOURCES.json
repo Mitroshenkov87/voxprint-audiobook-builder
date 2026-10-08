@@ -7,6 +7,7 @@
   "accelerate": "https://raw.githubusercontent.com/huggingface/accelerate/main/LICENSE",
   "bitsandbytes": "https://raw.githubusercontent.com/bitsandbytes-foundation/bitsandbytes/main/LICENSE",
   "ctc-forced-aligner": "https://raw.githubusercontent.com/MahmoudAshraf97/ctc-forced-aligner/main/LICENSE",
+  "dnsmos-code": "https://raw.githubusercontent.com/microsoft/DNS-Challenge/591184a9fcb2cbdec02520fed81a32bbbf9d73ff/LICENSE-CODE",
   "einops": "https://raw.githubusercontent.com/arogozhnikov/einops/main/LICENSE",
   "eng_to_ipa": "https://raw.githubusercontent.com/mphilli/English-to-IPA/master/LICENSE",
   "ffmpeg-gpl-3.0": "https://raw.githubusercontent.com/spdx/license-list-data/main/text/GPL-3.0-only.txt",

@@ -960,6 +960,9 @@ class MainWindow(QWidget):
                        wer="-" if wer is None else f"{round(100 * wer)} %",
                        pitch="-" if st is None else f"{st:+.1f}", verdict=tr("check.verdict_" + chk.get("verdict", "good"))
                        if chk.get("verdict", "good") != "good" else tr("check.verdict_good")))
+        if chk.get("sim") is not None or chk.get("mos") is not None:
+            lbl.setText(lbl.text() + "\n" + tr("preview.row_extra", sim="-" if chk.get("sim") is None else f"{chk['sim']:.2f}",
+                                                mos="-" if chk.get("mos") is None else f"{chk['mos']:.1f}"))
         hint.setText(" ".join(tr("check.sugg_" + c) for c in chk.get("issues", []) if c != "no_pitch"))
         hint.setVisible(bool(hint.text()))
 
