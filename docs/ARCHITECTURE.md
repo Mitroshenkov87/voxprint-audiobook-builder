@@ -11,7 +11,7 @@ ui/                     PySide6 windows and dialogs - no heavy work, only signal
 workers/                glue between UI and core: Qt threads (QThread) and Qt-free scenario runners
 core/                   the pipeline itself: audio/text processing, alignment, dataset, LoRA training, export. No Qt, no installer logic
 infra/                  everything around the pipeline: folders, environment probe, install state, downloads, updates, Windows glue
-locales/                en.json / de.json / ru.json - the only place with user-visible text
+locales/                en.json / de.json / ru.json / uk.json / lv.json - the only place with user-visible text
 credits.json, licenses/ third-party list (single source for the About dialog and THIRD_PARTY_NOTICES.md)
 installer/, build.bat   PyInstaller + Inno Setup packaging
 tools/                  maintenance scripts (fetch licence texts, generate notices)

@@ -5,6 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Added
+- **Ukrainian and Latvian interface** (`locales/uk.json`, `locales/lv.json`): Settings -> Language lists Українська and Latviešu next to English, Deutsch and Русский. Every UI string is translated; a system locale `uk` or `lv` is picked up the same way as `en` / `de` / `ru`.
+
 ## [0.1.1-beta] - 2026-10-08 - build 665 "Tikkun"
 
 Fixes and wishes from the first install on a real PC (RTX 4090 laptop, Windows 11, 150 % display scale). Codename *Tikkun*

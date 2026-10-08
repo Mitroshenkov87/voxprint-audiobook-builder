@@ -423,7 +423,7 @@ def test_format_defaults_groups_and_descriptions(app, lib):
     assert not n.format_checks[ex.FORMAT_M4B].isChecked() and not n.format_checks[ex.FORMAT_MP3_CHAPTERS].isChecked()
     assert "VLC" in n.lbl_players.text() and "Audiobookshelf" in n.lbl_players.text() and "varies by player" in n.lbl_players.text()
     # every format has a name and a one-line "where it plays" in every language
-    for lang in ("en", "ru", "de"):
+    for lang in i18n.LANGS:
         i18n.set_language(lang)
         from ui.narrate_window import format_texts
         texts = format_texts()

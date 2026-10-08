@@ -1,4 +1,4 @@
-"""Localization: key/placeholder parity of en/ru/de, language detection and switching, no hard-coded user strings in code."""
+"""Localization: key/placeholder parity of en/de/ru/uk/lv, language detection and switching, no hard-coded user strings in code."""
 import json
 import re
 from pathlib import Path
@@ -18,8 +18,9 @@ def _cat(lang):
     return json.loads((LOC / f"{lang}.json").read_text(encoding="utf-8"))
 
 
-def test_three_languages_and_identical_keys_and_placeholders():
-    assert LANGS == ("en", "de", "ru")
+def test_languages_and_identical_keys_and_placeholders():
+    assert LANGS == ("en", "de", "ru", "uk", "lv")
+    assert i18n.LANG_NAMES["uk"] == "Українська" and i18n.LANG_NAMES["lv"] == "Latviešu"
     assert set(i18n.LANG_NAMES) == set(LANGS)
     # no stray catalogs of dropped/unsupported languages
     assert sorted(p.stem for p in (ROOT / "locales").glob("*.json")) == sorted(LANGS)
@@ -40,6 +41,12 @@ def test_scripts_match_languages():
     c = _cat("ru")
     assert CYR.search(c["ui.btn_lora"]) and CYR.search(c["about.what"])
     assert c["ui.language"] == "Язык"
+    uk, lv = _cat("uk"), _cat("lv")
+    assert CYR.search(uk["ui.btn_lora"]) and uk["ui.language"] == "Мова"
+    assert lv["ui.language"] == "Valoda" and "ā" in lv["narr.start"] and "ī" in lv["ui.settings_title"]
+    # a handful of labels are the same in every language (format names, placeholder-only lines)
+    same = [k for k, v in en.items() if v == uk[k] or v == lv[k]]
+    assert len(same) < 20, same
 
 
 def test_every_key_used_in_code_exists():
@@ -106,7 +113,8 @@ def test_tr_fallbacks(monkeypatch):
 def test_normalize_code():
     n = i18n.normalize_code
     assert n("ru-RU") == "ru" and n("de_AT.UTF-8") == "de" and n("EN") == "en" and n("de-AT") == "de"
-    assert n("uk_UA.UTF-8") is None and n("be-BY") is None             # Ukrainian/Belarusian are no longer offered
+    assert n("uk_UA.UTF-8") == "uk" and n("lv_LV.UTF-8") == "lv"
+    assert n("be-BY") is None                                          # Belarusian is not offered
     assert n("fr-FR") is None and n("") is None and n(None) is None and n("C") is None
 
 
@@ -118,8 +126,12 @@ def test_detection_order(monkeypatch, tmp_path):
     assert i18n.detect_language() == "en"                       # the default is English
     i18n.reset()
     assert tr("ui.btn_lora") == "Create voice (LoRA)"
-    monkeypatch.setenv("LANG", "uk_UA.UTF-8")
+    monkeypatch.setenv("LANG", "fr_FR.UTF-8")
     assert i18n.detect_language() == "en"                       # unsupported system language -> English
+    monkeypatch.setenv("LANG", "uk_UA.UTF-8")
+    assert i18n.detect_language() == "uk"
+    monkeypatch.setenv("LANG", "lv_LV.UTF-8")
+    assert i18n.detect_language() == "lv"
     monkeypatch.setenv("LANG", "ru_RU.UTF-8")
     assert i18n.detect_language() == "ru"                       # the system language
     i18n.set_language("de", persist=True)
@@ -179,8 +191,8 @@ def test_ui_language_switcher_retranslates_and_persists(app):
     w = MainWindow(runner=lambda *a: None, autocheck=False, auto_open_folder=False)
     w.show()
     cmb = w.settings_dialog().cmb_lang
-    assert cmb.count() == 3 and cmb.currentData() == "ru"
-    assert [cmb.itemText(i) for i in range(3)] == ["English", "Deutsch", "Русский"]
+    assert cmb.count() == len(i18n.LANGS) and cmb.currentData() == "ru"
+    assert [cmb.itemText(i) for i in range(cmb.count())] == ["English", "Deutsch", "Русский", "Українська", "Latviešu"]
     w.set_language("en")
     assert w.btn_lora.text() == "Create voice (LoRA)" and w.btn_merge.text() == "Build universal model (~4 GB)"
     assert w.lbl_status.text() == "Choose the audio and the text - I will do the rest."
@@ -191,8 +203,13 @@ def test_ui_language_switcher_retranslates_and_persists(app):
     assert w.btn_dataset.text() == "Datensatz erstellen"
     w.set_language("ru")
     assert w.settings_dialog().btn_update.text() == _cat("ru")["ui.btn_update"]
-    w.set_language("uk")                                         # not offered any more: ignored
-    assert i18n.get_language() == "ru" and w.settings_dialog().cmb_lang.currentData() == "ru"
+    w.set_language("uk")
+    assert i18n.get_language() == "uk" and w.btn_lora.text() == _cat("uk")["ui.btn_lora"]
+    assert w.settings_dialog().cmb_lang.currentData() == "uk"
+    w.set_language("lv")
+    assert i18n.get_language() == "lv" and w.btn_dataset.text() == _cat("lv")["ui.btn_dataset"]
+    w.set_language("be")                                         # not offered: ignored
+    assert i18n.get_language() == "lv" and w.settings_dialog().cmb_lang.currentData() == "lv"
     # the chosen file is kept when the language changes
     w.set_audio(Path("/tmp/voice.wav"))
     w.set_language("en")

@@ -29,7 +29,7 @@ def test_fit_centres_and_clamp_pulls_a_window_back_on_screen(app):
     assert AVAIL.contains(w.frameGeometry())
 
 
-@pytest.mark.parametrize("lang", ["de", "ru"])           # the longest strings
+@pytest.mark.parametrize("lang", ["de", "ru", "uk", "lv"])   # the longest strings
 def test_every_window_fits_1707x1027_and_narrate_uses_two_columns(app, tmp_path, lang):
     from ui.about_dialog import AboutDialog
     from ui.modules_dialog import ModulesDialog

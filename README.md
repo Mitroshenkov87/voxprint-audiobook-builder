@@ -24,7 +24,7 @@
 * **Per-voice licences and consent** - every voice carries a licence and a usage scope; the UI shows whether commercial use is allowed ([voices](docs/VOICES.md)).
 * **Resumable and safe** - downloads, narration and backups continue where they stopped; SHA-256 checks everywhere.
 * **Local and private** - no account, no telemetry; your recordings never leave the computer ([privacy](docs/PRIVACY.md)).
-* UI in English, Deutsch and Русский; automatic text clean-up (numbers in words, abbreviations, footnotes) for Russian and English.
+* UI in English, Deutsch, Русский, Українська and Latviešu; automatic text clean-up (numbers in words, abbreviations, footnotes) for Russian and English.
 
 More: [all features and screenshots](docs/FEATURES.md) · [how it works](docs/HOW-IT-WORKS.md).
 

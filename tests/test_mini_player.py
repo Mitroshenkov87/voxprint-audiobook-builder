@@ -171,12 +171,12 @@ def test_texts_exist_in_every_language(app, tmp_path):
     pl = MiniPlayer(backend=FakeBackend())
     pl.set_plan([tmp_path / "x.wav"], live=True)
     seen = set()
-    for lang in ("en", "ru", "de"):
+    for lang in i18n.LANGS:
         i18n.set_language(lang)
         pl.retranslate()
         seen.add((pl.btn_play.text(), pl.lbl_title.text()))
         assert "{" not in pl.lbl_status.text()
-    assert len(seen) == 3
+    assert len(seen) == len(i18n.LANGS)
     i18n.set_language("en")
 
 

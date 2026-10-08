@@ -30,7 +30,7 @@ build.bat onedir       :: dist\Voxprint\ folder (preferred: faster start, and Qt
 Experimental thin installer (shell only, modules downloaded by the app): `build_thin.bat`, then `installer\build_online.ps1 -Thin` - see [THIN-INSTALLER.md](THIN-INSTALLER.md).
 Command-line maintenance flags of `main.py`: `--prefetch` (download models now), `--selftest`, `--selftest-imports`, `--selftest-narrate [voice]` (headless: narrates two sentences with the first voice, result in `<app home>\logs\selftest_narrate.txt`, exit code 0 / 1 / 2 = no voice), `--verify-install`, `--repair`.
 App data lives in `%LOCALAPPDATA%\Voxprint` (`models\`, `logs\`, `state\`, ...; override with `VOXPRINT_HOME`).
-Interface language override: `VOXPRINT_LANG=en|de|ru`.
+Interface language override: `VOXPRINT_LANG=en|de|ru|uk|lv`.
 
 ## Contributing
 Contributions are welcome - see [`CONTRIBUTING.md`](../CONTRIBUTING.md) and [`DEVELOPMENT.md`](DEVELOPMENT.md) (setup, tests, code style, localization, how to propose changes) and
@@ -46,18 +46,17 @@ CLI for stage-by-stage checks on a GPU machine: `python -m core.cli audio.wav te
 Regenerate the notices after editing `credits.json`: `python tools/gen_notices.py` (a test checks they are in sync).
 
 ### Localization
-Supported UI languages: **English (default), German, Russian**. Catalogs are flat JSON files `locales/{en,de,ru}.json` (`"ui.start": "...{name}..."`);
+Supported UI languages: **English (default), German, Russian, Ukrainian, Latvian**. Catalogs are flat JSON files `locales/{en,de,ru,uk,lv}.json` (`"ui.start": "...{name}..."`);
 `core/i18n.py` provides `tr(key, **params)`. Language order: `VOXPRINT_LANG`, saved choice (`state\language`), Windows user locale, English. A system language that
-is not supported (e.g. Ukrainian) falls back to English. Tests check that all catalogs have identical keys and placeholders and that no user-facing literals are left in the code.
+is not supported (e.g. French) falls back to English. Tests check that all catalogs have identical keys and placeholders and that no user-facing literals are left in the code.
 
 #### Adding a language
-Ukrainian and Belarusian were dropped on purpose (fewer languages to keep in sync); their last complete catalogs are in git history
-(`git show cdea827:locales/uk.json`, `...be.json`; component texts in `git show cdea827:credits.json`). To add a language `xx`:
+Belarusian was dropped on purpose (fewer languages to keep in sync); its last complete catalog is in git history
+(`git show cdea827:locales/be.json`; component texts in `git show cdea827:credits.json`). To add a language `xx`:
 1. `core/i18n.py`: append `"xx"` to `LANGS` and its own-language name to `LANG_NAMES` (the language switcher and the system-locale mapping `normalize_code` are driven by these two).
 2. `locales/xx.json`: copy `en.json` and translate all values; keep every key and every `{placeholder}` (a test enforces both).
 3. `credits.json`: add an `"xx"` text to every `purpose` (and `note`) entry - the credits test requires all `LANGS`.
-4. Run `python -m pytest` - the parity tests (`tests/test_i18n.py`, `tests/test_credits.py`) and the per-language UI tests iterate over `i18n.LANGS`; update the
-   places that count languages (the switcher test in `tests/test_i18n.py` and the `len(seen) == 3` checks in `tests/test_env_install.py` / `tests/test_model_locator.py`).
+4. Run `python -m pytest` - the parity tests (`tests/test_i18n.py`, `tests/test_credits.py`) and the per-language UI tests iterate over `i18n.LANGS`.
 5. Mention it in the README.
 
 ### Repository link

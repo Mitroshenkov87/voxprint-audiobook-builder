@@ -36,7 +36,7 @@ voice recording and a text file to ready output files you can load into a neural
   (1.7B or 0.6B base, 8-bit Adam, CPU fallback, automatic retry plan after out-of-memory).
 * Optional **universal model** (~4 GB, `custom_voice` format) merged from the adapter - works in any Qwen3-TTS app.
 * **`voice.json`** next to the adapter (schema 3): id, name, language (BCP-47 code), creation date (UTC), speech duration, epochs, base model, author, speaker, prepared by, organization, project link, licence (+ URL), gender, age group, the derived voice type, description and the derived `commercial_use`.
-* **Settings** dialog (gear): language (English, Deutsch, Русский), update check, model/data folders, repair, About.
+* **Settings** dialog (gear): language (English, Deutsch, Русский, Українська, Latviešu), update check, model/data folders, repair, About.
 * Scrollable window that stays usable on small screens (e.g. 1366x768 at 150% scaling).
 * Safe self-maintenance: verified-version updates with staging + smoke test + rollback, a repair command, a completion manifest.
 * Acrylic (glass) look on Windows 11 with a dark, high-contrast (WCAG AA) theme and a plain fallback.

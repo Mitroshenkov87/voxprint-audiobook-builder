@@ -103,7 +103,7 @@ def test_chosen_preset_and_manual_values_reach_the_task_request(app, tmp_path):
 def test_preset_texts_in_every_language():
     from core import i18n
     from core.i18n import tr
-    for lang in ("en", "ru", "de"):
+    for lang in i18n.LANGS:
         i18n.set_language(lang, persist=False)
         for k in ("preset.label", "preset.fast", "preset.desc_maximum", "preset.estimate", "preset.adv_lr", "preset.adv_hint"):
             assert tr(k) != k

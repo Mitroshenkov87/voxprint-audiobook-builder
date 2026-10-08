@@ -188,7 +188,7 @@ def test_test_only_voice_notes_in_narrate(app, lib, tmp_path):
     n = narrate(lib, tmp_path, [])
     n.refresh_voices()
     assert "Test use only" in n.lbl_voice_info.text() and "Personal use only" not in n.lbl_voice_info.text()
-    for lang in ("ru", "de"):
+    for lang in ("ru", "de", "uk", "lv"):
         i18n.set_language(lang)
         n.refresh_voices()
         assert n.lbl_voice_info.text().count("\n") >= 1

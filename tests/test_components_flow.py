@@ -294,7 +294,7 @@ def test_window_texts_in_every_language(app):          # noqa: F811
     d = ModulesDialog(manifest_fn=lambda: {"modules": []}, models_start=lambda hook: None)
     seen = set()
     try:
-        for lang in ("en", "ru", "de"):
+        for lang in i18n.LANGS:
             i18n.set_language(lang)
             d.retranslate()
             d._set_overall(0.5)
@@ -304,4 +304,4 @@ def test_window_texts_in_every_language(app):          # noqa: F811
     finally:
         i18n.set_language("en")
         d.shutdown()
-    assert len(seen) == 3
+    assert len(seen) == len(i18n.LANGS)

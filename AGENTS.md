@@ -16,7 +16,7 @@ Windows (Inno Setup, online/full/thin) and the Linux package: see [docs/BUILDING
 
 ## Invariants - do not break
 * **Windows and Linux must both work**: Windows-only code stays in `infra/platform_win.py` behind `sys.platform`; everything else imports cleanly on Linux (Linux is experimental: [docs/LINUX.md](docs/LINUX.md)).
-* **UI languages en / ru / de**: every user-visible string goes through `tr("key")`; all three catalogs keep identical keys and `{placeholders}` (tests enforce it).
+* **UI languages en / de / ru / uk / lv**: every user-visible string goes through `tr("key")`; all catalogs keep identical keys and `{placeholders}` (tests enforce it).
 * **No desktop shortcut** is created by the installer (Start menu entry only).
 * **Voices need consent**: every voice carries a licence and a consent scope (`voice.json`); never add or commit recordings/voices of other people; the output-use limits shown in the UI must stay accurate. Terms: [docs/legal/](docs/legal/EULA-audiobook-builder.md). Not legal advice.
 * **No secrets** in the repo, logs or commits (tokens, keys, personal paths); downloads are hash-checked (SHA-256) - keep it that way.
