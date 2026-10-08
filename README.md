@@ -22,6 +22,7 @@
 * **Train your voice** - give it a 5-15 minute recording (yours, or of someone who agreed) and the text you read; everything else is automatic ([Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) LoRA).
 * **Offline translation** before narrating: Russian, English, German ([details](docs/TRANSLATION.md)).
 * **Re-voice** a recording: turn it into editable text, or convert it directly into one of your voices ([details](docs/REVOICE.md)).
+* **Two open voices included** - *Boaz* (male) and *Tirzah* (female), Russian, CC0-1.0, trained only from public-domain LibriVox recordings ([details](voices/BUNDLED.md)). Listen: [Genesis 1:1-2:3 with Boaz](samples/genesis-boaz.mp3) · [with Tirzah](samples/genesis-tirzah.mp3) ([samples](samples/README.md)).
 * **Per-voice licences and consent** - every voice carries a licence and a usage scope; the UI shows whether commercial use is allowed ([voices](docs/VOICES.md)).
 * **Resumable and safe** - downloads, narration and backups continue where they stopped; SHA-256 checks everywhere.
 * **Local and private** - no account, no telemetry; your recordings never leave the computer ([privacy](docs/PRIVACY.md)).
