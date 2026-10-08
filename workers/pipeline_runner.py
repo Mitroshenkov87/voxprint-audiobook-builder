@@ -77,6 +77,7 @@ class TaskRequest:
     preset: str = "balanced"             # training preset: fast / balanced / maximum / manual (core.train_presets)
     manual: Optional[object] = None      # core.train_presets.Manual for the "manual" preset
     adapter_scale: Optional[float] = None  # LoRA strength chosen in the preview (None = automatic, core/adapter_strength.py)
+    auto_pick: bool = False              # LoRA: hold out ~5 % of the clips, then pick the best checkpoint + strength (core/checkpoint_pick.py)
 
     def voice_name(self) -> str:
         """Voice name = the recording's file name (or the adapter folder's name); also the result folder name in ``output/``."""
@@ -135,6 +136,7 @@ class TaskResult:
     quality: Optional[dict] = None       # LoRA with quality_check: the checks of the sample (voice_check.Check.as_dict())
     consent: Optional[dict] = None       # the voice.json "consent" block written for this voice (LoRA only)
     asr_report: Optional[object] = None  # no-transcript mode: core.asr_dataset.AsrReport (files, kept clips, seconds ...)
+    pick: Optional[dict] = None          # LoRA with auto_pick: the chosen epoch / strength and every candidate's scores
 
     @property
     def open_dir(self) -> Path:
@@ -315,6 +317,36 @@ def _quality_check(req, res, build, asr_factory, deps, cancel) -> None:
         log.warning("voice quality check failed: %s", exc)
 
 
+HOLDOUT_FRACTION = 0.05     # share of clips kept out of training for the automatic checkpoint pick
+
+
+def _auto_pick(req, res, build, asr_factory, deps, progress, cancel) -> Optional[float]:
+    """Pick the best checkpoint and adapter strength (:mod:`core.checkpoint_pick`); returns the strength for voice.json, or
+    ``None`` (the user's preview choice stands, or the pick could not run).  Never fails a finished training run."""
+    from core import adapter_strength, checkpoint_pick
+    from core.errors import CancelledByUser
+    from workers import preview_runner
+
+    scales = (req.adapter_scale,) if req.adapter_scale is not None else adapter_strength.PREVIEW_SCALES
+    factory = deps.get("engine_factory") or (lambda a, l: preview_runner._default_engine(a, l, merge=False))
+    try:
+        result = checkpoint_pick.run_pick(res.adapter_path, build.training_language, engine_factory=factory,
+                                          asr=_asr_for_check(req, asr_factory),
+                                          mos=preview_runner.resolve_mos(deps.get("mos", preview_runner.AUTO)),
+                                          scales=scales, progress=progress, cancel=cancel)
+        if result is None:
+            return None
+        checkpoint_pick.apply_pick(res.adapter_path, result)
+        res.pick = result
+        return None if req.adapter_scale is not None else float(result["best_scale"])
+    except CancelledByUser:
+        raise
+    except Exception as exc:  # noqa: BLE001 - the final adapter is complete; keep it
+        log.warning("automatic checkpoint pick failed: %s", exc, exc_info=True)
+        res.warnings.append(tr("warn.pick_failed"))
+        return None
+
+
 def _consent_block(req: TaskRequest, res: TaskResult, progress: ProgressCallback, cancel: CancelToken,
                    asr_factory) -> Optional[dict]:
     """The ``consent`` block for voice.json.  "auto" reads the spoken statement at the end of the recording; whatever goes wrong
@@ -448,11 +480,14 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
 
             kw["plan"] = build_plan(req.preset, detect_gpu(), build.n_segments, force_cpu=req.force_cpu,
                                     language=build.training_language, manual=req.manual)
+        if req.auto_pick:
+            kw["holdout_fraction"] = HOLDOUT_FRACTION
         res.adapter_path = train_lora_from_dataset(dataset_dir, output_dir, progress, cancel, req.force_cpu,
                                                    language=build.training_language, warnings_out=res.warnings, **kw)
+        picked_scale = _auto_pick(req, res, build, asr_factory, synth_deps or {}, progress, cancel) if req.auto_pick else None
         remember_adapter(res.adapter_path, req.voice_name())
         cblock = _consent_block(req, res, progress, cancel, asr_factory)
-        info = _write_voice_json(req, res.adapter_path, build.language, build.total_seconds, cblock)
+        info = _write_voice_json(req, res.adapter_path, build.language, build.total_seconds, cblock, picked_scale)
         res.voice_id = _register_voice(res.adapter_path, info, voice_library,
                                        typed_id=not req.voice_display_name.strip())   # a typed name is used as is
         if not res.voice_id:

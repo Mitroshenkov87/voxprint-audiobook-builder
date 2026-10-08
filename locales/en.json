@@ -714,5 +714,10 @@
  "voices.strength_note": "Voice strength (0.10-1.00): how strongly the trained adapter shapes the voice when reading. 1.00 is exactly as trained (voices trained before this setting use 1.00); lower values often sound calmer and more natural. After a change, chapters are synthesized again with the new strength.",
  "check.sugg_sim": "The sample sounds less like your recording than expected: try the other voice strength or a longer, more even recording.",
  "check.sugg_mos": "The predicted sound quality is low (noise or distortion): try a lower voice strength or a cleaner recording.",
- "preview.row_extra": "Similarity to your voice {sim} (1.00 = identical), predicted quality {mos} of 5"
+ "preview.row_extra": "Similarity to your voice {sim} (1.00 = identical), predicted quality {mos} of 5",
+ "pick.checkbox": "Pick the best checkpoint and voice strength automatically (recommended)",
+ "pick.tip": "About 5% of the clips are kept out of training. Afterwards the last passes are tried at several voice strengths on those unseen sentences and scored by speech recognition, similarity to your voice and predicted sound quality; the best one is kept, the other checkpoints are deleted. Adds a few minutes on a fast graphics card.",
+ "progress.pick": "Choosing the best checkpoint: candidate {i} of {n}…",
+ "progress.pick_done": "Best checkpoint: pass {epoch}, voice strength {scale}",
+ "warn.pick_failed": "The automatic checkpoint pick did not run; the voice uses the last pass."
 }

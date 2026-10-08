@@ -55,6 +55,7 @@ class TrainPlan:
     attn_implementation: str = "eager"   # as in train_lora.py; flash-attn is not used on Windows
     warnings: List[str] = field(default_factory=list)
     speaker_centroid: bool = True  # averaged speaker embedding over clean clips (core/speaker_centroid.py) instead of ref.wav
+    holdout_fraction: float = 0.0  # clips kept out of training for the validation loss / automatic checkpoint pick (0 = none)
 
     @property
     def effective_batch(self) -> int:

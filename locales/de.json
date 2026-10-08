@@ -714,5 +714,10 @@
  "voices.strength_note": "Stimmstärke (0,10–1,00): wie stark der trainierte Adapter die Stimme beim Vorlesen prägt. 1.00 ist genau wie trainiert (Stimmen, die vor dieser Einstellung trainiert wurden, nutzen 1.00); kleinere Werte klingen oft ruhiger und natürlicher. Nach einer Änderung werden Kapitel mit der neuen Stärke neu synthetisiert.",
  "check.sugg_sim": "Das Beispiel klingt Ihrer Aufnahme weniger ähnlich als erwartet: Versuchen Sie eine andere Stimmstärke oder eine längere, gleichmäßigere Aufnahme.",
  "check.sugg_mos": "Die vorhergesagte Klangqualität ist niedrig (Rauschen oder Verzerrung): Versuchen Sie eine geringere Stimmstärke oder eine sauberere Aufnahme.",
- "preview.row_extra": "Ähnlichkeit mit Ihrer Stimme {sim} (1.00 = identisch), vorhergesagte Qualität {mos} von 5"
+ "preview.row_extra": "Ähnlichkeit mit Ihrer Stimme {sim} (1.00 = identisch), vorhergesagte Qualität {mos} von 5",
+ "pick.checkbox": "Besten Zwischenstand und Stimmstärke automatisch wählen (empfohlen)",
+ "pick.tip": "Etwa 5 % der Clips werden nicht trainiert. Danach werden die letzten Durchgänge mit mehreren Stimmstärken an diesen unbekannten Sätzen ausprobiert und per Spracherkennung, Ähnlichkeit mit Ihrer Stimme und vorhergesagter Klangqualität bewertet; der beste bleibt, die anderen Zwischenstände werden gelöscht. Dauert auf einer schnellen Grafikkarte einige Minuten länger.",
+ "progress.pick": "Auswahl des besten Zwischenstands: Kandidat {i} von {n}…",
+ "progress.pick_done": "Bester Zwischenstand: Durchgang {epoch}, Stimmstärke {scale}",
+ "warn.pick_failed": "Die automatische Auswahl des Zwischenstands lief nicht; die Stimme nutzt den letzten Durchgang."
 }

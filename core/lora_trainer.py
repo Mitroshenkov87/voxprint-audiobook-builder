@@ -54,6 +54,9 @@ LORA_TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj"]   # as in train_l
 LORA_DROPOUT = 0.05
 SUB_TALKER_WEIGHT = 0.3
 ADAPTER_FILES = ("adapter_model.safetensors", "adapter_config.json", "ref_sample.wav", "training_meta.json")
+HOLDOUT_MIN_ROWS = 20      # smaller datasets keep every clip for training (no holdout)
+HOLDOUT_MAX = 16           # validation clips at most (cost of the per-epoch validation loss)
+HOLDOUT_FILE = "holdout.json"    # in checkpoints/: the held-out clips (texts for the automatic checkpoint pick)
 
 
 # --------------------------------------------------------------------------- data
@@ -93,6 +96,18 @@ def load_training_rows(dataset_dir: Path) -> Dict[str, Any]:
         log.warning("ref_text.txt missing - using the first sample text (as train_lora.py does)")
         ref_text = rows[0]["text"]
     return {"rows": rows, "ref_audio": str(ref), "ref_text": ref_text}
+
+
+def split_holdout(rows: List[Dict[str, Any]], fraction: float) -> tuple:
+    """``(training rows, held-out rows)``: about ``fraction`` of the clips, evenly spread over the recording (deterministic),
+    at least 2 and at most :data:`HOLDOUT_MAX`; nothing is held out for ``fraction <= 0`` or fewer than
+    :data:`HOLDOUT_MIN_ROWS` clips."""
+    n = len(rows)
+    if fraction <= 0 or n < HOLDOUT_MIN_ROWS:
+        return list(rows), []
+    k = min(HOLDOUT_MAX, max(2, int(round(n * fraction))))
+    picks = {min(n - 1, int((i + 0.5) * n / k)) for i in range(k)}
+    return [r for i, r in enumerate(rows) if i not in picks], [r for i, r in enumerate(rows) if i in picks]
 
 
 def build_lora_config(r: int = 32, alpha: int = 128, dropout: float = LORA_DROPOUT):
@@ -227,6 +242,20 @@ def compute_sample_loss(sample: Dict[str, Any], hf_model: Any, base_talker: Any,
     return talker_loss + SUB_TALKER_WEIGHT * sub_loss, talker_loss, sub_loss
 
 
+def validation_loss(val_samples: List[Dict[str, Any]], hf_model: Any, peft_talker: Any, base_talker: Any, device: Any,
+                    language: str) -> float:
+    """Mean loss over the held-out samples (no gradients, dropout off); the model is put back into training mode."""
+    import torch
+
+    peft_talker.eval()
+    try:
+        with torch.no_grad():
+            vals = [float(compute_sample_loss(s, hf_model, base_talker, device, language)[0]) for s in val_samples]
+    finally:
+        peft_talker.train()
+    return sum(vals) / max(1, len(vals))
+
+
 def loss_warnings(final_loss: float, first_loss: float) -> List[str]:
     """User-facing warnings about the final loss: suspiciously low (over-fitting) or barely decreased."""
     out: List[str] = []
@@ -268,8 +297,11 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
     dtype = torch.bfloat16 if plan.dtype == "bfloat16" else torch.float32
     hf_model.to(device)
     spk, centroid = speaker_conditioning(hf_model, data, device, dtype, plan.speaker_centroid)
-    samples = prepare_samples(data["rows"], tokenize, encode_audio, spk, device, plan.max_seconds_per_item,
+    train_rows, hold_rows = split_holdout(data["rows"], plan.holdout_fraction)
+    samples = prepare_samples(train_rows, tokenize, encode_audio, spk, device, plan.max_seconds_per_item,
                               progress, cancel, warnings)
+    val_samples = prepare_samples(hold_rows, tokenize, encode_audio, spk, device, plan.max_seconds_per_item,
+                                  noop_progress, cancel, []) if hold_rows else []
 
     for p in hf_model.parameters():
         p.requires_grad_(False)
@@ -298,6 +330,7 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
     peft_talker.train()
     started = time.time()
     epoch_losses: List[float] = []
+    val_losses: List[float] = []
     best = float("inf")
     n = len(samples)
     total_steps = n * plan.epochs
@@ -329,6 +362,9 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
         avg = acc_loss / max(1, count)
         epoch_losses.append(avg)
         log.info("epoch %d/%d avg_loss=%.4f", epoch, plan.epochs, avg)
+        if val_samples:
+            val_losses.append(validation_loss(val_samples, hf_model, peft_talker, base_talker, device, plan.language))
+            log.info("epoch %d/%d val_loss=%.4f", epoch, plan.epochs, val_losses[-1])
         best = min(best, avg)
         save_adapter_folder(peft_talker, output_dir / "checkpoints" / f"epoch_{epoch:02d}")
 
@@ -348,8 +384,15 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
     else:
         (output_dir / speaker_centroid.FILENAME).unlink(missing_ok=True)      # a stale one from an earlier run
     (output_dir / "checkpoints").mkdir(exist_ok=True)
+    holdout_file = output_dir / "checkpoints" / HOLDOUT_FILE
+    if hold_rows:
+        holdout_file.write_text(json.dumps({"fraction": plan.holdout_fraction,
+                                            "rows": [{"audio": r["rel"], "text": r["text"]} for r in hold_rows]},
+                                           ensure_ascii=False, indent=2), encoding="utf-8")
+    else:
+        holdout_file.unlink(missing_ok=True)
     (output_dir / "checkpoints" / "losses.json").write_text(
-        json.dumps({"epoch_avg_loss": epoch_losses, "warnings": warnings,
+        json.dumps({"epoch_avg_loss": epoch_losses, "epoch_val_loss": val_losses, "warnings": warnings,
                     "speaker_embedding": {"source": "centroid" if centroid else "ref",
                                           "clips": len(centroid[1]) if centroid else 1}},
                    ensure_ascii=False, indent=2),
@@ -406,13 +449,14 @@ def _train_once(dataset_dir: Path, output_dir: Path, plan: TrainPlan, progress: 
 def train_lora_from_dataset(dataset_dir, output_dir, progress: ProgressCallback = noop_progress,
                             cancel: Optional[CancelToken] = None, force_cpu: bool = False,
                             plan: Optional[TrainPlan] = None, language: Optional[str] = None,
-                            warnings_out: Optional[List[str]] = None,
+                            warnings_out: Optional[List[str]] = None, holdout_fraction: float = 0.0,
                             _run: Callable[..., Path] = _train_once) -> Path:
     """Train an adapter from a dataset folder and return the adapter *folder*.
 
     Chooses the parameters automatically (``infra/vram_optimizer.plan_training``), and on out-of-memory reduces the load and
     tries again; when nothing is left to reduce it raises ``OutOfMemoryError_`` (the UI then offers the CPU).  ``language``
-    defaults to ``training_language`` from the dataset's ``report.json``.  ``_run`` is the injection point used by tests.
+    defaults to ``training_language`` from the dataset's ``report.json``.  ``holdout_fraction`` > 0 keeps that share of the
+    clips out of training (validation loss, automatic checkpoint pick).  ``_run`` is the injection point used by tests.
     """
     cancel = cancel or CancelToken()
     dataset_dir, output_dir = Path(dataset_dir), Path(output_dir)
@@ -424,6 +468,10 @@ def train_lora_from_dataset(dataset_dir, output_dir, progress: ProgressCallback 
         except (OSError, ValueError):
             language = None
     plan = plan or plan_training(detect_gpu(), n_items, force_cpu=force_cpu, language=language or "russian")
+    if holdout_fraction > 0:
+        from dataclasses import replace
+
+        plan = replace(plan, holdout_fraction=holdout_fraction)
     progress(Stage.TRAIN, 0.0, tr("progress.plan", device=plan.device, epochs=plan.epochs))
     while True:
         try:

@@ -55,3 +55,25 @@ Older voices have no file and keep the single-clip path. `VOXPRINT_SPEAKER_CENTR
 
 GPU validation: train one voice twice (centroid on / off, same seed), compare similarity and steadiness across 3-4 chapters;
 check that a centroid voice narrates with the ICL prompt without artefacts (the x-vector no longer matches the ICL clip exactly).
+
+## 2. Automatic checkpoint and strength pick
+
+`core/checkpoint_pick.py`, Train window check box *Pick the best checkpoint and voice strength automatically* (on by default;
+`TaskRequest.auto_pick`).
+
+1. Training keeps ~5 % of the clips out (`TrainPlan.holdout_fraction`, at least 2, at most 16, evenly spread; datasets under 20
+   clips keep everything) and records a validation loss per epoch (`checkpoints/losses.json` `epoch_val_loss`); the held-out
+   texts go to `checkpoints/holdout.json`.
+2. After training, the last 3 epoch checkpoints x strengths 0.35 / 0.50 / 1.00 (only the user's strength when one was chosen in
+   the preview) synthesize up to 4 held-out sentences (short to long; the preview sentence when there is no holdout) on one
+   unmerged engine (`switch_adapter`, `set_adapter_scale`).
+3. Score = 0.5 x (1 - CER) + 0.3 x similarity + 0.2 x (MOS - 1) / 4 (weights re-normalised over the available metrics),
+   minus 0.5 x the share of samples that never stopped. Ties: strength nearer 0.50, then the later epoch.
+4. The winner's adapter replaces the final one, `training_meta.json` `epochs` becomes the picked epoch, the strength goes to
+   `voice.json`, every score to `checkpoints/pick.json`, and the other epoch folders are deleted.
+
+A failed pick only adds a warning; the voice keeps the last epoch. The validation loss is recorded but not used for the choice
+(the loss is a weak quality signal); it is there to compare with the pick on the GPU.
+
+GPU validation: time per candidate (estimate 20-40 s on an RTX 4090) and total; whether the pick agrees with listening on 3-4
+voices; whether the weights or the 4-phrase set need changing; whether the validation loss tracks the pick.

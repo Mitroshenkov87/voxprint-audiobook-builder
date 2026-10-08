@@ -528,12 +528,16 @@ class MainWindow(QWidget):
         self.chk_compare.setChecked(True)               # the best option is pre-selected (see infra.auto_steps)
         self.chk_check = QCheckBox()
         self.chk_check.setChecked(True)
+        self.chk_pick = QCheckBox()                     # automatic checkpoint + strength pick (core/checkpoint_pick.py)
+        self.chk_pick.setChecked(True)
         mark_recommended(self.chk_compare)
         mark_recommended(self.chk_check)
+        mark_recommended(self.chk_pick)
         prev.addWidget(self.btn_preview)
         prev.addWidget(self.chk_compare)
         root.addLayout(prev)
         root.addWidget(self.chk_check)
+        root.addWidget(self.chk_pick)
         self.lbl_preview_estimate = QLabel()
         self.lbl_preview_estimate.setObjectName("hint")
         self.lbl_preview_estimate.setWordWrap(True)
@@ -726,6 +730,8 @@ class MainWindow(QWidget):
         self.btn_preview.setText(tr("preview.button"))
         self.chk_compare.setText(recommended_text(tr("preview.compare")))
         self.chk_check.setText(tr("check.checkbox"))
+        self.chk_pick.setText(tr("pick.checkbox"))
+        self.chk_pick.setToolTip(tr("pick.tip"))
         self.btn_lora.setText(tr("ui.btn_lora"))
         self.btn_lora.setToolTip(tr("ui.tip_lora"))
         self.lbl_hint_lora.setText(tr("ui.hint_lora"))
@@ -890,6 +896,7 @@ class MainWindow(QWidget):
         """Select every recommended automatic option of this window again."""
         self.chk_compare.setChecked(True)
         self.chk_check.setChecked(True)
+        self.chk_pick.setChecked(True)
 
     # ------------------------------------------------------------------ quick preview
     def show_previews(self, items: list) -> None:
@@ -1010,7 +1017,7 @@ class MainWindow(QWidget):
 
     def _task_extras(self) -> dict:
         return dict(compare=self.chk_compare.isChecked(), quality_check=self.chk_check.isChecked(),
-                    adapter_scale=getattr(self, "preview_scale", None))
+                    auto_pick=self.chk_pick.isChecked(), adapter_scale=getattr(self, "preview_scale", None))
 
     def _consent_kwargs(self) -> dict:
         return dict(consent_mode=self.consent_mode, consent_scope=str(self.cmb_consent_scope.currentData()),
@@ -1246,6 +1253,7 @@ class MainWindow(QWidget):
         self.btn_preview.setEnabled(ready)
         self.chk_compare.setEnabled(not busy)
         self.chk_check.setEnabled(not busy)
+        self.chk_pick.setEnabled(not busy)
         if self._settings is not None:
             self._settings.refresh()
         self.btn_cancel.setVisible(bool(self.worker and self.worker.isRunning()))
