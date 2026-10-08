@@ -70,11 +70,11 @@ def test_narrate_window_preselects_and_marks_the_best(app, lib):
     s = make_studio(lib)
     try:
         n = s.narrate_window
-        for key in au.RULE_STEPS:
-            assert n.prep_checks[key].isChecked() and n.prep_checks[key].property("recommended") == "true"
-            assert "recommended" in n.prep_checks[key].text()
-        n.prep_checks[text_prep.STEP_LINKS].setChecked(False)
+        assert n.chk_prepare.isChecked() and n.chk_prepare.property("recommended") == "true"
+        assert "recommended" in n.chk_prepare.text()
+        assert n.selected_rule_steps() == set(au.RULE_STEPS)
+        n.chk_prepare.setChecked(False)
         s.reload_auto_steps()
-        assert n.prep_checks[text_prep.STEP_LINKS].isChecked()
+        assert n.chk_prepare.isChecked()
     finally:
         s.shutdown()

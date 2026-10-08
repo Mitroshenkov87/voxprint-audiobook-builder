@@ -104,7 +104,51 @@ def test_model_crash_falls_back_and_prepare_keeps_the_original(tmp_path):
 def test_prompts_are_bundled_with_their_placeholders():
     t = llm_text.load_prompt("literary_translate")
     assert all(k in t for k in ("{source_language}", "{target_language}", "{glossary}", "{context}", "{text}"))
-    assert "{language}" in llm_text.load_prompt("prepare_narration") and "{names}" in llm_text.load_prompt("names_glossary")
+    prep = llm_text.load_prompt("prepare_narration")
+    assert all(k in prep for k in ("{language}", "{glossary}", "{context}", "{text}"))
+    assert "{names}" in llm_text.load_prompt("names_glossary")
+    marks = llm_text.load_prompt("speaker_markup")
+    assert "{language}" in marks and "{text}" in marks and "NARRATOR" in marks
+    for text in (prep, t, marks):
+        low = text.lower()
+        assert "english" in low and "german" in low and "russian" in low
+        assert "paragraph" in low and ("dialogue" in low or "speech" in low)
+        assert "—" in text
+
+
+def test_spoken_shape_keeps_dialogue_and_scene_breaks():
+    assert llm_text.keeps_spoken_shape('"Hello," she said.', '"Hello," she replied.')
+    assert llm_text.keeps_spoken_shape("„Hallo“, sagte sie.", "„Hallo“, antwortete sie.")
+    assert llm_text.keeps_spoken_shape("— Здравствуйте, сказал он.", "— Здравствуйте, ответил он.")
+    assert not llm_text.keeps_spoken_shape('"Hello," she said.', "Hello, she said.")
+    assert not llm_text.keeps_spoken_shape("* * *", "The scene changed in the garden.")
+
+
+def test_prepare_accepts_shaped_text_in_three_languages_and_rejects_flat_dialogue(tmp_path):
+    samples = {
+        "en": '"Hello," she said, and then she walked across the long quiet room.',
+        "de": "„Hallo“, sagte sie, und dann ging sie durch das lange stille Zimmer.",
+        "ru": "— Здравствуйте, сказал он, и потом он пошёл через длинную тихую комнату.",
+    }
+
+    def echo(prompt):
+        return _text_of(prompt)
+
+    def flatten(prompt):
+        text = _text_of(prompt)
+        for mark in ('"', "„", "“", "«", "»", "—", "–"):
+            text = text.replace(mark, "")
+        return text
+
+    for lang, src in samples.items():
+        cache = tl.TranslationCache(tmp_path / f"{lang}.json")
+        good = FakeModel(echo)
+        out = llm_text.prepare_paragraphs([src], lang, llm_text.LLMPlan(lambda m=good: m, "fake"), cache, None)
+        assert out[0] == src and good.closed
+        flat = FakeModel(flatten)
+        missed = llm_text.prepare_paragraphs(
+            [src], lang, llm_text.LLMPlan(lambda m=flat: m, "flat"), tl.TranslationCache(tmp_path / f"{lang}-flat.json"), None)
+        assert 0 not in missed and flat.closed
 
 
 def test_status_gate_and_server_failure(tmp_path):
@@ -128,10 +172,16 @@ def test_narrate_window_options_are_greyed_until_downloaded(app, lib, tmp_path):
     n.refresh_voices()
     n.load_book_file(book_file(tmp_path, RU_TXT))
     n._refresh_buttons()
-    assert not n.chk_llm_prepare.isEnabled() and not n.chk_literary.isEnabled() and not n.btn_llm_download.isHidden()
+    assert not n.chk_llm_prepare.isEnabled() and not n.chk_literary.isEnabled() and not n.chk_speakers.isEnabled()
+    assert not n.btn_llm_download.isHidden()
+    assert n.chk_literary.toolTip() and not n.chk_literary.isChecked()
+    n.chk_literary.click()                                     # a disabled box does not switch
+    assert not n.chk_literary.isChecked()
     state["st"] = "ready"
     n._refresh_buttons()
-    assert n.chk_llm_prepare.isEnabled() and n.btn_llm_download.isHidden()
+    assert n.chk_llm_prepare.isEnabled() and n.chk_literary.isEnabled() and n.chk_speakers.isEnabled()
+    assert n.btn_llm_download.isHidden()
+    assert not n.chk_translate.isChecked()                     # translation stays off; literary is still clickable
     assert n.options().llm_prepare is None                     # off by default
     n.chk_llm_prepare.setChecked(True)
     assert n.options().llm_prepare.tag == "fake"

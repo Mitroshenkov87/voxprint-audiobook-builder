@@ -189,19 +189,11 @@ Unter dem Badge wiederholt ein Hinweis die Einschränkung, zum Beispiel: „{{na
 
 ## Schritt 3 – Text vorbereiten
 
-„{{narr.prep_hint}}“ Nichts wird zur Prüfung angezeigt, und Ihre Buchdatei wird nie verändert. Alle regelbasierten Schritte sind standardmäßig angehakt; nehmen Sie den Haken bei dem heraus, was Sie nicht wollen.
+„{{narr.prep_hint}}“ Nichts wird zur Prüfung angezeigt, und Ihre Buchdatei wird nie verändert.
 
 | Kontrollkästchen | Was es tut |
 |---|---|
-| {{prep.layout}} | {{prep.layout_d}} |
-| {{prep.noise}} | {{prep.noise_d}} |
-| {{prep.quotes}} | {{prep.quotes_d}} |
-| {{prep.links}} | {{prep.links_d}} |
-| {{prep.headings}} | {{prep.headings_d}} |
-| {{prep.numbers}} | {{prep.numbers_d}} |
-| {{prep.abbrev}} | {{prep.abbrev_d}} |
-| {{prep.spellfix}} | {{prep.spellfix_d}} Es braucht einen einmaligen Download (eine Schaltfläche **{{prep.model_download}}** erscheint; das Modell ist etwa 365 MB groß) und gilt nur für russische Bücher. |
-| ▸ {{prep.more}} | Ausgegraute Ideen für spätere Versionen: Pausen und Zeichensetzung per KI, russische Betonungszeichen, verschiedene Stimmen für Figuren. Sie sind mit „{{prep.later_tag}}“ markiert und tun noch nichts. |
+| {{prep.one}} | {{prep.one_d}} Eine Schaltfläche **{{prep.model_download}}** erscheint, wenn das russische Tippfehler-Modell noch nicht auf diesem Computer ist (etwa 365 MB). |
 
 Die Regeln decken Russisch und Englisch vollständig ab. Für andere Sprachen (zum Beispiel deutsche Bücher) werden nur die sprachneutralen Schritte angewendet – Layout, Fußnoten, Anführungszeichen, Links.
 
@@ -497,11 +489,11 @@ Findet das Programm eine ältere Komponente in einer Umgebung, die ihm nicht geh
 
 Ab Werk ist alles, was automatisch laufen kann, **bereits gewählt** und mit einem Stern und dem Wort „{{auto.recommended}}“ markiert: Wenn Sie nichts anfassen, arbeitet Voxprint mit maximaler Qualität. Die dafür nötigen Modelle gehören zum Download beim ersten Start, es ist nichts extra anzuklicken. Die einzelnen Kontrollkästchen bleiben in ihren Fenstern.
 
-* Textaufbereitung („Buch vertonen“): die sieben regelbasierten Schritte – Layout, Fußnotenmarken und Seitenzahlen, Anführungszeichen und Striche, Links, Kapitelüberschriften, Zahlen in Worten, Abkürzungen.
-* KI-Korrektur von Tippfehlern (russische Bücher; einmaliger Download von etwa 365 MB).
+* Textaufbereitung („Buch vertonen“): ein Schalter, „{{prep.one}}“, standardmäßig an (Layout, Fußnoten, Anführungszeichen, Links, Überschriften, Zahlen, Abkürzungen und russische Tippfehler, wenn das Modell heruntergeladen ist).
+* Übersetzung des Buches vor dem Vertonen (Englisch, Russisch, Deutsch; Opus-MT-Modelle, etwa 300 MB je Richtung, einmal geladen). Aus, bis Sie sie einschalten.
 * Trainingsfenster: „{{check.checkbox}}“ und „{{preview.compare}}“ (beide brauchen das Spracherkennungsmodell, etwa 1,9 GB, einmal geladen).
 * Immer aktiv, ohne Schalter: Ausrichtung des Textes auf das Audio mit Plausibilitätsprüfung, Audio-Qualitätsfilter, Erkennungsfilter des Nur-Audio-Modus.
-* Nicht enthalten, weil es sie noch nicht gibt: Zeichensetzungsmodell, Betonungszeichen, Sprecherrollen.
+* Nicht enthalten, weil es sie noch nicht gibt: Zeichensetzungsmodell und russische Betonungszeichen. Sprechermarken sind eine eigene Option auf der Karte des KI-Textmodells.
 
 Die Trainingsvorgabe bleibt absichtlich bei „{{preset.balanced}}“: In unseren Tests ließ längeres Training mit höherer Lernrate die Stimme nuscheln, mehr ist dort also nicht besser. Stattdessen wird nach „{{preview.compare}}“ die bessere der beiden Varianten als „{{auto.recommended}}“ markiert (zuerst das Urteil, dann weniger Erkennungsfehler, dann die kleinere Tonhöhenabweichung; ohne klaren Unterschied Variante A, die günstiger ist). Die Entscheidung bleibt bei Ihnen: Hören Sie immer hin.
 

@@ -70,7 +70,7 @@ When a statement ends the recording, up to 60 s of unscripted speech at the end 
 ## Narrate a book
 1. **Choose book…**: `.txt` (UTF-8 / cp1251; headings like "Chapter 1", "Глава 2", "Part I" become chapters), `.fb2` / `.fb2.zip`, `.epub`. The book title, author and cover are read when present.
 2. Pick the **voice** (a licence badge is shown; for a personal-use-only voice you are reminded not to publish or sell the narration). No voices yet? The window offers *Train your voice* / *My voices*.
-3. **Prepare the text** (automatic, see [below](#prepare-the-text)): all rule-based steps are on by default; leave them as they are or untick what you do not want.
+3. **Prepare the text** (one switch, on by default, see [below](#prepare-the-text)). Translation is a separate card and stays off until you turn it on.
 4. Pick the **format** (see below) and a **quality** button (*Compact / Standard / High*), then **Start narration**. Rarely needed things are collapsed: *Other formats*, and *Advanced* (exact bitrates per format, the **working folder** - default `<projects folder>\Audiobooks` (Settings -> *Projects folder*), remembered; each book gets its own sub-folder there for everything of the job - whether chapter titles are read aloud, and a read-only sample of how the first changed paragraph looks after preparation).
 5. Progress with the time left; **Pause / Resume** and **Cancel** are always available. A **mini player** appears as soon as the first fragments are ready: *Play / Pause*, a seek slider and the clock work on the finished part while the rest is still being made, and the player follows new fragments (it waits if it catches up with the synthesis). It only checks a few file names every 1.5 s and plays through Qt Multimedia, so it does not slow the narration down; when the job ends the whole result becomes the playlist. Every synthesized fragment is stored (`<output>\<book>\.cache`), so after a cancel, a crash or closing the program
    **Start continues where it stopped**; the cache is deleted after a successful run. Texts are split into chunks at sentence/clause boundaries (reusing the clause splitter of the aligner), chapters get a pause between them.
@@ -99,7 +99,7 @@ recognition model (part of the normal model download); without one the check is 
 says how many fragments were generated again.
 
 ## Prepare the text
-Pipeline: **rules** (deterministic, instant) -> optional **AI clean-up** (small model, on demand) -> **synthesis**. Nothing is shown for review; the original book is never modified, and chapter titles in the output
+One switch, **Prepare text**, on by default. It runs the rule steps below, and, for a Russian book, the typo model when that model is already downloaded. Nothing is shown for review; the original book is never modified, and chapter titles in the output
 files / metadata / cover come from the original, unprepared book. For debugging, the prepared text is written next to the job cache: `<output>\<book>\.debug\prepared_text.txt` and `prep_report.json`
 (counts per step, skipped steps, model revision). Unlike `.cache` they are **kept** after a successful run, so you can see exactly what was read; delete the `.debug` folder if you do not need it.
 
@@ -107,27 +107,30 @@ files / metadata / cover come from the original, unprepared book. For debugging,
 
 **Working folder and clean-up.** On start Voxprint asks whether the book file may be **copied** or **moved** into the book's sub-folder (or left where it is) - nothing is copied without asking. When the audiobook is ready a dialog lets you tick what to keep: the audiobook, the original book file, the prepared / translated text; temporary parts (`.cache`, `.work`) are always removed. *Keep everything* deletes nothing.
 
-| Step (checkbox) | What it does |
+What the switch does:
+
+| Part | What it does |
 |---|---|
-| Tidy the layout | joins hard-wrapped lines and hyphenated line ends, removes soft hyphens, zero-width and odd space characters, ligatures, double spaces |
-| Remove footnote marks and page numbers | `[1]`, superscripts, lone page numbers, running headers repeated on many pages |
-| Normalize quotes and dashes | typographic quotes/apostrophes, dialogue dashes, `--`, ellipses |
-| Shorten links and e-mail addresses | a URL / address is read as "ссылка" / "link" instead of being spelled out |
-| Fix chapter headings | `ГЛАВА XII` -> "Глава двенадцатая", `CHAPTER IV` -> "Chapter four"; ALL-CAPS headings become normal text |
-| Say numbers in words | integers, decimals, ordinals (`5-му` -> "пятому"), years ("в 1999 г." -> "в тысяча девятьсот девяносто девятом году"), dates, percents, money, units; Russian case/gender/number agreement is derived from the surrounding words |
-| Expand abbreviations | `т. д.`, `и т. п.`, `им.`, `г.`, `Dr.`, `etc.` ... (context-aware: "г." after a year vs. "г. Москва") |
-| AI: fix typos and add missing commas | Russian only; see below |
+| Layout | joins hard-wrapped lines and hyphenated line ends, removes soft hyphens, zero-width and odd space characters, ligatures, double spaces |
+| Footnote marks and page numbers | `[1]`, superscripts, lone page numbers, running headers repeated on many pages |
+| Quotes and dashes | typographic quotes/apostrophes, dialogue dashes, `--`, ellipses |
+| Links and e-mail addresses | a URL / address is read as "ссылка" / "link" instead of being spelled out |
+| Chapter headings | `ГЛАВА XII` -> "Глава двенадцатая", `CHAPTER IV` -> "Chapter four"; ALL-CAPS headings become normal text |
+| Numbers in words | integers, decimals, ordinals (`5-му` -> "пятому"), years ("в 1999 г." -> "в тысяча девятьсот девяносто девятом году"), dates, percents, money, units; Russian case/gender/number agreement is derived from the surrounding words |
+| Abbreviations | `т. д.`, `и т. п.`, `им.`, `г.`, `Dr.`, `etc.` ... (context-aware: "г." after a year vs. "г. Москва") |
+| Typos and missing commas | Russian only, and only when the model below is downloaded |
 
 Languages: the rule steps cover **Russian and English** completely (own number-to-words code in `core/num_words.py`; `num2words` was not used because it is LGPL-2.1 and does not decline numbers by the following word). For other languages
 (German is the first one with a UI translation) only the language-neutral steps (layout, quotes, noise, links) run; digits and abbreviations are left for the TTS engine's own normalizer. The language is taken from the book's metadata, else
 detected from the text. Very long sentences are not split by the preparation step: the chunker already splits them at clause boundaries.
 
-**AI clean-up (Russian).** Model: `ai-forever/sage-fredt5-distilled-95m` (SAGE, MIT licence, about 365 MB, pinned revision `ed51b4a`...). It is **not shipped**: the row shows "Needs a one-time download (365 MB)" with a *Download* button; afterwards the
-box is ticked by default for Russian books and greyed out ("Russian books only") for others. The model is only a *proposer*; a rule-based **validator** (`core/text_cleanup.py`) decides what is applied: it accepts only close spelling fixes of
+**AI clean-up (Russian).** Model: `ai-forever/sage-fredt5-distilled-95m` (SAGE, MIT licence, about 365 MB, pinned revision `ed51b4a`...). It is **not shipped**: the row shows "Needs a one-time download (365 MB)" with a *Download* button. Once it is downloaded, Prepare text includes it for a Russian book (or when the language is not known yet) and skips it for other languages ("Russian books only"). The model is only a *proposer*; a rule-based **validator** (`core/text_cleanup.py`) decides what is applied: it accepts only close spelling fixes of
 a word (edit distance <= 2-3, the source word rare in the book itself, no names, no digits, same letter case), `е` -> `ё` in known cases and inserted commas / semicolons / colons / dashes (at most one per four words); everything else - deletions, rewording, changed
 punctuation, case changes - is rejected, and a paragraph where the model wants to change more than 5 % of the words is left untouched. Results are cached per paragraph (`.cache\cleanup.json`), so a resumed job does not run the model again.
 *Not verified on real hardware*: the `SageEngine` (transformers `AutoModelForSeq2SeqLM`, greedy generation) and the real download have never run - tests use a fake engine and a fake `snapshot_download`.
 
-**Announced, not available yet** (greyed out under *More preparation (coming later)*, entries exist in the registry `infra/text_models.py` as placeholders): punctuation model for fluent reading pauses (RUPunct), Russian stress marks and `ё`, multi-voice speaker markup, and English / German neural spell checkers.
+**Not in this version** (registry placeholders in `infra/text_models.py`, no check box): punctuation model for fluent reading pauses (RUPunct), Russian stress marks and `ё`, and English / German neural spell checkers. Speaker marks are a separate option on the AI text model card (see below).
+
+**Mark speakers** (AI text model card, off by default, clickable only when Gemma is downloaded). An extra pass labels each paragraph narrator, male or female. Pick a male voice and a female voice, open *Preview and edit speakers*, change any row, then Start. Narration loads one voice at a time and reads each paragraph with the voice you assigned. With only the narrator voice selected, the marks stay in the preview and the narrator reads the whole book. The command line does not offer this yet.
 
 Translation before narrating (optional): see [TRANSLATION.md](TRANSLATION.md).

@@ -111,19 +111,11 @@ Under the badge a reminder repeats the limit, for example *{{narr.voice_personal
 
 ## Step 3 – prepare the text
 
-*{{narr.prep_hint}}* Nothing is shown for review and your book file is never changed. All rule-based steps are ticked by default; untick what you do not want.
+*{{narr.prep_hint}}* Nothing is shown for review and your book file is never changed.
 
 | Check box | What it does |
 |---|---|
-| {{prep.layout}} | {{prep.layout_d}} |
-| {{prep.noise}} | {{prep.noise_d}} |
-| {{prep.quotes}} | {{prep.quotes_d}} |
-| {{prep.links}} | {{prep.links_d}} |
-| {{prep.headings}} | {{prep.headings_d}} |
-| {{prep.numbers}} | {{prep.numbers_d}} |
-| {{prep.abbrev}} | {{prep.abbrev_d}} |
-| {{prep.spellfix}} | {{prep.spellfix_d}} It needs a one-time download (a button **{{prep.model_download}}** appears; the model is about 365 MB) and is available for Russian books only. |
-| ▸ {{prep.more}} | Greyed-out ideas for later versions: pauses and punctuation by AI, Russian stress marks, different voices for characters. They are marked "{{prep.later_tag}}" and do nothing yet. |
+| {{prep.one}} | {{prep.one_d}} A **{{prep.model_download}}** button appears when the Russian typo model is not on this computer yet (about 365 MB). |
 
 The rules cover Russian and English fully. For other languages (for example German books) only the language-neutral steps – layout, footnotes, quotes, links – are applied.
 
@@ -419,12 +411,11 @@ When the program finds an older component in an environment it does not own (for
 
 Out of the box, everything that can run automatically is **already selected** and marked with a star and the word *{{auto.recommended}}*: if you touch nothing, Voxprint works at maximum quality. The models these options need are part of the first-start download, so there is nothing extra to click. The single check boxes stay in their windows.
 
-* Text preparation (Narrate a book): the seven rule-based steps – layout, footnote marks and page numbers, quotes and dashes, links, chapter headings, numbers in words, abbreviations.
-* AI clean-up of typos (Russian books; one-time download of about 365 MB).
-* Translation of the book before narrating (English, Russian, German; Opus-MT models, about 300 MB per direction, downloaded once).
+* Text preparation (Narrate a book): one switch, *{{prep.one}}*, on by default (layout, footnotes, quotes, links, headings, numbers, abbreviations, and Russian typos when that model is downloaded).
+* Translation of the book before narrating (English, Russian, German; Opus-MT models, about 300 MB per direction, downloaded once). Off until you turn it on.
 * Training window: *{{check.checkbox}}* and *{{preview.compare}}* (both need the speech-recognition model, about 1.9 GB, downloaded once).
 * Always on, without a switch: alignment of the text onto the audio and its plausibility check, the audio quality filter, the recognition filters of the audio-only mode.
-* Not included, because they do not exist yet: punctuation model, stress marks, speaker roles.
+* Not included, because they do not exist yet: punctuation model and Russian stress marks. Speaker marks are a separate option on the AI text model card.
 
 The training preset stays at *{{preset.balanced}}* on purpose: in our tests longer training with a higher learning rate made voices babble, so more is not better there. Instead, after **{{preview.compare}}** the better of the two variants is marked **{{auto.recommended}}** (verdict first, then fewer recognition errors, then the smaller pitch shift; with no clear difference variant A, which is cheaper). The choice is still yours: always listen.
 

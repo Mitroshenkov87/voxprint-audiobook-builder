@@ -18,9 +18,10 @@ is :mod:`core.tts_engine` and unit tests use a fake one.
 rule-based steps and the optional neural clean-up; the prepared text is saved to ``<job>/.debug/``.  Chapter titles in
 the exported files keep their original spelling.  **Translation** (``options.translate``, :mod:`core.translate`) comes first:
 the book is translated sentence by sentence (cached; the readable result is ``<job>/translation_<lang>.txt``), the job
-folder gets the suffix `` (<lang>)`` and the target language is narrated.  Extension points (deliberately not implemented
-yet): the ``preprocessors`` option (a per-chunk ``text -> text`` hook) and ``Chunk``-level voice selection for
-multi-voice role markup (all chunks currently use the job's voice).
+folder gets the suffix `` (<lang>)`` and the target language is narrated.  **Speakers** (``options.speakers``,
+:mod:`core.speakers`): when a male or female voice is selected besides the narrator, each chunk is synthesized with that
+voice (one model load per voice, then the chapters are joined in book order).  The ``preprocessors`` option (a per-chunk
+``text -> text`` hook) is still unused.
 """
 from __future__ import annotations
 
@@ -49,6 +50,7 @@ from core import pauses as pz
 from core import pace as pc
 from core import ai_disclosure
 from core import cpu_budget
+from core import speakers as spk
 from core.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_book
 from core.errors import CancelledByUser, DatasetMakerError, NarrationError
 from core.events import CancelToken
@@ -135,6 +137,8 @@ class NarrationOptions:
     #: Ordinal numbers by context ("глава 2" -> "глава вторая", "3-го" -> "третьего", "21st"), :mod:`core.ordinals`;
     #: Settings -> Narration / ``--no-ordinals``.  On by default.
     ordinals: bool = True
+    #: Speaker marks and the male / female voice ids (:mod:`core.speakers`).  ``None`` = the narrator voice only.
+    speakers: Optional[spk.SpeakerCast] = None
 
 
 @dataclass
@@ -320,21 +324,33 @@ WRITER_THREADS = 2
 PENDING_WRITE_BATCHES = 2
 
 
+def chunk_voice_tag(chunk: Chunk, engine_tag: str, voices: Optional[Dict[str, tuple]] = None) -> str:
+    """Cache tag of one chunk: the extra voice's tag when ``chunk.voice_id`` names one, else ``engine_tag``."""
+    vid = chunk.voice_id or ""
+    if vid and voices and vid in voices:
+        return str(voices[vid][1])
+    return engine_tag
+
+
 def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSEngine], engine_tag: str,
                       cache: ChunkCache, texts: Dict[int, str], progress: ProgressFn,
                       cancel: CancelToken, pause: PauseToken, on_saved: Optional[Callable[[Chunk], None]] = None,
                       engine_future: Optional[Future] = None,
-                      background_check: Optional[Callable[[], None]] = None, checker=None) -> Dict[str, int]:
+                      background_check: Optional[Callable[[], None]] = None, checker=None,
+                      voices: Optional[Dict[str, tuple]] = None) -> Dict[str, int]:
     """Synthesize every chunk that is not cached yet.  Returns ``{"cached": n, "made": m}``.
 
     ``texts`` maps a chunk index to the prepared text; ``engine_tag`` identifies the engine without creating it.
-    ``on_saved(chunk)`` runs (on a writer thread) once a chunk is on disk.  ``engine_future``: an engine already being
-    loaded in the background (used instead of calling ``engine_factory``).  ``background_check()`` raises the error of
-    other background work (chapter assembly, encodes) between batches.  ``checker`` (:class:`core.chunk_check.ChunkChecker`)
-    re-reads each new chunk before it is written and regenerates it when it does not say its text; it is closed at the end.
+    ``voices`` maps an extra voice id to ``(factory, tag)``. Chunks are spoken one voice at a time (the narrator
+    first) so the model is loaded once per voice, then closed before the next voice. With no ``voice_id`` set this is
+    the single-voice path. ``on_saved(chunk)`` runs (on a writer thread) once a chunk is on disk.  ``engine_future``:
+    an engine already being loaded in the background (used for the narrator voice).  ``background_check()`` raises the
+    error of other background work (chapter assembly, encodes) between batches.  ``checker``
+    (:class:`core.chunk_check.ChunkChecker`) re-reads each new chunk before it is written and regenerates it when it
+    does not say its text; it is closed at the end.
     """
     total = len(chunks)
-    keys = {c.index: cache.key(engine_tag, texts[c.index]) for c in chunks}
+    keys = {c.index: cache.key(chunk_voice_tag(c, engine_tag, voices), texts[c.index]) for c in chunks}
     pending = [c for c in chunks if not cache.has(keys[c.index])]
     cached = total - len(pending)
     done = cached
@@ -358,54 +374,81 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
         if on_saved is not None:
             on_saved(c)
 
+    order: List[str] = []
+    buckets: Dict[str, List[Chunk]] = {}
+    for c in pending:
+        vid = c.voice_id or ""
+        if vid not in buckets:
+            order.append(vid)
+            buckets[vid] = []
+        buckets[vid].append(c)
+    if "" in order:                                          # narrator first, then each extra voice once
+        order.remove("")
+        order.insert(0, "")
+    used_preload = False
+
     try:
-        queue = list(pending)
         batch_limit = 0                                      # 0 = not known yet (the engine is created lazily)
         eta: Optional[float] = None                          # last estimate, repeated in the "batch starts" message
-        while queue:
-            pause.wait(cancel)
-            cancel.check()
-            if engine is None:
-                progress(NarrationProgress(done, total, None, tr("narr.loading_model")))
-                engine = _wait_engine(engine_future, cancel) if engine_future is not None else engine_factory()
-                batch_limit = _batch_limit(engine)
-                slots = threading.BoundedSemaphore(max(4, PENDING_WRITE_BATCHES * batch_limit))
-            group = _next_group(queue, texts, batch_limit)
-            # Say what is being generated *before* the (possibly minutes-long) batch call: otherwise the UI and the log
-            # stay on "model loaded" until the first batch is finished and the job looks frozen.
-            first, last = done + 1, done + len(group)
-            log.info("Synthesizing chunks %d-%d of %d (%d chars)", first, last, total,
-                     sum(len(texts[c.index]) for c in group))
-            progress(NarrationProgress(done, total, eta, tr("narr.synth_batch", first=first, last=last, total=total)))
-            t0 = time.monotonic()
-            audios, batch_limit = _synth_group(engine, [texts[c.index] for c in group], [c.index for c in group], batch_limit)
-            if checker is not None:            # on this (GPU) thread, before the writers see the chunk: the cache holds the winner
-                progress(NarrationProgress(done, total, eta, tr("narr.checking", first=first, last=last, total=total)))
-                audios = [checker.check(engine, texts[c.index], keys[c.index], c.index, a, engine.sample_rate)
-                          for c, a in zip(group, audios)]
-            spent += time.monotonic() - t0
-            for c, audio in zip(group, audios):
-                while not slots.acquire(timeout=0.2):                    # type: ignore[union-attr]
-                    cancel.check()
-                    _raise_finished(futures)                            # a failed write never frees its wait
-                futures.append(saver.submit(save, c, audio, engine.sample_rate))
-                chars_done += max(1, len(texts[c.index]))
-                remaining_chars -= len(texts[c.index])
-                done += 1
-            _raise_finished(futures)
-            futures = [f for f in futures if not f.done()]               # finished writes: nothing left to check
-            if background_check is not None:
-                background_check()
-            eta = spent / chars_done * max(0, remaining_chars) if chars_done else None
-            progress(NarrationProgress(done, total, eta, tr("narr.chunk_progress", done=done, total=total)))
+        for vid in order:
+            if engine is not None:                           # one model in memory: the previous voice is closed first
+                try:
+                    engine.close()
+                except Exception:  # noqa: BLE001
+                    log.warning("engine close failed", exc_info=True)
+                engine = None
+            queue = list(buckets[vid])
+            while queue:
+                pause.wait(cancel)
+                cancel.check()
+                if engine is None:
+                    progress(NarrationProgress(done, total, None, tr("narr.loading_model")))
+                    if not vid and engine_future is not None:
+                        engine = _wait_engine(engine_future, cancel)
+                        used_preload = True
+                    elif vid and voices and vid in voices:
+                        engine = voices[vid][0]()
+                    else:
+                        engine = engine_factory()
+                    batch_limit = _batch_limit(engine)
+                    if slots is None:
+                        slots = threading.BoundedSemaphore(max(4, PENDING_WRITE_BATCHES * batch_limit))
+                group = _next_group(queue, texts, batch_limit)
+                # Say what is being generated *before* the (possibly minutes-long) batch call: otherwise the UI and the log
+                # stay on "model loaded" until the first batch is finished and the job looks frozen.
+                first, last = done + 1, done + len(group)
+                log.info("Synthesizing chunks %d-%d of %d (%d chars)", first, last, total,
+                         sum(len(texts[c.index]) for c in group))
+                progress(NarrationProgress(done, total, eta, tr("narr.synth_batch", first=first, last=last, total=total)))
+                t0 = time.monotonic()
+                audios, batch_limit = _synth_group(engine, [texts[c.index] for c in group], [c.index for c in group], batch_limit)
+                if checker is not None:        # on this (GPU) thread, before the writers see the chunk: the cache holds the winner
+                    progress(NarrationProgress(done, total, eta, tr("narr.checking", first=first, last=last, total=total)))
+                    audios = [checker.check(engine, texts[c.index], keys[c.index], c.index, a, engine.sample_rate)
+                              for c, a in zip(group, audios)]
+                spent += time.monotonic() - t0
+                for c, audio in zip(group, audios):
+                    while not slots.acquire(timeout=0.2):                # type: ignore[union-attr]
+                        cancel.check()
+                        _raise_finished(futures)                        # a failed write never frees its wait
+                    futures.append(saver.submit(save, c, audio, engine.sample_rate))
+                    chars_done += max(1, len(texts[c.index]))
+                    remaining_chars -= len(texts[c.index])
+                    done += 1
+                _raise_finished(futures)
+                futures = [f for f in futures if not f.done()]           # finished writes: nothing left to check
+                if background_check is not None:
+                    background_check()
+                eta = spent / chars_done * max(0, remaining_chars) if chars_done else None
+                progress(NarrationProgress(done, total, eta, tr("narr.chunk_progress", done=done, total=total)))
         for f in futures:
             f.result()
     finally:
         saver.shutdown(wait=True)
         if checker is not None:
             checker.close()                                              # the recogniser leaves (V)RAM with the engine
-        if engine is None and engine_future is not None:
-            close_when_loaded(engine_future)                             # loading meanwhile but never used: free it
+        if engine_future is not None and not used_preload:
+            close_when_loaded(engine_future)                             # loaded for the narrator but that voice was cached
         if engine is not None:
             try:
                 engine.close()
@@ -532,7 +575,7 @@ def _synth_with_retry(engine: TTSEngine, text: str, index: int, attempts: int = 
 def assemble_chapter(book: Book, position: int, chapter: int, chunks: Sequence[Chunk], engine_tag: str,
                      cache: ChunkCache, texts: Dict[int, str], work_dir: Path,
                      pauses: Optional[pz.PauseProfile] = None, lengths: Optional[pz.PauseLengths] = None,
-                     shape: bool = False) -> ex.ChapterAudio:
+                     shape: bool = False, tags: Optional[Dict[int, str]] = None) -> ex.ChapterAudio:
     """Join the cached chunks of one chapter (``chunks``, in order) with their pauses into ``chapter_<position+1>.wav``.
 
     With ``shape`` every piece first loses its own leading / trailing silence (so the inserted pauses are what is heard)
@@ -544,7 +587,7 @@ def assemble_chapter(book: Book, position: int, chapter: int, chunks: Sequence[C
     sf_out: Optional[sf.SoundFile] = None
     try:
         for c in chunks:
-            loaded = cache.load(cache.key(engine_tag, texts[c.index]))
+            loaded = cache.load(cache.key((tags or {}).get(c.index, engine_tag), texts[c.index]))
             if loaded is None:
                 raise NarrationError(tr("err.narration_chunk", n=c.index + 1), details="cache entry missing")
             data, sr = loaded
@@ -580,9 +623,9 @@ def _by_chapter(chunks: Sequence[Chunk]) -> Dict[int, List[Chunk]]:
 def assemble_chapters(book: Book, chunks: Sequence[Chunk], engine_tag: str, cache: ChunkCache,
                       texts: Dict[int, str], work_dir: Path,
                       pauses: Optional[pz.PauseProfile] = None, lengths: Optional[pz.PauseLengths] = None,
-                      shape: bool = False) -> List[ex.ChapterAudio]:
+                      shape: bool = False, tags: Optional[Dict[int, str]] = None) -> List[ex.ChapterAudio]:
     """Join the cached chunks of every chapter with their pauses into lossless chapter WAV files (streamed to disk)."""
-    return [assemble_chapter(book, pos, ci, group, engine_tag, cache, texts, work_dir, pauses, lengths, shape)
+    return [assemble_chapter(book, pos, ci, group, engine_tag, cache, texts, work_dir, pauses, lengths, shape, tags)
             for pos, (ci, group) in enumerate(_by_chapter(chunks).items())]
 
 
@@ -594,13 +637,13 @@ class _ChapterPipeline:
     def __init__(self, book: Book, chunks: Sequence[Chunk], engine_tag: str, cache: ChunkCache, texts: Dict[int, str],
                  work: Path, pauses: Optional[pz.PauseProfile], exporter: ex.Exporter, pool: ThreadPoolExecutor,
                  cancel: CancelToken, pause: PauseToken, lengths: Optional[pz.PauseLengths] = None,
-                 shape: bool = False) -> None:
+                 shape: bool = False, tags: Optional[Dict[int, str]] = None) -> None:
         self.book, self.engine_tag, self.cache, self.texts, self.work, self.pauses = book, engine_tag, cache, texts, work, pauses
-        self.lengths, self.shape = lengths, shape
+        self.lengths, self.shape, self.tags = lengths, shape, tags or {}
         self.exporter, self.pool, self.cancel, self.pause = exporter, pool, cancel, pause
         self.groups = _by_chapter(chunks)
         self.position = {ci: pos for pos, ci in enumerate(self.groups)}
-        self.left = {ci: sum(1 for c in g if not cache.has(cache.key(engine_tag, texts[c.index])))
+        self.left = {ci: sum(1 for c in g if not cache.has(cache.key(self.tags.get(c.index, engine_tag), texts[c.index])))
                      for ci, g in self.groups.items()}
         self.futures: Dict[int, Future] = {}
         self._lock = threading.Lock()
@@ -629,7 +672,7 @@ class _ChapterPipeline:
         self.pause.wait(self.cancel)               # paused: background work holds too (the user wants the machine back)
         self.cancel.check()
         ch = assemble_chapter(self.book, self.position[ci], ci, self.groups[ci], self.engine_tag, self.cache, self.texts,
-                              self.work, self.pauses, self.lengths, self.shape)
+                              self.work, self.pauses, self.lengths, self.shape, self.tags)
         self.exporter.add_chapter(ch)
         return ch
 
@@ -669,7 +712,8 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
                  progress: Optional[ProgressFn] = None, cancel: Optional[CancelToken] = None,
                  pause: Optional[PauseToken] = None, ffmpeg: Optional[str] = None,
                  run: Optional[ex.Run] = None, chapters: Sequence[int] = (),
-                 on_plan: Optional[Callable[[List[Path]], None]] = None, checker=None) -> NarrationResult:
+                 on_plan: Optional[Callable[[List[Path]], None]] = None, checker=None,
+                 extra_engines: Optional[Dict[str, tuple]] = None) -> NarrationResult:
     """Run a complete narration job into ``out_dir / <book name>`` and return its :class:`NarrationResult`.
 
     ``engine_factory`` is called only if some chunk is missing from the cache.  ``chapters`` restricts the job to the
@@ -717,11 +761,32 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
             book, plan, language, debug_dir=job_dir / ".debug", cache_dir=job_dir / ".cache",
             progress=lambda f, m: progress(NarrationProgress(int(f * 100), 100, None, tr("narr.preparing_neural", done=m), "prepare")),
             cancel=cancel)
+    speaker_lines: Optional[List[spk.SpeakerLine]] = None
+    speaker_note = ""
+    cast = options.speakers if (options.speakers is not None and extra_engines) else None
+    if cast is not None:
+        speaker_lines = cast.lines
+        if speaker_lines is None and cast.tagger is not None:
+            code = tplan.target if tplan is not None else (tl.detect_book_language(book) or "en")
+            progress(NarrationProgress(0, 1, None, tr("spk.tagging", pct=0), "prepare"))
+            speaker_lines = spk.tag_paragraphs(
+                [text for _ci, text in spk.paragraphs(book)], code, cast.tagger,
+                lambda f: progress(NarrationProgress(int(f * 100), 100, None, tr("spk.tagging", pct=int(f * 100)), "prepare")))
     chunk_list = chunk_book(book, options.max_chars, chapters, options.speak_titles, options.pauses, options.pause_lengths,
                             options.pace)
     shape = options.pause_lengths is not None or options.pace is not None
     if not chunk_list:
         raise NarrationError(tr("err.book_empty"))
+    if cast is not None and speaker_lines:
+        voice_ids = {"male": cast.male_id, "female": cast.female_id}
+        chunk_list, speaker_note = spk.assign(chunk_list, book, speaker_lines, voice_ids, cast.narrator_id)
+        debug = job_dir / ".debug"
+        debug.mkdir(parents=True, exist_ok=True)
+        note = spk.describe(speaker_lines)
+        if speaker_note:
+            note += "\n" + speaker_note + "\n"
+            progress(NarrationProgress(0, 1, None, tr("spk.mismatch"), "prepare"))
+        (debug / "speakers.txt").write_text(note, encoding="utf-8")
     if options.ai_disclosure:              # in the narrated language (the translation target when translating)
         chunk_list = ai_disclosure.prepend(chunk_list, ai_disclosure.phrase(
             language or book.language, narrator, options.disclosure_date))
@@ -740,8 +805,9 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
     try:
         normalizer = text_steps(language, book.language, options, bool(plan is not None and plan.spells_out_numbers))
         texts = {c.index: prepare_text(c.text, options, normalizer) for c in chunk_list}
+        tags = {c.index: chunk_voice_tag(c, engine_tag, extra_engines) for c in chunk_list}
         if on_plan is not None:
-            on_plan([cache.path(cache.key(engine_tag, texts[c.index])) for c in chunk_list])
+            on_plan([cache.path(cache.key(tags[c.index], texts[c.index])) for c in chunk_list])
         work = job_dir / ".work"
         shutil.rmtree(work, ignore_errors=True)
         work.mkdir(parents=True, exist_ok=True)
@@ -753,12 +819,12 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
         n_chapters = len({c.chapter for c in chunk_list})
         exporter = ex.Exporter(ffmpeg, formats, meta, job_dir, n_chapters, options.bitrates, run, work, pool.submit)
         chapters_pipe = _ChapterPipeline(source_book, chunk_list, engine_tag, cache, texts, work, options.pauses, exporter,
-                                         pool, cancel, pause, options.pause_lengths, shape)
+                                         pool, cancel, pause, options.pause_lengths, shape, tags)
         chapters_pipe.start()
         handed_over, engine_future = engine_future, None          # from here on synthesize_chunks owns (and closes) it
         counts = synthesize_chunks(chunk_list, engine_factory, engine_tag, cache, texts, progress, cancel, pause,
                                    on_saved=chapters_pipe.chunk_saved, engine_future=handed_over,
-                                   background_check=chapters_pipe.check, checker=checker)
+                                   background_check=chapters_pipe.check, checker=checker, voices=extra_engines)
 
         stage_s["synthesis"] = time.monotonic() - t_job
         total = len(chunk_list)

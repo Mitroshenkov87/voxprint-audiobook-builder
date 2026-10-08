@@ -138,7 +138,7 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     assert bn.build_number({"GITHUB_RUN_NUMBER": "39"}) == 668
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34"}) == 700
     name = bn.info()["codename"]
-    assert name.isascii() and name.isalpha()
+    assert name == "Kolot" and name.isascii() and name.isalpha()
     c = tmp_path / "credits.json"
     c.write_text(json.dumps({"app": {"version": "0.1.1"}}), encoding="utf-8")
     bn.stamp(c, 665, "0123456789abcdef", "Tikkun")

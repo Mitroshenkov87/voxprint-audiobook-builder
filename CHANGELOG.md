@@ -5,13 +5,23 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+## [0.1.4-beta] - 2026-10-08 - build 668 "Kolot"
+
+Codename *Kolot* (Biblical Hebrew *qolot*, plural of *qol*, "voice"; Exodus 19:16 also "thunder"). The next *build-installer* run is build 668: `GITHUB_RUN_NUMBER` 39 plus the offset 629 already in `BUILD.json`. This change does not publish a release.
+
 ### Added
+- **One Prepare text switch**, on by default. It runs the rule steps (layout, footnotes, quotes, links, headings, numbers, abbreviations) and, for a Russian book, the typo model when that model is already downloaded. Translation stays its own card and stays off until it is turned on.
+- **Speaker marks.** When the text model is downloaded, Mark speakers labels each paragraph narrator, male or female. The user edits the marks in a preview, picks a male voice and a female voice, and narration speaks those paragraphs with those voices (one voice model at a time, chapters joined in book order). The command line does not offer this yet.
+- **Narration prompts** for English, German and Russian keep pauses, paragraph structure and dialogue marks (quotes, German low-high quotes, a leading em dash, guillemets). A rewrite that flattens that shape is rejected.
 - **Ordinal numbers by context** before synthesis: Russian "день 1" -> "день первый", "в главе 3" -> "в главе третьей", "псалом 22", "Глава IV", written endings ("3-го", "в 5-м томе", "90-х"); English "21st", heading "Chapter IV"; German "am 3. Oktober" -> "am dritten Oktober". The rules are data (`core/ordinal_rules.py`, [docs/ORDINALS.md](docs/ORDINALS.md)). On by default; Settings -> Narration or `--no-ordinals`.
 
 ### Documentation
 - **User manuals (en / ru / de) for 0.1.3 build 667 "Menuchah"**: new English screenshots of build 667 (Studio, Narrate, My voices with Boaz and Tirzah, Train, Settings, Check and repair) in `docs/screenshots/en-667/`, with the projects path and the network address blurred; sections on measured pauses and adaptive reading speed, the bundled voices, the new Settings (projects folder, backup and restore, Check and repair), the online installer with Full / Quick setup, and a new *Command line* chapter (narrate, train, backup / restore, checking the installation). The ru and de manuals list the localized name of every control the English screenshots show (`{{en:key}}` in `docs/manual/build_manual.py`). README and FEATURES use the new screenshots; README lists the pauses and the adaptive speed.
 
 ### Fixed
+- Text-model check boxes (literary translation, prepare text for narration, mark speakers) stay clickable when Gemma is downloaded, including when translation is off. When the model is missing they look disabled and do not switch.
+- Check & repair no longer squeezes the Settings right column: long status lines wrap, and the project, backup and folder buttons stack instead of painting on top of each other.
+- After a book and a voice are chosen, the narration status line says they are chosen. It still says "Choose a book and a voice." until both are chosen, and it does not overwrite a running or finished job.
 - Narration stopped with `WinError 32` on a chunk `.part.flac` -> `.flac` rename (build 667 log): two chunks with the same text (a repeated verse) were written to one temporary file by two writer threads. Every write now has its own temporary file, a locked rename is retried with backoff, a twin already on disk is kept, and a file that stays locked stops the job with a clear message (finished parts are kept). An output file held by a player is waited for in the same way before ffmpeg writes it. Stale `.part.flac` files are swept at the next start.
 - Model downloads left an empty `.<model>.lock` file per model in the models folder; the lock is deleted after a successful download and Check & repair removes stale ones (a lock held by a running download is kept).
 - Russian ordinals with a stressed ending were built as "вторый", "шестый", "сороковый" in the nominative masculine (used by dates and the AI disclosure).
