@@ -82,6 +82,15 @@ def detect_gpu() -> GpuInfo:
         return GpuInfo(False)
 
 
+def safe_max_clip_seconds(gpu: GpuInfo, force_cpu: bool = False) -> float:
+    """Longest training clip this machine is allowed (seconds): 20 on GPUs with >= 10 GB, else 15.
+
+    Training runs batch 1 with gradient checkpointing, so the peak memory grows with the longest single clip (about linearly
+    in its codec frames); the 6-10 GB tier (0.6B / 8-bit Adam) has the least headroom.  On the CPU only the time grows,
+    15 s keeps a step short."""
+    return 20.0 if (gpu.available and not force_cpu and gpu.total_gb >= 10) else 15.0
+
+
 def compute_epochs(n_items: int, target_passes: int = TARGET_PASSES, lo: int = 2, hi: int = 15) -> int:
     """Epochs such that (examples x epochs) lands near ``target_passes`` (the 250-400 rule from lora.md), clamped to [lo, hi]."""
     return max(lo, min(hi, round(target_passes / max(1, n_items))))

@@ -79,6 +79,7 @@ class TaskRequest:
     adapter_scale: Optional[float] = None  # LoRA strength chosen in the preview (None = automatic, core/adapter_strength.py)
     auto_pick: bool = False              # LoRA: hold out ~5 % of the clips, then pick the best checkpoint + strength (core/checkpoint_pick.py)
     clip_max_cer: float = 0.0            # audio + text, LoRA / dataset: drop clips whose ASR re-reading differs by more (core/clip_check.py; 0 = off)
+    max_clip_s: float = 15.0             # audio + text: longest training clip, 12-20 s (core/slicer.long_clip_config; 12 = classic cut)
 
     def voice_name(self) -> str:
         """Voice name = the recording's file name (or the adapter folder's name); also the result folder name in ``output/``."""
@@ -228,6 +229,20 @@ def _register_voice(adapter_dir: Path, info: dict, library=None, typed_id: bool 
     except Exception as exc:  # noqa: BLE001 - the adapter itself is already saved; never fail the run for the library
         log.warning("cannot register the voice in the library: %s", exc)
         return ""
+
+
+def _slice_config(req: TaskRequest, gpu=None):
+    """Slicer settings for the requested longest clip, capped by what this machine's training memory allows."""
+    from core.slicer import long_clip_config
+    from infra.vram_optimizer import detect_gpu, safe_max_clip_seconds
+
+    want = float(req.max_clip_s or 0)
+    if want > 12.0:                   # only then the GPU matters (detect_gpu imports torch)
+        cap = safe_max_clip_seconds(gpu if gpu is not None else detect_gpu(), req.force_cpu)
+        if want > cap:
+            log.info("longest clip %.0f s capped to %.0f s for this machine", want, cap)
+            want = cap
+    return long_clip_config(want)
 
 
 def _asr_for_clip_check(req: TaskRequest, asr_factory, preview: bool):
@@ -475,7 +490,8 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
         else:
             path = md.ensure_aligner_model(progress)
             aligner = make_default_aligner(str(path), "cpu" if req.force_cpu else "auto")
-        cfg = BuildConfig(max_edge_gap=60.0 if req.consent_mode == "auto" else BuildConfig.max_edge_gap)
+        cfg = BuildConfig(max_edge_gap=60.0 if req.consent_mode == "auto" else BuildConfig.max_edge_gap,
+                          slice=_slice_config(req))
         clip_asr, clip_warn = _asr_for_clip_check(req, asr_factory, preview)
         if clip_asr is not None:
             from core import clip_check

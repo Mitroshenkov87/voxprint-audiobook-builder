@@ -162,3 +162,19 @@ speech recognition": switched on by the **High** quality preset, off with Compac
 Needs the GPU laptop: the slowdown (one recognition per chunk plus the retries), whether 0.6B fits on the GPU next to the TTS
 model or falls back to the CPU on 8 GB cards, how many chunks a real book regenerates at 15 % (a high share points at the text
 normaliser rather than at the voice), and whether the retries are audibly better.
+
+## B4. Longer training clips (research item 9)
+
+`core/slicer.long_clip_config`, chosen in the Train window ("Longest training clip", 12-20 s, default 15 s;
+`TaskRequest.max_clip_s`; audio + text mode only - the audio-only mode already cuts up to 20 s in `core/asr_dataset.py`).
+
+| | Value |
+| --- | --- |
+| Hard maximum | the chosen length (`SliceConfig.max_dur`); 12 s = `SliceConfig()` exactly as before |
+| Cost | above the 8 s target, segments that END a sentence cost `0.015 x (d - 8)^2` instead of `0.08 x (d - 8)^2`, so a whole 16 s sentence beats a mid-sentence cut; segments ending mid-sentence keep the steep cost, so long clips are always whole sentences and most clips stay near 8 s |
+| Memory cap | `infra/vram_optimizer.safe_max_clip_seconds`: 20 s on GPUs with >= 10 GB, else 15 s (6-10 GB tier with 0.6B / 8-bit Adam, CPU); training stays batch 1 + gradient checkpointing, the trainer's own per-item limit is 30 s, and an out-of-memory error still steps down the plan (`reduce_after_oom`) |
+| Report | `report.json` -> `max_clip_seconds`, `segments_over_12s` |
+
+Needs the GPU laptop: peak VRAM of a 20 s clip on the 16 GB card (1.7B, no 8-bit Adam) and of a 15 s clip on an 8 GB card,
+the share of > 12 s clips on a real recording, and whether long-passage stability improves (narrate a chapter with sentences
+longer than 30 s of speech before / after).

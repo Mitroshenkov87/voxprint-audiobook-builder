@@ -5,6 +5,11 @@ pause.  A small dynamic program then groups consecutive phrases into segments so
 the cost prefers durations near ``target_mid`` (8 s), punishes anything below ``min_dur`` very hard and likes
 segments that end at a sentence boundary.  Cuts are placed in the middle of the silence between phrases, so no word
 is ever clipped.  Segments outside ``[min_dur, max_dur]`` (3-12 s) are dropped and reported as a warning.
+
+Longer clips (:func:`long_clip_config`, up to 15-20 s): the hard maximum is raised and the cost above ``target_mid`` grows
+much more slowly for segments that END a sentence, so a long sentence with comma pauses stays whole instead of being cut
+mid-sentence; most segments stay near 8 s, a share becomes 12-20 s.  Voices trained only on short clips can fall apart in
+long generations (Qwen3-TTS issue #39), and cutting strictly at pauses teaches the model less about comma pauses.
 """
 from __future__ import annotations
 
@@ -28,6 +33,29 @@ class SliceConfig:
     target_min: float = 4.0    # preferred minimum
     target_mid: float = 8.0    # preferred "middle" length (the cost is quadratic around it)
     pad: float = 0.10          # silence kept on each side (limited to half of the neighbouring pause)
+    #: slope of the quadratic cost above ``target_mid`` for segments that end a sentence (0.08 = same as everywhere else)
+    long_slope: float = 0.08
+
+
+#: Longest training clip offered in the Train window (seconds); 12 is the classic cut, the default allows 15.
+CLASSIC_MAX_CLIP_S = 12.0
+DEFAULT_MAX_CLIP_S = 15.0
+MAX_CLIP_S_LIMIT = 20.0
+#: Gentle slope of long mode: a whole 16 s sentence (cost 0.015 * 8^2 = 0.96) beats a mid-sentence cut into 8 + 8 s
+#: (+1.5 for the half that does not end a sentence); a 20 s one (2.16) usually still loses to two 10 s halves (1.82).
+LONG_SLOPE = 0.015
+
+
+def long_clip_config(max_clip_s: float) -> "SliceConfig":
+    """Slicer settings for a longest clip of ``max_clip_s`` seconds (clamped to 12-20; 12 = the classic cut, unchanged)."""
+    try:
+        m = float(max_clip_s)
+    except (TypeError, ValueError):
+        m = DEFAULT_MAX_CLIP_S
+    m = max(CLASSIC_MAX_CLIP_S, min(MAX_CLIP_S_LIMIT, m))
+    if m <= CLASSIC_MAX_CLIP_S:
+        return SliceConfig()
+    return SliceConfig(max_dur=m, long_slope=LONG_SLOPE)
 
 
 @dataclass
@@ -98,7 +126,8 @@ def _seg_cost(dur: float, ends_sentence: bool, cfg: SliceConfig) -> float:
     """Cost of a candidate segment: quadratic around the target length, a huge penalty below the minimum,
     a small one below the preferred minimum, and +1.5 when it does not end a sentence.
     """
-    cost = 0.08 * (dur - cfg.target_mid) ** 2
+    slope = cfg.long_slope if (ends_sentence and dur > cfg.target_mid) else 0.08
+    cost = slope * (dur - cfg.target_mid) ** 2
     if dur < cfg.min_dur:
         cost += 1000.0 + (cfg.min_dur - dur) * 100.0
     elif dur < cfg.target_min:
@@ -110,7 +139,7 @@ def _seg_cost(dur: float, ends_sentence: bool, cfg: SliceConfig) -> float:
 
 def slice_words(words: Sequence[WordTiming], text: str, total_duration: float,
                 cfg: SliceConfig | None = None) -> SliceResult:
-    """Cut ``words`` into segments of 3-12 s.
+    """Cut ``words`` into segments of 3-12 s (up to ``cfg.max_dur``, see :func:`long_clip_config`).
 
     ``words`` must carry ``char_start``/``char_end`` (see ``text_utils.attach_spans``) so each segment can take its text
     from the normalized ``text``.  ``total_duration`` bounds the last cut.  Returns the kept segments (re-indexed from 1)

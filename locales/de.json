@@ -737,5 +737,7 @@
  "narr.check_chunks": "Jedes Fragment per Spracherkennung prüfen und Fragmente neu erzeugen, die ihren Text nicht sagen (langsamer)",
  "narr.check_chunks_tip": "Nach der Synthese wird jedes Fragment per Spracherkennung neu gelesen. Weichen mehr als 15 % der Zeichen vom Text ab (ausgelassene oder wiederholte Wörter, Gebrabbel), wird es bis zu zweimal neu erzeugt und der beste Versuch behalten. Die Vertonung dauert länger. Wird mit der Voreinstellung „Hoch“ eingeschaltet; bereits fertige Fragmente werden nicht erneut geprüft.",
  "narr.checking": "Fragmente {first}–{last} von {total} werden per Spracherkennung geprüft…",
- "narr.check_summary": "Sprachprüfung: {n} von {total} Fragmenten neu erzeugt, {bad} weiterhin zweifelhaft."
+ "narr.check_summary": "Sprachprüfung: {n} von {total} Fragmenten neu erzeugt, {bad} weiterhin zweifelhaft.",
+ "clipmax.label": "Längster Trainingsclip:",
+ "clipmax.tip": "Die meisten Clips bleiben bei etwa 8 Sekunden; bei mehr als 12 s bleiben lange Sätze mit Kommas bis zu dieser Länge ganz, damit die Stimme in langen Passagen stabil bleibt. 12 s ist der klassische Schnitt. Grafikkarten mit weniger als 10 GB Videospeicher und die CPU sind auf 15 s begrenzt."
 }

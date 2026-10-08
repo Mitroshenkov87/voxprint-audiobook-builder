@@ -555,6 +555,20 @@ class MainWindow(QWidget):
         crow.setContentsMargins(0, 0, 0, 0)
         root.addWidget(self.clipcheck_row)
         self.chk_clipcheck.toggled.connect(lambda on: self.sp_clipcer.setEnabled(on and not self.busy))
+        # longest training clip (core/slicer.long_clip_config): 12 s = the classic cut, 15 s default, 20 s on GPUs with >= 10 GB
+        lrow = QHBoxLayout()
+        lrow.setContentsMargins(0, 0, 0, 0)
+        self.lbl_clipmax = QLabel()
+        self.sp_clipmax = QSpinBox()
+        self.sp_clipmax.setRange(12, 20)
+        self.sp_clipmax.setValue(15)
+        self.sp_clipmax.setSuffix(" s")
+        lrow.addWidget(self.lbl_clipmax)
+        lrow.addWidget(self.sp_clipmax)
+        lrow.addStretch(1)
+        self.clipmax_row = QWidget()
+        self.clipmax_row.setLayout(lrow)
+        root.addWidget(self.clipmax_row)
         self.lbl_preview_estimate = QLabel()
         self.lbl_preview_estimate.setObjectName("hint")
         self.lbl_preview_estimate.setWordWrap(True)
@@ -752,6 +766,9 @@ class MainWindow(QWidget):
         self.chk_clipcheck.setText(tr("clipcheck.checkbox"))
         self.chk_clipcheck.setToolTip(tr("clipcheck.tip"))
         self.sp_clipcer.setToolTip(tr("clipcheck.tip"))
+        self.lbl_clipmax.setText(tr("clipmax.label"))
+        self.lbl_clipmax.setToolTip(tr("clipmax.tip"))
+        self.sp_clipmax.setToolTip(tr("clipmax.tip"))
         self.btn_lora.setText(tr("ui.btn_lora"))
         self.btn_lora.setToolTip(tr("ui.tip_lora"))
         self.lbl_hint_lora.setText(tr("ui.hint_lora"))
@@ -918,6 +935,7 @@ class MainWindow(QWidget):
         self.chk_check.setChecked(True)
         self.chk_pick.setChecked(True)
         self.chk_clipcheck.setChecked(True)
+        self.sp_clipmax.setValue(15)
 
     # ------------------------------------------------------------------ quick preview
     def show_previews(self, items: list) -> None:
@@ -1039,7 +1057,8 @@ class MainWindow(QWidget):
     def _task_extras(self) -> dict:
         return dict(compare=self.chk_compare.isChecked(), quality_check=self.chk_check.isChecked(),
                     auto_pick=self.chk_pick.isChecked(), adapter_scale=getattr(self, "preview_scale", None),
-                    clip_max_cer=self.sp_clipcer.value() / 100.0 if self.chk_clipcheck.isChecked() else 0.0)
+                    clip_max_cer=self.sp_clipcer.value() / 100.0 if self.chk_clipcheck.isChecked() else 0.0,
+                    max_clip_s=float(self.sp_clipmax.value()))
 
     def _consent_kwargs(self) -> dict:
         return dict(consent_mode=self.consent_mode, consent_scope=str(self.cmb_consent_scope.currentData()),
@@ -1155,6 +1174,7 @@ class MainWindow(QWidget):
         self.chk_asr_ok.setChecked(False)
         self.asr_box.setVisible(on)
         self.clipcheck_row.setVisible(not on)     # the clip cross-check needs a transcript (core/clip_check.py)
+        self.clipmax_row.setVisible(not on)       # auto-transcribed datasets cut their own clips (core/asr_dataset.py, up to 20 s)
         self._apply_text_row()      # the text row stays: in this mode it is the OPTIONAL script that was read aloud
         self._show_audio_label()
         self._refresh_buttons()
@@ -1279,6 +1299,7 @@ class MainWindow(QWidget):
         self.chk_pick.setEnabled(not busy)
         self.chk_clipcheck.setEnabled(not busy)
         self.sp_clipcer.setEnabled(not busy and self.chk_clipcheck.isChecked())
+        self.sp_clipmax.setEnabled(not busy)
         if self._settings is not None:
             self._settings.refresh()
         self.btn_cancel.setVisible(bool(self.worker and self.worker.isRunning()))

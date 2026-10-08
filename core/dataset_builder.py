@@ -362,6 +362,8 @@ class DatasetBuilder:
             "audio_seconds": round(total, 2),
             "segments": len(segments),
             "segments_seconds": round(total_seg, 2),
+            "max_clip_seconds": cfg.slice.max_dur,                                  # core/slicer.long_clip_config
+            "segments_over_12s": sum(1 for s in segments if s.duration > 12.0),
             "sentences_in_text": len(sentences),
             "normalizer": {"engine": norm.engine, "changed": norm.changed},
             "quality_dropped": n_dropped_q,
