@@ -302,10 +302,14 @@ def main(argv=None) -> int:
     from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
 
+    app = QApplication.instance() or QApplication(argv)
+    from ui import splash as splash_mod
+
+    splash = splash_mod.show()            # the first thing on screen: before the heavy UI imports below
+    splash.loading_ui()
+    from ui import screen_fit
     from ui.studio import StudioWindow
 
-    app = QApplication.instance() or QApplication(argv)
-    from ui import screen_fit
 
     screen_fit.install(app)               # every window / dialog clamped to the screen's work area when shown
     import threading
@@ -333,6 +337,7 @@ def main(argv=None) -> int:
 
     from infra import modules as _mods
 
+    splash.checking()
     thin_wait = False        # thin build, runtime modules missing: the model download waits until they are installed
     try:
         thin_wait = (not selftest) and _mods.is_thin() and not _mods.installed_without_network()
@@ -372,6 +377,7 @@ def main(argv=None) -> int:
 
         hard_exit.arm()          # closing the main window kills every helper process at once (docs/BUILDING.md)
     win.show_studio()
+    splash.finish(win)                    # closes once the Studio window is on screen
     if thin_wait:
         _offer_components(win, app, want_prefetch)
     if selftest:

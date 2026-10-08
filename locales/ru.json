@@ -792,5 +792,7 @@
  "ui.transparency_default": "Обычная",
  "ui.transparency_more": "Сильнее",
  "ui.transparency_off": "Выключена",
- "train.checks_options": "Проверки и параметры фрагментов"
+ "train.checks_options": "Проверки и параметры фрагментов",
+ "splash.loading_ui": "Загрузка интерфейса…",
+ "splash.checking": "Проверка компонентов…"
 }

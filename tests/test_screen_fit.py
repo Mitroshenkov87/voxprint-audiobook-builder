@@ -65,3 +65,16 @@ def test_window_transparency_levels(app):
     assert main_window.build_style(True) == main_window.build_style(False)
     with pytest.raises(ValueError):
         ui_prefs.set_transparency("max")
+
+
+def test_splash_shows_a_status_and_closes_with_the_main_window(app):
+    from ui import splash
+
+    s = splash.show()
+    s.status("Loading interface\u2026")
+    assert s.isVisible() and s.message() == "Loading interface\u2026"
+    assert s.width() <= AVAIL.width() and s.height() <= AVAIL.height()
+    w = QWidget()
+    w.show()
+    s.finish(w)
+    assert not s.isVisible()
