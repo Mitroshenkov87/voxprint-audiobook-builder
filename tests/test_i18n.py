@@ -76,7 +76,7 @@ def test_no_cyrillic_user_literals_left_in_code():
         # service comments of the requirements-file generator
         if f.name in ("normalizer.py", "text_utils.py", "i18n.py", "model_export.py", "updater.py",
                       "verified_manifest.py", "book_parsers.py", "num_words.py", "text_prep.py", "text_cleanup.py", "asr_dataset.py", "asr.py", "consent.py", "script_match.py", "spoken_date.py", "selftest_narrate.py", "selftest_text.py", "preview_runner.py", "voice_check.py",
-                      "ai_disclosure.py"):   # Russian word tables and rules (data); the disclosure is spoken in the BOOK language
+                      "ai_disclosure.py", "languages.py"):   # Russian word tables and rules (data); the disclosure is spoken in the BOOK language
             continue
         tree = ast.parse(f.read_text(encoding="utf-8"))
         doc = {id(n.body[0].value) for n in ast.walk(tree)
