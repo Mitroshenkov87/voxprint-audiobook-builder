@@ -12,3 +12,7 @@ dataset/
 *.safetensors
 *.wav
 !assets/**/*.wav
+
+# audit (tools/audit.py)
+audit-report.txt
+.coverage

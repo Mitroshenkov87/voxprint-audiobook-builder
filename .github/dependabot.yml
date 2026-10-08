@@ -1,0 +1,20 @@
+# Dependency update PRs: weekly for pip, monthly for the GitHub Actions; few open PRs at a time.
+# PyTorch / transformers / qwen-* are pinned on purpose (verified with the models): their PRs are ignored here.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: torch
+      - dependency-name: torchaudio
+      - dependency-name: transformers
+      - dependency-name: qwen-tts
+      - dependency-name: qwen-asr
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2

@@ -1,0 +1,19 @@
+# CodeQL (free for public repositories): weekly and on demand only - not on every push.
+name: codeql
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+  security-events: write
+jobs:
+  analyze:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          build-mode: none
+      - uses: github/codeql-action/analyze@v3

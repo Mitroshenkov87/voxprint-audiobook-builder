@@ -1,0 +1,7 @@
+ruff
+mypy
+bandit
+pip-audit
+vulture
+radon
+coverage

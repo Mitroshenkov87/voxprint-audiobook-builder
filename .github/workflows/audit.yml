@@ -1,0 +1,38 @@
+# Manual code audit (tools/audit.py): ruff, mypy, bandit, pip-audit, vulture, radon and optionally coverage; one summary
+# in the job log, the full report as an artifact.  The app's dependencies are installed (CPU PyTorch) so pip-audit sees them.
+name: audit
+on:
+  workflow_dispatch:
+    inputs:
+      coverage:
+        description: "Also run the test suite under coverage (slower)"
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: App environment (CPU PyTorch) and audit tools
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q libegl1 libxkbcommon0 libgl1 ffmpeg
+          python -m pip install -q uv
+          uv venv .app && uv venv .tools
+          uv pip install -q --python .app/bin/python torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+          uv pip install -q --python .app/bin/python -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt coverage
+          uv pip install -q --python .app/bin/python --no-deps -r requirements-nodeps.txt
+          uv pip install -q --python .tools/bin/python -r requirements-audit.txt
+      - name: Audit
+        run: .tools/bin/python tools/audit.py --python .app/bin/python ${{ inputs.coverage && '--coverage' || '' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-report
+          path: audit-report.txt
