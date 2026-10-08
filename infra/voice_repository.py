@@ -96,6 +96,12 @@ class RepoVoice:
     license_url: str = ""
     description: str = ""
     voice_type: str = ""
+    gender: str = ""          # schema-3 details (core/voice_info.py); "" = not given by the index
+    age_group: str = ""
+    speaker: str = ""
+    prepared_by: str = ""
+    organization: str = ""
+    project_url: str = ""
     base_model: str = ""
     size_bytes: int = 0
     names: dict = field(default_factory=dict)       # optional localized display names {"ru": "...", "en": "..."}
@@ -223,6 +229,12 @@ def parse_index(data: Any) -> List[RepoVoice]:
             voice_info.license_url_for(lic),
             description=voice_info.clean_description(str(e.get("description", ""))),
             voice_type=voice_info.normalize_voice_type(str(e.get("voice_type", ""))),
+            gender=voice_info.normalize_gender(str(e.get("gender", ""))),
+            age_group=voice_info.normalize_age_group(str(e.get("age_group", ""))),
+            speaker=voice_info.clean_line(str(e.get("speaker", ""))),
+            prepared_by=voice_info.clean_line(str(e.get("prepared_by", ""))),
+            organization=voice_info.clean_line(str(e.get("organization", "")), voice_info.MAX_ORGANIZATION_CHARS),
+            project_url=voice_info.clean_project_url(str(e.get("project_url", ""))),
             base_model=str(e.get("base_model", "")), size_bytes=size, names=voice_info.clean_names(e.get("names")),
             descriptions=voice_info.clean_names(e.get("descriptions"), voice_info.clean_description)))
     return out
@@ -306,7 +318,9 @@ def download_voice(entry: RepoVoice, library: VoiceLibrary, opener: Opener = net
             tmp.unlink(missing_ok=True)               # a wrong/corrupt partial must not poison the next attempt
             raise VoiceRepositoryError(tr("err.voice_repo_hash"), details=f"{digest} != {entry.sha256}")
         overrides = {"name": entry.name, "author": entry.author, "license": entry.license,
-                     "license_url": entry.license_url, "voice_type": entry.voice_type,
+                     "license_url": entry.license_url, "voice_type": entry.voice_type, "gender": entry.gender,
+                     "age_group": entry.age_group, "speaker": entry.speaker, "prepared_by": entry.prepared_by,
+                     "organization": entry.organization, "project_url": entry.project_url,
                      "description": entry.description, "language": entry.language, "base_model": entry.base_model,
                      "names": entry.names or None, "descriptions": entry.descriptions or None, "repo_id": entry.id}
         rec = library.import_zip(tmp, overrides=overrides)

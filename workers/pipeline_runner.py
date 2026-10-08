@@ -57,8 +57,14 @@ class TaskRequest:
     force_cpu: bool = False
     adapter_dir: Optional[Path] = None   # KIND_MERGE only: folder of the trained adapter
     voice_display_name: str = ""         # optional, typed by the user: voice name, library folder and result folder
-    voice_type: str = ""                 # optional, goes to voice.json: male / female / child / other
+    voice_type: str = ""                 # optional, older form (CLI --type): male / female / child / other
     voice_description: str = ""          # optional free text, goes to voice.json
+    gender: str = ""                     # optional voice.json details (schema 3, core/voice_info.py); gender / age group
+    age_group: str = ""                  # win over voice_type when set
+    speaker: str = ""
+    prepared_by: str = ""
+    organization: str = ""
+    project_url: str = ""
     no_transcript: bool = False          # audio only: the app recognises the speech itself (see core.asr_dataset)
     audio_files: List[Path] = field(default_factory=list)   # no_transcript: files and/or folders (many clips)
     asr_language: Optional[str] = None   # no_transcript: "Russian" / "English" ... or None = automatic
@@ -84,13 +90,21 @@ class TaskRequest:
             return safe_name(Path(self.adapter_dir).name)
         return "voice"
 
+    def effective_voice_type(self) -> str:
+        """``voice_type`` as voice.json will store it: derived from gender / age group, else the older ``voice_type``."""
+        from core import voice_info
+
+        if voice_info.normalize_gender(self.gender) or voice_info.normalize_age_group(self.age_group):
+            return voice_info.derive_voice_type(self.gender, self.age_group)
+        return voice_info.normalize_voice_type(self.voice_type)
+
     def voice_folder(self) -> str:
         """Name of the folder with the trained voice: the voice name plus its type (``anna_male``, ``anna_unspecified``)."""
         from core import voice_info
 
         if self.voice_display_name.strip():
             return self.voice_name()                       # the user's own name, no type suffix
-        return safe_name(voice_info.with_type_suffix(self.voice_name(), self.voice_type))
+        return safe_name(voice_info.with_type_suffix(self.voice_name(), self.effective_voice_type()))
 
     def resolved_root(self) -> Path:
         """Result folder: ``out_root`` if given, else ``<audio folder>/<voice>_Voxprint``."""
@@ -187,7 +201,9 @@ def _write_voice_json(req: TaskRequest, adapter_dir: Path, language: str, speech
         extra = dict(license=consent_mod.license_for_scope(consent_block["scope"]), consent=consent_block,
                      author=consent_block.get("name", ""))
     info = voice_info.build_voice_info(req.voice_display_name.strip() or req.voice_name(), language, speech_seconds, epochs, base_model,
-                                       req.voice_type, req.voice_description, **extra)
+                                       req.voice_type, req.voice_description, gender=req.gender, age_group=req.age_group,
+                                       speaker=req.speaker, prepared_by=req.prepared_by, organization=req.organization,
+                                       project_url=req.project_url, **extra)
     try:
         voice_info.write_voice_json(adapter_dir, info)
     except OSError as exc:

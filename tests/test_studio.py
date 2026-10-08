@@ -314,7 +314,7 @@ def test_edit_license_changes_the_badge(app, lib, tmp_path):
     dlg.edt_name.setText("Anna Prime")
     dlg.cmb_license.setCurrentIndex(dlg.cmb_license.findData("CC0-1.0"))
     assert "allows commercial use" in dlg.lbl_license_note.text()
-    dlg.cmb_type.setCurrentIndex(dlg.cmb_type.findData("female"))
+    dlg.cmb_gender.setCurrentIndex(dlg.cmb_gender.findData("female"))
     s.voices_window.apply_edit(rec.id, dlg.values())
     got = lib.get("anna-prime") or lib.get(rec.id)                                # the folder follows the new name
     assert got is not None and lib.get(rec.id) is None

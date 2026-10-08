@@ -19,6 +19,7 @@ def run(voice_id: str = "", out_dir: Optional[Path] = None, library=None, narrat
     from core import narration as nr
     from core.book_parsers import Book, Chapter
     from core.events import CancelToken
+    from core.languages import language_name
     from infra import paths
 
     log = Path(paths.logs_dir()) / "selftest_narrate.txt"
@@ -54,7 +55,7 @@ def run(voice_id: str = "", out_dir: Optional[Path] = None, library=None, narrat
                 return run_narration(job, progress, cancel, pause)
         else:
             from workers.narration_runner import NarrationJob
-        lang = (voice.language or "english").lower()
+        lang = (language_name(voice.language) or "english").lower()   # voice.json: "ru" (schema 3) or "Russian"
         book = Book("Selftest", "Voxprint", {"russian": "ru", "german": "de"}.get(lang, "en"),
                     [Chapter("Selftest", SENTENCES.get(lang, SENTENCES["english"]))])
         job = NarrationJob(book, voice, out_dir, nr.NarrationOptions(formats={ex.FORMAT_MP3_CHAPTERS}))

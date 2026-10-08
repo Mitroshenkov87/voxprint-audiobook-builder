@@ -17,12 +17,13 @@ from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (QComboBox, QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget,
+from PySide6.QtWidgets import (QComboBox, QDialog, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget,
                                QListWidgetItem, QMenu, QMessageBox, QProgressBar, QPushButton, QVBoxLayout, QWidget)
 
 from core import voice_info
 from core.errors import DatasetMakerError
 from core.i18n import tr
+from core.languages import language_name
 from core.voice_library import VoiceLibrary, VoiceRecord
 from infra import voice_catalog as catalog
 from infra import voice_repository as repo
@@ -40,6 +41,25 @@ def voice_type_label(code: str) -> str:
     return labels.get(code, labels[""])
 
 
+def gender_labels() -> dict:
+    """Localized names of the ``gender`` values ("" = not set)."""
+    return {"": tr("ui.voice_gender_none"), "male": tr("ui.voice_gender_male"), "female": tr("ui.voice_gender_female")}
+
+
+def age_labels() -> dict:
+    """Localized names of the ``age_group`` values ("" = not set)."""
+    return {"": tr("ui.voice_age_none"), "child": tr("ui.voice_age_child"), "young": tr("ui.voice_age_young"),
+            "adult": tr("ui.voice_age_adult"), "elderly": tr("ui.voice_age_elderly")}
+
+
+def fill_combo(combo: QComboBox, labels: dict, current: str = "") -> None:
+    """(Re)fill ``combo`` with ``labels`` (code -> text), keeping the code ``current`` selected."""
+    combo.clear()
+    for code, text in labels.items():
+        combo.addItem(text, code)
+    combo.setCurrentIndex(max(0, combo.findData(current)))
+
+
 def badge_text(license_id: str, commercial: bool) -> str:
     """Text of the licence badge: what the licence allows, plus the licence id."""
     if commercial:
@@ -55,9 +75,12 @@ def duration_text(seconds: float) -> str:
 
 def meta_line(rec: VoiceRecord) -> str:
     """One line: language, training length, epochs, voice type and author."""
-    parts = [rec.language.capitalize() if rec.language else "", duration_text(float(rec.info.get("duration", 0))),
+    parts = [language_name(rec.language), duration_text(float(rec.info.get("duration", 0))),
              tr("voices.epochs", n=int(rec.info.get("epochs", 0)))]
     parts.append(voice_type_label(str(rec.info.get("voice_type") or "")))      # older voices: "not specified"
+    age = str(rec.info.get("age_group") or "")
+    if age and age != "child":                                                 # "child" is the type label already
+        parts.append(age_labels().get(age, ""))
     if rec.info.get("author"):
         parts.append(tr("voices.by_author", author=rec.info["author"]))
     return " \u00b7 ".join(p for p in parts if p)
@@ -106,7 +129,7 @@ class RemoteCard(QFrame):
         top.addStretch(1)
         lay.addLayout(top)
         size = catalog.size_text(item.size_bytes)
-        meta = [p for p in (item.language.capitalize() if item.language else "", item.author and tr("voices.by_author", author=item.author),
+        meta = [p for p in (language_name(item.language), item.author and tr("voices.by_author", author=item.author),
                             size) if p]
         self.lbl_meta = QLabel(" \u00b7 ".join(meta))
         self.lbl_meta.setObjectName("carddesc")
@@ -196,13 +219,15 @@ class VoiceCard(QFrame):
 
 
 class VoiceEditDialog(QDialog):
-    """Edit name, author, licence, voice type and description of a voice."""
+    """Edit name, author, speaker, prepared by, organization, project link, licence, gender / age and description.
+
+    A form layout (label left, field right) keeps the dialog short enough for 150 % display scaling."""
 
     def __init__(self, rec: VoiceRecord, parent: Optional[QWidget] = None) -> None:
         """Fill the fields from ``rec``; :meth:`values` returns what the user entered."""
         super().__init__(parent)
         self.setObjectName("root")
-        self.setMinimumWidth(480)
+        self.setMinimumWidth(560)
         if parent is not None:
             self.setStyleSheet(parent.styleSheet())
         self.setWindowTitle(tr("voices.edit_title"))
@@ -220,18 +245,36 @@ class VoiceEditDialog(QDialog):
             self.cmb_license.addItem(rec.license, rec.license)
         self.cmb_license.setCurrentIndex(self.cmb_license.findData(rec.license))
         self.lbl_license_note = hint_label()
-        self.cmb_type = QComboBox()
-        for code in ("",) + voice_info.VOICE_TYPES:
-            self.cmb_type.addItem(voice_type_label(code), code)
-        self.cmb_type.setCurrentIndex(max(0, self.cmb_type.findData(str(rec.info.get("voice_type", "")))))
+        self.cmb_gender, self.cmb_age = QComboBox(), QComboBox()
+        fill_combo(self.cmb_gender, gender_labels(), str(rec.info.get("gender", "")))
+        fill_combo(self.cmb_age, age_labels(), str(rec.info.get("age_group", "")))
+        ga = QHBoxLayout()
+        ga.setContentsMargins(0, 0, 0, 0)
+        ga.addWidget(self.cmb_gender, 1)
+        ga.addWidget(self.cmb_age, 1)
+        self.edt_speaker = QLineEdit(str(rec.info.get("speaker", "")))
+        self.edt_prepared = QLineEdit(str(rec.info.get("prepared_by", "")))
+        self.edt_org = QLineEdit(str(rec.info.get("organization", "")))
+        self.edt_url = QLineEdit(str(rec.info.get("project_url", "")))
+        self.edt_url.setPlaceholderText("https://")
+        for w, n in ((self.edt_speaker, voice_info.MAX_NAME_CHARS), (self.edt_prepared, voice_info.MAX_NAME_CHARS),
+                     (self.edt_org, voice_info.MAX_ORGANIZATION_CHARS), (self.edt_url, voice_info.MAX_URL_CHARS)):
+            w.setMaxLength(n)
+        for w in (self.edt_speaker, self.edt_prepared, self.edt_org):
+            w.setPlaceholderText(tr("voices.author_placeholder"))
         self.edt_desc = QLineEdit(str(rec.info.get("description", "")))
         self.edt_desc.setMaxLength(voice_info.MAX_DESCRIPTION_CHARS)
-        for label, w in ((tr("voices.field_name"), self.edt_name), (tr("voices.field_author"), self.edt_author),
-                         (tr("voices.field_license"), self.cmb_license), (None, self.lbl_license_note),
-                         (tr("voices.field_type"), self.cmb_type), (tr("voices.field_description"), self.edt_desc)):
-            if label:
-                lay.addWidget(QLabel(label))
-            lay.addWidget(w)
+        form = QFormLayout()
+        form.setSpacing(8)
+        form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
+        for label, w in ((tr("voices.field_name"), self.edt_name), (tr("voices.field_speaker"), self.edt_speaker),
+                         (tr("voices.field_gender_age"), ga), (tr("voices.field_author"), self.edt_author),
+                         (tr("voices.field_prepared_by"), self.edt_prepared),
+                         (tr("voices.field_organization"), self.edt_org), (tr("voices.field_project_url"), self.edt_url),
+                         (tr("voices.field_description"), self.edt_desc), (tr("voices.field_license"), self.cmb_license)):
+            form.addRow(label, w)
+        lay.addLayout(form)
+        lay.addWidget(self.lbl_license_note)      # outside the form: a wrapped label in a form row gets cut off
         self.lbl_rights = hint_label()
         self.lbl_rights.setText(tr("voices.rights_note"))
         lay.addWidget(self.lbl_rights)
@@ -259,8 +302,10 @@ class VoiceEditDialog(QDialog):
 
     def values(self) -> dict:
         """The edited fields, ready for :meth:`VoiceLibrary.update`."""
-        return {"name": self.edt_name.text(), "author": self.edt_author.text(),
-                "license": str(self.cmb_license.currentData()), "voice_type": str(self.cmb_type.currentData()),
+        return {"name": self.edt_name.text(), "author": self.edt_author.text(), "speaker": self.edt_speaker.text(),
+                "prepared_by": self.edt_prepared.text(), "organization": self.edt_org.text(),
+                "project_url": self.edt_url.text(), "license": str(self.cmb_license.currentData()),
+                "gender": str(self.cmb_gender.currentData() or ""), "age_group": str(self.cmb_age.currentData() or ""),
                 "description": self.edt_desc.text()}
 
 
@@ -358,7 +403,7 @@ class RepoDialog(QDialog):
         else:
             self.lbl_state.setText(tr("voices.repo_found", n=len(self.entries)))
         for e in self.entries:
-            it = QListWidgetItem(f"{e.display_name}  \u00b7  {e.language}  \u00b7  {badge_text(e.license, e.commercial_use)}")
+            it = QListWidgetItem(f"{e.display_name}  \u00b7  {language_name(e.language)}  \u00b7  {badge_text(e.license, e.commercial_use)}")
             it.setData(Qt.ItemDataRole.UserRole, e.id)
             self.list.addItem(it)
         self._on_selection()

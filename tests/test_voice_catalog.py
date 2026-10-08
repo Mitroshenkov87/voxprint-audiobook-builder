@@ -68,6 +68,48 @@ def test_download_imports_the_package_with_names_licence_and_owner_consent(tmp_p
     assert (rec.path / "adapter_model.safetensors").is_file() and not (rec.path / c.CLIP_NAME).exists()
 
 
+DETAILS = {"speaker": "Анна", "prepared_by": "Studio Nord", "organization": "Voxprint e.V.",
+           "project_url": "https://example.org/voice", "gender": "female", "age_group": "adult", "language": "ru-RU"}
+
+
+def test_package_carries_schema3_details_into_entry_model_card_and_library(tmp_path):
+    data, entry = package(tmp_path, {**SPEC, **DETAILS, "license": "CC-BY-4.0"})
+    for k, v in DETAILS.items():
+        assert entry[k] == v, k
+    assert entry["voice_type"] == "female"                               # derived, for older app versions
+    card = (tmp_path / "dist" / "open-voice" / "README.md").read_text(encoding="utf-8")
+    head = card.split("---")[1]
+    assert 'license: "cc-by-4.0"' in head and '- "ru"' in head and "pipeline_tag: text-to-speech" in head
+    for text in ("| Speaker | Анна |", "| Prepared by | Studio Nord |", "| Organization | Voxprint e.V. |",
+                 "| Project | https://example.org/voice |", "| Gender | female |", "| Age group | adult |",
+                 "| Language | Russian (`ru-RU`) |"):
+        assert text in card, text
+    assert "open-voice/README.md" in zipfile.ZipFile(io.BytesIO(data)).namelist()
+    ent = repo.parse_index(index_for(entry))[0]
+    assert (ent.speaker, ent.gender, ent.age_group, ent.project_url) == ("Анна", "female", "adult", "https://example.org/voice")
+    rec = repo.download_voice(ent, VoiceLibrary(tmp_path / "lib"), opener=opener_for({URL: data}))
+    assert all(rec.info[k] == v for k, v in DETAILS.items())            # README.md is not imported, the fields are
+    assert not (rec.path / "README.md").exists()
+
+
+def test_model_card_for_a_custom_licence_and_hostile_text(tmp_path):
+    info = voice_info.normalize_info({"id": "v", "name": "A | <b>B</b>", "license": voice_info.LICENSE_TEST_ONLY,
+                                      "speaker": "x|y"})
+    card = mvp.model_card(info)
+    assert 'license: "other"' in card and 'license_name: "custom-test-use-only"' in card
+    assert "# A \\| &lt;b>B&lt;/b>" in card and "| Speaker | x\\|y |" in card
+    assert "language:" not in card                                       # no language known: no metadata line
+    bad = voice_info.normalize_info({"project_url": "javascript:alert(1)"})
+    assert "javascript" not in mvp.model_card(bad)
+
+
+def test_old_spec_voice_type_still_names_the_package(tmp_path):
+    ad = make_adapter(tmp_path / "ad", name="Open Voice", with_voice_json=True)
+    entry = mvp.build(ad, {**SPEC, "voice_type": "child"}, tmp_path / "dist", URL)
+    assert entry["voice_type"] == "child" and entry["age_group"] == "child"
+    assert (tmp_path / "dist" / "open-voice_child.zip").is_file()
+
+
 def test_names_and_descriptions_follow_the_ui_language_with_fallback(tmp_path):
     data, entry = package(tmp_path)
     lib = VoiceLibrary(tmp_path / "lib")

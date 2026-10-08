@@ -38,7 +38,7 @@ def test_add_list_get_and_fields(tmp_path):
     assert rec.path.parent == tmp_path / "lib" and adapter_complete(rec.path)
     got = lib.get(rec.id)
     assert got.name == "Anna" and got.license == "CC-BY-4.0" and got.commercial_use is True
-    assert got.info["id"] == rec.id and got.language == "english" and got.ref_text == "Hello there"
+    assert got.info["id"] == rec.id and got.language == "en" and got.ref_text == "Hello there"
     assert got.preview_path == rec.path / "ref_sample.wav" and got.base_model == "Qwen/Base"
     assert [v.id for v in lib.list_voices()] == [rec.id] and not lib.is_empty()
     assert lib.get("missing") is None and lib.get("../x") is None and lib.get("") is None
@@ -58,7 +58,7 @@ def test_adapter_without_voice_json_gets_safe_defaults(tmp_path):
     lib = VoiceLibrary(tmp_path / "lib")
     rec = lib.add_from_adapter(make_adapter(tmp_path / "my_voice", with_voice_json=False))
     assert rec.name == "my_voice" and rec.license == "custom/personal-only" and not rec.commercial_use
-    assert voice_info.read_voice_json(rec.path)["schema"] == 2
+    assert voice_info.read_voice_json(rec.path)["schema"] == voice_info.VOICE_SCHEMA
 
 
 def test_import_folder_ignores_foreign_files(tmp_path):

@@ -302,14 +302,24 @@ class VoiceLibrary:
 
     # ------------------------------------------------------------------ changing
     def update(self, voice_id: str, **fields: Any) -> VoiceRecord:
-        """Change editable details (``name, author, license, license_url, voice_type, description``) and save voice.json."""
+        """Change editable details (``name, author, speaker, prepared_by, organization, project_url, license, license_url,
+        gender, age_group, voice_type, description``) and save voice.json."""
         rec = self.get(voice_id)
         if rec is None:
             raise VoiceLibraryError(tr("err.voice_not_found"), details=voice_id)
         info = dict(rec.info)
-        for key in ("name", "author", "license", "license_url", "voice_type", "description", "consent"):
+        for key in ("name", "author", "speaker", "prepared_by", "organization", "project_url", "license", "license_url",
+                    "gender", "age_group", "voice_type", "description", "consent"):
             if key in fields and fields[key] is not None:
                 info[key] = fields[key]
+        if fields.get("voice_type") is not None and fields.get("gender") is None and fields.get("age_group") is None:
+            # an old-style caller sets only voice_type: it replaces gender / age group (voice_type is derived from them)
+            info["gender"], info["age_group"] = voice_info.split_voice_type(fields["voice_type"])
+        elif fields.get("gender") is not None or fields.get("age_group") is not None:
+            # voice_type is derived: drop a stale one, or normalize_info would "migrate" it back into a cleared gender / age
+            old = str(info.get("voice_type") or "")
+            info["voice_type"] = voice_info.derive_voice_type(info.get("gender"), info.get("age_group"),
+                                                              old if old == "other" else "")
         if "license" in fields and "license_url" not in fields:
             info["license_url"] = ""                                   # re-derived for the new licence
         # Per-language names/descriptions (downloaded voices) are shown *instead of* name/description, so an edit

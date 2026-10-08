@@ -298,7 +298,14 @@ def test_voice_fields_are_passed_to_the_task_request(app):
     w.set_text(Path("/tmp/a.txt"))
     w.cmb_voice_type.setCurrentIndex(w.cmb_voice_type.findData("female"))
     w.edt_voice_desc.setText("  warm  alto ")
+    w.cmb_voice_age.setCurrentIndex(w.cmb_voice_age.findData("elderly"))
+    assert w.voice_more_box.isHidden()                                  # folded away until asked for
+    w.btn_voice_more.setChecked(True)
+    w.edt_voice_speaker.setText(" Анна ")
+    w.edt_voice_url.setText("https://example.org")
     w.start(KIND_LORA)
     assert wait_for(lambda: "req" in seen)
-    assert seen["req"].voice_type == "female" and seen["req"].voice_description == "warm  alto"
+    assert seen["req"].gender == "female" and seen["req"].voice_description == "warm  alto"
+    assert seen["req"].effective_voice_type() == "female" and seen["req"].voice_folder().endswith("_female")
+    assert (seen["req"].age_group, seen["req"].speaker, seen["req"].project_url) == ("elderly", "Анна", "https://example.org")
     w.close()

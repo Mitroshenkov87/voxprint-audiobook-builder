@@ -1,6 +1,6 @@
 # My voices and licences
 
-*My voices* lists the library as cards: name, language, length of speech, epochs, voice type, author, a **licence badge** (green: commercial use allowed, amber: personal use only), **Preview** (plays the reference sample),
+*My voices* lists the library as cards: name, language, length of speech, epochs, voice type (from gender / age group), author, a **licence badge** (green: commercial use allowed, amber: personal use only), **Preview** (plays the reference sample),
 *Narrate with this voice*, *Details…* (edit name, author, licence, description) and *Delete* (asks first). **Import voice…** accepts an adapter folder or a `.zip` (archives are checked: no path tricks, only the
 adapter files, size limits). A voice without a declared licence is treated as `custom/personal-only`.
 

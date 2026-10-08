@@ -54,6 +54,8 @@ python main.py voices list
 python main.py voices export VOICE --out ZIP
 ```
 
+`voices list` prints one tab-separated line per voice: id, name, type, language code, licence, gender, age group (`-` = not set).
+
 `VOICE` is an id or display name (example: `[model_voice]`). The zip is the small voice package (adapter + `voice.json` + clips), importable in *My voices*.
 
 ```

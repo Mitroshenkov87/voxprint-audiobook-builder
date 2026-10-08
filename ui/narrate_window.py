@@ -38,6 +38,7 @@ from core import num_words as nw
 from core import translate as tl
 from core import voice_info
 from core.i18n import tr
+from core.languages import language_name
 from core.voice_library import VoiceLibrary
 from infra import features, text_models
 from infra import voice_catalog as catalog
@@ -1015,7 +1016,7 @@ class NarrateWindow(SubWindow):
             return
         self.badge_box.addWidget(make_badge(rec.license, rec.commercial_use, str(rec.info.get("license_url", ""))))
         self.badge_box.addWidget(make_scope_badge(rec.scope))
-        lang = rec.language.capitalize() if rec.language else ""
+        lang = language_name(rec.language)
         self.lbl_voice_info.setText(" \u00b7 ".join(p for p in (lang, rec.info.get("author", "")) if p)
                                     + self._scope_note(rec))
 
@@ -1027,7 +1028,7 @@ class NarrateWindow(SubWindow):
             return
         self.badge_box.addWidget(make_badge(e.license, e.commercial_use, e.license_url))
         self.badge_box.addWidget(make_scope_badge(catalog.scope_for_license(e.license)))
-        lang = e.language.capitalize() if e.language else ""
+        lang = language_name(e.language)
         note = "\n" + tr("narr.voice_test_only_note") if e.license == voice_info.LICENSE_TEST_ONLY else ""
         self.lbl_voice_info.setText(" \u00b7 ".join(p for p in (lang, e.author) if p) + "\n" + tr("narr.voice_remote_note") + note)
 

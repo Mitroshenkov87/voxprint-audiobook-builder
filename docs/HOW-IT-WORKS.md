@@ -38,15 +38,16 @@ output\<voice name>\  adapter_model.safetensors, adapter_config.json, ref_sample
           tts_model_type=custom_voice + talker_config.spk_id, speech_tokenizer\, ref_sample.wav, ref_text.txt,
           speaker_embedding.safetensors, voxprint_voice.json, USAGE.txt)
 ```
-`voice.json` (schema 2) example:
+`voice.json` (schema 3) example:
 ```json
-{"schema": 2, "id": "my-voice", "name": "My voice", "language": "russian", "created": "2026-10-03T12:00:00Z",
+{"schema": 3, "id": "my-voice", "name": "My voice", "language": "ru", "created": "2026-10-03T12:00:00Z",
  "duration": 412.7, "epochs": 15, "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base", "author": "Aleksandr",
- "license": "custom/personal-only", "license_url": "", "voice_type": "female",
+ "speaker": "[model_voice]", "prepared_by": "", "organization": "", "project_url": "",
+ "license": "custom/personal-only", "license_url": "", "gender": "female", "age_group": "adult", "voice_type": "female",
  "description": "Warm narrator voice, calm pace", "commercial_use": false}
 ```
-`voice_type` (`male|female|child|other`) and `description` (whitespace collapsed, ≤ 500 characters) are optional (empty strings when unset). `license` is an SPDX-like id (see the table above; default
-`custom/personal-only`), `license_url` is filled for the known licences, and `commercial_use` is **derived** from the licence. Schema-1 files (`voice_name`, `speech_seconds`) are migrated when read.
+`language` is a BCP-47 code and `created` ISO 8601 UTC. `speaker`, `prepared_by`, `organization` (any script), `project_url` (http/https only), `gender` (`male|female`), `age_group` (`child|young|adult|elderly`) and `description` (whitespace collapsed, ≤ 500 characters) are optional (empty strings when unset); `voice_type` (`male|female|child|other`) is derived from gender / age group for older readers and the folder-name suffix. `license` is an SPDX-like id (see the table above; default
+`custom/personal-only`), `license_url` is filled for the known licences, and `commercial_use` is **derived** from the licence. Schema-1 files (`voice_name`, `speech_seconds`) and schema-2 files (`voice_type` only, language names like `russian`) are migrated when read.
 Library layout: `%LOCALAPPDATA%\Voxprint\voices\<id>\` = `adapter_model.safetensors`, `adapter_config.json`, `ref_sample.wav`, `training_meta.json`, `voice.json`.
 
 Audiobook output: `<output>\<Book title>\` with the chosen files (`Author - Title.opus` / `.m4b` / `.mp3`, or folders `... - MP3`, `... - Opus`, `... - FLAC`, `... - WAV` with `NN - Chapter` files and a `.m3u8`);

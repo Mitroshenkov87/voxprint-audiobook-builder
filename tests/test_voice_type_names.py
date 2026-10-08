@@ -126,7 +126,7 @@ def test_train_window_suggests_but_never_overrides_the_users_choice(app, tmp_pat
 def test_selector_is_localized(app):
     from tests.test_ui import make_window
     seen = {}
-    for lang, word in (("en", "Male voice"), ("ru", "Мужской"), ("de", "Männlich")):
+    for lang, word in (("en", "Male"), ("ru", "Мужской"), ("de", "Männlich")):
         i18n.set_language(lang)
         w = make_window(lambda *a: None)
         texts = [w.cmb_voice_type.itemText(i) for i in range(w.cmb_voice_type.count())]

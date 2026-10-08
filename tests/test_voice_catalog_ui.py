@@ -114,6 +114,26 @@ def test_edit_dialog_keeps_the_stored_name_and_explains_the_test_only_licence(ap
     assert "Test use only" in dlg.lbl_license_note.text()
 
 
+
+def test_edit_dialog_edits_the_schema3_details(app, lib, tmp_path, entries):
+    from ui.voices_window import VoiceEditDialog
+    i18n.set_language("ru")
+    rec = fake_download(tmp_path)(entries[0], lib)
+    dlg = VoiceEditDialog(rec)
+    assert dlg.cmb_gender.count() == 3 and dlg.cmb_age.count() == 5 and "Пол" in dlg.cmb_gender.itemText(0)
+    dlg.cmb_gender.setCurrentIndex(dlg.cmb_gender.findData("male"))
+    dlg.cmb_age.setCurrentIndex(dlg.cmb_age.findData("young"))
+    dlg.edt_speaker.setText("Борис")
+    dlg.edt_org.setText("Студия «Север»")
+    dlg.edt_url.setText("javascript:alert(1)")
+    got = lib.update(rec.id, **dlg.values())
+    assert (got.info["gender"], got.info["age_group"], got.info["voice_type"]) == ("male", "young", "male")
+    assert got.info["speaker"] == "Борис" and got.info["organization"] == "Студия «Север»" and got.info["project_url"] == ""
+    again = VoiceEditDialog(got)
+    assert again.cmb_age.currentData() == "young" and again.edt_speaker.text() == "Борис"
+    i18n.set_language("en")
+
+
 # ----------------------------------------------------------------------------- Narrate
 def narrate(lib, tmp_path, entries, **kw):
     runner = kw.pop("runner", fake_runner_factory([]))

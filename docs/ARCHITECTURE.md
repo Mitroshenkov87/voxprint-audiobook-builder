@@ -36,7 +36,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `teacher_forcing.py`, `lora_trainer.py` | teacher-forced input construction; LoRA training of Qwen3-TTS-12Hz-Base (adapter, `training_meta.json`) |
 | `model_export.py` | merged "universal" model (`merge_and_unload`) |
 | `model_locator.py` | finds models downloaded by other apps (Hugging Face cache, Pinokio/Alexandria, ModelScope) - read-only |
-| `voice_info.py` | `voice.json` (schema 2): fields, voice types, **licences** (`LICENSES`, `license_allows_commercial`, derived `commercial_use`), migration of schema 1, read/write |
+| `voice_info.py` | `voice.json` (schema 3): fields, gender / age group (derived voice type), **licences** (`LICENSES`, `license_allows_commercial`, derived `commercial_use`), migration of schema 1, read/write |
 | `voice_library.py` | the voice library under `voices/<id>/`: `VoiceLibrary`, `VoiceRecord`, register / import (folder, hardened zip) / update / delete / list |
 | `book_parsers.py` | TXT (heading detection), FB2 (+ `.fb2.zip`, entity guard, cover), EPUB (nav / NCX / spine) -> `Book` / `Chapter`; stdlib only |
 | `num_words.py` | own number-to-words for Russian (cardinals, ordinals with case / gender / number, decimals) and English (cardinals, ordinals, years); no `num2words` (LGPL-2.1, no declension by suffix). Cyrillic *data* |
@@ -150,19 +150,21 @@ Narration and the repository dialog use their own `QThread`s (`workers/narrate_w
 ## 7. File formats
 **Adapter folder** (output of training): `adapter_model.safetensors`, `adapter_config.json`, `ref_sample.wav` (+ text in `training_meta.json`, used as the voice reference), `training_meta.json`, `voice.json`.
 
-**`voice.json`** (`core/voice_info.py`, `VOICE_SCHEMA = 2`):
+**`voice.json`** (`core/voice_info.py`, `VOICE_SCHEMA = 3`):
 ```json
 {
-  "schema": 2, "id": "anna", "name": "Anna", "language": "russian", "created": "2026-10-03T12:00:00Z",
+  "schema": 3, "id": "anna", "name": "Anna", "language": "ru", "created": "2026-10-03T12:00:00Z",
   "duration": 1543.2, "epochs": 5, "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base", "author": "",
-  "license": "custom/personal-only", "license_url": "", "voice_type": "", "description": "", "commercial_use": false
+  "speaker": "", "prepared_by": "", "organization": "", "project_url": "",
+  "license": "custom/personal-only", "license_url": "", "gender": "", "age_group": "", "voice_type": "",
+  "description": "", "commercial_use": false
 }
 ```
-`voice_type` is `male | female | child | other` or empty; `description` has collapsed whitespace and at most 500 characters. `license` is one of `LICENSES` (CC0-1.0, CC-BY-4.0, CC-BY-SA-4.0 allow commercial use;
+`language` is a BCP-47 code (`core/languages.py`); `gender` is `male | female` or empty, `age_group` `child | young | adult | elderly` or empty; `voice_type` (`male | female | child | other` or empty) is derived from them (child age group -> `child`, else the gender, else a stored `other`); `project_url` is http(s) only, like `license_url`; `description` has collapsed whitespace and at most 500 characters. `license` is one of `LICENSES` (CC0-1.0, CC-BY-4.0, CC-BY-SA-4.0 allow commercial use;
 CC-BY-NC-4.0, CC-BY-NC-SA-4.0 and `custom/personal-only` do not); unknown or missing values become `custom/personal-only`. `commercial_use` is always recomputed from the licence when a file is read, so an imported file cannot
-claim more than its licence gives. Schema 1 (`voice_name`, `speech_seconds`) is migrated on read. **Library layout:** `voices/<id>/{adapter_model.safetensors, adapter_config.json, ref_sample.wav, training_meta.json, voice.json}`.
+claim more than its licence gives. Schema 1 (`voice_name`, `speech_seconds`) and schema 2 (`voice_type` -> gender / age group, language names -> codes) are migrated on read. **Library layout:** `voices/<id>/{adapter_model.safetensors, adapter_config.json, ref_sample.wav, training_meta.json, voice.json}`.
 
-**Repository index** (`infra/voice_repository.py`): `{"schema": 1, "voices": [{id, name, language, author, license, license_url, description, voice_type, base_model, url, sha256, size_bytes, names?, descriptions?}]}` (`names` / `descriptions`: optional `{ru,en,de}` maps).
+**Repository index** (`infra/voice_repository.py`): `{"schema": 1, "voices": [{id, name, language, author, license, license_url, description, voice_type, base_model, url, sha256, size_bytes, names?, descriptions?, gender?, age_group?, speaker?, prepared_by?, organization?, project_url?}]}` (`names` / `descriptions`: optional `{ru,en,de}` maps). `tools/make_voice_package.py` also writes a Hugging Face model card (`README.md` with YAML metadata) into the package.
 
 **Audiobook output**: see [HOW-IT-WORKS.md](HOW-IT-WORKS.md) ("Output format"); format keys and defaults are in `core/audiobook_export.py` (`DEFAULT_FORMATS = (opus_single,)`).
 

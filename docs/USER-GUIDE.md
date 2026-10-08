@@ -5,7 +5,7 @@ Use **← Studio** in any window to come back; the gear (top right) opens Settin
 
 ## Train your voice
 1. Press **Choose audio** and **Choose text** (or drag the files into the window). The text is a UTF-8 `.txt` of what you read.
-2. Optional, under the main button: pick a **voice type** (male / female / child / other) and type a short **description** - both are saved in `voice.json`.
+2. Optional, under the main button: pick the **gender** (male / female) and **age group** (child / young / adult / elderly) and type a short **description**; *More about the voice* adds speaker, prepared by, organization and a project link. Everything is saved in `voice.json` and can be changed later in the voice's Properties.
 3. Press **Create voice (LoRA)** - everything else is automatic. When it finishes, the folder opens:
    `...\<recording name>_Voxprint\dataset` (the dataset) and `...\output\<voice name>` (the small adapter, tens of MB).
    **Create dataset** builds only the dataset.

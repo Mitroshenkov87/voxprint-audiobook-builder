@@ -252,7 +252,7 @@ def cmd_train(args: argparse.Namespace, *,
 
 
 def cmd_voices_list(args: argparse.Namespace, *, library: Optional[VoiceLibrary] = None) -> int:
-    """``voices list``: print id, name, type, language, licence."""
+    """``voices list``: print id, name, type, language, licence, gender, age group (tab-separated; "-" = not set)."""
     lib = library if library is not None else VoiceLibrary()
     voices = lib.list_voices()
     if not voices:
@@ -260,7 +260,8 @@ def cmd_voices_list(args: argparse.Namespace, *, library: Optional[VoiceLibrary]
         return 0
     for v in voices:
         vtype = v.info.get("voice_type") or "-"
-        print(f"{v.id}\t{v.name}\t{vtype}\t{v.language or '-'}\t{v.license}")
+        gender, age = v.info.get("gender") or "-", v.info.get("age_group") or "-"     # appended: older columns keep their places
+        print(f"{v.id}\t{v.name}\t{vtype}\t{v.language or '-'}\t{v.license}\t{gender}\t{age}")
     return 0
 
 

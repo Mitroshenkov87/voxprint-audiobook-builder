@@ -20,7 +20,7 @@ from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QSpinBox, QToolButton, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QSpinBox, QToolButton, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
 from core import consent as consent_mod, i18n, model_export, train_presets, voice_info
@@ -548,24 +548,52 @@ class MainWindow(QWidget):
         root.addWidget(self.preview_player)
         root.addWidget(self.preview_box)
 
-        # Two optional fields; they only end up in voice.json next to the adapter.
+        # Optional fields; they only end up in voice.json next to the adapter (the name also names the folders).
         vrow = QHBoxLayout()
         self.edt_voice_name = QLineEdit()           # voice name -> library folder and file names (empty = from the recording)
         self.edt_voice_name.setMaxLength(80)
         vrow.addWidget(self.edt_voice_name, 1)
-        self.cmb_voice_type = QComboBox()
-        self.cmb_voice_type.addItem("", "")
-        for code in voice_info.VOICE_TYPES:
+        self.cmb_voice_type = QComboBox()           # gender ("" / male / female); the name is kept from the older type selector
+        for code in ("",) + voice_info.GENDERS:
             self.cmb_voice_type.addItem("", code)
+        self.cmb_voice_age = QComboBox()            # age group ("" / child / young / adult / elderly)
+        for code in ("",) + voice_info.AGE_GROUPS:
+            self.cmb_voice_age.addItem("", code)
         self.edt_voice_desc = QLineEdit()
         self.edt_voice_desc.setMaxLength(voice_info.MAX_DESCRIPTION_CHARS)
-        vrow.addWidget(self.cmb_voice_type)
         vrow.addWidget(self.edt_voice_desc, 1)
         root.addLayout(vrow)
+        grow = QHBoxLayout()                        # gender, age group and the "more" expander share one row
+        for combo in (self.cmb_voice_type, self.cmb_voice_age):     # may shrink below the longest item (narrow window)
+            combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+            combo.setMinimumContentsLength(10)
+        grow.addWidget(self.cmb_voice_type, 1)
+        grow.addWidget(self.cmb_voice_age, 1)
+        root.addLayout(grow)
         self.lbl_voice_type_hint = QLabel()          # "suggested from the pitch ..." / the file-name rule
         self.lbl_voice_type_hint.setObjectName("hint")
         self.lbl_voice_type_hint.setWordWrap(True)
         root.addWidget(self.lbl_voice_type_hint)
+        # Who / where details: folded away by default so the Train window stays short (150 % scaling on small screens)
+        self.btn_voice_more = QToolButton()
+        self.btn_voice_more.setCheckable(True)
+        self.btn_voice_more.setObjectName("expander")
+        grow.addWidget(self.btn_voice_more)
+        self.voice_more_box = QWidget()
+        self.voice_more_box.hide()
+        mg = QGridLayout(self.voice_more_box)
+        mg.setContentsMargins(0, 0, 0, 0)
+        mg.setSpacing(6)
+        self.edt_voice_speaker, self.edt_voice_prepared = QLineEdit(), QLineEdit()
+        self.edt_voice_org, self.edt_voice_url = QLineEdit(), QLineEdit()
+        for i, (w, n) in enumerate(((self.edt_voice_speaker, voice_info.MAX_NAME_CHARS),
+                                    (self.edt_voice_prepared, voice_info.MAX_NAME_CHARS),
+                                    (self.edt_voice_org, voice_info.MAX_ORGANIZATION_CHARS),
+                                    (self.edt_voice_url, voice_info.MAX_URL_CHARS))):
+            w.setMaxLength(n)
+            mg.addWidget(w, i // 2, i % 2)
+        root.addWidget(self.voice_more_box)
+        self.btn_voice_more.toggled.connect(self._on_voice_more_toggled)
         self._voice_type_user_set = False             # the user chose a type: the pitch suggestion must not override it
         self._suggest_token = 0
         self.cmb_voice_type.activated.connect(lambda _i: setattr(self, "_voice_type_user_set", True))
@@ -706,12 +734,18 @@ class MainWindow(QWidget):
         self.btn_dataset.setText(tr("ui.btn_dataset"))
         self.btn_dataset.setToolTip(tr("ui.tip_dataset"))
         self.btn_settings.setToolTip(tr("ui.settings_tip"))
+        from ui.voices_window import age_labels, gender_labels
+
         self.cmb_voice_type.setToolTip(tr("ui.voice_type_tip"))
-        type_labels = {"": tr("ui.voice_type_none"), "male": tr("ui.voice_type_male"),
-                       "female": tr("ui.voice_type_female"), "child": tr("ui.voice_type_child"),
-                       "other": tr("ui.voice_type_other")}
-        for i in range(self.cmb_voice_type.count()):
-            self.cmb_voice_type.setItemText(i, type_labels[self.cmb_voice_type.itemData(i)])
+        self.cmb_voice_age.setToolTip(tr("ui.voice_age_tip"))
+        for combo, labels in ((self.cmb_voice_type, gender_labels()), (self.cmb_voice_age, age_labels())):
+            for i in range(combo.count()):
+                combo.setItemText(i, labels[combo.itemData(i)])
+        self._on_voice_more_toggled(self.btn_voice_more.isChecked())
+        self.edt_voice_speaker.setPlaceholderText(tr("ui.voice_speaker_placeholder"))
+        self.edt_voice_prepared.setPlaceholderText(tr("ui.voice_prepared_placeholder"))
+        self.edt_voice_org.setPlaceholderText(tr("ui.voice_org_placeholder"))
+        self.edt_voice_url.setPlaceholderText(tr("ui.voice_url_placeholder"))
         self.edt_voice_desc.setPlaceholderText(tr("ui.voice_desc_placeholder"))
         self.edt_voice_name.setPlaceholderText(tr("ui.voice_name_placeholder"))
         if not self.lbl_voice_type_hint.text():
@@ -800,6 +834,20 @@ class MainWindow(QWidget):
         self._on_preset()
         self._refresh_buttons()
         self._suggest_voice_type(self.audio)
+
+    def _on_voice_more_toggled(self, on: bool) -> None:
+        """Show / hide the optional speaker, prepared-by, organization and project-link fields."""
+        self.voice_more_box.setVisible(on)
+        self.btn_voice_more.setText(("\u25be " if on else "\u25b8 ") + tr("ui.voice_more"))
+
+    def voice_details(self) -> dict:
+        """The optional voice.json fields typed in the Train window, as :class:`TaskRequest` keyword arguments."""
+        return dict(voice_type="", gender=str(self.cmb_voice_type.currentData() or ""),
+                    age_group=str(self.cmb_voice_age.currentData() or ""),
+                    voice_description=self.edt_voice_desc.text().strip(),
+                    voice_display_name=self.edt_voice_name.text().strip(),
+                    speaker=self.edt_voice_speaker.text().strip(), prepared_by=self.edt_voice_prepared.text().strip(),
+                    organization=self.edt_voice_org.text().strip(), project_url=self.edt_voice_url.text().strip())
 
     def _suggest_voice_type(self, audio: Path) -> None:
         """Estimate male / female from the recording's pitch in a background thread (a hint; the user decides)."""
@@ -1157,9 +1205,9 @@ class MainWindow(QWidget):
         self.chk_no_text.setEnabled(not busy)
         self.chk_asr_ok.setEnabled(not busy)
         self.btn_settings.setEnabled(True)
-        self.cmb_voice_type.setEnabled(not busy)
-        self.edt_voice_desc.setEnabled(not busy)
-        self.edt_voice_name.setEnabled(not busy)
+        for w in (self.cmb_voice_type, self.cmb_voice_age, self.edt_voice_desc, self.edt_voice_name, self.edt_voice_speaker,
+                  self.edt_voice_prepared, self.edt_voice_org, self.edt_voice_url):
+            w.setEnabled(not busy)
         has_adapter = last_adapter() is not None
         self.btn_merge.setEnabled(not busy and has_adapter)
         self.btn_merge.setToolTip(tr("ui.tip_merge") if has_adapter else tr("ui.tip_merge_disabled"))
@@ -1194,18 +1242,14 @@ class MainWindow(QWidget):
                 return
             self._launch(TaskRequest(kind=kind, no_transcript=True, audio_files=list(self.audio_files), force_cpu=force_cpu,
                                      text=self.text,      # optional script: the recognised pieces are matched to it (core.script_match)
-                                     voice_type=str(self.cmb_voice_type.currentData() or ""),
-                                     voice_description=self.edt_voice_desc.text().strip(),
-                                 voice_display_name=self.edt_voice_name.text().strip(),
+                                     **self.voice_details(),
                                      preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None,
                                      **self._consent_kwargs(), **self._task_extras()))
             return
         if self.busy or not (self.audio and self.text):
             return
         self._launch(TaskRequest(kind=kind, audio=self.audio, text=self.text, force_cpu=force_cpu,
-                                 voice_type=str(self.cmb_voice_type.currentData() or ""),
-                                 voice_description=self.edt_voice_desc.text().strip(),
-                                 voice_display_name=self.edt_voice_name.text().strip(),
+                                 **self.voice_details(),
                                  preset=self.preset, manual=self.manual_values() if self.preset == train_presets.MANUAL else None,
                                      **self._consent_kwargs(), **self._task_extras()))
 
