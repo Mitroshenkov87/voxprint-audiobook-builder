@@ -17,6 +17,13 @@ variants use a subset of the paths / heavier stroke), and combined with
 original sound-wave bars (not part of Tabler Icons) on a dark rounded tile.
 The dark tile, gradient, bars and installer arrow badge are original work.
 
+Splash artwork (splash.jpg)
+---------------------------
+splash.jpg (wheat field and mountains with the Voxprint icon) is original artwork
+created and owned by the author, Aleksandr Mitroshenkov, for this project; it is
+not third-party material. The Voxprint icon shown in it is covered by the
+attribution above.
+
 --- MIT License text (Tabler Icons) ---------------------------------------
 
  MIT License

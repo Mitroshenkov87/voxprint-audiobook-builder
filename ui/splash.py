@@ -1,8 +1,12 @@
 """Start-up splash screen: shown by ``main`` right after the QApplication exists, before the heavy UI modules are
-imported, so something appears within about a second.  Only Qt and small modules are imported here."""
+imported, so something appears within about a second.  Only Qt and small modules are imported here.
+
+The artwork (``assets/splash.jpg``, the author's own) is square, about 480 logical pixels (smaller on a small work area),
+rendered at the screen's scale; a translucent strip at the bottom carries the name, version, a thin progress bar and the
+status line."""
 from __future__ import annotations
 
-from PySide6.QtCore import QRect, Qt
+from PySide6.QtCore import QRect, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QSplashScreen
 
@@ -10,59 +14,81 @@ from core import appinfo
 from core.i18n import tr
 from infra import paths
 
-#: logical size (a 150 % screen draws it at 1.5x; the pixmap is rendered at the device pixel ratio, so it stays sharp)
-W, H = 480, 260
-BG, TEXT, MUTED, ACCENT = "#17171c", "#f2f2f5", "#c4c4d0", "#f5d76e"
+SIDE = 480                                   # logical px; at most 60 % of the shorter side of the work area
+STRIP = 92                                   # height of the bottom strip
+TEXT, MUTED, BAR = "#f2f2f5", "#d0d0da", "#f5d76e"
 
 
-def _pixmap() -> QPixmap:
+def _side() -> int:
+    screen = QGuiApplication.primaryScreen()
+    if screen is None:
+        return SIDE
+    a = screen.availableGeometry()
+    return max(240, min(SIDE, int(min(a.width(), a.height()) * 0.6)))
+
+
+def _pixmap(side: int) -> QPixmap:
     screen = QGuiApplication.primaryScreen()
     dpr = screen.devicePixelRatio() if screen is not None else 1.0
-    pm = QPixmap(int(W * dpr), int(H * dpr))
-    pm.setDevicePixelRatio(dpr)
-    pm.fill(QColor(BG))
-    p = QPainter(pm)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-    p.setPen(QColor(ACCENT))
-    p.drawRect(0, 0, W - 1, H - 1)
-    logo = QPixmap(str(paths.resource_dir() / "assets" / "voxprint.png"))
-    if not logo.isNull():
-        p.drawPixmap(QRect(32, 56, 96, 96), logo)
-    f = QFont()
-    f.setPixelSize(26)
-    f.setBold(True)
-    p.setFont(f)
-    p.setPen(QColor(TEXT))
-    p.drawText(QRect(148, 56, W - 168, 70), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-               | Qt.TextFlag.TextWordWrap, appinfo.APP_DISPLAY_NAME)
-    f.setPixelSize(14)
-    f.setBold(False)
-    p.setFont(f)
-    p.setPen(QColor(MUTED))
-    p.drawText(QRect(148, 126, W - 168, 24), Qt.AlignmentFlag.AlignLeft, f"v{appinfo.APP_VERSION}")
-    p.end()
+    art = QPixmap(str(paths.resource_dir() / "assets" / "splash.jpg"))
+    if art.isNull():
+        art = QPixmap(int(side * dpr), int(side * dpr))
+        art.fill(QColor("#17171c"))
+    pm = art.scaled(int(side * dpr), int(side * dpr), Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                    Qt.TransformationMode.SmoothTransformation)
+    pm.setDevicePixelRatio(dpr)                # drawn in logical pixels, sharp at 150 %
     return pm
 
 
 class Splash(QSplashScreen):
-    """The splash with one status line at the bottom; :meth:`status` repaints right away (the event loop is not running)."""
+    """The splash; :meth:`status` sets the line and the bar and repaints at once (the event loop is not running yet)."""
 
     def __init__(self) -> None:
-        super().__init__(_pixmap())
-        f = self.font()
+        self.side = _side()
+        super().__init__(_pixmap(self.side))
+        self._text, self._fraction = "", 0.0
+
+    def drawContents(self, p: QPainter) -> None:  # noqa: N802 - Qt naming
+        s = self.side
+        top = s - STRIP
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.fillRect(QRect(0, top, s, STRIP), QColor(10, 12, 18, 170))
+        f = QFont(self.font())
+        f.setPixelSize(19)
+        f.setBold(True)
+        p.setFont(f)
+        p.setPen(QColor(TEXT))
+        p.drawText(QRect(18, top + 10, s - 36, 26), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                   appinfo.APP_DISPLAY_NAME)
         f.setPixelSize(13)
-        self.setFont(f)
+        f.setBold(False)
+        p.setFont(f)
+        p.setPen(QColor(MUTED))
+        p.drawText(QRect(18, top + 10, s - 36, 26), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                   f"v{appinfo.APP_VERSION}")
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(255, 255, 255, 50))
+        p.drawRoundedRect(QRectF(18, top + 44, s - 36, 4), 2, 2)
+        p.setBrush(QColor(BAR))
+        p.drawRoundedRect(QRectF(18, top + 44, (s - 36) * self._fraction, 4), 2, 2)
+        p.setPen(QColor(MUTED))
+        p.drawText(QRect(18, top + 54, s - 36, 26), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, self._text)
+
+    def message(self) -> str:  # noqa: D102 - the status line (QSplashScreen.message() stays empty: we paint it ourselves)
+        return self._text
+
+    def status(self, text: str, fraction: float = -1.0) -> None:
+        self._text = text
+        if fraction >= 0:
+            self._fraction = max(0.0, min(1.0, fraction))
+        self.repaint()
+        QApplication.processEvents()
 
     def loading_ui(self) -> None:
-        self.status(tr("splash.loading_ui"))
+        self.status(tr("splash.loading_ui"), 0.25)
 
     def checking(self) -> None:
-        self.status(tr("splash.checking"))
-
-    def status(self, text: str) -> None:
-        self.showMessage(text, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter, QColor(MUTED))
-        QApplication.processEvents()
+        self.status(tr("splash.checking"), 0.7)
 
 
 def show() -> Splash:

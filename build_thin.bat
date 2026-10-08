@@ -29,7 +29,7 @@ if "%META%"=="" (echo [ERROR] shell metadata list. & exit /b 1)
 
 echo === Build thin shell ===
 pyinstaller --onedir --windowed --noconfirm --clean --name Voxprint --distpath dist\thin --workpath build\thin-work --specpath build\thin-work ^
-  --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" ^
+  --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" --add-data "%CD%\assets\splash.jpg;assets" ^
   --paths "%CD%" --paths "%CD%\infra" --paths "%CD%\build\stdlib_bundle" --hidden-import _vx_stdlib ^
   --add-data "%CD%\infra\verified_manifest.json;infra" --add-data "%CD%\infra\assets_manifest.json;infra" --add-data "%CD%\infra\model_mirrors.json;infra" --add-data "%CD%\infra\model_release.json;infra" --add-data "%CD%\infra\runtime_lock.json;infra" ^
   --add-data "%CD%\locales;locales" --add-data "%CD%\prompts;prompts" --add-data "%CD%\credits.json;." --add-data "%CD%\licenses;licenses" ^
