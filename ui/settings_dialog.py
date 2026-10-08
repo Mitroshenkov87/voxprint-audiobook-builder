@@ -2,7 +2,7 @@
 
 The main window only keeps "choose audio / choose text / create voice".  Service items live here:
 
-* interface language,
+* interface language and window transparency (:mod:`infra.ui_prefs`),
 * "Check for updates",
 * shortcuts to the models folder and the data/log folder,
 * "Repair installation" and "Auto-repair" (every component and model checked by hash, missing / broken parts fetched
@@ -22,13 +22,14 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QMessageBox, QProgressBar,
-                               QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel, QMessageBox,
+                               QProgressBar, QPushButton, QScrollArea, QVBoxLayout, QWidget)
 
 from core import i18n
 from core.errors import BackupError
 from core.i18n import tr
-from infra import asr_choice, backup, existing_models, modules as runtime_modules, netroute, preload, sysinfo
+from infra import asr_choice, backup, existing_models, modules as runtime_modules, netroute, preload, sysinfo, ui_prefs
+from ui import screen_fit
 from workers import backup_runner
 from workers.auto_repair_worker import AutoRepairWorker
 from workers.backup_worker import BackupWorker
@@ -51,12 +52,28 @@ class SettingsDialog(QDialog):
         self.setStyleSheet(window.styleSheet())     # same dark / acrylic look as the main window
 
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 20, 24, 20)
-        lay.setSpacing(12)
+        lay.setContentsMargins(18, 14, 18, 14)
+        lay.setSpacing(8)
 
         self.lbl_title = QLabel()
         self.lbl_title.setObjectName("title")
         lay.addWidget(self.lbl_title)
+
+        from ui.window_base import ColumnFlow       # local: ui.main_window imports this module (circular at load time)
+
+        # two columns that fold into one on a narrow dialog, inside a scroll area: the dialog never grows past the screen
+        left_w, right_w = QWidget(), QWidget()
+        left, right = QVBoxLayout(left_w), QVBoxLayout(right_w)
+        for col in (left, right):
+            col.setContentsMargins(0, 0, 0, 0)
+            col.setSpacing(8)
+        flow = ColumnFlow(min_two=0)
+        scroll = QScrollArea()
+        scroll.setObjectName("content")
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(flow)
+        lay.addWidget(scroll, 1)
 
         # --- language ---
         row = QHBoxLayout()
@@ -68,7 +85,20 @@ class SettingsDialog(QDialog):
         row.addWidget(self.lbl_language)
         row.addStretch(1)
         row.addWidget(self.cmb_lang)
-        lay.addLayout(row)
+        left.addLayout(row)
+
+        # --- window transparency (infra/ui_prefs.py): default / more / off ---
+        trow = QHBoxLayout()
+        self.lbl_transparency = QLabel()
+        self.cmb_transparency = QComboBox()
+        for level in ui_prefs.TRANSPARENCY_LEVELS:
+            self.cmb_transparency.addItem("", level)
+        self.cmb_transparency.setCurrentIndex(max(0, self.cmb_transparency.findData(ui_prefs.transparency())))
+        trow.addWidget(self.lbl_transparency)
+        trow.addStretch(1)
+        trow.addWidget(self.cmb_transparency)
+        left.addLayout(trow)
+        self.cmb_transparency.currentIndexChanged.connect(self._on_transparency_changed)
 
         # --- network interface (infra/netroute.py): Auto / system default / a specific adapter ---
         nrow = QHBoxLayout()
@@ -78,7 +108,7 @@ class SettingsDialog(QDialog):
         nrow.addWidget(self.lbl_net)
         nrow.addStretch(1)
         nrow.addWidget(self.cmb_net)
-        lay.addLayout(nrow)
+        left.addLayout(nrow)
         self._fill_net()
         self.cmb_net.currentIndexChanged.connect(self._on_net_changed)
 
@@ -92,7 +122,7 @@ class SettingsDialog(QDialog):
         self.lbl_preload.setWordWrap(True)
         prow.addWidget(self.chk_preload)
         prow.addWidget(self.lbl_preload, 1)
-        lay.addLayout(prow)
+        left.addLayout(prow)
         self.chk_preload.toggled.connect(self._on_preload_toggled)
 
         # --- speech recognition model (infra/asr_choice.py): automatic by VRAM / 0.6B / 1.7B / both downloaded ---
@@ -106,11 +136,11 @@ class SettingsDialog(QDialog):
         arow.addWidget(self.lbl_asr)
         arow.addStretch(1)
         arow.addWidget(self.cmb_asr)
-        lay.addLayout(arow)
+        left.addLayout(arow)
         self.lbl_asr_note = QLabel()
         self.lbl_asr_note.setObjectName("cardnote")
         self.lbl_asr_note.setWordWrap(True)
-        lay.addWidget(self.lbl_asr_note)
+        left.addWidget(self.lbl_asr_note)
         self.cmb_asr.currentIndexChanged.connect(self._on_asr_changed)
 
         # --- service buttons ---
@@ -122,7 +152,7 @@ class SettingsDialog(QDialog):
         self.btn_components = QPushButton()          # thin build only: the runtime modules (infra/modules.py)
         self.btn_diag = QPushButton()                # logs + system information as one zip (infra/diagnostics.py)
         for b in (self.btn_update, self.btn_models, self.btn_data, self.btn_diag, self.btn_components):
-            lay.addWidget(b)
+            left.addWidget(b)
         self.btn_diag.clicked.connect(self.save_diagnostics)
         self.btn_components.setVisible(runtime_modules.is_thin())
         self.btn_components.clicked.connect(self.open_components)
@@ -141,16 +171,16 @@ class SettingsDialog(QDialog):
         self.backup_worker: Optional[BackupWorker] = None
         self.lbl_backup_title = QLabel()
         self.lbl_backup_title.setObjectName("sectiontitle")
-        lay.addWidget(self.lbl_backup_title)
+        right.addWidget(self.lbl_backup_title)
         self.chk_voices = QCheckBox()
         self.chk_voices.setChecked(True)
-        lay.addWidget(self.chk_voices)
+        right.addWidget(self.chk_voices)
         brow = QHBoxLayout()
         self.btn_backup = QPushButton()
         self.btn_restore = QPushButton()
         brow.addWidget(self.btn_backup)
         brow.addWidget(self.btn_restore)
-        lay.addLayout(brow)
+        right.addLayout(brow)
         self.bar_backup = QProgressBar()
         self.bar_backup.setRange(0, 100)
         self.bar_backup.setVisible(False)
@@ -158,16 +188,16 @@ class SettingsDialog(QDialog):
         self.lbl_backup_status.setWordWrap(True)
         self.btn_backup_cancel = QPushButton()
         self.btn_backup_cancel.setVisible(False)
-        lay.addWidget(self.bar_backup)
-        lay.addWidget(self.lbl_backup_status)
-        lay.addWidget(self.btn_backup_cancel)
+        right.addWidget(self.bar_backup)
+        right.addWidget(self.lbl_backup_status)
+        right.addWidget(self.btn_backup_cancel)
         self.lbl_existing_title = QLabel()
         self.lbl_existing_title.setObjectName("sectiontitle")
-        lay.addWidget(self.lbl_existing_title)
+        right.addWidget(self.lbl_existing_title)
         self.lbl_existing_hint = QLabel()
         self.lbl_existing_hint.setWordWrap(True)
         self.lbl_existing_hint.setObjectName("cardnote")
-        lay.addWidget(self.lbl_existing_hint)
+        right.addWidget(self.lbl_existing_hint)
         erow = QHBoxLayout()
         self.lbl_existing = QLabel()
         self.lbl_existing.setWordWrap(True)
@@ -176,13 +206,13 @@ class SettingsDialog(QDialog):
         erow.addWidget(self.lbl_existing, 1)
         erow.addWidget(self.btn_existing)
         erow.addWidget(self.btn_existing_clear)
-        lay.addLayout(erow)
+        right.addLayout(erow)
 
         rrow = QHBoxLayout()                      # Repair (environment only) | Auto-repair (everything, by hash)
         self.btn_autorepair = QPushButton()
         rrow.addWidget(self.btn_repair)
         rrow.addWidget(self.btn_autorepair)
-        lay.addLayout(rrow)
+        right.addLayout(rrow)
         self.autorepair_job: Optional[Callable[..., Any]] = None          # injectable (tests); None = infra.auto_repair.run
         self.autorepair_worker: Optional[AutoRepairWorker] = None
         self.bar_autorepair = QProgressBar()
@@ -190,10 +220,11 @@ class SettingsDialog(QDialog):
         self.bar_autorepair.setVisible(False)
         self.lbl_autorepair_status = QLabel()
         self.lbl_autorepair_status.setWordWrap(True)
-        lay.addWidget(self.bar_autorepair)
-        lay.addWidget(self.lbl_autorepair_status)
-        lay.addWidget(self.btn_about)
-        lay.addStretch(1)
+        right.addWidget(self.bar_autorepair)
+        right.addWidget(self.lbl_autorepair_status)
+        right.addWidget(self.btn_about)
+        flow.add(left_w)
+        flow.add(right_w)
         self.btn_close = QPushButton()
         close_row = QHBoxLayout()
         close_row.addStretch(1)
@@ -215,6 +246,20 @@ class SettingsDialog(QDialog):
         self.btn_close.clicked.connect(self.accept)
         self.retranslate()
         self.refresh()
+        hint = max(left_w.sizeHint().height(), right_w.sizeHint().height())
+        screen_fit.fit(self, left_w.sizeHint().width() + right_w.sizeHint().width() + 60, hint + 140)
+
+    def _on_transparency_changed(self, _i: int = 0) -> None:
+        """Store the level and restyle the open windows (the Studio refreshes all its pages) and this dialog."""
+        from ui.main_window import apply_look       # local: circular at load time
+
+        ui_prefs.set_transparency(self.cmb_transparency.currentData())
+        refresh = getattr(self._win, "apply_look_all", None)
+        if refresh is not None:
+            refresh()
+        else:
+            apply_look(self._win)
+        self.setStyleSheet(self._win.styleSheet())
 
     # ------------------------------------------------------------------ texts and state
     def retranslate(self) -> None:
@@ -222,6 +267,9 @@ class SettingsDialog(QDialog):
         self.setWindowTitle(tr("ui.settings_title"))
         self.lbl_title.setText(tr("ui.settings_title"))
         self.lbl_language.setText(tr("ui.language"))
+        self.lbl_transparency.setText(tr("ui.transparency"))
+        for i, text in enumerate((tr("ui.transparency_default"), tr("ui.transparency_more"), tr("ui.transparency_off"))):
+            self.cmb_transparency.setItemText(i, text)              # same order as ui_prefs.TRANSPARENCY_LEVELS
         self.lbl_net.setText(tr("ui.net_iface"))
         self.cmb_net.setToolTip(tr("ui.net_iface_tip"))
         self.lbl_net.setToolTip(tr("ui.net_iface_tip"))

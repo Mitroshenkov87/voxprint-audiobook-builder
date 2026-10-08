@@ -17,7 +17,7 @@ from core.errors import CancelledByUser
 from core.events import CancelToken
 from core.i18n import tr
 from ui.audio_preview import Previewer
-from ui.window_base import SubWindow, card_frame, hint_label
+from ui.window_base import SubWindow, card_frame, fit_to_screen, hint_label
 
 log = logging.getLogger("voxprint.revoice")
 
@@ -86,12 +86,13 @@ class RevoiceWindow(SubWindow):
         self._input = None
         self._build()
         self.retranslate()
+        fit_to_screen(self, self.content, 820, 560)
 
     # ------------------------------------------------------------------ construction
     def _build(self) -> None:
         c = card_frame()
         v = QVBoxLayout(c)
-        v.setContentsMargins(16, 14, 16, 14)
+        v.setContentsMargins(14, 10, 14, 10)
         v.setSpacing(6)
         self.lbl_audio = QLabel()
         self.lbl_audio.setObjectName("sectiontitle")
@@ -116,7 +117,7 @@ class RevoiceWindow(SubWindow):
 
         c = card_frame()
         v = QVBoxLayout(c)
-        v.setContentsMargins(16, 14, 16, 14)
+        v.setContentsMargins(14, 10, 14, 10)
         v.setSpacing(6)
         self.lbl_text = QLabel()
         self.lbl_text.setObjectName("sectiontitle")

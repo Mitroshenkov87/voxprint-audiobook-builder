@@ -28,11 +28,12 @@ from core import i18n
 from core.i18n import tr
 from core.voice_library import VoiceLibrary
 from infra import hard_exit, preload
-from ui.main_window import APP_TITLE, MainWindow
+from ui.main_window import APP_TITLE, MainWindow, apply_look
 from ui.narrate_window import NarrateWindow
 from ui.revoice_window import RevoiceWindow
 from ui.settings_dialog import SettingsDialog
 from ui.voices_window import VoicesWindow
+from ui import screen_fit
 from ui.window_base import SubWindow, fit_to_screen
 
 PAGES = ("studio", "train", "voices", "narrate", "revoice")
@@ -47,9 +48,9 @@ class ActionCard(QPushButton):
         self.setObjectName("bigcard")
         self.setProperty("primary", "true" if primary else "false")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumHeight(132)
+        self.setMinimumHeight(100)
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(22, 18, 22, 18)
+        lay.setContentsMargins(18, 12, 18, 12)
         lay.setSpacing(6)
         self.lbl_title = QLabel()
         self.lbl_title.setObjectName("cardtitle")
@@ -100,7 +101,7 @@ class StudioWindow(SubWindow):
         self.apply_theme_to_children()
         self._connect()
         self.retranslate()
-        fit_to_screen(self, self.content, 820, 600)
+        fit_to_screen(self, self.content, 1040, 600)   # wide enough for two narrate columns
         self._timer = QTimer(self)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self.refresh)
@@ -159,6 +160,12 @@ class StudioWindow(SubWindow):
         for name, w in self.pages.items():
             if name not in ("studio", "train"):
                 w.apply_style_from(self)       # type: ignore[attr-defined]
+
+    def apply_look_all(self) -> None:
+        """Window transparency changed in Settings: restyle the visible pages now (hidden ones on their next show)."""
+        for w in set(self.pages.values()):
+            if w.isVisible():
+                apply_look(w)
 
     # ------------------------------------------------------------------ texts
     def window_title(self) -> str:
@@ -237,6 +244,9 @@ class StudioWindow(SubWindow):
         if old is not new:
             new.resize(old.size())
             new.move(old.pos())
+            want = getattr(new, "wide_width", lambda: 0)()
+            if want > new.width():                 # e.g. the two Narrate columns: wider, capped to the screen, centred
+                screen_fit.fit(new, want, new.height())
         self.current_page = page
         new.show()
         new.raise_()

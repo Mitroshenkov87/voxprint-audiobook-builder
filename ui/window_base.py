@@ -8,29 +8,84 @@ Navigation is request-based: a window never shows another one itself, it emits `
 """
 from __future__ import annotations
 
-import sys
 from typing import Optional
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout,
+from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout,
                                QWidget)
 
 from core.i18n import tr
-from infra import platform_win
-from ui.main_window import APP_TITLE, MIN_WINDOW_H, MIN_WINDOW_W, build_style
+from ui import screen_fit
+from ui.main_window import APP_TITLE, MIN_WINDOW_H, MIN_WINDOW_W, apply_look, build_style
 
 
 def fit_to_screen(win: QWidget, content: QWidget, min_w: int = 820, min_h: int = 560) -> None:
-    """Initial size: the content's natural size (at least ``min_w`` x ``min_h``) limited to ~94 % x ~90 % of the work area."""
+    """Initial size: the content's natural size (at least ``min_w`` x ``min_h``) limited to the work area, centred
+    (:func:`ui.screen_fit.fit`); the content scrolls below that."""
     hint = content.sizeHint()
-    w, h = max(min_w, hint.width()), max(min_h, hint.height() + 8)
-    try:
-        avail = (win.screen() or QApplication.primaryScreen()).availableGeometry()
-        w, h = min(w, int(avail.width() * 0.94)), min(h, int(avail.height() * 0.90))
-    except Exception:  # noqa: BLE001 - no screen (tests)
-        pass
     win.setMinimumSize(MIN_WINDOW_W, MIN_WINDOW_H)
-    win.resize(max(w, MIN_WINDOW_W), max(h, MIN_WINDOW_H))
+    screen_fit.fit(win, max(min_w, hint.width()), max(min_h, hint.height() + 8))
+
+
+class ColumnFlow(QWidget):
+    """Cards in one column, or in two when the window is wide enough (height-first: a short 16:10 laptop screen at 150 %
+    shows the whole form with little scrolling).  The order is kept: the first cards fill the left column up to about
+    half of the total height, the rest go right.  Cards hidden at that moment count as zero height."""
+
+    #: never two columns below this width, however narrow the cards are
+    TWO_COLUMNS_MIN_W = 1000
+
+    def __init__(self, parent: Optional[QWidget] = None, min_two: int = TWO_COLUMNS_MIN_W) -> None:
+        super().__init__(parent)
+        self.min_two = min_two
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(10)
+        self._cols = (QVBoxLayout(), QVBoxLayout())
+        for col in self._cols:
+            col.setContentsMargins(0, 0, 0, 0)
+            col.setSpacing(10)
+            row.addLayout(col, 1)
+        self._cards: list = []
+        self.two = False
+
+    def add(self, card: QWidget) -> None:
+        self._cards.append(card)
+        self._place(self.two)
+
+    def _split(self) -> int:
+        """Index of the first right-hand card: the split that makes the taller column as short as possible."""
+        heights = [0 if c.isHidden() else c.sizeHint().height() for c in self._cards]
+        total, acc = sum(heights), 0
+        best = (total, len(self._cards))
+        for i, hgt in enumerate(heights):
+            acc += hgt
+            best = min(best, (max(acc, total - acc), i + 1))
+        return best[1]
+
+    def two_column_width(self) -> int:
+        """Width the two columns need (long check-box texts do not wrap, so the widest card of each column counts)."""
+        split = self._split()
+        left = max((c.minimumSizeHint().width() for c in self._cards[:split]), default=0)
+        right = max((c.minimumSizeHint().width() for c in self._cards[split:]), default=0)
+        return left + right + 10
+
+    def _place(self, two: bool) -> None:
+        self.two = two
+        for col in self._cols:                       # empty both columns (the cards stay children of this widget)
+            while col.count():
+                col.takeAt(0)
+        split = self._split() if two else len(self._cards)
+        for i, card in enumerate(self._cards):
+            self._cols[0 if i < split else 1].addWidget(card)
+        for col in self._cols:
+            col.addStretch(1)
+
+    def resizeEvent(self, e) -> None:  # noqa: N802
+        super().resizeEvent(e)
+        two = self.width() >= max(self.min_two, self.two_column_width())
+        if two != self.two:
+            self._place(two)
 
 
 def card_frame() -> QFrame:
@@ -72,8 +127,8 @@ class SubWindow(QWidget):
         self.scroll.viewport().setAutoFillBackground(False)
         outer.addWidget(self.scroll)
         self.body = QVBoxLayout(self.content)
-        self.body.setContentsMargins(28, 24, 28, 24)
-        self.body.setSpacing(14)
+        self.body.setContentsMargins(20, 14, 20, 14)
+        self.body.setSpacing(10)
 
         head = QHBoxLayout()
         self.btn_back = QPushButton()
@@ -108,11 +163,7 @@ class SubWindow(QWidget):
     def showEvent(self, e) -> None:  # noqa: N802
         """Enable the Acrylic backdrop once the native window exists (Windows 11), else stay on the plain dark look."""
         super().showEvent(e)
-        if sys.platform == "win32" and self.backdrop == "plain":
-            self.backdrop = platform_win.apply_backdrop(int(self.winId()))
-            self.setStyleSheet(build_style(self.backdrop == "acrylic"))
-            if self.backdrop != "acrylic":
-                self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        apply_look(self)
 
     def closeEvent(self, e) -> None:  # noqa: N802
         """Tell the Studio (it shuts the application down)."""

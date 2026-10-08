@@ -305,6 +305,9 @@ def main(argv=None) -> int:
     from ui.studio import StudioWindow
 
     app = QApplication.instance() or QApplication(argv)
+    from ui import screen_fit
+
+    screen_fit.install(app)               # every window / dialog clamped to the screen's work area when shown
     import threading
 
     from infra import diagnostics

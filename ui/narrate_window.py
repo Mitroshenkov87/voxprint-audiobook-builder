@@ -47,7 +47,7 @@ from ui.main_window import mark_recommended, open_folder, recommended_text
 from ui import job_dialogs
 from ui.mini_player import MiniPlayer
 from ui.voices_window import make_badge, make_scope_badge
-from ui.window_base import SubWindow, card_frame, fit_to_screen, hint_label
+from ui.window_base import ColumnFlow, SubWindow, card_frame, fit_to_screen, hint_label
 from workers.narrate_worker import NarrateWorker, RepoDownloadWorker, RepoIndexWorker, TextModelDownloadWorker, TextModelsDownloadWorker
 from workers.narration_runner import NarrationJob, default_output_dir, format_eta, run_narration
 
@@ -178,7 +178,7 @@ class NarrateWindow(SubWindow):
         self.retranslate()
         self._sync_preset()
         self.refresh_voices()
-        fit_to_screen(self, self.content, 820, 600)
+        fit_to_screen(self, self.content, 1040, 600)
 
     # ------------------------------------------------------------------ construction
     def _format_row(self, fmt: str, parent_layout: QVBoxLayout, checked: bool = False) -> QCheckBox:
@@ -206,15 +206,21 @@ class NarrateWindow(SubWindow):
         chk.toggled.connect(lambda c, k=key: self._on_prep_toggled(k, c))
         return chk
 
+    def wide_width(self) -> int:
+        """Window width for two card columns (Studio.navigate widens to it when the screen allows)."""
+        return self.flow.two_column_width() + 80        # + body margins, scroll bar and frame
+
     def _build(self) -> None:
         """Create all widgets (texts come from :meth:`retranslate`)."""
         self.lbl_intro = hint_label()
         self.body.addWidget(self.lbl_intro)
+        self.flow = ColumnFlow()                    # the six cards: two columns on wide windows (window_base)
+        self.body.addWidget(self.flow)
 
         # --- book ---
         c = card_frame()
         v = QVBoxLayout(c)
-        v.setContentsMargins(16, 14, 16, 14)
+        v.setContentsMargins(14, 10, 14, 10)
         v.setSpacing(8)
         self.lbl_book_title = QLabel()
         self.lbl_book_title.setObjectName("sectiontitle")
@@ -233,12 +239,12 @@ class NarrateWindow(SubWindow):
         v.addLayout(row)
         v.addWidget(self.lbl_book_info)
         v.addWidget(self.lbl_book_error)
-        self.body.addWidget(c)
+        self.flow.add(c)
 
         # --- voice ---
         c = card_frame()
         v = QVBoxLayout(c)
-        v.setContentsMargins(16, 14, 16, 14)
+        v.setContentsMargins(14, 10, 14, 10)
         v.setSpacing(8)
         self.lbl_voice_title = QLabel()
         self.lbl_voice_title.setObjectName("sectiontitle")
@@ -271,12 +277,12 @@ class NarrateWindow(SubWindow):
         nv.addWidget(self.lbl_no_voice)
         nv.addLayout(nrow)
         v.addWidget(self.no_voice)
-        self.body.addWidget(c)
+        self.flow.add(c)
 
         # --- prepare the text (automatic: rules, then the optional AI clean-up) ---
         c = card_frame()
         v = QVBoxLayout(c)
-        v.setContentsMargins(16, 14, 16, 14)
+        v.setContentsMargins(14, 10, 14, 10)
         v.setSpacing(6)
         self.lbl_prep_title = QLabel()
         self.lbl_prep_title.setObjectName("sectiontitle")
@@ -312,12 +318,12 @@ class NarrateWindow(SubWindow):
         self.more_prep_box.setVisible(False)
         v.addWidget(self.more_prep_box)
         self.btn_more_prep.toggled.connect(self._on_more_prep_toggled)
-        self.body.addWidget(c)
+        self.flow.add(c)
 
         # --- translate the book (optional) ---
         c = card_frame()
         v = QVBoxLayout(c)
-        v.setContentsMargins(16, 14, 16, 14)
+        v.setContentsMargins(14, 10, 14, 10)
         v.setSpacing(6)
         self.lbl_tr_title = QLabel()
         self.lbl_tr_title.setObjectName("sectiontitle")
@@ -351,12 +357,12 @@ class NarrateWindow(SubWindow):
         self.chk_translate.toggled.connect(lambda _c: self._refresh_buttons())
         self.cmb_translate.currentIndexChanged.connect(lambda _i: self._refresh_buttons())
         self.btn_tr_download.clicked.connect(self.download_translate_models)
-        self.body.addWidget(c)
+        self.flow.add(c)
 
         # --- the optional AI text model: literary translation, prepare text for narration (off by default) ---
         c = card_frame()
         v = QVBoxLayout(c)
-        v.setContentsMargins(16, 14, 16, 14)
+        v.setContentsMargins(14, 10, 14, 10)
         v.setSpacing(6)
         self.lbl_llm_title = QLabel()
         self.lbl_llm_title.setObjectName("sectiontitle")
@@ -384,12 +390,12 @@ class NarrateWindow(SubWindow):
         self.btn_llm_prompts.clicked.connect(self.edit_prompts)
         self.chk_literary.toggled.connect(lambda _c: self._refresh_buttons())
         self.chk_llm_prepare.toggled.connect(lambda _c: self._refresh_buttons())
-        self.body.addWidget(c)
+        self.flow.add(c)
 
         # --- output format and quality ---
         c = card_frame()
         v = QVBoxLayout(c)
-        v.setContentsMargins(16, 14, 16, 14)
+        v.setContentsMargins(14, 10, 14, 10)
         v.setSpacing(6)
         self.lbl_format_title = QLabel()
         self.lbl_format_title.setObjectName("sectiontitle")
@@ -529,7 +535,7 @@ class NarrateWindow(SubWindow):
         self.advanced_box.setVisible(False)
         v.addWidget(self.advanced_box)
         self.btn_advanced.toggled.connect(self._on_advanced_toggled)
-        self.body.addWidget(c)
+        self.flow.add(c)
 
         # --- run ---
         self.btn_start = QPushButton()

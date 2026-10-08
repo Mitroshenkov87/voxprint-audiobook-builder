@@ -116,7 +116,7 @@ class RemoteCard(QFrame):
         self.setObjectName("card")
         self.key = item.key
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(16, 14, 16, 14)
+        lay.setContentsMargins(14, 10, 14, 10)
         lay.setSpacing(6)
         top = QHBoxLayout()
         self.lbl_name = QLabel(item.name)
@@ -171,7 +171,7 @@ class VoiceCard(QFrame):
         self.setObjectName("card")
         self.voice_id = rec.id
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(16, 14, 16, 14)
+        lay.setContentsMargins(14, 10, 14, 10)
         lay.setSpacing(6)
         top = QHBoxLayout()
         self.lbl_name = QLabel(rec.name)
@@ -232,7 +232,7 @@ class VoiceEditDialog(QDialog):
             self.setStyleSheet(parent.styleSheet())
         self.setWindowTitle(tr("voices.edit_title"))
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 20, 24, 20)
+        lay.setContentsMargins(18, 14, 18, 14)
         lay.setSpacing(10)
         self.edt_name = QLineEdit(str(rec.info.get("name") or rec.name))   # the stored default, not the localized display name
         self.edt_name.setMaxLength(voice_info.MAX_NAME_CHARS)
@@ -338,7 +338,7 @@ class RepoDialog(QDialog):
         if parent is not None:
             self.setStyleSheet(parent.styleSheet())
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 20, 24, 20)
+        lay.setContentsMargins(18, 14, 18, 14)
         lay.setSpacing(10)
         self.lbl_title = QLabel()
         self.lbl_title.setObjectName("title")
@@ -520,12 +520,12 @@ class VoicesWindow(SubWindow):
         self.lbl_status.setWordWrap(True)
         self.body.addWidget(self.lbl_status)
         self.cards_box = QVBoxLayout()
-        self.cards_box.setSpacing(12)
+        self.cards_box.setSpacing(10)
         self.body.addLayout(self.cards_box)
         # empty state
         self.empty = card_frame()
         el = QVBoxLayout(self.empty)
-        el.setContentsMargins(20, 18, 20, 18)
+        el.setContentsMargins(16, 12, 16, 12)
         self.lbl_empty = QLabel()
         self.lbl_empty.setWordWrap(True)
         self.btn_train = QPushButton()

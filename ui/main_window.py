@@ -20,7 +20,7 @@ from typing import Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
-from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QSpinBox, QToolButton, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QSpinBox, QToolButton, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                                QMessageBox, QProgressBar, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
 from core import adapter_strength, consent as consent_mod, i18n, model_export, train_presets, voice_info
@@ -28,7 +28,7 @@ from core.appinfo import APP_DISPLAY_NAME
 from core.errors import DatasetMakerError
 from core.events import Stage
 from core.i18n import tr
-from infra import paths, platform_win
+from infra import paths, platform_win, ui_prefs
 from infra.vram_optimizer import detect_gpu
 from workers.pipeline_runner import (KIND_DATASET, KIND_LORA, KIND_MERGE, KIND_PREVIEW, TaskRequest, last_adapter, run_task)
 from ui.mini_player import MiniPlayer
@@ -72,6 +72,18 @@ NOTE_BORDER = "#6b5720"
 GREEN = "#86efac"
 BADGE_GREEN_TEXT = "#0b1f12"
 BADGE_AMBER_TEXT = "#251a02"
+# Soft blue / yellow palette: yellow primary buttons, soft blue menus, lists and accents.
+PRIMARY = "#f5d76e"          # main action buttons ("Start", "Narrate", the primary Studio card border)
+PRIMARY_HOVER = "#f9e291"
+PRIMARY_BORDER = "#fbe8a6"
+TEXT_ON_PRIMARY = "#1c1604"
+PRIMARY_DISABLED_BG = "#36321f"
+PRIMARY_DISABLED_TEXT = "#b9b08a"
+MENU_BG = "#1c2535"          # drop-down lists and menus: a soft blue tint of the dark background
+MENU_SELECTION = "#2f4c78"
+# Window transparency (Settings): "more" lets ~25 % more of the blurred desktop through than the default tint.
+ROOT_GLASS_MORE = "rgba(16,16,22,167)"
+CARD_GLASS_MORE = "rgba(34,34,44,214)"
 
 
 def recommended_text(text: str) -> str:
@@ -99,18 +111,18 @@ def _check_icon_url() -> str:
 STYLE_TEMPLATE = """
 * {{{{ font-family: "Segoe UI Variable Text", "Segoe UI", "Ubuntu", "Noto Sans", "Cantarell", "DejaVu Sans", sans-serif; font-size: 14px; color: {text}; }}}}
 QWidget#root {{{{ background: {{root_bg}}; }}}}
-QLabel#title {{{{ font-size: 26px; font-weight: 600; }}}}
+QLabel#title {{{{ font-size: 22px; font-weight: 600; }}}}
 QLabel#subtitle {{{{ color: {muted}; }}}}
 QFrame#card {{{{ background: {{card_bg}}; border: 1px solid {border}; border-radius: 12px; }}}}
 QLabel#fileLabel {{{{ color: {muted}; }}}}
-QPushButton {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px; padding: 8px 16px; }}}}
+QPushButton {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px; padding: 6px 14px; }}}}
 QPushButton:hover {{{{ background: {hover}; }}}}
 QPushButton:pressed {{{{ background: #23232d; }}}}
 QPushButton:disabled {{{{ color: {disabled}; background: #1f1f28; border-color: #34343f; }}}}
-QPushButton#primary {{{{ background: {accent}; border: 1px solid {soft}; font-size: 17px;
-                      font-weight: 600; padding: 14px 20px; color: {on_accent}; }}}}
-QPushButton#primary:hover {{{{ background: {accent_hover}; }}}}
-QPushButton#primary:disabled {{{{ background: #2a3a55; color: #9db0cc; border-color: #3a4d6e; }}}}
+QPushButton#primary {{{{ background: {primary}; border: 1px solid {primary_border}; font-size: 16px;
+                      font-weight: 600; padding: 10px 18px; color: {on_primary}; }}}}
+QPushButton#primary:hover {{{{ background: {primary_hover}; }}}}
+QPushButton#primary:disabled {{{{ background: {primary_dis_bg}; color: {primary_dis_text}; border-color: #4a4430; }}}}
 QProgressBar {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px;
                height: 16px; text-align: center; }}}}
 QProgressBar::chunk {{{{ background: {strong}; border-radius: 7px; }}}}
@@ -127,8 +139,11 @@ QLabel#liveline[state="error"] {{{{ color: #f87171; }}}}
 QComboBox {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px;
             padding: 6px 12px; min-width: 110px; }}}}
 QComboBox:disabled {{{{ color: {disabled}; }}}}
-QComboBox QAbstractItemView {{{{ background: #23232b; border: 1px solid {border};
-                              selection-background-color: {strong}; }}}}
+QComboBox QAbstractItemView {{{{ background: {menu_bg}; border: 1px solid {border};
+                              selection-background-color: {menu_sel}; selection-color: #ffffff; }}}}
+QMenu {{{{ background: {menu_bg}; border: 1px solid {border}; padding: 4px; }}}}
+QMenu::item {{{{ padding: 5px 18px; border-radius: 6px; }}}}
+QMenu::item:selected {{{{ background: {menu_sel}; color: #ffffff; }}}}
 QLineEdit {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px;
             padding: 6px 12px; selection-background-color: {strong}; }}}}
 QPushButton#gear {{{{ padding: 6px 12px; font-size: 18px; }}}}
@@ -143,12 +158,12 @@ QPushButton#back {{{{ padding: 6px 12px; }}}}
 QPushButton#bigcard {{{{ background: {{card_bg}}; border: 1px solid {border}; border-radius: 16px; text-align: left; padding: 0; }}}}
 QPushButton#bigcard:hover {{{{ background: {hover}; border-color: {accent}; }}}}
 QPushButton#bigcard:disabled {{{{ background: #1f1f28; }}}}
-QPushButton#bigcard[primary="true"] {{{{ border: 2px solid {accent}; }}}}
+QPushButton#bigcard[primary="true"] {{{{ border: 2px solid {primary}; }}}}
 QPushButton#bigcard QLabel {{{{ background: transparent; }}}}
-QLabel#cardtitle {{{{ font-size: 21px; font-weight: 600; }}}}
+QLabel#cardtitle {{{{ font-size: 19px; font-weight: 600; }}}}
 QLabel#carddesc {{{{ color: {muted}; }}}}
 QLabel#cardnote {{{{ color: {amber}; font-size: 12px; }}}}
-QLabel#sectiontitle {{{{ font-size: 16px; font-weight: 600; }}}}
+QLabel#sectiontitle {{{{ font-size: 15px; font-weight: 600; }}}}
 QLabel#badge {{{{ padding: 2px 9px; border-radius: 9px; font-size: 12px; font-weight: 600; }}}}
 QLabel#badge[commercial="true"] {{{{ color: {badge_green_text}; background: {green}; }}}}
 QLabel#badge[commercial="false"] {{{{ color: {badge_amber_text}; background: {amber}; }}}}
@@ -172,10 +187,12 @@ QListWidget::item:selected {{{{ background: {strong}; color: #ffffff; }}}}
 QDialog#root, QTextBrowser {{{{ color: {text}; }}}}
 QDialog#root {{{{ background: {root_plain}; }}}}
 """.format(text=TEXT, muted=TEXT_MUTED, faint=TEXT_FAINT, disabled=TEXT_DISABLED, on_accent=TEXT_ON_ACCENT,
-           accent=ACCENT, accent_hover=ACCENT_HOVER, soft=ACCENT_SOFT, strong=ACCENT_STRONG,
+           accent=ACCENT, soft=ACCENT_SOFT, strong=ACCENT_STRONG,
            control=CONTROL_BG, hover=CONTROL_HOVER, border=CONTROL_BORDER, root_plain=ROOT_PLAIN, amber=AMBER,
            note_bg=NOTE_BG, note_border=NOTE_BORDER, green=GREEN, badge_green_text=BADGE_GREEN_TEXT,
-           badge_amber_text=BADGE_AMBER_TEXT,
+           badge_amber_text=BADGE_AMBER_TEXT, primary=PRIMARY, primary_hover=PRIMARY_HOVER, primary_border=PRIMARY_BORDER,
+           on_primary=TEXT_ON_PRIMARY, primary_dis_bg=PRIMARY_DISABLED_BG, primary_dis_text=PRIMARY_DISABLED_TEXT,
+           menu_bg=MENU_BG, menu_sel=MENU_SELECTION,
            check_image=(f"image: url({_check_icon_url()});" if _check_icon_url() else ""))
 
 # (foreground, background) pairs that must keep >= 4.5:1; checked by tests/test_ui.py::test_theme_contrast.
@@ -186,6 +203,8 @@ CONTRAST_PAIRS = [
     (TEXT, ACCENT_STRONG), ("#dcdce4", "#34343f"), ("#86efac", CARD_PLAIN),
     (BADGE_GREEN_TEXT, GREEN), (BADGE_AMBER_TEXT, AMBER), (AMBER, CARD_PLAIN), (AMBER, NOTE_BG), (AMBER, ROOT_PLAIN),
     ("#ffffff", ACCENT_STRONG), (ACCENT_SOFT, ROOT_PLAIN), (ACCENT_SOFT, CARD_PLAIN),
+    (TEXT_ON_PRIMARY, PRIMARY), (TEXT_ON_PRIMARY, PRIMARY_HOVER), (PRIMARY_DISABLED_TEXT, PRIMARY_DISABLED_BG),
+    (TEXT, MENU_BG), ("#ffffff", MENU_SELECTION),
 ]
 
 
@@ -209,10 +228,30 @@ def acknowledge_privacy() -> None:
 
 
 def build_style(glass: bool) -> str:
-    """Return the stylesheet: ``glass`` = Acrylic backdrop behind a translucent window, else the solid fallback."""
-    if glass:
+    """Return the stylesheet: ``glass`` = Acrylic backdrop behind a translucent window, else the solid fallback.
+    The Settings option "Window transparency" picks the tint: default, more (see ``ROOT_GLASS_MORE``) or off (solid)."""
+    level = ui_prefs.transparency()
+    if glass and level == "more":
+        return STYLE_TEMPLATE.format(root_bg=ROOT_GLASS_MORE, card_bg=CARD_GLASS_MORE)
+    if glass and level != "off":
         return STYLE_TEMPLATE.format(root_bg=ROOT_GLASS, card_bg=CARD_GLASS)
     return STYLE_TEMPLATE.format(root_bg=ROOT_PLAIN, card_bg=CARD_PLAIN)
+
+
+def apply_look(win: QWidget) -> None:
+    """Backdrop + stylesheet of a top-level window for the current transparency level (Settings).  Called on every show
+    and, for the visible windows, when the level changes; hidden windows catch up on their next show.  The Acrylic
+    backdrop is asked for once, on a shown window (Windows 11, the native window must exist); "off" only swaps in the
+    solid colours (the solid root paints the whole translucent window), so switching back needs no restart."""
+    level = ui_prefs.transparency()
+    if sys.platform == "win32" and level != "off" and win.isVisible() and not getattr(win, "_backdrop_tried", False):
+        win._backdrop_tried = True  # type: ignore[attr-defined]
+        win.backdrop = platform_win.apply_backdrop(int(win.winId()))  # type: ignore[attr-defined]
+        if win.backdrop != "acrylic":  # type: ignore[attr-defined]
+            win.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+    style = build_style(getattr(win, "backdrop", "plain") == "acrylic")
+    if win.styleSheet() != style:      # re-polishing every widget is not free: only when something changed
+        win.setStyleSheet(style)
 
 
 def audio_seconds(path: Path) -> Optional[float]:
@@ -328,15 +367,11 @@ class MainWindow(QWidget):
         pixels, i.e. already divided by the Windows display scale (125%, 150%...).  On a short screen (1366x768 at
         150% gives ~510 logical px) vertical scrolling takes over instead of the window overflowing the screen.
         """
+        from ui import screen_fit
+
         hint = self.content.sizeHint()
-        w, h = max(820, hint.width()), max(560, hint.height() + 8)
-        try:
-            avail = (self.screen() or QApplication.primaryScreen()).availableGeometry()
-            w, h = min(w, int(avail.width() * 0.94)), min(h, int(avail.height() * 0.90))
-        except Exception:  # noqa: BLE001 - no screen (tests): keep the natural size
-            pass
         self.setMinimumSize(MIN_WINDOW_W, MIN_WINDOW_H)
-        self.resize(max(w, MIN_WINDOW_W), max(h, MIN_WINDOW_H))
+        screen_fit.fit(self, max(820, hint.width()), max(560, hint.height() + 8))
 
     # ------------------------------------------------------------------ interface
     def _card(self) -> QFrame:
@@ -359,8 +394,8 @@ class MainWindow(QWidget):
         self.scroll.viewport().setAutoFillBackground(False)
         outer.addWidget(self.scroll)
         root = QVBoxLayout(self.content)
-        root.setContentsMargins(28, 24, 28, 24)
-        root.setSpacing(14)
+        root.setContentsMargins(20, 14, 20, 14)
+        root.setSpacing(10)
         head = QHBoxLayout()
         self.btn_back = QPushButton()                      # back to the Studio home (hidden outside the Studio)
         self.btn_back.setObjectName("back")
@@ -381,7 +416,7 @@ class MainWindow(QWidget):
 
         card = self._card()
         cl = QVBoxLayout(card)
-        cl.setContentsMargins(16, 14, 16, 14)
+        cl.setContentsMargins(14, 10, 14, 10)
         cl.setSpacing(10)
         self.btn_audio = QPushButton()
         self.lbl_audio = QLabel()
@@ -417,7 +452,7 @@ class MainWindow(QWidget):
         # Training presets (Fast / Balanced / Maximum / Manual) with a time estimate and a collapsed advanced panel
         pcard = self._card()
         pl = QVBoxLayout(pcard)
-        pl.setContentsMargins(16, 12, 16, 12)
+        pl.setContentsMargins(14, 10, 14, 10)
         pl.setSpacing(8)
         prow = QHBoxLayout()
         self.lbl_preset = QLabel()
@@ -469,7 +504,7 @@ class MainWindow(QWidget):
         # Voice-owner consent: read from the spoken statement at the end of the recording, or chosen by hand
         ccard = self._card()
         cl2 = QVBoxLayout(ccard)
-        cl2.setContentsMargins(16, 12, 16, 12)
+        cl2.setContentsMargins(14, 10, 14, 10)
         cl2.setSpacing(8)
         self.lbl_consent = QLabel()
         self.lbl_consent.setObjectName("sectiontitle")
@@ -538,8 +573,21 @@ class MainWindow(QWidget):
         prev.addWidget(self.btn_preview)
         prev.addWidget(self.chk_compare)
         root.addLayout(prev)
-        root.addWidget(self.chk_check)
-        root.addWidget(self.chk_pick)
+        # the automatic checks and clip options are pre-set well, so they fold away (height-first layout on small screens);
+        # their rows keep their own hidden state inside the folded box
+        self.btn_checks = QToolButton()
+        self.btn_checks.setCheckable(True)
+        self.btn_checks.setObjectName("expander")
+        root.addWidget(self.btn_checks)
+        self.checks_box = QWidget()
+        self.checks_box.hide()
+        chl = QVBoxLayout(self.checks_box)
+        chl.setContentsMargins(0, 0, 0, 0)
+        chl.setSpacing(6)
+        root.addWidget(self.checks_box)
+        self.btn_checks.toggled.connect(self._on_checks_toggled)
+        chl.addWidget(self.chk_check)
+        chl.addWidget(self.chk_pick)
         # speech-recognition cross-check of the dataset clips (core/clip_check.py): text mode only, CER threshold 10-15 %
         crow = QHBoxLayout()
         self.chk_clipcheck = QCheckBox()
@@ -555,7 +603,7 @@ class MainWindow(QWidget):
         self.clipcheck_row = QWidget()
         self.clipcheck_row.setLayout(crow)
         crow.setContentsMargins(0, 0, 0, 0)
-        root.addWidget(self.clipcheck_row)
+        chl.addWidget(self.clipcheck_row)
         self.chk_clipcheck.toggled.connect(lambda on: self.sp_clipcer.setEnabled(on and not self.busy))
         # longest training clip (core/slicer.long_clip_config): 12 s = the classic cut, 15 s default, 20 s on GPUs with >= 10 GB
         lrow = QHBoxLayout()
@@ -570,7 +618,7 @@ class MainWindow(QWidget):
         lrow.addStretch(1)
         self.clipmax_row = QWidget()
         self.clipmax_row.setLayout(lrow)
-        root.addWidget(self.clipmax_row)
+        chl.addWidget(self.clipmax_row)
         # optional noise clean-up (core/denoise.py): the row appears ONLY when the recording sounds noisy; never ticked by itself
         drow = QVBoxLayout()
         drow.setContentsMargins(0, 0, 0, 0)
@@ -776,6 +824,7 @@ class MainWindow(QWidget):
         for i, code in enumerate(train_presets.PRESETS):
             self.cmb_preset.setItemText(i, tr("preset." + code))
         self.btn_adv.setText(("\u25be " if self.btn_adv.isChecked() else "\u25b8 ") + tr("preset.advanced"))
+        self._on_checks_toggled(self.btn_checks.isChecked())
         for lab, key in zip(self.adv_rows, ("epochs", "rank", "alpha", "lr", "accum")):
             lab.setText(tr("preset.adv_" + key))
         self.lbl_adv_hint.setText(tr("preset.adv_hint"))
@@ -894,11 +943,7 @@ class MainWindow(QWidget):
     def showEvent(self, e) -> None:  # noqa: N802
         """On Windows, enable the Acrylic backdrop once the native window exists; otherwise stay on the plain dark look."""
         super().showEvent(e)
-        if sys.platform == "win32" and self.backdrop == "plain":
-            self.backdrop = platform_win.apply_backdrop(int(self.winId()))
-            self.setStyleSheet(build_style(self.backdrop == "acrylic"))
-            if self.backdrop != "acrylic":
-                self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+        apply_look(self)
 
     # ------------------------------------------------------------------ file selection
     def set_audio(self, path: Path) -> None:
@@ -1264,6 +1309,10 @@ class MainWindow(QWidget):
     def _on_adv_toggled(self, on: bool) -> None:
         self.adv_box.setVisible(on)
         self.btn_adv.setText(("\u25be " if on else "\u25b8 ") + tr("preset.advanced"))
+
+    def _on_checks_toggled(self, on: bool) -> None:
+        self.checks_box.setVisible(on)
+        self.btn_checks.setText(("\u25be " if on else "\u25b8 ") + tr("train.checks_options"))
 
     def _on_preset(self, _i: int = 0) -> None:
         """Show the values of the chosen preset in the advanced panel (editable only for Manual) and refresh the estimate."""

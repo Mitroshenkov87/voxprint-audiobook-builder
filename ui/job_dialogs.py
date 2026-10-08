@@ -53,7 +53,7 @@ class CleanupDialog(QDialog):
             self.setStyleSheet(parent.styleSheet())
         self.setWindowTitle(tr("work.clean_title"))
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 20, 24, 20)
+        lay.setContentsMargins(18, 14, 18, 14)
         lay.setSpacing(10)
         intro = hint_label()
         intro.setText(tr("work.clean_text", folder=str(files.job_dir), mb=_mb(files.size(files.temp))))

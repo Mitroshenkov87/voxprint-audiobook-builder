@@ -36,7 +36,7 @@ class AboutDialog(QDialog):
         if parent is not None:
             self.setStyleSheet(parent.styleSheet())
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 20, 24, 20)
+        lay.setContentsMargins(18, 14, 18, 14)
         lay.setSpacing(10)
 
         title = QLabel(f"{html.escape(appinfo.APP_DISPLAY_NAME)}  <span style='font-size:14px;color:#9aa0aa'>"

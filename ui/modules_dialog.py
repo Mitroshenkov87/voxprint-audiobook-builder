@@ -144,7 +144,7 @@ class ModulesDialog(QDialog):
         self._models_state = ""          # "" | "running" | "done" | "failed" | "later"
         self._step = 1
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(24, 20, 24, 20)
+        lay.setContentsMargins(18, 14, 18, 14)
         lay.setSpacing(10)
         self.lbl_title = QLabel()
         self.lbl_title.setObjectName("title")

@@ -787,5 +787,10 @@
  "revoice.no_asr": "No speech recognition model is installed. Download the models first (Settings or the first start).",
  "revoice.text_hint": "The recognised text appears here. Lines starting with # are chapter titles.",
  "revoice.name": "Title:",
- "revoice.narrate": "Narrate this text →"
+ "revoice.narrate": "Narrate this text →",
+ "ui.transparency": "Window transparency",
+ "ui.transparency_default": "Default",
+ "ui.transparency_more": "More",
+ "ui.transparency_off": "Off",
+ "train.checks_options": "Checks and clip options"
 }

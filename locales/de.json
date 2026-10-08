@@ -787,5 +787,10 @@
  "revoice.no_asr": "Kein Spracherkennungsmodell installiert. Laden Sie zuerst die Modelle herunter (Einstellungen oder erster Start).",
  "revoice.text_hint": "Hier erscheint der erkannte Text. Zeilen, die mit # beginnen, sind Kapiteltitel.",
  "revoice.name": "Titel:",
- "revoice.narrate": "Diesen Text vorlesen →"
+ "revoice.narrate": "Diesen Text vorlesen →",
+ "ui.transparency": "Fenstertransparenz",
+ "ui.transparency_default": "Standard",
+ "ui.transparency_more": "Stärker",
+ "ui.transparency_off": "Aus",
+ "train.checks_options": "Prüfungen und Clip-Optionen"
 }
