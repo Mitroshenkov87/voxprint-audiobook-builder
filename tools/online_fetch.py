@@ -450,7 +450,8 @@ def _have_size(path: Path, comp: dict) -> bool:
 
 def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Optional[List[str]] = None,
         sleep: Callable[[float], None] = time.sleep, roles: Optional[List[str]] = None,
-        portable: Optional[Path] = None, keep_all: bool = False, offline: bool = False, flavor: str = "auto") -> int:
+        portable: Optional[Path] = None, keep_all: bool = False, offline: bool = False, flavor: str = "auto",
+        modules: Optional[List[str]] = None) -> int:
     """Install the components of the manifest into ``dest``; returns the number of components fetched.
 
     ``portable``: a *portable setup folder* (docs/THIN-INSTALLER.md).  Every selected component is also kept there
@@ -459,6 +460,8 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
     ``keep_all``: keep ALL components of the manifest (those of the PyTorch ``flavor`` this PC gets: ``auto``, a flavor name or
     ``all``) in the folder, not only the ones installed now (``roles`` / ``only``); the installer uses it to keep the runtime too.
     ``offline``: never touch the network; the manifest is ``<portable>/manifest.json`` and every needed file must be in the folder.
+    ``modules``: only the components of these runtime modules (field ``module``; of the ``flavor`` when one is named) - unlike
+    ``only`` this selects the same modules in any release's manifest (the number of parts may differ).
     Without internet a folder that has a manifest is used automatically.  When the folder was made from an older manifest, only the
     parts whose SHA-256 changed are fetched and the files of the old version are removed at the end."""
     pm = _portable_mod() if portable is not None else None
@@ -491,6 +494,9 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
     flavored = (lambda c: pm.matches_flavor(c, fl)) if (pm is not None and fl) else (lambda c: True)
     comps = [c for c in man["components"] if (not only or c["id"] in only) and (not roles or c.get("role", "core") in roles)
              and (portable is None or flavored(c))]
+    if modules is not None:
+        named = flavor if flavor not in ("auto", "all", "") else ""
+        comps = [c for c in comps if c.get("module") in modules and (not named or not c.get("flavor") or c["flavor"] == named)]
     keep = [c for c in man["components"] if flavored(c)] if (portable is not None and keep_all) else (comps if portable is not None else [])
     if old_man is not None and not offline and pm is not None and old_man["components"] != man["components"]:
         d = pm.diff(old_man, man, fl or "all")
@@ -575,6 +581,25 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
     return fetched
 
 
+def run_channel(pinned: str, latest: str, dest: Path, cache: Path, status: Status, prefer: str = "pinned", **kw) -> tuple:
+    """:func:`run` with the *pinned* manifest (the one this release was built and tested with) or the *latest* one (the newest
+    release's manifest), falling back to the other when a download fails or a SHA-256 does not match.  The default is pinned;
+    its fallback to latest keeps an online install working when an upstream file of the pinned set disappears.  A manifest is
+    always used as a whole (the parts of two releases must not be mixed).  Returns ``(components fetched, manifest used)``."""
+    order = [src for src in ((latest, pinned) if prefer == "latest" else (pinned, latest)) if src]
+    order = list(dict.fromkeys(order))
+    for i, src in enumerate(order):
+        try:
+            return run(src, dest, cache, status, **kw), src
+        except FetchError as exc:
+            if str(exc) == "cancelled" or i + 1 == len(order):
+                raise
+            which = "latest" if order[i + 1] == latest else "pinned (verified)"
+            status.write("running", 0.0, f"{exc} - trying the {which} components", force=True)
+            print(f"{exc} - trying the {which} manifest {order[i + 1]}", file=sys.stderr, flush=True)
+    raise FetchError("no manifest")
+
+
 class _Sub:
     """A slice of the overall progress (components first, then the models) on top of a :class:`Status`."""
 
@@ -642,6 +667,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--flavor", default="auto", help="PyTorch flavor kept in the setup folder: auto (this PC), cu128 / cu126 / cpu, or all")
     ap.add_argument("--models", choices=("none", "auto", "all"), default=None,
                     help="models to put into the setup folder (default: auto with --portable-all, else none)")
+    ap.add_argument("--latest-manifest", help="manifest of the newest release: the fallback of the pinned --manifest, or the first "
+                                               "choice with --prefer latest (falls back to the pinned one)")
+    ap.add_argument("--prefer", choices=("pinned", "latest"), default="pinned", help="which manifest to try first (default pinned)")
     ap.add_argument("--iface", help="network interface / local IP to use, 'auto' (default) or 'default' (never hop); "
                                     "same as the VOXPRINT_NET_IFACE variable")
     try:
@@ -664,8 +692,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             n = run_portable(a.manifest, Path(a.dest), Path(a.cache), st, Path(a.portable), roles=a.role,
                              models=a.models or "auto", flavor=a.flavor)
         else:
-            n = run(a.manifest, Path(a.dest), Path(a.cache), st, a.only, roles=a.role, portable=Path(a.portable) if a.portable else None,
-                    flavor=a.flavor)
+            n, used = run_channel(a.manifest, a.latest_manifest or "", Path(a.dest), Path(a.cache), st, a.prefer, only=a.only,
+                                  roles=a.role, portable=Path(a.portable) if a.portable else None, flavor=a.flavor)
+            if used != a.manifest:
+                print(f"installed from {used}")
     except FetchError as exc:
         st.write("error", 0.0, str(exc), force=True)
         print(f"ERROR: {exc}", file=sys.stderr)

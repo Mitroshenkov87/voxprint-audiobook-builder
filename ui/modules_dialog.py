@@ -22,7 +22,7 @@ import logging
 from typing import Any, Callable, Dict, List, Optional
 
 from PySide6.QtCore import QThread, Signal
-from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QCheckBox, QDialog, QHBoxLayout, QLabel, QProgressBar, QPushButton, QVBoxLayout, QWidget
 
 from core.i18n import tr
 from infra import modules as mods
@@ -164,7 +164,12 @@ class ModulesDialog(QDialog):
         self.btn_download.setObjectName("primary")
         self.btn_cancel = QPushButton()
         self.btn_close = QPushButton()
-        for w in (self.lbl_title, self.lbl_hint, self.lbl_status, self.bar, self.lbl_overall):
+        # pinned (tested with this release) by default; "try latest" = the newest release's manifest, pinned as the fallback
+        self.chk_latest = QCheckBox()
+        self.chk_latest.setChecked(mods.prefer_latest())
+        self.chk_latest.setVisible(bool(mods.latest_url()))
+        self.chk_latest.toggled.connect(mods.set_prefer_latest)
+        for w in (self.lbl_title, self.lbl_hint, self.lbl_status, self.bar, self.lbl_overall, self.chk_latest):
             lay.addWidget(w)
         brow = QHBoxLayout()
         brow.addStretch(1)
@@ -190,6 +195,7 @@ class ModulesDialog(QDialog):
         self.lbl_hint.setText(hint)
         self.btn_cancel.setText(tr("ui.cancel"))
         self.btn_close.setText(tr("modules.btn_close"))
+        self.chk_latest.setText(tr("modules.try_latest"))
         self._render()
 
     @property
@@ -239,6 +245,7 @@ class ModulesDialog(QDialog):
         self.btn_download.setEnabled(not working and can)
         self.btn_cancel.setVisible(self.busy)                # the model download of step 2 has no cancel: it can be closed
         self.btn_close.setEnabled(not self.busy)
+        self.chk_latest.setEnabled(not working)
 
     # ---------------------------------------------------------------- list
     def refresh(self) -> None:

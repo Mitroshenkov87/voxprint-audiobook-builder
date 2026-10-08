@@ -70,8 +70,11 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
     mname = f"manifest-thin-{channel}.json" if runtime_lock is not None else f"manifest-{channel}.json"
     if thin:        # tell the shell where the manifest is (the app's module manager reads it)
         mj = (dist / "_internal" if (dist / "_internal").is_dir() else dist) / "modules.json"
-        mj.write_text(json.dumps({"schema": 1, "manifest_url": f"{base}/{mname}", "tag": tag}, indent=1),
-                      encoding="utf-8")
+        # manifest_url = pinned (this release); latest_manifest_url = the newest release's (try-latest option and fallback;
+        # only for GitHub release assets - a custom base_url has no "latest" alias)
+        latest = "" if base_url else f"https://github.com/{repo}/releases/latest/download/{mname}"
+        mj.write_text(json.dumps({"schema": 1, "manifest_url": f"{base}/{mname}", "latest_manifest_url": latest, "tag": tag},
+                                 indent=1), encoding="utf-8")
     parts: List[dict] = []
     cur: Optional[zipfile.ZipFile] = None
     cur_path: Optional[Path] = None

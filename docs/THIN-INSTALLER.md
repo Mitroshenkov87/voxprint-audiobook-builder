@@ -65,6 +65,15 @@ The flavor we download follows the driver (`nvidia-smi`): CUDA ≥ 12.8 → `cu1
 Finished components are recorded (SHA-256) and skipped next time; a broken one is deleted and fetched again; closing the window or going offline just
 stops (press Download again); the runtime folder can be deleted at any time. A new release has a new manifest — changed files get new hashes, the rest stays.
 
+## Pinned vs latest components
+
+Every release's manifest is *pinned*: the exact files (size + SHA-256) this release was built and tested with. `modules.json` and the online installer also know the newest release's manifest (`releases/latest/download/...`; `latest_manifest_url`, installer define `LatestManifestUrl`, set by `build_online.ps1` for GitHub builds).
+
+- Default: pinned. If a pinned download fails or its SHA-256 does not match (an upstream file disappeared), the whole latest manifest is used instead, so an online install does not brick.
+- Optional "Try the latest component versions" (installer checkbox on the models-folder page, silent `/Latest=1`; Components window check box): the latest manifest first, the pinned one as the fallback.
+- A manifest is always used as a whole (parts of two releases are never mixed); runtime modules are selected by module id, so a different number of parts is fine. The app remembers the manifest it installed from (`state/modules_channel.json`) and reads the module list from it.
+- `voxprint-fetch --manifest <pinned> --latest-manifest <latest> [--prefer latest]`.
+
 ## CI (`build-thin` job of `.github/workflows/build-installer.yml`)
 
 Installs only the pinned shell packages (Qt, numpy, soundfile ...) into a venv, runs the unit tests that need no PyTorch, builds the shell with

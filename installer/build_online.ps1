@@ -67,12 +67,15 @@ $channel = if ($Tag -match '^[vV]?[0-9][0-9.]*-') { "beta" } else { "stable" }
 $manifest = if ($RuntimeLock) { "manifest-thin-$channel.json" } else { "manifest-$channel.json" }
 if (-not (Test-Path "build\online-release\$manifest")) { throw "$manifest was not written" }
 if (-not $ManifestUrl) { $ManifestUrl = "https://github.com/$Repo/releases/download/$Tag/$manifest" }
+# the newest release's manifest: fallback of the pinned one and the "try the latest versions" option (local test builds: none)
+$LatestManifestUrl = if ($ManifestUrl -like "https://github.com/*") { "https://github.com/$Repo/releases/latest/download/$manifest" } else { "" }
 
 $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $iscc)) { $iscc = "$env:ProgramFiles\Inno Setup 6\ISCC.exe" }
 $setupName = if ($Thin) { "Voxprint-Setup-thin.exe" } else { "Voxprint-Setup-online.exe" }
 $finalName = if ($RuntimeLock) { "Voxprint-Setup-online.exe" } else { $setupName }
 $isArgs = @("/DONLINE", "/DONEDIR", "/DManifestUrl=$ManifestUrl")
+if ($LatestManifestUrl) { $isArgs += "/DLatestManifestUrl=$LatestManifestUrl" }
 if ($Thin) { $isArgs += "/DTHIN" }
 if ($Portable) { $isArgs += "/DPORTABLE" }
 & $iscc @isArgs installer\Voxprint.iss

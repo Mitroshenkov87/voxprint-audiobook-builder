@@ -794,5 +794,6 @@
  "ui.transparency_off": "Aus",
  "train.checks_options": "Prüfungen und Clip-Optionen",
  "splash.loading_ui": "Oberfläche wird geladen…",
- "splash.checking": "Komponenten werden geprüft…"
+ "splash.checking": "Komponenten werden geprüft…",
+ "modules.try_latest": "Neueste Komponentenversionen versuchen (bei einem Fehler zurück zu den geprüften)"
 }

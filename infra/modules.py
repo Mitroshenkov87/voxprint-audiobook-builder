@@ -27,6 +27,7 @@ log = logging.getLogger("voxprint.modules")
 
 CONFIG_NAME = "modules.json"
 MANIFEST_CACHE = "modules_manifest.json"
+CHANNEL_FILE = "modules_channel.json"      # {"prefer": "pinned" | "latest", "installed_from": manifest URL of the last install}
 Progress = Callable[[float, str], None]
 
 
@@ -76,6 +77,37 @@ def load_config() -> Optional[Dict[str, Any]]:
 def is_thin() -> bool:
     """True in a thin build (a ``modules.json`` is shipped)."""
     return load_config() is not None
+
+
+# ------------------------------------------------------------------------------------------------ pinned / latest
+def _channel_state() -> Dict[str, Any]:
+    try:
+        d = json.loads((paths.state_dir() / CHANNEL_FILE).read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_channel_state(d: Dict[str, Any]) -> None:
+    f = paths.state_dir() / CHANNEL_FILE
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(d), encoding="utf-8")
+
+
+def prefer_latest() -> bool:
+    """Components window option "Try the latest versions": the newest release's manifest first, the pinned one as the fallback."""
+    return _channel_state().get("prefer") == "latest"
+
+
+def set_prefer_latest(on: bool) -> None:
+    d = _channel_state()
+    d["prefer"] = "latest" if on else "pinned"
+    _save_channel_state(d)
+
+
+def latest_url() -> str:
+    """Manifest of the newest release (``modules.json`` ``latest_manifest_url``); '' when the build has none."""
+    return str((load_config() or {}).get("latest_manifest_url", ""))
 
 
 def runtime_dir() -> Path:
@@ -142,7 +174,8 @@ def load_manifest(source: Optional[str] = None, offline_ok: bool = True) -> Dict
     """The release manifest (downloaded; the last good copy is kept in ``state/`` for offline use)."""
     of = _fetch_module()
     cfg = load_config() or {}
-    src = source or str(cfg.get("manifest_url", ""))
+    # the manifest the runtime was last installed from (the latest one after "try latest" or a fallback), else the pinned one
+    src = source or str(_channel_state().get("installed_from") or cfg.get("manifest_url", ""))
     if not src:
         raise ModulesError("no manifest address (modules.json)")
     cache = paths.state_dir() / MANIFEST_CACHE
@@ -269,7 +302,14 @@ def install(module_ids: Optional[List[str]] = None, progress: Optional[Progress]
     of = _fetch_module()
     cfg = load_config() or {}
     src = manifest_source or str(cfg.get("manifest_url", ""))
-    man = load_manifest(src)
+    latest = "" if manifest_source else latest_url()
+    try:
+        man = load_manifest(src)
+    except ModulesError:
+        if not latest:
+            raise
+        man = load_manifest(latest)                    # the pinned manifest is gone: the newest release's one
+
     mods = modules(man)
     chosen = [m for m in mods if (m.id in module_ids if module_ids else (m.required and not m.installed))]
     chosen = _reuse_first(man, chosen, progress)
@@ -282,11 +322,18 @@ def install(module_ids: Optional[List[str]] = None, progress: Optional[Progress]
     try:
         # a setup folder (installer option "Keep a portable setup folder") is used first: valid files there need no download,
         # newly downloaded ones are kept in it; without internet its own manifest is used
-        n = of.run(src, runtime_dir(), cache_dir(), st, only=comp_ids, portable=setup_folder(), flavor=flavor_for(man) or "auto")
+        n, used = of.run_channel(src, latest, runtime_dir(), cache_dir(), st, "latest" if prefer_latest() else "pinned",
+                                 modules=[m.id for m in chosen], portable=setup_folder(), flavor=flavor_for(man) or "auto")
     except of.FetchError as exc:
         if st.was_cancelled:
             raise Cancelled("cancelled") from exc
         raise ModulesError(str(exc)) from exc
+    d = _channel_state()
+    d["installed_from"] = used if used != src else ""
+    _save_channel_state(d)
+    if used != src:                                    # the module list must now be read from the manifest actually used
+        log.info("runtime modules installed from %s (fallback / latest)", used)
+        load_manifest(used)
     activate()
     return n
 

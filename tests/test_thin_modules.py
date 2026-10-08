@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import sys
 import zipfile
 from pathlib import Path
@@ -281,3 +282,27 @@ def test_thin_build_script_excludes_the_heavy_libraries():
     for name in ("torch", "transformers", "scipy", "librosa", "qwen_tts", "huggingface_hub"):
         assert re.search(rf"\b{name}\b", bat.split("set HEAVY=")[1].split("set EXCL=")[0])
     assert "--exclude-module" in bat and "netroute" in bat and "dist\\thin" in bat
+
+
+def test_try_latest_falls_back_to_pinned_and_a_missing_pinned_set_falls_back_to_latest(thin, tmp_path, monkeypatch):
+    monkeypatch.setattr(of.time, "sleep", lambda s: None)
+    out = tmp_path / "srv"
+    man = json.loads((out / "manifest-beta.json").read_text(encoding="utf-8"))
+    bad = json.loads(json.dumps(man))
+    next(c for c in bad["components"] if c["id"].startswith("rt-"))["sha256"] = "0" * 64      # a "latest" set with a wrong hash
+    (out / "manifest-latest.json").write_text(json.dumps(bad), encoding="utf-8")
+    cfg = tmp_path / "modules.json"
+    cfg.write_text(json.dumps({"schema": 1, "manifest_url": f"{thin.url}/manifest-beta.json",
+                               "latest_manifest_url": f"{thin.url}/manifest-latest.json"}), encoding="utf-8")
+    mods.set_prefer_latest(True)
+    assert mods.install() >= 1 and all(m.installed for m in mods.modules(mods.load_manifest()) if m.required)
+    # pinned manifest gone (404): the newest release's manifest is used and remembered for the module list
+    (out / "manifest-latest.json").write_text(json.dumps(man), encoding="utf-8")
+    cfg.write_text(json.dumps({"schema": 1, "manifest_url": f"{thin.url}/gone.json",
+                               "latest_manifest_url": f"{thin.url}/manifest-latest.json"}), encoding="utf-8")
+    mods.set_prefer_latest(False)
+    shutil.rmtree(mods.runtime_dir())
+    (mods.paths.state_dir() / mods.MANIFEST_CACHE).unlink()
+    assert mods.install() >= 1
+    assert mods._channel_state()["installed_from"].endswith("/manifest-latest.json")
+    assert all(m.installed for m in mods.modules(mods.load_manifest()) if m.required)

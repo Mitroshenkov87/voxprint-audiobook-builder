@@ -40,6 +40,11 @@
 #ifndef ManifestUrl
 #define ManifestUrl "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/latest/download/manifest-stable.json"
 #endif
+; The newest release's manifest (build_online.ps1 passes it for GitHub builds): the fallback when a file of the pinned set fails,
+; and the first choice when "Try the latest component versions" is ticked (silent: /Latest=1).  Empty = pinned only.
+#ifndef LatestManifestUrl
+#define LatestManifestUrl ""
+#endif
 
 [Setup]
 AppId={{6F1D2B7A-3C54-4E0B-9A41-7B5E0C9D2F18}
@@ -115,6 +120,9 @@ english.ModelsPageBackupFound=The folder %1 contains a Voxprint backup. It will 
 russian.ModelsPageBackupFound=В папке %1 найдена резервная копия Voxprint. Она не станет папкой моделей: при первом запуске модели и голоса будут скопированы из неё в %2 (сама копия только читается).
 german.ModelsPageBackupFound=Der Ordner %1 enthält eine Voxprint-Sicherung. Er wird nicht als Modellordner verwendet: Beim ersten Start werden Modelle und Stimmen nach %2 kopiert (die Sicherung selbst wird nur gelesen).
 
+english.LatestCheck=Try the latest component versions (falls back to the verified ones)
+russian.LatestCheck=Попробовать последние версии компонентов (с откатом на проверенные)
+german.LatestCheck=Neueste Komponentenversionen versuchen (sonst die geprüften)
 english.OnlineStatus=Downloading and unpacking the Voxprint components (the download can be resumed if it is interrupted)...
 russian.OnlineStatus=Загрузка и распаковка компонентов Voxprint (при обрыве загрузку можно продолжить)...
 german.OnlineStatus=Voxprint-Komponenten werden geladen und entpackt (bei einem Abbruch kann der Download fortgesetzt werden)...
@@ -198,6 +206,9 @@ Filename: "{app}\{#AppExe}"; Parameters: "--prefetch"; Description: "{cm:RunPref
 var
   ModelsPage: TWizardPage;
   ModelsEdit: TNewEdit;
+#ifdef ONLINE
+  LatestCheck: TNewCheckBox;
+#endif
 #ifdef PORTABLE
   PortablePage: TWizardPage;
   PortableCheck: TNewCheckBox;
@@ -447,6 +458,19 @@ begin
   Browse.Height := ModelsEdit.Height + ScaleY(2);
   Browse.Caption := WizardForm.DirBrowseButton.Caption;
   Browse.OnClick := @ModelsBrowseClick;
+#ifdef ONLINE
+  if '{#LatestManifestUrl}' <> '' then
+  begin
+    LatestCheck := TNewCheckBox.Create(ModelsPage);
+    LatestCheck.Parent := ModelsPage.Surface;
+    LatestCheck.Left := 0;
+    LatestCheck.Top := ScaleY(176);
+    LatestCheck.Width := ModelsPage.SurfaceWidth;
+    LatestCheck.Height := ScaleY(20);
+    LatestCheck.Caption := CustomMessage('LatestCheck');
+    LatestCheck.Checked := ExpandConstant('{param:Latest|0}') = '1';
+  end;
+#endif
 #ifdef PORTABLE
   CreatePortablePage();
 #endif
@@ -534,6 +558,13 @@ begin
   Exe := ExpandConstant('{tmp}\voxprint-fetch.exe');
   Params := '--manifest ' + AddQuotes(Manifest) + ' --dest ' + AddQuotes(ExpandConstant('{app}')) +
             ' --cache ' + AddQuotes(Cache) + ' --status ' + AddQuotes(StatusFile);
+  if '{#LatestManifestUrl}' <> '' then
+  begin
+    { pinned first (default) with the newest release as the fallback, or the other way round when the box is ticked }
+    Params := Params + ' --latest-manifest ' + AddQuotes('{#LatestManifestUrl}');
+    if (LatestCheck <> nil) and LatestCheck.Checked then
+      Params := Params + ' --prefer latest';
+  end;
 #ifdef THIN
   { THIN installer: only the shell (role "core") is installed here; the app downloads the runtime modules itself }
   Params := Params + ' --role core';
