@@ -32,6 +32,8 @@ from core.i18n import tr
 import gc
 import json
 import logging
+import math
+import os
 import random
 import shutil
 import time
@@ -223,8 +225,49 @@ def make_optimizer(params: List[Any], lr: float, use_8bit: bool, device: str, wa
 # --------------------------------------------------------------------------- training
 
 
-def compute_sample_loss(sample: Dict[str, Any], hf_model: Any, base_talker: Any, device: Any, language: str):
-    """Loss of one sample as ``(total, talker_loss, sub_loss)``: the first-codec-group cross-entropy plus 0.3 x the sub-talker loss (as in ``train_lora.py``)."""
+def lr_factor(step: int, total: int, warmup_fraction: float = 0.1, min_ratio: float = 0.1) -> float:
+    """Learning-rate multiplier of optimizer step ``step`` (0-based) of ``total``: linear warmup over ``warmup_fraction`` of
+    the steps, then a cosine decay from 1 to ``min_ratio`` at the last step (research notes: warmup ~5-10 %, floor ~10 %)."""
+    import math
+
+    total = max(1, int(total))
+    warm = int(round(total * warmup_fraction)) if warmup_fraction > 0 else 0
+    if step < warm:
+        return (step + 1) / warm
+    span = max(1, total - warm - 1)
+    progress = min(1.0, max(0.0, (step - warm) / span))
+    return min_ratio + (1.0 - min_ratio) * 0.5 * (1.0 + math.cos(math.pi * progress))
+
+
+def lr_schedule_of(plan: TrainPlan) -> str:
+    """The schedule to use: ``VOXPRINT_LR_SCHEDULE`` (cosine / constant) overrides the plan's (for A/B runs)."""
+    env = os.environ.get("VOXPRINT_LR_SCHEDULE", "").strip().lower()
+    return env if env in ("cosine", "constant") else plan.lr_schedule
+
+
+def fix_sub_talker_shift_of(plan: TrainPlan) -> bool:
+    """Opt-in sub-talker loss fix: the plan flag or ``VOXPRINT_FIX_SUBTALKER_SHIFT=1``."""
+    return plan.fix_sub_talker_shift or os.environ.get("VOXPRINT_FIX_SUBTALKER_SHIFT", "").strip() in ("1", "true", "yes")
+
+
+def sub_talker_loss(sub_logits: Any, codec_ids: Any):
+    """Sub-talker (code groups 2..G) cross-entropy WITHOUT the extra label shift.
+
+    ``code_predictor.forward_finetune`` returns logits ``[T, G-1, V]`` that are already aligned with the labels
+    ``codec_ids[:, 1:]`` (logit k predicts group k+1), but computes its loss with transformers' causal-LM loss, which shifts
+    the labels once more: logit k is then scored against group k+2 and the last group is never trained (QwenLM/Qwen3-TTS
+    PR #178, issue #179).  This computes the aligned loss.  OPT-IN ONLY: issue #39 reports no gain at lr 2e-6 and
+    over-fitting at 2e-5 with this fix, so it needs a GPU A/B before it can become the default (docs/VOICE-QUALITY.md)."""
+    import torch.nn.functional as F
+
+    v = sub_logits.shape[-1]
+    return F.cross_entropy(sub_logits.reshape(-1, v).float(), codec_ids[:, 1:].reshape(-1).to(sub_logits.device))
+
+
+def compute_sample_loss(sample: Dict[str, Any], hf_model: Any, base_talker: Any, device: Any, language: str,
+                        fix_sub_shift: bool = False):
+    """Loss of one sample as ``(total, talker_loss, sub_loss)``: the first-codec-group cross-entropy plus 0.3 x the sub-talker
+    loss (as in ``train_lora.py``; ``fix_sub_shift`` = the opt-in aligned sub-talker loss, see :func:`sub_talker_loss`)."""
     import torch.nn.functional as F
 
     full_input, labels, all_codec_ids, prefill_len = build_teacher_forcing_input(
@@ -238,19 +281,22 @@ def compute_sample_loss(sample: Dict[str, Any], hf_model: Any, base_talker: Any,
     talker_loss = F.cross_entropy(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1),
                                   ignore_index=-100)
     audio_hidden = hidden[0, prefill_len - 1:prefill_len + T - 1, :]
-    _, sub_loss = base_talker.forward_sub_talker_finetune(all_codec_ids, audio_hidden)
+    sub_logits, sub_loss = base_talker.forward_sub_talker_finetune(all_codec_ids, audio_hidden)
+    if fix_sub_shift:
+        sub_loss = sub_talker_loss(sub_logits, all_codec_ids)
     return talker_loss + SUB_TALKER_WEIGHT * sub_loss, talker_loss, sub_loss
 
 
 def validation_loss(val_samples: List[Dict[str, Any]], hf_model: Any, peft_talker: Any, base_talker: Any, device: Any,
-                    language: str) -> float:
+                    language: str, fix_sub_shift: bool = False) -> float:
     """Mean loss over the held-out samples (no gradients, dropout off); the model is put back into training mode."""
     import torch
 
     peft_talker.eval()
     try:
         with torch.no_grad():
-            vals = [float(compute_sample_loss(s, hf_model, base_talker, device, language)[0]) for s in val_samples]
+            vals = [float(compute_sample_loss(s, hf_model, base_talker, device, language, fix_sub_shift)[0])
+                    for s in val_samples]
     finally:
         peft_talker.train()
     return sum(vals) / max(1, len(vals))
@@ -324,6 +370,15 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
              sum(p.numel() for p in params), plan.lora_r, plan.lora_alpha, plan.lr, plan.epochs,
              plan.grad_accum, len(samples))
     opt = make_optimizer(params, plan.lr, plan.use_8bit_adam, plan.device, warnings)
+    schedule = lr_schedule_of(plan)
+    fix_sub = fix_sub_talker_shift_of(plan)
+    # one optimizer step every grad_accum samples and at the end of each epoch (see the loop below)
+    opt_steps = plan.epochs * math.ceil(len(samples) / max(1, plan.grad_accum))
+    sched = None
+    if schedule == "cosine":
+        sched = torch.optim.lr_scheduler.LambdaLR(
+            opt, lambda s: lr_factor(s, opt_steps, plan.warmup_fraction, plan.min_lr_ratio))
+    lr_trace: List[float] = []
 
     rnd = random.Random(seed)
     oom = getattr(torch.cuda, "OutOfMemoryError", MemoryError)
@@ -343,7 +398,7 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
         for k, sample in enumerate(order, start=1):
             cancel.check()
             try:
-                total, _, _ = compute_sample_loss(sample, hf_model, base_talker, device, plan.language)
+                total, _, _ = compute_sample_loss(sample, hf_model, base_talker, device, plan.language, fix_sub)
                 (total / plan.grad_accum).backward()
             except oom as exc:
                 raise OutOfMemoryError_(details=str(exc)) from exc
@@ -352,7 +407,10 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
             done += 1
             if k % plan.grad_accum == 0 or k == n:
                 torch.nn.utils.clip_grad_norm_(params, max_norm=1.0)
+                lr_trace.append(float(opt.param_groups[0]["lr"]))
                 opt.step()
+                if sched is not None:
+                    sched.step()
                 opt.zero_grad(set_to_none=True)
             if k % 4 == 0 or k == n:
                 snap = VramMonitor.snapshot()
@@ -363,7 +421,7 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
         epoch_losses.append(avg)
         log.info("epoch %d/%d avg_loss=%.4f", epoch, plan.epochs, avg)
         if val_samples:
-            val_losses.append(validation_loss(val_samples, hf_model, peft_talker, base_talker, device, plan.language))
+            val_losses.append(validation_loss(val_samples, hf_model, peft_talker, base_talker, device, plan.language, fix_sub))
             log.info("epoch %d/%d val_loss=%.4f", epoch, plan.epochs, val_losses[-1])
         best = min(best, avg)
         save_adapter_folder(peft_talker, output_dir / "checkpoints" / f"epoch_{epoch:02d}")
@@ -393,6 +451,12 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
         holdout_file.unlink(missing_ok=True)
     (output_dir / "checkpoints" / "losses.json").write_text(
         json.dumps({"epoch_avg_loss": epoch_losses, "epoch_val_loss": val_losses, "warnings": warnings,
+                    "lr_schedule": {"kind": schedule, "warmup_fraction": plan.warmup_fraction,
+                                    "min_lr_ratio": plan.min_lr_ratio, "optimizer_steps": len(lr_trace),
+                                    "lr_first": lr_trace[0] if lr_trace else None,
+                                    "lr_peak": max(lr_trace) if lr_trace else None,
+                                    "lr_last": lr_trace[-1] if lr_trace else None},
+                    "fix_sub_talker_shift": fix_sub,
                     "speaker_embedding": {"source": "centroid" if centroid else "ref",
                                           "clips": len(centroid[1]) if centroid else 1}},
                    ensure_ascii=False, indent=2),

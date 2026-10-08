@@ -56,6 +56,10 @@ class TrainPlan:
     warnings: List[str] = field(default_factory=list)
     speaker_centroid: bool = True  # averaged speaker embedding over clean clips (core/speaker_centroid.py) instead of ref.wav
     holdout_fraction: float = 0.0  # clips kept out of training for the validation loss / automatic checkpoint pick (0 = none)
+    lr_schedule: str = "cosine"    # "cosine" (linear warmup, cosine decay) | "constant" (the old behaviour); env VOXPRINT_LR_SCHEDULE
+    warmup_fraction: float = 0.1   # share of the optimizer steps spent warming up (cosine schedule)
+    min_lr_ratio: float = 0.1      # the cosine decays to this share of the peak learning rate
+    fix_sub_talker_shift: bool = False   # opt-in experiment, see core/lora_trainer.sub_talker_loss (env VOXPRINT_FIX_SUBTALKER_SHIFT=1)
 
     @property
     def effective_batch(self) -> int:

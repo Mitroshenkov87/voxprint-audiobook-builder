@@ -77,3 +77,31 @@ A failed pick only adds a warning; the voice keeps the last epoch. The validatio
 
 GPU validation: time per candidate (estimate 20-40 s on an RTX 4090) and total; whether the pick agrees with listening on 3-4
 voices; whether the weights or the 4-phrase set need changing; whether the validation loss tracks the pick.
+
+## 7. Warmup + cosine learning-rate schedule
+
+`core/lora_trainer.lr_factor`, `TrainPlan.lr_schedule` = `"cosine"` (default) | `"constant"` (the old behaviour),
+`warmup_fraction` 0.1, `min_lr_ratio` 0.1. Linear warmup over the first 10 % of the optimizer steps, then a cosine decay to
+10 % of the peak at the last step (steps = epochs x ceil(clips / gradient accumulation)). `VOXPRINT_LR_SCHEDULE=constant`
+switches it off for an A/B run. `checkpoints/losses.json` records the schedule and the first / peak / last learning rate.
+
+GPU validation: the average learning rate is now lower than with the constant schedule (about 0.5x over a run), so the presets'
+epochs / learning rates were tuned for the old behaviour; compare one voice with both schedules (same seed and preset) by the
+pick scores and by ear, and re-tune the presets if the cosine run is under-trained.
+
+## 8. Sub-talker label shift (prepared, NOT decided)
+
+`code_predictor.forward_finetune` returns logits already aligned with `codec_ids[:, 1:]`, but its loss is transformers'
+causal-LM loss, which shifts the labels again: logit k is scored against code group k+2 and the last group is never trained
+(confirmed by `tests/test_lr_schedule_and_subtalker.py` on the installed `qwen_tts`). The aligned loss
+(`core/lora_trainer.sub_talker_loss`) is **opt-in**: `TrainPlan.fix_sub_talker_shift=True` or `VOXPRINT_FIX_SUBTALKER_SHIFT=1`;
+`losses.json` records which one was used. Default: off (unchanged training). References: QwenLM/Qwen3-TTS PR #178, issues #179
+and #39 (one user saw no gain at lr 2e-6 and over-fitting at 2e-5 with this fix combined with another change).
+
+A/B for the GPU run (one voice, 10-15 min recording, same seed / preset / everything else):
+
+1. A: `VOXPRINT_FIX_SUBTALKER_SHIFT` unset. B: `VOXPRINT_FIX_SUBTALKER_SHIFT=1`. Auto-pick on in both.
+2. Compare `checkpoints/pick.json` (best score, CER, similarity, MOS at the same strength), the validation loss curves, and
+   listen blind to 3-4 chapters (fine timbre, hiss / metallic artefacts, babbling).
+3. Repeat B at half the learning rate if B over-fits (validation loss rising early, artefacts). Make it the default only if B
+   wins on both scores and listening.
