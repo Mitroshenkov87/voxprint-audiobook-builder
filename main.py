@@ -168,7 +168,7 @@ def _modules_cli(argv) -> int:
             n = modules.install(ids, prog)
             out(f"OK: {n} component(s) installed")
         for m in modules.modules(modules.load_manifest()):
-            how = "reused  " if m.reused else "installed" if m.installed else "missing  "
+            how = "reused  " if m.reused else "installed" if m.installed else "update   " if m.update else "missing  "
             out(f"{m.id:8} {how} {m.size / 2**20:9.0f} MB  {m.title}")
         return 0
     except modules.ModulesError as exc:

@@ -308,10 +308,11 @@ class ModulesDialog(GlassDialog):
             return
         self._list_failed = False
         self.modules = list(res)
-        pending = bool(self.missing()) or self.extras_missing()
-        if pending and self.autostart and not self._auto_tried:
+        # first start: what is MISSING is fetched without a click; an update is only offered and waits for Download
+        absent = [m for m in self.missing() if not m.update]
+        if (absent or self.extras_missing()) and self.autostart and not self._auto_tried:
             self._auto_tried = True
-            self.start_install()                    # first start: no click needed
+            self.start_install(updates=False)
             return
         if self._note:
             self._set_line(self._note, error=self._note_error)
@@ -320,7 +321,7 @@ class ModulesDialog(GlassDialog):
         else:
             self._set_line(self._summary())
         self._render()
-        if self.modules and not any(m.required and not m.installed for m in self.modules):
+        if self.modules and not any(m.required and not (m.installed or m.update) for m in self.modules):
             self.ready.emit()
             self._start_models()
 
@@ -335,13 +336,15 @@ class ModulesDialog(GlassDialog):
             self._note = ""
             self.refresh()
 
-    def start_install(self) -> bool:
-        if self.busy or not (self.missing() or self.extras_missing()):
+    def start_install(self, updates: bool = True) -> bool:
+        """Download the missing modules (and, after a click, ``updates=True``, the updates too) plus the extras."""
+        chosen = [m for m in self.missing() if updates or not m.update]
+        if self.busy or not (chosen or self.extras_missing()):
             return False
         self._note = ""
         self._step = 1
-        ids = [m.id for m in self.missing()]
-        mod_bytes = sum(m.size for m in self.missing())
+        ids = [m.id for m in chosen]
+        mod_bytes = sum(m.size for m in chosen)
         extra_bytes = 0
         if self.extras_fn is not None:
             try:

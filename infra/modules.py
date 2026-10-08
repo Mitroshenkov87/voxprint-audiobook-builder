@@ -203,9 +203,16 @@ def load_manifest(source: Optional[str] = None, offline_ok: bool = True) -> Dict
 
 
 def modules(manifest: Dict[str, Any]) -> List[Module]:
-    """The modules of a manifest with their installed state (all components present with the recorded SHA-256)."""
+    """The modules of a manifest with their installed state.
+
+    A module is *installed* when every component is (:func:`tools.online_fetch.installed_ok`: a wheel by package name and
+    version, a zip part by SHA-256).  It is an *update* when it is not, but every outdated component still has an older
+    copy in place (the program works as it is); otherwise it is *missing*.  ``size`` is what a download would really fetch:
+    only the components that are not installed."""
     of = _fetch_module()
-    state = of.load_state(runtime_dir())
+    rd = runtime_dir()
+    state = of.load_state(rd)
+    dist_infos = _dist_infos(rd)
     by_id = {c["id"]: c for c in manifest.get("components", [])}
     flavor = flavor_for(manifest)
     installed_v, installed_b = _installed_release()
@@ -213,30 +220,47 @@ def modules(manifest: Dict[str, Any]) -> List[Module]:
     out: List[Module] = []
     for m in manifest.get("modules", []):
         comps = _components_of(m, by_id, flavor)
-        ok = bool(comps) and all(of.installed_ok(c, state, runtime_dir()) for c in comps)
+        todo = [c for c in comps if not of.installed_ok(c, state, rd)]
+        ok = bool(comps) and not todo
         reused = False
         if not ok and m.get("reusable") == "torch":
             from infra import runtime_reuse
 
             reused = ok = runtime_reuse.reused("torch") is not None           # a verified copy from another program
+        if ok:
+            todo = []
         mod = Module(str(m["id"]), str(m.get("title", m["id"])), bool(m.get("required", True)),
-                     0 if reused else sum(int(c["size"]) for c in comps),
-                     0 if reused else sum(int(c.get("unpacked_bytes", 0)) for c in comps),
+                     0 if reused else sum(int(c["size"]) for c in (todo or comps)),
+                     0 if reused else sum(int(c.get("unpacked_bytes", 0)) for c in (todo or comps)),
                      [c["id"] for c in comps], ok)
         mod.reused = reused
-        # the component ids of a module are stable across releases (rt-<module>-NN) while their SHA-256 changes: an id
-        # recorded with another hash means this module was installed from an older manifest
-        was_installed = not ok and bool(comps) and all(c["id"] in state for c in comps) and \
-            all((runtime_dir() / mk).exists() for c in comps for mk in c.get("markers", []))
-        if was_installed and not is_newer(available_v, installed_v, available_b, installed_b):
-            # same (or older) version and build with other hashes, or a build without a number: wheels built from sdists differ
-            # byte for byte between rebuilds; the installed files work, so this is neither missing nor an update
+        present = bool(todo) and all(_older_copy(c, state, rd, dist_infos) for c in todo)
+        if present and all(c.get("kind") != "wheel" for c in todo) and \
+                not is_newer(available_v, installed_v, available_b, installed_b):
+            # zip parts have no package version: a same-release rebuild (other bytes, same content) is not an update
             mod.installed = True
             mod.size = mod.unpacked = 0
         else:
-            mod.update = not ok and any(c["id"] in state for c in comps)
+            mod.update = present
         out.append(mod)
     return out
+
+
+def _dist_infos(rd: Path) -> set:
+    """Lower-case distribution names of the ``*.dist-info`` folders in the runtime folder."""
+    try:
+        return {p.name.split("-")[0].lower() for p in rd.iterdir() if p.name.endswith(".dist-info")}
+    except OSError:
+        return set()
+
+
+def _older_copy(comp: Dict[str, Any], state: Dict[str, str], rd: Path, dist_infos: set) -> bool:
+    """True when another version of this component is installed: a wheel by its distribution name (the marker
+    ``<name>-<version>.dist-info``), a zip part by its id (stable across releases) with its marker files."""
+    markers = list(comp.get("markers", []))
+    if comp.get("kind") == "wheel" and markers:
+        return markers[0].split("-")[0].lower() in dist_infos
+    return comp["id"] in state and all((rd / mk).exists() for mk in markers)
 
 
 def _installed_release() -> tuple:
@@ -303,14 +327,14 @@ def installed_without_network() -> bool:
         man = of.validate_manifest(json.loads((paths.state_dir() / MANIFEST_CACHE).read_text(encoding="utf-8")))
     except (OSError, ValueError, of.FetchError):
         return False
-    return all(m.installed for m in modules(man) if m.required)
+    return all(m.installed or m.update for m in modules(man) if m.required)   # an update waits for the user's click
 
 
 def missing_required(manifest: Optional[Dict[str, Any]] = None) -> List[Module]:
     """Required modules that are not installed (needs the manifest, which is downloaded unless given)."""
     if not is_thin():
         return []
-    return [m for m in modules(manifest or load_manifest()) if m.required and not m.installed]
+    return [m for m in modules(manifest or load_manifest()) if m.required and not m.installed and not m.update]
 
 
 # ------------------------------------------------------------------------------------------------ install
@@ -379,7 +403,8 @@ def install(module_ids: Optional[List[str]] = None, progress: Optional[Progress]
         man = load_manifest(latest)                    # the pinned manifest is gone: the newest release's one
 
     mods = modules(man)
-    chosen = [m for m in mods if (m.id in module_ids if module_ids else (m.required and not m.installed))]
+    # default: what is missing; an update is installed only when its module is named (the user pressed Download)
+    chosen = [m for m in mods if (m.id in module_ids if module_ids else (m.required and not m.installed and not m.update))]
     chosen = _reuse_first(man, chosen, progress)
     comp_ids = [c for m in chosen for c in m.components]
     if not comp_ids:

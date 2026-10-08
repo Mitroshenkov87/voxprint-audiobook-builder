@@ -216,8 +216,8 @@ def check_modules(progress: Progress, cancel: CancelToken, api: Any = None) -> L
         mods = api.modules(api.load_manifest(offline_ok=True))
     except Exception as exc:  # noqa: BLE001
         return [Item("module", tr("autorepair.modules"), FAILED, str(exc))]
-    missing = [m for m in mods if m.required and not m.installed]
-    items = [Item("module", m.title, OK) for m in mods if m.installed]
+    missing = [m for m in mods if m.required and not m.installed and not m.update]     # repair, never an update
+    items = [Item("module", m.title, OK) for m in mods if m.installed or m.update]
     if missing:
         try:
             api.install([m.id for m in missing], progress, cancelled=lambda: cancel.is_cancelled)

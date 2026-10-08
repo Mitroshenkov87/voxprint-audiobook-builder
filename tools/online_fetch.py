@@ -196,8 +196,15 @@ def save_state(dest: Path, state: Dict[str, str], version: str = "", build: str 
 
 
 def installed_ok(comp: dict, state: Dict[str, str], dest: Path) -> bool:
-    """True when this exact component (same SHA-256) is already installed and its marker files still exist."""
-    if state.get(comp["id"]) != comp["sha256"]:
+    """True when this component is already installed and its marker files still exist.
+
+    A wheel is identified by its id, ``whl-<dist>-<version>``: the same package version is the same content, whatever the
+    bytes of the file (wheels built from sdists differ byte for byte between two release builds).  Other components (zip
+    parts) must carry the recorded SHA-256."""
+    if comp.get("kind") == "wheel":
+        if comp["id"] not in state:
+            return False
+    elif state.get(comp["id"]) != comp["sha256"]:
         return False
     return all((dest / m).exists() for m in comp.get("markers", []))
 
