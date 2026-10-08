@@ -53,6 +53,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `tts_engine.py` | the real engine `Qwen3AdapterEngine` (qwen-tts + PEFT adapter, voice-clone prompt from `ref_sample.wav`); attention backend flash-attn 2 > SDPA > eager with fallback; `synthesize_batch` / `max_batch` (batch by free VRAM); validated on an RTX 4090 |
 | `audiobook_export.py` | format registry, file naming, `ffmetadata` chapters, `.m3u8`, ffmpeg command builders, encoder pre-check, `Exporter` (per-chapter encodes during synthesis, single files in parallel at the end, results in a fixed order) / `export_formats` (injectable `run`; ffmpeg at below-normal priority) |
 | `cpu_budget.py` | CPU pool size and torch thread count for narration from the physical cores (`VOXPRINT_CPU_WORKERS` overrides) |
+| `model_cache.py` | models preloaded into RAM (`put` / `take` with ownership transfer, `take` waits for a load in progress, `to_device` for the qwen wrappers); used by `tts_engine`, `asr`, `text_cleanup` |
 
 ### `infra/`
 | Module | Purpose |
@@ -65,6 +66,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `auto_repair.py` | Settings -> *Auto-repair* / `--auto-repair`: `verify_install` (+ `repair_install` for a venv install), thin runtime modules, ffmpeg, then every known model file by size + SHA-256 (`model_mirrors.json`); bad files deleted, folder -> `.partial`, `ensure_model(root=...)` completes it; `Report.summary()` |
 | `existing_models.py` | the "existing models folder" (`state/existing_models_dir.txt`, env `VOXPRINT_EXISTING_MODELS`): `find` (model locator roots with `ignore_disabled`), `import_model` (hard link on the same drive, else verified copy through `<name>.importing`), `import_available`, `pending` (start-up); a Voxprint backup as source: `adopt_backup_choice` (a `models_dir.txt` that points at a backup becomes the source, the models folder goes back to the default), `backup_source`, `restore_pending`, `restore_backup` (whole backup restored once into the live folders) |
 | `features.py` | feature flags; today `aac_enabled()` (env `VOXPRINT_ENABLE_AAC` > `state/features.json` > `AAC_DEFAULT`) |
+| `preload.py`, `sysinfo.py` | optional "Preload models into memory at startup" (`state/preload.json`, off by default): RAM need from the model files + headroom vs. total / free RAM, low-priority background loader ticked by the Studio timer, freed on low memory; physical cores, RAM, thread priority |
 | `net.py` | HTTPS through the stdlib; retries with certifi roots on `CERTIFICATE_VERIFY_FAILED` |
 | `platform_win.py` | OS check, dark title bar, Acrylic backdrop (all guarded by `sys.platform`) |
 | `assets.py` | pinned non-pip assets (ffmpeg): download -> sha256 -> staging -> smoke test -> atomic swap -> rollback; ownership marker `.voxprint-owned` |
@@ -143,7 +145,7 @@ Narration and the repository dialog use their own `QThread`s (`workers/narrate_w
   (*Train your voice*, *Narrate with this voice*). The trainer window is the former main window, reused unchanged except for the back button; the Studio mirrors its status and progress on the home page, and the settings
   dialog (gear) is shared. Closing any window closes the application (`shutdown()`). A 1-second timer refreshes the home cards (voice count, "no voices yet" hint).
 * The training window contains the core workflow only: choose audio + text, optional voice name / type / description, one button, progress and result. Everything else lives in the
-  **Settings dialog** behind the gear button: language, updates, model and data folders, repair, About. The whole content sits in a scroll area, so the window fits small screens.
+  **Settings dialog** behind the gear button: language, updates, model and data folders, repair, model preload, About. The whole content sits in a scroll area, so the window fits small screens.
 * Windows 11 gets an Acrylic backdrop (`platform_win`) under a **strong dark tint**; panels and controls are solid and all text colours are opaque. The palette constants
   (`TEXT`, `TEXT_MUTED`, `CARD_GLASS`, ...) and `CONTRAST_PAIRS` live at the top of `ui/main_window.py`; `tests/test_ui.py::test_theme_contrast` checks WCAG AA (>= 4.5:1),
   also for the glass tint over a white backdrop. Without Acrylic the plain palette (`ROOT_PLAIN`, `CARD_PLAIN`) is used.

@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (QApplication, QLabel, QProgressBar, QPushButton, 
 from core import i18n
 from core.i18n import tr
 from core.voice_library import VoiceLibrary
-from infra import hard_exit
+from infra import hard_exit, preload
 from ui.main_window import APP_TITLE, MainWindow
 from ui.narrate_window import NarrateWindow
 from ui.settings_dialog import SettingsDialog
@@ -90,6 +90,8 @@ class StudioWindow(SubWindow):
         self._settings: Optional[SettingsDialog] = None
         self._about = None
         self._shutting_down = False
+        # Optional "Preload models into memory at startup" (Settings, off by default): ticked by the timer below.
+        self.preloader = preload.Preloader(self._preload_voice)
         self._build()
         self.trainer.enable_studio_nav()
         self.apply_theme_to_children()
@@ -189,6 +191,16 @@ class StudioWindow(SubWindow):
                                    tr("studio.voices_count", n=n) if n else "")
         self.progress.setVisible(self.progress.value() > 0 and (training or self.trainer.updating
                                                                  or self.trainer.repairing))
+        self.preloader.tick(busy=self.busy or self.trainer.updating or self.trainer.repairing)
+
+    def _preload_voice(self) -> Any:
+        """The voice selected in the narrator (its base model is what Narrate will load), else the first installed voice."""
+        vid = self.narrate_window.selected_voice_id()
+        voice = self.library.get(vid) if vid else None
+        if voice is None:
+            voices = self.library.list_voices()
+            voice = voices[0] if voices else None
+        return voice
 
     @property
     def busy(self) -> bool:
@@ -308,6 +320,7 @@ class StudioWindow(SubWindow):
         dlg = self.settings_dialog()
         dlg.setStyleSheet(self.styleSheet())
         dlg.refresh()
+        dlg.refresh_preload()                  # RAM and installed models may have changed since the dialog was built
         if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
             dlg.show()
             return
@@ -320,6 +333,7 @@ class StudioWindow(SubWindow):
             return
         self._shutting_down = True
         self._timer.stop()
+        self.preloader.free("exit")
         self.narrate_window.shutdown()
         self.voices_window.shutdown()
         self.trainer.close()

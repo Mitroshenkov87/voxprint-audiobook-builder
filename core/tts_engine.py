@@ -17,7 +17,7 @@ from typing import Callable, List, Optional, Sequence
 
 import numpy as np
 
-from core import cpu_budget
+from core import cpu_budget, model_cache
 from core.errors import NarrationError
 from core.events import ProgressCallback, Stage, noop_progress
 from core.i18n import tr
@@ -106,9 +106,22 @@ class Qwen3AdapterEngine:
         torch.set_num_threads(cpu_budget.plan(use_cuda).torch_threads)
         self._q = None
         self.attn = ""
+        # "Preload models at startup" (infra/preload.py) may hold this base model in RAM already: take it over instead of
+        # reading it from disk again (it was loaded on the CPU in the right dtype; only the move to the GPU is left).
+        pre = model_cache.take(model_cache.key("tts", base_dir, use_cuda)) if attn == "auto" else None
+        if pre is not None:
+            try:
+                self._q, self.attn = (model_cache.to_device(pre[0], "cuda:0") if use_cuda else pre[0]), pre[1]
+                log.info("using the preloaded base model (%s)", self.attn)
+            except Exception:  # noqa: BLE001 - e.g. out of VRAM while moving: load normally below
+                log.warning("the preloaded model could not be used; loading it again", exc_info=True)
+                self._q = None
+            pre = None
+            if self._q is None and use_cuda:
+                torch.cuda.empty_cache()         # whatever had already been moved before the failure
         # Attention backend: flash-attn 2 (if installed) > SDPA (PyTorch fused kernels) > eager.  Every step falls back to the
         # next one if the model refuses to load with it, so an unusual GPU/driver never blocks narration.
-        for impl in _attn_candidates(attn, use_cuda):
+        for impl in ([] if self._q is not None else _attn_candidates(attn, use_cuda)):
             try:
                 self._q = Qwen3TTSModel.from_pretrained(str(base_dir), device_map="cuda:0" if use_cuda else None, dtype=dtype,
                                                         attn_implementation=impl)

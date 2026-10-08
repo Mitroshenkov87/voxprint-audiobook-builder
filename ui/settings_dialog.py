@@ -9,6 +9,7 @@ The main window only keeps "choose audio / choose text / create voice".  Service
   again: :mod:`infra.auto_repair`),
 * backup / restore of the models and voices to any folder or drive, and the "existing models folder" that is imported
   before anything is downloaded (:mod:`infra.backup`, :mod:`infra.existing_models`),
+* "Preload models into memory at startup" (:mod:`infra.preload`; off by default, offered only with enough RAM),
 * "About".
 
 The dialog owns no business logic.  Every button calls back into the :class:`ui.main_window.MainWindow` that created
@@ -26,7 +27,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QHBox
 from core import i18n
 from core.errors import BackupError
 from core.i18n import tr
-from infra import backup, existing_models, modules as runtime_modules, netroute
+from infra import backup, existing_models, modules as runtime_modules, netroute, preload, sysinfo
 from workers import backup_runner
 from workers.auto_repair_worker import AutoRepairWorker
 from workers.backup_worker import BackupWorker
@@ -79,6 +80,19 @@ class SettingsDialog(QDialog):
         lay.addLayout(nrow)
         self._fill_net()
         self.cmb_net.currentIndexChanged.connect(self._on_net_changed)
+
+        # --- preload models into RAM at startup: checkbox + whether this PC has the memory for it (infra/preload.py) ---
+        self.memory: Callable[[], tuple] = sysinfo.memory                       # injectable (tests)
+        self.preload_targets: Callable[[str, bool], list] = preload.find_targets
+        prow = QHBoxLayout()
+        self.chk_preload = QCheckBox()
+        self.lbl_preload = QLabel()
+        self.lbl_preload.setObjectName("cardnote")
+        self.lbl_preload.setWordWrap(True)
+        prow.addWidget(self.chk_preload)
+        prow.addWidget(self.lbl_preload, 1)
+        lay.addLayout(prow)
+        self.chk_preload.toggled.connect(self._on_preload_toggled)
 
         # --- service buttons ---
         self.btn_update = QPushButton()
@@ -212,6 +226,54 @@ class SettingsDialog(QDialog):
         self.btn_existing.setText(tr("existing.choose"))
         self.btn_existing_clear.setText(tr("existing.clear"))
         self._render_existing()
+        self.chk_preload.setText(tr("preload.option"))
+        self.refresh_preload()
+
+    # ------------------------------------------------------------------ preload models at startup
+    def preload_availability(self) -> preload.Availability:
+        """What preloading would need on this PC right now (installed models of the current voice, RAM)."""
+        pre = getattr(self._win, "preloader", None)
+        voice = pre.voice_fn() if pre is not None else None
+        try:
+            targets = self.preload_targets(getattr(voice, "base_model", "") or "", preload.cuda_likely())
+        except Exception:  # noqa: BLE001 - a broken models folder must not break the dialog
+            log.warning("could not list the models to preload", exc_info=True)
+            targets = []
+        total, available = self.memory()
+        return preload.availability(targets, total, available, pre.held_bytes() if pre is not None else 0)
+
+    def refresh_preload(self) -> None:
+        """Checkbox state and the availability note next to it."""
+        av = self.preload_availability()
+        need, total = preload.gb(av.need, up=True), preload.gb(av.total)
+        if av.status == preload.OK:
+            note = tr("preload.available", total=total)
+        elif av.status == preload.TOO_SMALL:
+            note = tr("preload.too_small", need=need, total=total)
+        elif av.status == preload.LOW_NOW:
+            note = tr("preload.low_now", free=preload.gb(av.available), need=preload.gb(av.models, up=True))
+        elif av.status == preload.NOTHING:
+            note = tr("preload.no_models")
+        else:
+            note = tr("preload.unknown")
+        on = preload.enabled()
+        self.chk_preload.blockSignals(True)
+        self.chk_preload.setChecked(on)
+        self.chk_preload.setEnabled(av.offered or on)        # a ticked box can always be unticked
+        self.chk_preload.blockSignals(False)
+        self.lbl_preload.setText(note)
+        tip = tr("preload.tip", need=need)
+        self.chk_preload.setToolTip(tip)
+        self.lbl_preload.setToolTip(tip)
+
+    def _on_preload_toggled(self, on: bool) -> None:
+        """Remember the choice; unticking frees the preloaded models at once."""
+        pre = getattr(self._win, "preloader", None)
+        if pre is not None:
+            pre.set_enabled(on)
+        else:
+            preload.set_enabled(on)
+        self.refresh_preload()
 
     # ------------------------------------------------------------------ runtime modules (thin build)
     def open_components(self) -> None:

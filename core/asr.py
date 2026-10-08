@@ -59,7 +59,13 @@ class Qwen3ASR(BaseASR):
         import torch
         from qwen_asr import Qwen3ASRModel
 
+        from core import model_cache
+
         cuda = torch.cuda.is_available() and self.device in ("auto", "cuda")
+        pre = model_cache.take(model_cache.key("asr", self.model_path, cuda))      # "Preload models at startup"
+        if pre is not None:
+            self._m = model_cache.to_device(pre, "cuda:0") if cuda else pre
+            return
         self._m = Qwen3ASRModel.from_pretrained(self.model_path, dtype=torch.bfloat16 if cuda else torch.float32,
                                                 device_map="cuda:0" if cuda else "cpu")
 

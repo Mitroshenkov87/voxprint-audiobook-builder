@@ -310,9 +310,15 @@ class SageEngine:
         import torch
         from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-        self._tok = AutoTokenizer.from_pretrained(str(self.model_dir))
-        model = AutoModelForSeq2SeqLM.from_pretrained(str(self.model_dir))
+        from core import model_cache
+
         dev = self.device or ("cuda" if torch.cuda.is_available() else "cpu")
+        pre = model_cache.take(model_cache.key("sage", self.model_dir, dev.startswith("cuda")))   # "Preload models at startup"
+        if pre is not None:
+            self._tok, model = pre
+        else:
+            self._tok = AutoTokenizer.from_pretrained(str(self.model_dir))
+            model = AutoModelForSeq2SeqLM.from_pretrained(str(self.model_dir))
         self._model = model.to(dev).eval()
 
     def correct(self, texts: Sequence[str]) -> List[str]:

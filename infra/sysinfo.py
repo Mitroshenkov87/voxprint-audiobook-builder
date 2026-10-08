@@ -69,3 +69,21 @@ def memory() -> tuple:
         pass
     return 0, 0
 
+
+def lower_thread_priority() -> bool:
+    """Make the CALLING thread low-priority (background loading must not slow down the UI); False if not possible.
+
+    Linux applies nice values per thread (the native thread id works with ``setpriority``); Windows has thread priorities.
+    """
+    try:
+        if sys.platform == "win32":
+            import ctypes
+
+            k32 = ctypes.windll.kernel32                                # type: ignore[attr-defined]
+            return bool(k32.SetThreadPriority(k32.GetCurrentThread(), -2))      # THREAD_PRIORITY_LOWEST
+        import threading
+
+        os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), 10)
+        return True
+    except Exception:  # noqa: BLE001 - macOS without per-thread nice, missing permissions ...
+        return False
