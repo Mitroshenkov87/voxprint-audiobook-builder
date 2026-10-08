@@ -3,8 +3,9 @@
 
 Toolchain: Markdown -> HTML (python-markdown) -> PDF (WeasyPrint).  Needs: pip install markdown weasyprint pillow
   * ``{{key}}``  in the sources is replaced by the UI string ``key`` of locales/<lang>.json (exactly as in the app);
-  * ``![caption](@name)`` is a screenshot: img/<lang>/name.png, falling back to img/en/name.png (noted in the caption);
-    ``@narrate_top`` / ``@narrate_bottom`` are the two halves of the tall Narrate screenshot.
+  * ``{{en:key}}`` is the English UI string ``key`` (used by the ru/de manuals to name what the English screenshots show);
+  * ``![caption](@name)`` is a screenshot: img/<lang>/name.png, then img/en/name.png, then the English screenshot of the
+    current build in docs/screenshots/en-667/ (see :data:`SHOTS`); a non-localized picture is noted in the caption.
 Two themes per language (same content): ``Voxprint-Manual-<lang>.pdf`` = DARK (default, full-bleed near-black pages) and
 ``Voxprint-Manual-<lang>-print.pdf`` = LIGHT for printing.  The logo (mark + wordmark) is generated here as SVG - no external assets.
 Contrast of every text/background pair of both palettes is checked (WCAG, see :func:`check_contrast`) before building.
@@ -22,13 +23,13 @@ ROOT = HERE.parent.parent
 LANGS = ("en", "ru", "de")
 META = {
     "en": dict(title="Voxprint AI Audiobook Builder", sub="User manual", contents="Contents", page="Page",
-               ver="Version 0.1.0 (beta) · manual of 3 October 2026", fallback=" (screenshot of the English interface)",
+               ver="Version 0.1.3 (beta) · build 667 “Menuchah” · manual of 9 October 2026", fallback=" (screenshot of the English interface)",
                fig="Figure", html="en"),
     "ru": dict(title="Voxprint AI Audiobook Builder", sub="Руководство пользователя", contents="Содержание", page="Стр.",
-               ver="Версия 0.1.0 (бета) · руководство от 3 октября 2026 г.", fallback=" (снимок английского интерфейса)",
+               ver="Версия 0.1.3 (бета) · сборка 667 «Menuchah» · руководство от 9 октября 2026 г.", fallback=" (снимок английского интерфейса)",
                fig="Рис.", html="ru"),
     "de": dict(title="Voxprint AI Audiobook Builder", sub="Benutzerhandbuch", contents="Inhalt", page="Seite",
-               ver="Version 0.1.0 (Beta) · Handbuch vom 3. Oktober 2026", fallback=" (Screenshot der englischen Oberfläche)",
+               ver="Version 0.1.3 (Beta) · Build 667 „Menuchah“ · Handbuch vom 9. Oktober 2026", fallback=" (Screenshot der englischen Oberfläche)",
                fig="Abb.", html="de"),
 }
 
@@ -113,31 +114,29 @@ def page_css(theme: str) -> str:
             f'@page :first {{ margin: 0; background: {t["cover_bg"]}; @bottom-center {{ content: none; }}'
             f' @top-left {{ content: none; }} @top-right {{ content: none; }} }}')
 
-NARRATE_SPLIT = {"en": 940, "ru": 983, "de": 946}
-
-
-def make_crops(lang: str = "") -> None:
-    for l in LANGS:
-        src = HERE / "img" / l / "narrate.png"
-        if not src.exists():
-            continue
-        im = Image.open(src)
-        y = NARRATE_SPLIT[l]
-        im.crop((0, 0, im.width, y)).save(HERE / "build" / f"narrate_top_{l}.png")
-        im.crop((0, y, im.width, im.height)).save(HERE / "build" / f"narrate_bottom_{l}.png")
+#: English screenshots of build 667 (redacted: no personal paths or addresses), shared with README / FEATURES
+SHOT_DIR = ROOT / "docs" / "screenshots" / "en-667"
+SHOTS = {
+    "studio_home": "01-main-window",
+    "narrate_top": "02-narrate-book-top",
+    "narrate_bottom": "03-narrate-output-pauses-bottom",
+    "voices": "04-voice-library-boaz-tirzah",
+    "train_top": "05-train-voice-top",
+    "train_bottom": "06-train-voice-bottom",
+    "settings": "07-settings-pauses-speed-repair",
+    "repair_running": "08-check-and-repair-running",
+    "repair_done": "09-check-and-repair-finished",
+}
 
 
 def shot_path(name: str, lang: str):
-    """Return (relative path, is_fallback)."""
-    if name.startswith("narrate_top") or name.startswith("narrate_bottom"):
-        for l in (lang, "en"):
-            p = HERE / "build" / f"{name}_{l}.png"
-            if p.exists():
-                return p, l != lang
+    """Return (path, is_fallback): a localized picture first, then the English one."""
     for l in (lang, "en"):
         p = HERE / "img" / l / f"{name}.png"
         if p.exists():
             return p, l != lang
+    if name in SHOTS and (SHOT_DIR / f"{SHOTS[name]}.png").exists():
+        return SHOT_DIR / f"{SHOTS[name]}.png", lang != "en"
     raise FileNotFoundError(name)
 
 
@@ -147,21 +146,23 @@ CAPTIONS: list = []        # captions of the figures of the last rendering, in d
 def render(lang: str, out_dir: Path, theme: str = "dark", fig_h: int = 105, gap: float = 1.0, fig_over: dict = None) -> Path:
     m = META[lang]
     ui = json.loads((ROOT / "locales" / f"{lang}.json").read_text(encoding="utf-8"))
+    ui_en = json.loads((ROOT / "locales" / "en.json").read_text(encoding="utf-8"))
     src = (HERE / "src" / f"manual_{lang}.md").read_text(encoding="utf-8")
 
     def ui_sub(mo):
-        key = mo.group(1)
+        table = ui_en if mo.group(1) else ui
+        key = mo.group(2)
         plain = key.endswith("_plain")
         if plain:
             key = key[:-6]
-        if key not in ui:
+        if key not in table:
             raise KeyError(f"unknown UI key {key}")
-        v = ui[key].replace("\n", " ")
+        v = table[key].replace("\n", " ").replace("&&", "&")      # "&&" is Qt's escaped ampersand
         if plain:      # strings with {placeholders}: show an ellipsis instead of the value
             v = re.sub(r"\{[a-z_]+\}", "…", v)
         v = v.replace("&", "&amp;").replace("<", "&lt;")
         return f'<span class="ui">{v}</span>'
-    src = re.sub(r"\{\{([a-z_0-9.]+)\}\}", ui_sub, src)
+    src = re.sub(r"\{\{(en:)?([a-z_0-9.]+)\}\}", ui_sub, src)
 
     def img_sub(mo):
         cap, name = mo.group(1), mo.group(2)
@@ -288,7 +289,6 @@ def main() -> int:
     if bad:
         print("contrast check FAILED:", bad)
         return 1
-    make_crops("en")
     Path(a.out).mkdir(parents=True, exist_ok=True)
     for l in a.langs:
         if a.theme == "both" and not a.no_fit:

@@ -43,15 +43,22 @@ voice recording and a text file to ready output files you can load into a neural
 * Acrylic (glass) look on Windows 11 with a dark, high-contrast (WCAG AA) theme and a plain fallback.
 
 ## Screenshots
-Real screenshots of the current build on **Windows (RTX 4090 server, dark theme, English UI)**; Russian and German versions of the main windows are in [`docs/screenshots/ru/`](screenshots/ru) and [`docs/screenshots/de/`](screenshots/de).
+Real screenshots of build 667 "Menuchah" (0.1.3-beta) on **Windows 11 (RTX 4090, dark theme, English UI)**, in [`docs/screenshots/en-667/`](screenshots/en-667). Personal paths and network addresses are blurred. Older Russian and German screenshots (0.1.0) are in [`docs/screenshots/ru/`](screenshots/ru) and [`docs/screenshots/de/`](screenshots/de).
 
-| Studio | Train: presets and the no-transcript mode |
+| Studio | My voices: the bundled voices Boaz and Tirzah |
 |---|---|
-| <img src="screenshots/studio_home.png" width="300"> | <img src="screenshots/train_notranscript.png" width="330"> |
+| <img src="screenshots/en-667/01-main-window.png" width="330"> | <img src="screenshots/en-667/04-voice-library-boaz-tirzah.png" width="330"> |
 
-| Train: quick preview, compare two variants | Train: voice-owner consent after training | Settings |
+| Narrate: book, voice, text preparation | Narrate: output format, quality, pauses |
+|---|---|
+| <img src="screenshots/en-667/02-narrate-book-top.png" width="380"> | <img src="screenshots/en-667/03-narrate-output-pauses-bottom.png" width="380"> |
+
+| Train your voice (top) | Train your voice (bottom) |
+|---|---|
+| <img src="screenshots/en-667/05-train-voice-top.png" width="330"> | <img src="screenshots/en-667/06-train-voice-bottom.png" width="330"> |
+
+| Settings: pauses, reading speed, backup | Check and repair running | Check and repair finished |
 |---|---|---|
-| <img src="screenshots/train_preview.png" width="300"> | <img src="screenshots/train_consent.png" width="300"> | <img src="screenshots/settings.png" width="240"> |
+| <img src="screenshots/en-667/07-settings-pauses-speed-repair.png" width="250"> | <img src="screenshots/en-667/08-check-and-repair-running.png" width="250"> | <img src="screenshots/en-667/09-check-and-repair-finished.png" width="250"> |
 
-Russian: [`studio_home`](screenshots/ru/studio_home.png) · German: [`studio_home`](screenshots/de/studio_home.png)
-Screenshots that show voice lists are not included (they would show the maintainers' private voices); the voices window and the narration window with the mini player are described in the [User guide](USER-GUIDE.md) and [Voices](VOICES.md).
+Earlier screenshots (0.1.0): [quick preview, compare two variants](screenshots/train_preview.png) · [voice-owner consent after training](screenshots/train_consent.png) · [no-transcript mode](screenshots/train_notranscript.png).

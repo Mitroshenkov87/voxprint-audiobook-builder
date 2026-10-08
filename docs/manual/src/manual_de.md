@@ -5,11 +5,11 @@
 1. **Sie bringt einer Computerstimme bei, wie eine bestimmte Person zu klingen.** Sie geben eine Aufnahme einer Stimme (Ihrer eigenen oder der einer Person, die zugestimmt hat) – am besten 5 bis 15 Minuten – und, falls vorhanden, den gelesenen Text. Voxprint richtet Text und Ton aufeinander aus, schneidet die Aufnahme in saubere Stücke und trainiert ein kleines Stimm-Add-on (einen *Adapter*, technisch LoRA) für das Sprachmodell **Qwen3-TTS**.
 2. **Sie liest ganze Bücher mit dieser Stimme vor.** Sie wählen ein Buch (TXT, FB2 oder EPUB) und eine Stimme aus Ihrer Bibliothek und erhalten ein fertiges Hörbuch mit Kapiteln – eine Opus-Datei, eine MP3 pro Kapitel und so weiter.
 
-Es gibt keine Kommandozeile, keinen Browser und kein Benutzerkonto. Aufnahmen, Texte, Stimmen und Ergebnisse bleiben auf dem Computer. Das Programm geht nur ins Internet, um Modelle herunterzuladen, nach Updates zu suchen und – wenn Sie es verlangen – Stimmen aus dem Stimmen-Repository zu laden.
+Sie brauchen keine Kommandozeile, keinen Browser und kein Benutzerkonto (eine Kommandozeile gibt es für Skripte und Agenten – Kapitel 11). Aufnahmen, Texte, Stimmen und Ergebnisse bleiben auf dem Computer. Das Programm geht nur ins Internet, um Modelle herunterzuladen, nach Updates zu suchen und – wenn Sie es verlangen – Stimmen aus dem Stimmen-Repository zu laden.
 
-![Das Studio – der erste Bildschirm von Voxprint (dunkles Design, deutsche Oberfläche).](@studio_home)
+![Das Studio – der erste Bildschirm von Voxprint (Build 667).](@studio_home)
 
-> **Beta-Software.** Version 0.1.0 wurde auf einem Rechner (Windows mit NVIDIA RTX 4090) und mit im Wesentlichen einem Sprecher von Anfang bis Ende getestet. Rechnen Sie mit Ecken und Kanten; bewahren Sie eine Kopie Ihrer Aufnahmen und Stimmen auf (siehe „{{backup.title}}“ in Kapitel 8).
+> **Beta-Software.** Version 0.1.3 (Build 667 „Menuchah“) wurde auf einem Rechner (Windows 11 mit NVIDIA RTX 4090) und mit im Wesentlichen einem Sprecher von Anfang bis Ende getestet. Rechnen Sie mit Ecken und Kanten; bewahren Sie eine Kopie Ihrer Aufnahmen und Stimmen auf (siehe „{{backup.title}}“ in Kapitel 8).
 
 ## Was Sie brauchen
 
@@ -18,8 +18,8 @@ Es gibt keine Kommandozeile, keinen Browser und kein Benutzerkonto. Aufnahmen, T
 | Betriebssystem | Windows 11 24H2 (Build 26100), 64 Bit | Windows 11 26H2 |
 | Grafikkarte | NVIDIA mit etwa 6 GB Videospeicher (VRAM) | NVIDIA mit 16 GB VRAM oder mehr |
 | Ohne NVIDIA-Karte | Der Datensatz wird trotzdem erstellt; das Training läuft auf dem Prozessor und dauert viele Stunden (das Programm warnt Sie) | – |
-| Speicherplatz | etwa 17 GB (Modelle bis etwa 15 GB + Programm), plus etwa 4,2 GB für das optionale Universalmodell | eine SSD |
-| Internet | einmalig, um die Modelle herunterzuladen (bis etwa 15 GB; Spracherkennung 1.7B auf Grafikkarten ab 8 GB Grafikspeicher) | – |
+| Speicherplatz | etwa 30 GB für die Installationsart *Vollständig* (Modelle etwa 25 GB + Komponenten etwa 3 GB), plus etwa 4,2 GB für das optionale Universalmodell | eine SSD |
+| Internet | während der Installation (die Bibliotheken) und einmalig für die Modelle (zusammen etwa 28 GB bei *Vollständig*; Spracherkennung 1.7B auf Grafikkarten ab 8 GB Grafikspeicher) | – |
 
 ## So funktioniert es in fünf Schritten
 
@@ -29,21 +29,103 @@ Es gibt keine Kommandozeile, keinen Browser und kein Benutzerkonto. Aufnahmen, T
 4. Es trainiert auf Ihrer Grafikkarte einen kleinen Stimm-Adapter.
 5. Die Stimme erscheint unter **{{studio.voices_title}}**. Nun können Sie damit **{{studio.narrate_title}}**.
 
-> **Verwenden Sie Stimmen verantwortungsvoll.** Eine Stimme ist ein personenbezogenes Datum und ein Persönlichkeitsrecht ihres Inhabers. Verwenden Sie eine Stimme nur mit ausdrücklicher Erlaubnis der Person, der sie gehört, und im Rahmen der Lizenz der Stimme. Siehe Kapitel 11.
+> **Verwenden Sie Stimmen verantwortungsvoll.** Eine Stimme ist ein personenbezogenes Datum und ein Persönlichkeitsrecht ihres Inhabers. Verwenden Sie eine Stimme nur mit ausdrücklicher Erlaubnis der Person, der sie gehört, und im Rahmen der Lizenz der Stimme. Siehe Kapitel 12.
+
+## Screenshots und Bezeichnungen in der Oberfläche
+
+Alle Screenshots in diesem Handbuch stammen aus Build 667 mit **englischer** Oberfläche. Im Text heißen die Bedienelemente so wie in der deutschen Oberfläche. Wenn Sie auf einem Bild eine Beschriftung suchen, die Sie bei sich sehen, hilft diese Tabelle: links die Beschriftung auf dem Screenshot, rechts dieselbe in der deutschen Oberfläche (gleich lautende Beschriftungen sind weggelassen). Die Sprache stellen Sie unter „{{ui.settings_title}}“ → „{{ui.language}}“ um.
+
+| Auf dem Screenshot (englische Oberfläche) | In der deutschen Oberfläche |
+|---|---|
+| {{en:studio.narrate_title}} | {{studio.narrate_title}} |
+| {{en:studio.train_title}} | {{studio.train_title}} |
+| {{en:studio.voices_title}} | {{studio.voices_title}} |
+| {{en:studio.revoice_title}} | {{studio.revoice_title}} |
+| {{en:narr.choose_book}} | {{narr.choose_book}} |
+| {{en:narr.translate_title}} | {{narr.translate_title}} |
+| {{en:llm.title}} | {{llm.title}} |
+| {{en:llm.prepare}} | {{llm.prepare}} |
+| {{en:narr.prep_title}} | {{narr.prep_title}} |
+| {{en:narr.format}} | {{narr.format}} |
+| {{en:narr.quality}} | {{narr.quality}} |
+| {{en:narr.other_formats}} | {{narr.other_formats}} |
+| {{en:narr.pauses_enable}} | {{narr.pauses_enable}} |
+| {{en:narr.pauses}} | {{narr.pauses}} |
+| {{en:narr.advanced}} | {{narr.advanced}} |
+| {{en:narr.start}} | {{narr.start}} |
+| {{en:voices.import}} | {{voices.import}} |
+| {{en:voices.repo_button}} | {{voices.repo_button}} |
+| {{en:voices.remote_refresh}} | {{voices.remote_refresh}} |
+| {{en:voices.preview}} | {{voices.preview}} |
+| {{en:voices.narrate}} | {{voices.narrate}} |
+| {{en:voices.export}} | {{voices.export}} |
+| {{en:voices.open_folder}} | {{voices.open_folder}} |
+| {{en:voices.delete}} | {{voices.delete}} |
+| {{en:voices.remote_download}} | {{voices.remote_download}} |
+| {{en:ui.choose_audio}} | {{ui.choose_audio}} |
+| {{en:ui.choose_text}} | {{ui.choose_text}} |
+| {{en:asr.checkbox}} | {{asr.checkbox}} |
+| {{en:preset.label}} | {{preset.label}} |
+| {{en:preset.advanced}} | {{preset.advanced}} |
+| {{en:consent.title}} | {{consent.title}} |
+| {{en:ui.btn_lora}} | {{ui.btn_lora}} |
+| {{en:preview.button}} | {{preview.button}} |
+| {{en:preview.compare}} | {{preview.compare}} |
+| {{en:train.checks_options}} | {{train.checks_options}} |
+| {{en:ui.voice_more}} | {{ui.voice_more}} |
+| {{en:ui.btn_merge}} | {{ui.btn_merge}} |
+| {{en:ui.btn_dataset}} | {{ui.btn_dataset}} |
+| {{en:ui.settings_title}} | {{ui.settings_title}} |
+| {{en:ui.language}} | {{ui.language}} |
+| {{en:ui.transparency}} | {{ui.transparency}} |
+| {{en:ui.net_iface}} | {{ui.net_iface}} |
+| {{en:asrmodel.label}} | {{asrmodel.label}} |
+| {{en:preload.option}} | {{preload.option}} |
+| {{en:narrset.title}} | {{narrset.title}} |
+| {{en:narrset.comma}} | {{narrset.comma}} |
+| {{en:narrset.mid}} | {{narrset.mid}} |
+| {{en:narrset.sentence}} | {{narrset.sentence}} |
+| {{en:narrset.paragraph}} | {{narrset.paragraph}} |
+| {{en:narrset.chapter}} | {{narrset.chapter}} |
+| {{en:narrset.speed}} | {{narrset.speed}} |
+| {{en:narrset.style}} | {{narrset.style}} |
+| {{en:narrset.defaults}} | {{narrset.defaults}} |
+| {{en:ui.btn_update}} | {{ui.btn_update}} |
+| {{en:ui.settings_models_folder}} | {{ui.settings_models_folder}} |
+| {{en:ui.settings_data_folder}} | {{ui.settings_data_folder}} |
+| {{en:diag.button}} | {{diag.button}} |
+| {{en:modules.title}} | {{modules.title}} |
+| {{en:projects.title}} | {{projects.title}} |
+| {{en:backup.title}} | {{backup.title}} |
+| {{en:backup.include_models}} | {{backup.include_models}} |
+| {{en:backup.include_voices}} | {{backup.include_voices}} |
+| {{en:backup.link_models}} | {{backup.link_models}} |
+| {{en:backup.btn_backup}} | {{backup.btn_backup}} |
+| {{en:backup.btn_restore}} | {{backup.btn_restore}} |
+| {{en:existing.title}} | {{existing.title}} |
+| {{en:autorepair.title}} | {{autorepair.title}} |
+| {{en:backup.btn_restore_folder}} | {{backup.btn_restore_folder}} |
+| {{en:autorepair.button}} | {{autorepair.button}} |
+| {{en:autorepair.stop}} | {{autorepair.stop}} |
+| {{en:ui.about}} | {{ui.about}} |
 
 # Installation
 
 ## Das Installationsprogramm
 
-Starten Sie **Voxprint-Setup.exe** (Inno Setup, Installation für alle Benutzer des Rechners, etwa 1,8 GB, weil die PyTorch-Bibliotheken enthalten sind). Der Assistent ist auf Englisch, Russisch und Deutsch verfügbar. Nach der Seite für den Installationsordner gibt es eine optionale Seite **„Vorhandene Modelle (optional)“**: Wenn Sie bereits heruntergeladene Modelle einer früheren Installation oder aus einer Sicherung haben, wählen Sie diesen Ordner; sonst lassen Sie das Feld leer. Das Installationsprogramm kopiert nichts – es merkt sich nur den Ordner, und beim ersten Start importiert das Programm die Modelle von dort, statt sie herunterzuladen.
+Starten Sie **Voxprint-Setup-online.exe** (Inno Setup, Installation für alle Benutzer des Rechners, etwa 34 MB; Build 667 hat 35.235.971 Bytes und die SHA-256 `c145a9fc84c736d655fbbe9bfd5c1cc94794b1be7fb8e9a5eec293e6f1578e42`). Es ist ein *Online*-Installer: Die Bibliotheken (PyTorch und der Rest) werden während der Installation von PyTorch/PyPI geladen. Das Installationsprogramm ist nicht signiert, daher warnt Windows SmartScreen – wählen Sie *Weitere Informationen → Trotzdem ausführen* erst, wenn die SHA-256 mit der auf der Release-Seite übereinstimmt. Der Assistent ist auf Englisch, Russisch und Deutsch verfügbar; die dort gewählte Sprache wird zur Oberflächensprache des Programms.
 
-Stille Installation für Administratoren: `Voxprint-Setup.exe /VERYSILENT /ModelsDir="D:\old\models"`.
+Die Seite **„Installationsart“** bietet zwei Möglichkeiten. **Vollständig** (Standard) lädt beim ersten Start ohne weiteren Klick alles – die Komponenten und alle Modelle, etwa 28 GB; der Assistent zeigt die Gesamtgröße und prüft vorher den freien Platz. **Schnell** installiert nur das Programm; beim ersten Start öffnet sich das Fenster **{{modules.title}}**, das denselben vollständigen Download anbietet und ihn mit „Herunterladen“ startet. In keinem Modus wird etwas weggelassen.
+
+Nach der Seite für den Installationsordner gibt es eine optionale Seite **„Vorhandene Modelle (optional)“**: Wenn Sie bereits heruntergeladene Modelle einer früheren Installation oder aus einer Sicherung haben, wählen Sie diesen Ordner; sonst lassen Sie das Feld leer. Das Installationsprogramm kopiert nichts – es merkt sich nur den Ordner, und beim ersten Start importiert das Programm die Modelle von dort, statt sie herunterzuladen.
+
+Stille Installation für Administratoren: `Voxprint-Setup-online.exe /VERYSILENT /Mode=full /ModelsDir="D:\old\models"` (`/Mode=quick` für *Schnell*).
 
 > Wenn das Administratorkonto, das das Installationsprogramm ausführt, ein anderes ist als das Konto, mit dem Sie Voxprint benutzen, gehört der Datenordner dem Administrator. Legen Sie den Ordner mit vorhandenen Modellen dann später unter „{{ui.settings_title}}“ fest (Kapitel 8).
 
 ## Erster Start
 
-Beim ersten Start bereitet sich Voxprint vor. Mit dem Online-Installer öffnet sich das Fenster **{{modules.title}}** und arbeitet ohne Klick: Eine Zeile zeigt, was gerade geladen wird („{{modules.now_download}}“), danach die Prüfsummenprüfung, ein Balken den Gesamtfortschritt. Schritt 1 bringt die Programmkomponenten zusammen mit dem Textkorrektur-Modell SAGE und den Übersetzungsmodellen, Schritt 2 direkt danach ALLE Modelle (Stimme, Ausrichtung, Spracherkennung) in Ihren Modellordner. Sonst zeigt die Statuszeile „{{ui.prefetch_start}}“ und Voxprint lädt die benötigten Modelle (bis etwa 15 GB, einmalig). Ist Hugging Face langsam oder nicht erreichbar, wechselt Voxprint automatisch zum ModelScope-Spiegel. Der Download kann unterbrochen werden und läuft an der gleichen Stelle weiter. Modelle, die schon auf dem Computer liegen (zum Beispiel im Hugging-Face-Cache oder bei Alexandria/Pinokio), werden ohne erneuten Download nur lesend weiterverwendet.
+Beim ersten Start bereitet sich Voxprint vor. Mit dem Online-Installer öffnet sich das Fenster **{{modules.title}}** und arbeitet ohne Klick: Eine Zeile zeigt, was gerade geladen wird („{{modules.now_download}}“), danach die Prüfsummenprüfung, ein Balken den Gesamtfortschritt. Schritt 1 bringt die Programmkomponenten zusammen mit dem Textkorrektur-Modell SAGE und den Übersetzungsmodellen, Schritt 2 direkt danach ALLE Modelle (Stimme, Ausrichtung, Spracherkennung) in Ihren Modellordner. Sonst zeigt die Statuszeile „{{ui.prefetch_start}}“ und Voxprint lädt die benötigten Modelle (bis etwa 15 GB, einmalig). Ist Hugging Face langsam oder nicht erreichbar, wechselt Voxprint automatisch zum ModelScope-Spiegel. Der Download kann unterbrochen werden und läuft an der gleichen Stelle weiter. Modelle, die schon auf dem Computer liegen (zum Beispiel im Hugging-Face-Cache oder bei Alexandria/Pinokio), werden ohne erneuten Download nur lesend weiterverwendet. Die beiden mitgelieferten Stimmen *Boaz* und *Tirzah* (Kapitel 7) gehören zu diesem Download.
 
 Ist alles fertig, zeigt die Statuszeile „{{ui.prefetch_done}}“ Beim ersten Start erscheint ein Datenschutzhinweis; eine kurze Erinnerung („{{ui.footer_privacy}}“) bleibt am unteren Rand der Fenster.
 
@@ -52,8 +134,8 @@ Ist alles fertig, zeigt die Statuszeile „{{ui.prefetch_done}}“ Beim ersten S
 | Was | Wo |
 |---|---|
 | Programmdaten, Modelle, Protokolle, Stimmenbibliothek | `%LOCALAPPDATA%\Voxprint\` (`models\`, `logs\`, `voices\`, `state\`) |
-| Hörbücher | `Documents\Voxprint\Audiobooks` (änderbar unter „{{narr.advanced}}“ im Vertonungsfenster) |
-| Trainingsergebnisse | neben Ihrer Aufnahme: `<Name der Aufnahme>_Voxprint\dataset` und `output\<Stimmenname>` |
+| Projekte: Hörbücher, Stimmtrainings, Neu vertonen | der Projektordner `%LOCALAPPDATA%\Voxprint\Projects` mit `Audiobooks\<Buch>`, `Voices\<Stimmenname>_Voxprint` und `Re-voice`; eine Verknüpfung *Voxprint Projects* liegt in „Dokumente“. Änderbar unter **{{projects.title}}** in „{{ui.settings_title}}“. |
+| Trainingsergebnisse | `Projects\Voices\<Stimmenname>_Voxprint`: der `dataset` und der Adapter in `output\<Stimmenname>` |
 
 Den Modellordner und den Daten- und Protokollordner öffnen Sie mit Schaltflächen unter „{{ui.settings_title}}“.
 
@@ -65,7 +147,7 @@ Den Modellordner und den Daten- und Protokollordner öffnen Sie mit Schaltfläch
 
 # Das Studio (Startbildschirm)
 
-Das Studio ist das erste Fenster. Es hat keine eigenen Einstellungen – es ist ein Menü aus drei großen Karten und einem Zahnrad.
+Das Studio ist das erste Fenster. Es hat keine eigenen Einstellungen – es ist ein Menü aus vier großen Karten und einem Zahnrad.
 
 ![Das Studio.](@studio_home)
 
@@ -74,7 +156,8 @@ Das Studio ist das erste Fenster. Es hat keine eigenen Einstellungen – es ist 
 | Titel und Untertitel | „Voxprint AI Audiobook Builder – {{studio.tagline}}“. Nur zur Information. |
 | Karte **{{studio.narrate_title}}** | {{studio.narrate_desc}} Öffnet das Vertonungsfenster. Das ist die Hauptkarte. Ist die Bibliothek leer, steht auf der Karte: „{{studio.narrate_no_voice}}“ Während ein Buch vertont wird, steht dort „{{studio.narrate_running}}“ |
 | Karte **{{studio.train_title}}** | {{studio.train_desc}} Öffnet das Trainingsfenster. Während des Trainings steht dort „{{studio.train_running}}“ |
-| Karte **{{studio.voices_title}}** | {{studio.voices_desc}} Unten auf der Karte zeigt ein Zähler, wie viele Stimmen Sie haben (zum Beispiel „Stimmen in der Bibliothek: 3“). |
+| Karte **{{studio.voices_title}}** | {{studio.voices_desc}} Unten auf der Karte zeigt ein Zähler, wie viele Stimmen Sie haben (zum Beispiel „Stimmen in der Bibliothek: 2“ – die beiden mitgelieferten Stimmen). |
+| Karte **{{studio.revoice_title}}** | {{studio.revoice_desc}} |
 | Zahnrad (oben rechts) | Öffnet **{{ui.settings_title}}** (Kapitel 8). |
 | Hinweis unten | „{{ui.footer_privacy}}“ |
 
@@ -84,7 +167,7 @@ Jedes andere Fenster hat oben links eine Schaltfläche **{{nav.back}}**, die Sie
 
 Öffnen Sie dieses Fenster über die Karte **{{studio.narrate_title}}**. {{narr.intro}}
 
-![Das Vertonungsfenster, obere Hälfte: Buch, Stimme und Textvorbereitung (Demonstrationsstimme).](@narrate_top)
+![Das Vertonungsfenster, obere Hälfte: Buch, Stimme (die mitgelieferte Stimme Boaz), Textvorbereitung, Übersetzung und das optionale KI-Textmodell.](@narrate_top)
 
 ## Schritt 1 – das Buch
 
@@ -99,7 +182,7 @@ Lässt sich die Datei nicht öffnen, erscheint eine Meldung wie „{{err.book_un
 
 Die Auswahlliste unter **{{narr.voice}}** zeigt die Stimmen Ihrer Bibliothek. Online-Stimmen, die noch nicht installiert sind, erscheinen als „<Name> (herunterladen, <Größe>)“; sie werden beim Start automatisch geladen und geprüft. Unter der Liste zeigt ein farbiges **Lizenz-Badge**, was Sie mit dem Ergebnis tun dürfen (siehe Kapitel 7 und das Glossar in Kapitel 9):
 
-* grün – kommerzielle Nutzung erlaubt (zum Beispiel „CC-BY-4.0 · kommerzielle Nutzung erlaubt“ und „Kommerziell“);
+* grün – kommerzielle Nutzung erlaubt (zum Beispiel „CC0-1.0 · kommerzielle Nutzung erlaubt“ und „Kommerziell“ bei den mitgelieferten Stimmen);
 * bernsteinfarben – eingeschränkt („Nur persönliche Nutzung · …“, „Nur privat“, „Öffentlich, nichtkommerziell“).
 
 Unter dem Badge wiederholt ein Hinweis die Einschränkung, zum Beispiel: „{{narr.voice_personal_note}}“ Haben Sie noch gar keine Stimmen, sagt das Fenster „{{narr.no_voice}}“ und bietet die Schaltflächen **{{studio.train_title}}** und **{{studio.voices_title}}** an.
@@ -130,9 +213,15 @@ Die Karte **{{narr.translate_title}}** hat ein Kontrollkästchen (*{{narr.transl
 * *{{narr.translate_note}}*
 * Maschinelle Übersetzung ist keine menschliche Übersetzung: Namen, Redewendungen, Zeiten und Geschlecht können falsch sein; kurze Überschriften leiden am meisten. Gedichte verlieren den Reim.
 
+### Optional – das KI-Textmodell
+
+Die Karte **{{llm.title}}** gehört zum optionalen Textmodell Gemma 4 12B (etwa 7 GB mit der llama.cpp-Laufzeit; es wird von der Installationsart *Vollständig* oder mit `voxprint models download llm` geladen). Ist es installiert, steht auf der Karte „{{llm.ready}}“ Sie bietet zwei Kontrollkästchen: „{{llm.literary}}“ und „{{llm.prepare}}“. „{{llm.note}}“ **{{llm.prompts}}** öffnet den Ordner mit den Anweisungen für das Modell; geänderte Dateien werden statt der eingebauten verwendet.
+
+> Bekanntes Problem in Build 667: Die beiden Kontrollkästchen dieser Karte reagieren möglicherweise nicht auf einen Klick, obwohl das Modell geladen ist. Die regelbasierte Textvorbereitung (Schritt 3) ist nicht betroffen. Das wird in einem der nächsten Builds behoben.
+
 ## Schritt 4 – Ausgabeformat und Qualität
 
-![Das Vertonungsfenster, untere Hälfte: Ausgabeformat, Qualität, Fortschritt und Mini-Player.](@narrate_bottom)
+![Das Vertonungsfenster, untere Hälfte: Textvorbereitung, Ausgabeformat, Qualität, exakte Pausen und die Start-Schaltfläche.](@narrate_bottom)
 
 **{{narr.format}}** – wählen Sie eines:
 
@@ -154,7 +243,15 @@ Bei M4B erscheint ein gelber Patenthinweis: „{{narr.aac_note}}“ Kurz gesagt:
 | {{narr.preset_standard}} | {{narr.preset_standard_d}} | 32 / 96 / 64 kbit/s | 14 / 43 / 29 MB |
 | {{narr.preset_high}} | {{narr.preset_high_d}} | 48 / 128 / 96 kbit/s | 22 / 58 / 43 MB |
 
-**{{narr.pauses}}** – ein Regler mit fünf Stufen, von *{{narr.pauses_1}}* über *{{narr.pauses_3}}* (Standard) bis *{{narr.pauses_5}}*. Voxprint schneidet den Text an jedem Komma, Satzende, jeder Auslassung, jedem Gedankenstrich, Absatz, Szenenwechsel und Kapitelende und fügt dort **Stille exakter Länge** ein, sodass die Pausen hörbar sind, egal wie das Stimmmodell den Text phrasiert. Bei *{{narr.pauses_3}}* folgen auf einen Satz 430 ms, auf einen Absatz 1,05 s und auf ein Kapitel 1,9 s – etwas länger als in früheren Versionen; jede Art hat ihre eigene Länge (Komma 240 ms, Auslassung 680 ms, Gedankenstrich 320 ms, Szenenwechsel 1,9 s), der Regler skaliert alle. Die Wahl wird gespeichert. Ändert man sie für ein bereits vertontes Buch, werden die gespeicherten Fragmente neu zusammengefügt statt erneut gesprochen, solange die Textteile gleich bleiben.
+**{{narr.pauses_enable}}** – standardmäßig aus. Eingeschaltet wird der Text zusätzlich an **jedem** Komma geschnitten und dort Stille exakter Länge eingefügt; die Pausen sind am deutlichsten, aber die Stimme kann kurze Wörter verschlucken. Nur dann ist der Regler **{{narr.pauses}}** aktiv: fünf Stufen von *{{narr.pauses_1}}* über *{{narr.pauses_3}}* (Standard) bis *{{narr.pauses_5}}*; bei *{{narr.pauses_3}}* folgen auf einen Satz 430 ms und auf einen Absatz 1050 ms, und der Regler skaliert jede Art von Pause. Ändert man ihn für ein bereits vertontes Buch, werden die gespeicherten Fragmente neu zusammengefügt statt erneut gesprochen, solange die Textteile gleich bleiben.
+
+**{{narr.check_chunks}}** – standardmäßig aus. Nach der Synthese wird jedes Fragment per Spracherkennung nachgehört; Fragmente, die Wörter auslassen oder wiederholen, werden neu erzeugt.
+
+### Pausen und Lesetempo
+
+Seit Version 0.1.3 folgt jede Vertonung der Zeichensetzung und der Gliederung des Textes – auch ohne das Häkchen oben. Voxprint schneidet den Text satzweise und an starken Übergängen innerhalb eines Satzes (Gedankenstrich, Doppelpunkt, Semikolon, ein Komma vor „und“ / „aber“), schneidet bei jedem gesprochenen Stück die eigene Stille ab und fügt Stille exakter Länge ein: Komma 0,25 s, starke Grenze 0,40 s, Satz 0,60 s, Absatz oder Vers 1,00 s, Kapiteltitel, Kapitelende oder Szenenwechsel 2,00 s. Einfache Kommas bleiben innerhalb eines Stücks, und kein Stück ist kürzer als 20 Zeichen, damit die Stimme keine Wörter verschluckt.
+
+Das **Lesetempo passt sich dem Text an**: Lange, kommareiche und beschreibende Sätze sowie bibelartige Texte werden etwas langsamer gelesen, Dialoge und kurze Zeilen im eigenen Tempo der Stimme. Die fünf Pausenlängen, ein globales **{{narrset.speed}}** (70–130 %) und der **{{narrset.style}}** („{{narrset.style_auto}}“, „{{narrset.style_scripture}}“, „{{narrset.style_fiction}}“, „{{narrset.style_dialogue}}“) werden unter „{{ui.settings_title}}“ → **{{narrset.title}}** (Kapitel 8) eingestellt und gelten ab der nächsten Vertonung. Das Tempo wird nach der Synthese per Zeitdehnung mit erhaltener Tonhöhe angewendet; Änderungen an Pausen oder Tempo sprechen fertige Fragmente daher nie neu – der nächste Lauf fügt sie nur neu zusammen.
 
 **▸ {{narr.advanced}}** (eingeklappt) enthält: die genauen Bitraten je Format (ändern Sie eine, wird die Qualität „benutzerdefiniert“: keine Schaltfläche ist hervorgehoben); **{{narr.choose_folder}}** – den Ordner, in dem das Hörbuch abgelegt wird; das Kontrollkästchen **{{narr.speak_titles}}**; und das schreibgeschützte Feld „{{narr.sample}}“, das zeigt, wie der erste geänderte Absatz nach der Vorbereitung aussieht.
 
@@ -204,7 +301,7 @@ Weitere Hinweise aus dem Skript: Gefühle müssen nicht gespielt werden – es g
 
 Öffnen Sie es über die Karte **{{studio.train_title}}**. {{ui.subtitle}}
 
-![Das Trainingsfenster mit eingeschaltetem Modus „kein Text“ (englische Oberfläche).](@train_notranscript)
+![Das Trainingsfenster, oberer Teil: Audio und Text, Trainingsqualität, Einverständnis und die Hauptschaltfläche.](@train_top)
 
 | Bedienelement | Was es tut und wann Sie es benutzen |
 |---|---|
@@ -216,8 +313,8 @@ Weitere Hinweise aus dem Skript: Gefühle müssen nicht gespielt werden – es g
 | **{{consent.title}}** | Wie die Erlaubnis des Stimminhabers festgehalten wird: siehe Abschnitt 6.6. |
 | **{{ui.btn_lora}}** | Die Hauptschaltfläche: richtet die Aufnahme aus, schneidet sie, trainiert die Stimme und legt sie in Ihrer Bibliothek ab. |
 | **{{preview.button}}** und Kontrollkästchen **{{preview.compare}}** | Ein schneller Hör- und Vergleichstest vor dem langen Lauf: Abschnitt 6.5. |
-| Kontrollkästchen „{{check.checkbox}}“ | Nach dem Training lässt Voxprint die neue Stimme einen Testsatz sprechen und prüft Tonhöhe und Verständlichkeit automatisch. Eingeschaltet lassen. |
-| Auswahl des Stimmtyps | Optional: „{{ui.voice_type_male}}“, „{{ui.voice_type_female}}“, „{{ui.voice_type_child}}“, „{{ui.voice_type_other}}“ oder „{{ui.voice_type_none}}“. Wird in voice.json gespeichert und an den Ordnernamen der trainierten Stimme angehängt (`anna_male`, `anna_female`, `anna_unspecified`). Das Programm schlägt männlich oder weiblich anhand der Tonhöhe Ihrer Aufnahme vor; ändern Sie es, falls es nicht stimmt. Ältere Stimmen ohne Typ erscheinen als „{{ui.voice_type_none}}“. |
+| ▸ **{{train.checks_options}}** – Kontrollkästchen „{{check.checkbox}}“ | Nach dem Training lässt Voxprint die neue Stimme einen Testsatz sprechen und prüft Tonhöhe und Verständlichkeit automatisch. Eingeschaltet lassen. |
+| „{{ui.voice_gender_none}}“ und „{{ui.voice_age_none}}“, ▸ **{{ui.voice_more}}** | Optionale Angaben zur Stimme. Das Geschlecht („{{ui.voice_type_male}}“, „{{ui.voice_type_female}}“, „{{ui.voice_type_child}}“, „{{ui.voice_type_other}}“) wird in voice.json gespeichert und an den Ordnernamen der trainierten Stimme angehängt (`anna_male`, `anna_female`, `anna_unspecified`). Das Programm schlägt männlich oder weiblich anhand der Tonhöhe Ihrer Aufnahme vor; ändern Sie es, falls es nicht stimmt. „{{ui.voice_more}}“ enthält weitere optionale Felder für voice.json. |
 | Beschreibungsfeld | „{{ui.voice_desc_placeholder}}“ |
 | **{{ui.btn_merge}}** | Führt den trainierten Adapter zu einem eigenständigen Modellordner zusammen, der in jeder App mit Qwen3-TTS funktioniert (Abschnitt 6.7). |
 | **{{ui.btn_dataset}}** | Bereitet nur den Datensatz vor (ausgerichtete und geschnittene Clips), ohne Training. Nützlich, wenn Sie woanders trainieren wollen. |
@@ -225,9 +322,11 @@ Weitere Hinweise aus dem Skript: Gefühle müssen nicht gespielt werden – es g
 | Statuszeile | Zu Beginn: „{{ui.status_idle}}“ |
 | Zahnrad (oben rechts) | Öffnet „{{ui.settings_title}}“. |
 
-Ist der Auftrag beendet, zeigt die Statuszeile „{{ui.voice_registered}}“ und eine Schaltfläche **{{ui.open_folder}}** erscheint. Der Adapterordner ist `…\output\<Stimmenname>` (einige zehn MB); der Datensatz liegt in `…\<Name der Aufnahme>_Voxprint\dataset`.
+![Das Trainingsfenster, unterer Teil: schnelle Vorschau, Name und Beschreibung, Geschlecht und Alter, Universalmodell, Datensatz und die Fortschrittsstufen.](@train_bottom)
 
-Im Standardmodus (mit Text) stehen die beiden Schaltflächen **{{ui.choose_audio}}** und **{{ui.choose_text}}** untereinander, jeweils mit dem Namen der gewählten Datei, und der Block „kein Text“ mit der Warnung ist ausgeblendet. *(Für diesen Standardzustand gibt es keinen eigenen Screenshot; das Bild oben zeigt den Modus „kein Text“, der alle übrigen Bedienelemente enthält.)*
+Ist der Auftrag beendet, zeigt die Statuszeile „{{ui.voice_registered}}“ und eine Schaltfläche **{{ui.open_folder}}** erscheint. Der Trainingsordner ist `Projects\Voices\<Stimmenname>_Voxprint` im Projektordner: der Datensatz liegt in `dataset`, der Adapter (einige zehn MB) in `output\<Stimmenname>`.
+
+Die Bilder zeigen den Standardmodus mit Text: **{{ui.choose_audio}}** und **{{ui.choose_text}}** untereinander, jeweils mit dem Namen der gewählten Datei. Das Kontrollkästchen „{{asr.checkbox}}“ schaltet in den Modus „nur Audio“ (Abschnitt 6.4): Die Textzeile wird zum optionalen Skript, und ein Block mit einer Warnung erscheint.
 
 ## Trainingsstufen
 
@@ -309,7 +408,7 @@ Der kleine Adapter (einige zehn MB) funktioniert nur in wenigen Apps (zum Beispi
 
 Öffnen Sie das Fenster über die Karte **{{studio.voices_title}}**. {{voices.intro}}
 
-![Meine Stimmen: drei Stimmenkarten (Demonstrationsstimmen) mit Lizenz- und Umfang-Badges.](@voices)
+![Meine Stimmen: die mitgelieferten Stimmen Boaz und Tirzah (CC0-1.0, schreibgeschützt) und die noch nicht geladene Offene Universalstimme.](@voices)
 
 Jede Stimme ist eine Karte:
 
@@ -320,8 +419,10 @@ Jede Stimme ist eine Karte:
 | Beschreibung | Was der Autor geschrieben hat. Bei einer Stimme „nur zum Testen“ steht zusätzlich eine Warnung. |
 | **{{voices.preview}}** | Spielt eine kurze Probe der Stimme. **{{voices.stop}}** hält sie an. Hat die Stimme keine Probe: „{{voices.no_preview}}“ |
 | **{{voices.narrate}}** | Öffnet das Vertonungsfenster mit bereits gewählter Stimme. |
-| **{{voices.edit}}** | Öffnet „{{voices.edit_title}}“: {{voices.field_name}}, {{voices.field_author}}, {{voices.field_license}}, {{voices.field_type}}, {{voices.field_description}}. Drücken Sie **{{voices.save}}**. |
-| **{{voices.delete}}** | Löscht die Stimme nach Rückfrage von diesem Computer: „{{voices.delete_confirm_plain}}“ |
+| **{{voices.edit}}** | Öffnet „{{voices.edit_title}}“: {{voices.field_name}}, {{voices.field_author}}, {{voices.field_license}}, {{voices.field_gender_age}}, {{voices.field_description}}. Drücken Sie **{{voices.save}}**. |
+| **{{voices.export}}** | Speichert die Stimme für einen anderen Computer: „{{voices.export_small_plain}}“ (die trainierte Stimme; ein anderes Voxprint importiert sie in einer Sekunde) oder „{{voices.export_full_plain}}“ (das Universalmodell). |
+| **{{voices.open_folder}}** | Öffnet den Ordner der Stimme. |
+| **{{voices.delete}}** | Löscht die Stimme nach Rückfrage von diesem Computer: „{{voices.delete_confirm_plain}}“ Mitgelieferte Stimmen sind schreibgeschützt: **{{voices.edit}}** und **{{voices.delete}}** sind ausgegraut („{{voices.bundled_tip}}“). |
 
 Die Fußzeile des Fensters wiederholt: „{{voices.rights_note}}“
 
@@ -329,7 +430,7 @@ Ist die Bibliothek leer, sagt das Fenster „{{voices.empty}}“ und bietet **{{
 
 ## Online-Stimmen und das Stimmen-Repository
 
-![Stimmen, die online verfügbar, aber noch nicht installiert sind, haben eine Schaltfläche „Herunterladen“ (Demonstrationsdaten; englische Oberfläche).](@voices_online)
+Die dritte Karte im Bild oben, die *Offene Universalstimme*, ist so eine Online-Stimme: „{{voices.remote_state}}“ und eine Schaltfläche **{{voices.remote_download}}**.
 
 * Stimmen aus dem Online-Index erscheinen von selbst als Karten mit dem Zustand „{{voices.remote_state}}“, ihrer Lizenz, der Größe und einer Schaltfläche **{{voices.remote_download}}**. Der Download wird per SHA-256-Prüfsumme kontrolliert und kann fortgesetzt werden.
 * **{{voices.remote_refresh}}** lädt die Liste neu. Ohne Verbindung zeigt Voxprint die zuletzt bekannte Liste („{{voices.repo_offline}}“).
@@ -348,11 +449,12 @@ Ist die Bibliothek leer, sagt das Fenster „{{voices.empty}}“ und bietet **{{
 | custom/personal-only (Standard) | nicht erlaubt; Ergebnisse bleiben auf Ihrem Computer |
 | custom/test-use-only | nicht erlaubt; nur zum Testen, keine Veröffentlichung |
 
+* **Boaz** (männlich) und **Tirzah** (weiblich) – zwei offene **russische** Stimmen, die mit Voxprint kommen (Teil des Standard-Modelldownloads, jeweils etwa eine halbe Stunde Sprache). Sie sind nur mit gemeinfreien LibriVox-Aufnahmen trainiert: Boaz mit *Аграфена (Agrafena)* von Boris Saizew, gelesen von Mark Chulsky; Tirzah mit *Степные сказки (Stepnyia skazki)* von Grigori Danilewski, gelesen von Anastasiia Solokha. Lizenz **CC0-1.0** – für jede Nutzung frei, auch kommerziell; eine Namensnennung ist erwünscht. Die Namen stammen von Voxprint und bedeuten keine Billigung durch die Sprecher. In der Bibliothek sind sie schreibgeschützt („{{voices.bundled_note_plain}}“). Hörproben – Genesis 1,1–2,3 (russische Synodalübersetzung, gemeinfrei) mit beiden Stimmen, ebenfalls CC0 – liegen im Repository-Ordner `samples/`.
 * **Offene Universalstimme** (englisch: *Open universal voice*, russisch: *Открытый универсальный голос*) – eine englische Stimme für alle, die keine eigene Aufnahme haben. Nur mit dem gemeinfreien LJ-Speech-Datensatz trainiert (Sprecherin Linda Johnson, LibriVox); Lizenz **CC0-1.0** – für jede Nutzung frei, auch kommerziell; die Nennung des LJ-Speech-Datensatzes (Keith Ito) ist erwünscht.
 
-Sie wird getrennt (nicht im Installationsprogramm enthalten) aus dem Stimmen-Repository geladen.
+Die Offene Universalstimme wird getrennt aus dem Stimmen-Repository geladen.
 
-> Die Bilder hier und in Kapitel 5 verwenden Demonstrationsstimmen. Stimmen, die Sie selbst trainieren, sind standardmäßig **nur für den persönlichen Gebrauch** (Umfang „{{consent.badge_private_only}}“): keine öffentliche Nutzung der Ausgabe, keine kommerziellen Projekte.
+> Die Bilder in diesem Handbuch zeigen die mitgelieferten Stimmen. Stimmen, die Sie selbst trainieren, sind standardmäßig **nur für den persönlichen Gebrauch** (Umfang „{{consent.badge_private_only}}“): keine öffentliche Nutzung der Ausgabe, keine kommerziellen Projekte.
 
 Das Badge ist eine Information, keine Rechtsberatung. Die Lizenz gilt nur für das Stimmenmodell.
 
@@ -360,23 +462,34 @@ Das Badge ist eine Information, keine Rechtsberatung. Die Lizenz gilt nur für d
 
 Öffnen Sie **{{ui.settings_title}}** mit dem Zahnrad (oben rechts im Studio und in den anderen Fenstern).
 
-![Einstellungen (englische Oberfläche).](@settings)
+![Einstellungen (Build 667; Projektpfad und Netzwerkadresse sind unkenntlich gemacht).](@settings)
 
 | Bedienelement | Was es tut |
 |---|---|
-| **{{ui.language}}** | Die Oberflächensprache: English, Deutsch, Русский. Sie ändert sich sofort in allen Fenstern. |
+| **{{ui.language}}** | Die Oberflächensprache: English, Deutsch, Русский, Українська, Latviešu. Sie ändert sich sofort in allen Fenstern. |
+| **{{ui.transparency}}** | Wie durchscheinend die Fenster sind: „{{ui.transparency_default}}“, „{{ui.transparency_more}}“ oder „{{ui.transparency_off}}“. |
+| **{{ui.net_iface}}** | Über welchen Netzwerkadapter die Downloads laufen. „{{ui.net_iface_auto}}“: Kann ein Download keine Verbindung aufbauen (VPN, ungewöhnlicher Adapter), werden die anderen Schnittstellen probiert und die funktionierende gemerkt. |
+| **{{asrmodel.label}}** | Welches Spracherkennungsmodell verwendet wird. „{{asrmodel.auto}}“ nimmt das 1.7B-Modell auf Karten ab etwa 8 GB Grafikspeicher, sonst 0.6B. Die Zeile unter dem Kontrollkästchen zeigt das verwendete Modell. |
+| **{{preload.option}}** | Lädt nach dem Start die installierten Sprachmodelle im Hintergrund in den Arbeitsspeicher, damit eine Vertonung sofort beginnt. Daneben steht der verfügbare RAM. |
+| **{{narrset.title}}** | {{narrset.comma}}, {{narrset.mid}}, {{narrset.sentence}}, {{narrset.paragraph}}, {{narrset.chapter}} – die fünf Pausenlängen in Sekunden (Standard 0,25 / 0,40 / 0,60 / 1,00 / 2,00 s); **{{narrset.speed}}** (70–130 %; 100 % ist das eigene Tempo der Stimme); **{{narrset.style}}**. Siehe Abschnitt 5.4. |
+| **{{narrset.defaults}}** | Stellt die Standardpausen und das Standardtempo wieder her. |
 | **{{ui.btn_update}}** | Prüft, ob neuere verifizierte Versionen von Komponenten oder Modellen existieren, und installiert sie (mit Sicherheitsprüfung und automatischem Zurückrollen). Voxprint prüft außerdem einmal pro Woche unauffällig. Meldungen: „{{upd.up_to_date}}“, „{{upd.restart}}“ |
 | **{{ui.settings_models_folder}}** | Öffnet den Ordner mit den heruntergeladenen Modellen. |
-| **{{ui.settings_data_folder}}** | Öffnet den Daten- und Protokollordner – schicken Sie das Protokoll dem Entwickler, wenn ein Fehler wiederkehrt. |
-| **{{backup.title}}** – Kontrollkästchen **{{backup.include_voices}}** | Ob Ihre Stimmenbibliothek zur Sicherung gehört (standardmäßig an). |
+| **{{ui.settings_data_folder}}** | Öffnet den Daten- und Protokollordner. |
+| **{{diag.button}}** | Speichert die Protokolldateien, Angaben zu diesem Computer (System, GPU, Speicher) und die Einstellungen als eine ZIP-Datei; die Namen Ihrer Dateien werden entfernt. Hängen Sie sie an eine Fehlermeldung an. |
+| **{{modules.title}}** | Öffnet das Komponenten-Fenster: was installiert ist, Updates und der vollständige Download. |
+| **{{projects.title}}** | Wo neue Projekte (Hörbücher, Stimmtrainings, Neu vertonen) gespeichert werden. **{{projects.open}}**, **{{projects.change}}** (am besten ein lokales Laufwerk mit viel Platz, das nicht mit der Cloud synchronisiert wird), **{{projects.default}}**. Bestehende Projekte bleiben, wo sie sind. |
+| **{{backup.title}}** – **{{backup.include_models}}**, **{{backup.include_voices}}** | Was in eine Sicherung kommt (beides standardmäßig an). |
+| **{{backup.link_models}}** | Beim Wiederherstellen die Modelle vom Sicherungslaufwerk lesen, statt sie zu kopieren. Das Laufwerk muss angeschlossen bleiben. |
 | **{{backup.btn_backup}}** | Kopiert Modelle (und Stimmen) in einen gewählten Ordner oder auf ein Laufwerk. Zeigt vorab Größe und freien Platz; fortsetzbar; identische Dateien werden übersprungen; jede Kopie wird geprüft. Fortschrittsbalken und eine Schaltfläche **{{ui.cancel}}** erscheinen. |
-| **{{backup.btn_restore}}** | Stellt aus einem Ordner `Voxprint-backup` wieder her. Stimmen, die schon mit anderem Inhalt existieren, werden nie überschrieben. |
+| **{{backup.btn_restore}}**, **{{backup.btn_restore_folder}}** | Stellt aus einem Ordner `Voxprint-backup` wieder her und prüft jede Datei per Prüfsumme. Stimmen, die schon mit anderem Inhalt existieren, werden nie überschrieben; beschädigte oder fehlende Dateien werden wie üblich geladen. |
 | **{{existing.title}}** | {{existing.hint}} **{{existing.choose}}** wählt den Ordner, **{{existing.clear}}** vergisst ihn. |
-| **{{ui.settings_repair}}** | {{ui.settings_repair_tip}}. Ihre Stimmen und Modelle bleiben erhalten. |
+| **{{autorepair.title}}** – **{{autorepair.button}}** | {{autorepair.desc}} Siehe Abschnitt 8.2. |
 | **{{ui.about}}** | Version, die Idee, Funktionsweise, Open-Source-Komponenten mit ihren Lizenzen, ein Link zum GitHub-Repository und Hinweise zu Drittsoftware. |
-| **{{about.btn_close}}** | Schließt den Dialog. |
 
-Bemerkt das Programm eine beschädigte Installation, bietet ein Banner die Reparatur an („{{ui.repair_offer_plain}}“). Hilft die Reparatur in der installierten Version nicht, starten Sie das Voxprint-Installationsprogramm erneut – Stimmen und Modelle bleiben erhalten.
+Die unterste Zeile zeigt die Version, zum Beispiel *Voxprint AI Audiobook Builder 0.1.3-beta · build 667 "Menuchah"*.
+
+Bemerkt das Programm eine beschädigte Installation, bietet ein Banner die Reparatur an („{{ui.repair_offer_plain}}“). Hilft **{{autorepair.button}}** nicht, starten Sie das Voxprint-Installationsprogramm erneut – Stimmen und Modelle bleiben erhalten.
 
 Findet das Programm eine ältere Komponente in einer Umgebung, die ihm nicht gehört (zum Beispiel Ihr eigenes Python), fragt es zuerst: „{{upg.title}}“ mit **{{upg.btn_upgrade}}** oder **{{upg.btn_later}}**; Ihre Umgebung ändert es nie stillschweigend.
 
@@ -391,6 +504,20 @@ Ab Werk ist alles, was automatisch laufen kann, **bereits gewählt** und mit ein
 * Nicht enthalten, weil es sie noch nicht gibt: Zeichensetzungsmodell, Betonungszeichen, Sprecherrollen.
 
 Die Trainingsvorgabe bleibt absichtlich bei „{{preset.balanced}}“: In unseren Tests ließ längeres Training mit höherer Lernrate die Stimme nuscheln, mehr ist dort also nicht besser. Stattdessen wird nach „{{preview.compare}}“ die bessere der beiden Varianten als „{{auto.recommended}}“ markiert (zuerst das Urteil, dann weniger Erkennungsfehler, dann die kleinere Tonhöhenabweichung; ohne klaren Unterschied Variante A, die günstiger ist). Die Entscheidung bleibt bei Ihnen: Hören Sie immer hin.
+
+## Prüfen und reparieren
+
+**{{autorepair.button}}** prüft das Programm, seine Komponenten und jede Modelldatei einzeln anhand ihrer SHA-256-Prüfsumme und lädt nur, was fehlt oder beschädigt ist. Ihre Stimmen und Bücher bleiben unberührt. Während der Prüfung zeigen ein Fortschrittsbalken und eine Schrittzeile (zum Beispiel *Step 8 of 21: Checking Qwen3-ASR-0.6B: model.safetensors*, deutsch „Schritt 8 von 21: …“), wo sie steht, und die Schaltfläche wird zu **{{autorepair.stop}}**; eine angehaltene Prüfung behält, was fertig ist.
+
+![Prüfen und reparieren während der Prüfung: Fortschrittsbalken und aktueller Schritt.](@repair_running)
+
+Am Ende erscheint eine Zusammenfassung, zum Beispiel *Check finished: 24 checked, 0 repaired or downloaded, 0 failed.* (deutsch „Prüfung beendet: …“). Was nicht repariert werden konnte, steht darunter.
+
+![Prüfen und reparieren abgeschlossen: die Zusammenfassung.](@repair_done)
+
+> Bekanntes Problem in Build 667: Während der Prüfung wird die rechte Spalte der Einstellungen gestaucht, und die Erklärtexte überlappen sich (erstes Bild). Das ist nur optisch und wird in einem der nächsten Builds behoben.
+
+Dieselbe Prüfung läuft ohne Fenster als `Voxprint.exe --auto-repair` (Kapitel 11).
 
 # Glossar
 
@@ -450,7 +577,11 @@ Die Trainingsvorgabe bleibt absichtlich bei „{{preset.balanced}}“: In unsere
 
 <dt>Spiegel (ModelScope)</dt><dd>Ein alternativer Download-Server, den Voxprint nutzt, wenn Hugging Face langsam oder nicht erreichbar ist.</dd>
 
-<dt>Reparieren (Repair)</dt><dd>Prüft die eigene Umgebung von Voxprint erneut und behebt, was defekt ist.</dd>
+<dt>Prüfen und reparieren</dt><dd>Prüft jede Komponenten- und Modelldatei per Prüfsumme und lädt nur Fehlendes oder Beschädigtes („{{ui.settings_title}}“ → „{{autorepair.button}}“ oder <code>--auto-repair</code>).</dd>
+
+<dt>Exakte Pausen</dt><dd>Stille fester Länge, die Voxprint zwischen den gesprochenen Stücken einfügt – nach einem Komma, einem Satz, einem Absatz, einem Kapitel –, unabhängig davon, wie das Stimmmodell den Text phrasiert.</dd>
+
+<dt>Mitgelieferte Stimmen</dt><dd>Boaz und Tirzah: zwei offene russische Stimmen (CC0-1.0), die mit Voxprint kommen und in der Bibliothek schreibgeschützt sind.</dd>
 
 </dl>
 
@@ -468,7 +599,7 @@ Die Trainingsvorgabe bleibt absichtlich bei „{{preset.balanced}}“: In unsere
 | {{err.oom}} | Schließen Sie andere Programme, die die Grafikkarte nutzen; Voxprint versucht es mit geringerer Last erneut („{{progress.oom_retry}}“). Als letzter Ausweg: **{{ui.retry_cpu}}**. |
 | {{err.download_failed}} | Prüfen Sie Ihre Internetverbindung und starten Sie neu; der Download läuft an der gleichen Stelle weiter. |
 | {{err.narration_chunk}} | Drücken Sie erneut **{{narr.start}}** – fertige Fragmente bleiben erhalten. |
-| {{err.narration_no_ffmpeg}} | Einstellungen → **{{ui.settings_repair}}**, oder wählen Sie WAV. |
+| {{err.narration_no_ffmpeg}} | Einstellungen → **{{autorepair.button}}**, oder wählen Sie WAV. |
 | {{err.book_unsupported}} | Wandeln Sie das Buch in TXT, FB2 oder EPUB um. |
 | {{err.book_unsafe}} | Die Datei wirkt beschädigt oder zu groß; versuchen Sie eine andere Kopie. |
 | {{warn.no_gpu}} | Training ist ohne NVIDIA-Karte möglich, aber extrem langsam. |
@@ -484,11 +615,84 @@ Die Trainingsvorgabe bleibt absichtlich bei „{{preset.balanced}}“: In unsere
 
 **Schickt Voxprint meine Aufnahmen irgendwohin?** Nein. Ins Internet gehen nur der Download von Modellen, die Update-Prüfung und – wenn Sie das Repository öffnen – das Abrufen des Stimmenindex und der von Ihnen gewählten Stimmen. Keine Telemetrie, kein Konto.
 
-**Welche Sprachen werden unterstützt?** Die Oberfläche: English, Deutsch, Русский. Die Textvorbereitung deckt Russisch und Englisch vollständig ab. Das Sprachmodell kann weitere Sprachen, sie sind aber nicht getestet.
+**Welche Sprachen werden unterstützt?** Die Oberfläche: English, Deutsch, Русский, Українська, Latviešu. Die Textvorbereitung deckt Russisch und Englisch vollständig ab. Das Sprachmodell kann weitere Sprachen, sie sind aber nicht getestet.
 
 **Wo ist das Protokoll?** Schaltfläche „{{ui.settings_data_folder}}“ in den Einstellungen. Schicken Sie die Datei von dort, wenn ein Fehler wiederkehrt.
 
 **Ist die Option AAC / M4B sicher zu verwenden?** Sie ist optional und standardmäßig aus gutem Grund ausgeschaltet: AAC ist patentbehaftet, und für die Einhaltung der Gesetze sind Sie verantwortlich (Abschnitt 5.4).
+
+# Kommandozeile
+
+Alles in diesem Kapitel ist optional: Die Fenster können dasselbe. Die Kommandozeile ist für Skripte, Server und KI-Agenten gedacht und nutzt dieselbe Verarbeitung wie die Fenster. Die vollständige Referenz ist `docs/CLI.md`, die Datei für Agenten `docs/AGENTS.md` (beide im Repository, auf Englisch). Die Meldungen der Kommandozeile selbst sind englisch.
+
+## Wo das Programm liegt und die Regeln
+
+Das installierte Programm ist `C:\Program Files\Voxprint\Voxprint.exe` (ein anderer Ordner, wenn Sie einen gewählt haben; `where.exe Voxprint` findet es). In einem Quellcode-Checkout verwenden Sie `python main.py`. Unten steht `voxprint` für beides.
+
+* Nichts fragt nach; `--yes` wird von jedem Befehl akzeptiert.
+* `--json` gibt den Fortschritt als JSON-Zeilen aus und endet mit einem Ergebnisobjekt (`type: result`, `ok`, `exit_code`, `outputs`, `warnings`, `error`, `hint`).
+* `voxprint --help` und `voxprint <Befehl> --help` zeigen kopierfertige Beispiele; `voxprint --version` gibt zum Beispiel `Voxprint 0.1.3-beta build 667 "Menuchah"` aus.
+* Setzen Sie `VOXPRINT_LANG=en`, wenn Sie die Meldungen der Verarbeitung maschinell auswerten.
+
+| Exit-Code | Bedeutung |
+|---|---|
+| 0 | Erfolg |
+| 1 | Unerwarteter Fehler – `voxprint diag` speichern |
+| 2 | Fehlende oder unbekannte Argumente |
+| 3 | Buch, Audio, Text, Stimme oder Sicherung fehlt oder ist nicht lesbar |
+| 4 | Ein Modell oder eine Komponente ist nicht installiert, oder der Download ist fehlgeschlagen |
+| 5 | Grafikspeicher reicht nicht – beim Training mit `--force-cpu` wiederholen |
+| 6 | Abgebrochen – denselben Befehl erneut ausführen, um fortzusetzen |
+
+## Ein Buch vertonen
+
+```
+voxprint narrate BOOK --voice ID_OR_NAME --out DIR [--format mp3,m4b,opus,...]
+    [--pause-comma S] [--pause-mid S] [--pause-sentence S] [--pause-paragraph S]
+    [--pause-chapter S] [--speed X] [--style auto|scripture|fiction|dialogue]
+    [--pauses] [--ai-disclosure] [--json]
+```
+
+Das Buch ist eine TXT-, FB2-, `.fb2.zip`- oder EPUB-Datei; das Ergebnis landet in `<DIR>/<Buchtitel>/`; Standardformat ist eine Opus-Datei. Die Pausen-Flags (Sekunden), `--speed` (0,7–1,3) und `--style` ersetzen für einen Lauf die Werte aus „{{ui.settings_title}}“ → „{{narrset.title}}“; `--pauses` schaltet das Schneiden an jedem Komma ein. Wird derselbe Befehl erneut ausgeführt, überspringt er bereits fertige Fragmente, und Änderungen an Pausen oder Tempo sprechen sie nie neu.
+
+```
+voxprint narrate genesis.txt --voice Boaz --out ./audiobooks --format mp3 --json
+```
+
+## Eine Stimme trainieren
+
+```
+voxprint train AUDIO [--text SCRIPT] [--name NAME] [--type male|female|child|other]
+    [--out DIR] [--consent none|auto|commercial|public_noncommercial|private_only]
+    [--speaker NAME] [--license ID] [--language CODE] [--force-cpu] [--json]
+```
+
+Mit `--text` wird die Aufnahme am Skript ausgerichtet; ohne (eine Datei oder ein Ordner mit Clips) baut die Spracherkennung den Datensatz. `--out` ist der übergeordnete Ordner; jede Stimme bekommt ihren eigenen Ordner `<Stimmenname>_Voxprint`. Ohne `--consent` wird die Stimme als *nur privat* gespeichert; `--consent auto` liest die gesprochene Erklärung, die anderen Werte halten einen selbst bestätigten Umfang fest, und `--license` erlaubt nie mehr als das Einverständnis. Trainieren Sie nur eine Stimme, die Sie nutzen dürfen.
+
+```
+voxprint train recording.wav --text script.txt --name Anna --type female --consent auto
+```
+
+## Sichern und wiederherstellen
+
+```
+voxprint backup --out DIR [--no-models] [--no-voices] [--json]
+voxprint restore --from DIR [--link] [--json]
+```
+
+`backup` kopiert die Modelle und die Stimmenbibliothek nach `<DIR>/Voxprint-backup/` mit dem Verzeichnis `voxprint-backup.json` (Version, Build, Größe und SHA-256 jeder Datei). Dateien, die dort schon mit gleicher Größe und gleichem Hash liegen, werden übersprungen, sodass eine unterbrochene Kopie weiterläuft; reicht der Platz nicht, wird nichts geschrieben. `restore` kopiert die Sicherung in die normalen Ordner und prüft jede Datei; eine beschädigte oder fehlende Datei wird genannt und später wie üblich geladen. `--link` lässt die Modelle auf dem Sicherungslaufwerk (es muss angeschlossen bleiben) und kopiert nur die Stimmen. Fehler enden mit Code 3. Es sind dieselben Aufträge wie die Schaltflächen unter „{{ui.settings_title}}“ → „{{backup.title}}“.
+
+## Die Installation prüfen
+
+```
+voxprint status --json                 # Version, GPU, Stimmen, Formate, Modelle
+voxprint models download required      # TTS, Ausrichtung und Spracherkennung, falls sie fehlen
+Voxprint.exe --verify-install          # schnelle Installationsprüfung mit Ursachen-Codes
+Voxprint.exe --auto-repair             # Prüfen und reparieren: jede Datei per SHA-256
+voxprint diag --out report.zip         # Diagnosebericht
+```
+
+`status` (auch `capabilities`) gibt ein JSON-Objekt aus und lädt nichts herunter – führen Sie es vor `train` oder `narrate` aus. `--auto-repair` ist derselbe Auftrag wie „{{ui.settings_title}}“ → **{{autorepair.button}}** (Abschnitt 8.2): eine Zeile je geprüftem Element, nur beschädigte oder fehlende Dateien werden geladen, Exit-Code 0, wenn alles in Ordnung ist; der Bericht steht auch in `logs\auto_repair.txt`. `--verify-install` schreibt `logs\verify_install.txt`. `diag` entspricht **{{diag.button}}**.
 
 # Lizenzen und Verantwortung
 
@@ -499,6 +703,6 @@ Die Trainingsvorgabe bleibt absichtlich bei „{{preset.balanced}}“: In unsere
 
 > **Dieses Handbuch und die Lizenz-Badges sind Informationen, keine Rechtsberatung.** Die Einverständniskarte hält fest, was eine sprechende Person gesagt hat; sie ersetzt nicht das Recht Ihres Landes.
 
-*Voxprint AI Audiobook Builder 0.1.0 (Beta). Handbuch vom 3. Oktober 2026.*
+*Voxprint AI Audiobook Builder 0.1.3 (Beta), Build 667 „Menuchah“. Handbuch vom 9. Oktober 2026.*
 
 *Voxprint AI Audiobook Builder ist ein unabhängiges Projekt und steht in keiner Verbindung zu anderen Produkten oder Diensten mit ähnlichen Namen.*
