@@ -157,11 +157,16 @@ def resolve_mos(mos):
 
 
 def reference_embedding(eng, adapter_dir: Path, ref: np.ndarray, ref_sr: int):
-    """The speaker embedding samples are compared with: the encoder's embedding of the reference clip; ``None`` when the
-    engine has no speaker encoder (test fakes) or it failed."""
+    """The speaker embedding samples are compared with: the voice's averaged embedding (core.speaker_centroid) when it has
+    one, else the encoder's embedding of the reference clip; ``None`` when the engine has no speaker encoder (test fakes)."""
     fn = getattr(eng, "speaker_embedding", None)
     if not callable(fn):
         return None
+    from core import speaker_centroid
+
+    centroid = speaker_centroid.load(adapter_dir)
+    if centroid is not None:
+        return centroid
     try:
         return fn(ref, ref_sr)
     except Exception as exc:  # noqa: BLE001 - an extra metric must never break the check

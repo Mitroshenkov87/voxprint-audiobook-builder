@@ -25,7 +25,7 @@ extra strength, guessed at 9 s).
 ## 3. Speaker similarity and MOS in the automatic check
 
 * **Similarity (SIM)**: cosine of the Qwen3-TTS speaker-encoder embeddings (`Qwen3AdapterEngine.speaker_embedding`) of the
-  sample and of the voice's reference clip. No extra download. The
+  sample and of the voice's reference (its averaged speaker embedding when it has one, see 4). No extra download. The
   encoder also conditions the voice, so it "judges itself": fine for ranking candidates, not an independent verdict. An
   independent encoder (SpeechBrain ECAPA, Apache-2.0, ~80 MB, new dependency) was not added.
 * **MOS**: DNSMOS P.835 OVRL (`core/mos.py`, reference windowing and polynomial mapping of `dnsmos_local.py`). 1.16 MB ONNX,
@@ -36,3 +36,22 @@ extra strength, guessed at 9 s).
 
 GPU validation: record SIM and MOS for 3-4 good and 2-3 known-bad voices (babbling, wrong pitch, noisy); set the thresholds
 between the groups; check that MOS does not punish a naturally breathy voice.
+
+## 4. Averaged speaker embedding (centroid)
+
+`core/speaker_centroid.py`. Instead of the x-vector of the single reference clip, the speaker encoder embeds up to 64 clean
+training clips (3-15 s, no clipping, RMS above -40 dBFS, highest estimated SNR first; at least 4, else the old path). Each
+embedding is normalised, the directions are averaged, and the result gets the median length back (a plain mean would shrink).
+Stored as `speaker_centroid.safetensors` next to the adapter and used by:
+
+* training (the speaker conditioning of every teacher-forced sample),
+* narration (replaces `ref_spk_embedding` of the voice-clone prompt; the ICL reference codes and text stay; cache key marker),
+* the universal model (its `codec_embedding` speaker row),
+* the voice check (similarity reference).
+
+Older voices have no file and keep the single-clip path. `VOXPRINT_SPEAKER_CENTROID=0` switches it off everywhere;
+`TrainPlan.speaker_centroid=False` for one training. Source: Baseten's Qwen3-TTS voice-cloning notes (single clips agree at
+~0.7 cosine, a centroid of 30-64 clips at 0.85+).
+
+GPU validation: train one voice twice (centroid on / off, same seed), compare similarity and steadiness across 3-4 chapters;
+check that a centroid voice narrates with the ICL prompt without artefacts (the x-vector no longer matches the ICL clip exactly).

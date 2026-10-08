@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from core import audio_utils as au
+from core import speaker_centroid
 from core.dataset_builder import TRAIN_SR, read_metadata_jsonl
 from core.errors import DatasetMakerError, OutOfMemoryError_, TrainingError
 from core.events import CancelToken, ProgressCallback, Stage, noop_progress
@@ -104,15 +105,39 @@ def build_lora_config(r: int = 32, alpha: int = 128, dropout: float = LORA_DROPO
 
 def speaker_embedding_from_ref(model: Any, ref_wav_path: str, device: Any, dtype: Any):
     """Speaker embedding of ``ref.wav`` (24 kHz): mel spectrogram + the model's speaker encoder, as in ``train_lora.py``."""
+    wav, _ = au.load_audio(ref_wav_path, TRAIN_SR)
+    return speaker_embedding_of(model, wav, device, dtype)
+
+
+def speaker_embedding_of(model: Any, wav: Any, device: Any, dtype: Any):
+    """Speaker embedding ``[1, D]`` of 24 kHz samples ``wav`` with the model's speaker encoder."""
     import torch
     from qwen_tts.core.models.modeling_qwen3_tts import mel_spectrogram  # type: ignore
 
-    wav, _ = au.load_audio(ref_wav_path, TRAIN_SR)
     with torch.no_grad():
         mel = mel_spectrogram(torch.from_numpy(wav).unsqueeze(0), n_fft=1024, num_mels=128,
                               sampling_rate=24000, hop_size=256, win_size=1024, fmin=0, fmax=12000).transpose(1, 2)
         emb = model.speaker_encoder(mel.to(device).to(dtype))
     return emb.detach()
+
+
+def speaker_conditioning(model: Any, data: Dict[str, Any], device: Any, dtype: Any, use_centroid: bool = True):
+    """``(spk [1, D], centroid)``: the averaged embedding over the clean training clips when possible (``centroid`` =
+    ``(vector, clip paths)``), else the embedding of the reference clip (``centroid`` = None)."""
+    import torch
+
+    if use_centroid:
+        try:
+            res = speaker_centroid.compute(
+                lambda x, sr: speaker_embedding_of(model, x, device, dtype)[0].float().cpu().numpy(),
+                [r["audio"] for r in data["rows"]], TRAIN_SR)
+        except Exception as exc:  # noqa: BLE001 - the single-clip path always works
+            log.warning("speaker centroid failed (%s): using the reference clip", exc)
+            res = None
+        if res is not None:
+            log.info("speaker embedding: centroid of %d clips", len(res[1]))
+            return torch.from_numpy(res[0]).to(device=device, dtype=dtype).unsqueeze(0), res
+    return speaker_embedding_from_ref(model, data["ref_audio"], device, dtype), None
 
 
 def prepare_samples(rows: List[Dict[str, Any]], tokenize: Callable[[str], Any],
@@ -242,7 +267,7 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
     device = torch.device(plan.device)
     dtype = torch.bfloat16 if plan.dtype == "bfloat16" else torch.float32
     hf_model.to(device)
-    spk = speaker_embedding_from_ref(hf_model, data["ref_audio"], device, dtype)
+    spk, centroid = speaker_conditioning(hf_model, data, device, dtype, plan.speaker_centroid)
     samples = prepare_samples(data["rows"], tokenize, encode_audio, spk, device, plan.max_seconds_per_item,
                               progress, cancel, warnings)
 
@@ -318,9 +343,16 @@ def train_on_model(hf_model: Any, tokenize: Callable[[str], Any], encode_audio: 
         "ref_sample_audio": data["ref_audio"], "ref_sample_text": data["ref_text"],
     }
     save_adapter_folder(peft_talker, output_dir, data["ref_audio"], data["ref_text"], meta)
+    if centroid is not None:
+        speaker_centroid.save(output_dir, centroid[0], centroid[1])
+    else:
+        (output_dir / speaker_centroid.FILENAME).unlink(missing_ok=True)      # a stale one from an earlier run
     (output_dir / "checkpoints").mkdir(exist_ok=True)
     (output_dir / "checkpoints" / "losses.json").write_text(
-        json.dumps({"epoch_avg_loss": epoch_losses, "warnings": warnings}, ensure_ascii=False, indent=2),
+        json.dumps({"epoch_avg_loss": epoch_losses, "warnings": warnings,
+                    "speaker_embedding": {"source": "centroid" if centroid else "ref",
+                                          "clips": len(centroid[1]) if centroid else 1}},
+                   ensure_ascii=False, indent=2),
         encoding="utf-8")
     for w in warnings:
         log.warning("training: %s", w)

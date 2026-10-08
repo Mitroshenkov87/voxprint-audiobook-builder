@@ -13,11 +13,11 @@ from __future__ import annotations
 import hashlib
 import logging
 from pathlib import Path
-from typing import Callable, List, Optional, Sequence
+from typing import Any, Callable, List, Optional, Sequence
 
 import numpy as np
 
-from core import adapter_strength, cpu_budget, model_cache
+from core import adapter_strength, cpu_budget, model_cache, speaker_centroid
 from core.errors import NarrationError
 from core.events import ProgressCallback, Stage, noop_progress
 from core.i18n import tr
@@ -86,7 +86,26 @@ def engine_tag(voice: VoiceRecord, language: str = "", scale: Optional[float] = 
     strength = voice.adapter_scale if scale is None else adapter_strength.clamp(scale, 1.0)
     if not adapter_strength.is_full(strength):           # 1.0 adds nothing: caches of older voices stay valid
         raw += f"|scale={strength:.2f}"
+    if speaker_centroid.enabled() and (voice.path / speaker_centroid.FILENAME).is_file():
+        raw += "|spk=centroid"                            # narration uses the averaged speaker embedding
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def use_centroid(prompt: Any, centroid: Optional[np.ndarray]) -> bool:
+    """Replace the x-vector of every voice-clone prompt item by the voice's averaged speaker embedding (same device / dtype);
+    the ICL part (reference codes + text) stays.  False when there is none or it does not fit (old voices: unchanged)."""
+    if centroid is None:
+        return False
+    import torch
+
+    items = list(prompt or [])
+    if not items or any(int(it.ref_spk_embedding.numel()) != int(centroid.size) for it in items):
+        log.warning("speaker centroid does not match the model's embedding size; using the reference clip")
+        return False
+    for it in items:
+        t = it.ref_spk_embedding
+        it.ref_spk_embedding = torch.from_numpy(np.asarray(centroid, dtype=np.float32)).to(device=t.device, dtype=t.dtype).reshape(t.shape)
+    return True
 
 
 class Qwen3AdapterEngine:
@@ -156,6 +175,7 @@ class Qwen3AdapterEngine:
         if not ref_audio.is_file() or not voice.ref_text:
             raise NarrationError(tr("err.voice_invalid"), details="reference clip or its text is missing")
         self._prompt = self._q.create_voice_clone_prompt(ref_audio=str(ref_audio), ref_text=voice.ref_text)
+        self.centroid = use_centroid(self._prompt, speaker_centroid.load(voice.path))
         self.sample_rate = 24000
 
     def set_adapter_scale(self, scale: float) -> None:

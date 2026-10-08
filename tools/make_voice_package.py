@@ -25,7 +25,8 @@ if str(ROOT) not in sys.path:
 
 from core import voice_info  # noqa: E402
 
-PACKAGE_FILES = ("adapter_model.safetensors", "adapter_config.json", "ref_sample.wav", "training_meta.json", "preview.wav", "preview.mp3")
+PACKAGE_FILES = ("adapter_model.safetensors", "adapter_config.json", "ref_sample.wav", "training_meta.json", "preview.wav", "preview.mp3",
+                 "speaker_centroid.safetensors")
 
 
 def build_voice_json(adapter: Path, spec: Dict[str, Any]) -> Dict[str, Any]:

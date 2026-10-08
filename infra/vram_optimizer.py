@@ -54,6 +54,7 @@ class TrainPlan:
     language: str = "russian"      # the trainer's --language flag (lower case; Alexandria's default is english)
     attn_implementation: str = "eager"   # as in train_lora.py; flash-attn is not used on Windows
     warnings: List[str] = field(default_factory=list)
+    speaker_centroid: bool = True  # averaged speaker embedding over clean clips (core/speaker_centroid.py) instead of ref.wav
 
     @property
     def effective_batch(self) -> int:

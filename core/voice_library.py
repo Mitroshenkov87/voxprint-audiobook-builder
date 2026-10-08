@@ -31,7 +31,8 @@ log = logging.getLogger("voxprint.voices")
 #: Files that make a usable adapter.
 REQUIRED_FILES = ("adapter_model.safetensors", "adapter_config.json")
 #: Everything that may live in a voice folder; any other file in an imported archive/folder is ignored.
-ALLOWED_FILES = REQUIRED_FILES + ("ref_sample.wav", "training_meta.json", "preview.wav", "consent_statement.wav", voice_info.VOICE_FILENAME)
+ALLOWED_FILES = REQUIRED_FILES + ("ref_sample.wav", "training_meta.json", "preview.wav", "consent_statement.wav", voice_info.VOICE_FILENAME,
+                                  "speaker_centroid.safetensors")   # core.speaker_centroid.FILENAME
 MAX_FILE_BYTES = 1 << 30            # 1 GiB per file
 MAX_TOTAL_BYTES = 2 << 30           # 2 GiB per voice
 PREVIEW_FILES = ("preview.wav", "ref_sample.wav")

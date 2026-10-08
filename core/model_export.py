@@ -103,7 +103,11 @@ def merge_adapter_into_model(hf_model: Any, adapter_dir: Path, spk_id: int = SPK
     adapter_strength.apply(peft_talker, scale)            # merge_and_unload bakes in the current scaling
     hf_model.talker = peft_talker.merge_and_unload()
     dtype = next(hf_model.talker.parameters()).dtype
-    spk = speaker_embedding_from_ref(hf_model, str(adapter_dir / "ref_sample.wav"), torch.device("cpu"), dtype)
+    from core import speaker_centroid
+
+    centroid = speaker_centroid.load(adapter_dir)          # the averaged embedding when the voice has one
+    spk = (torch.from_numpy(centroid).to(dtype).unsqueeze(0) if centroid is not None else
+           speaker_embedding_from_ref(hf_model, str(adapter_dir / "ref_sample.wav"), torch.device("cpu"), dtype))
     state: Dict[str, Any] = {}
     seen: set = set()
     for k, v in hf_model.state_dict().items():
