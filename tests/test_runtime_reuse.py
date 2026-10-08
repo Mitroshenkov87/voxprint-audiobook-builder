@@ -17,10 +17,10 @@ from tools import runtime_manifest as rm
 
 ROOT = Path(__file__).resolve().parents[1]
 LOCK = {"compat": {"torch": ">=2.8,<2.13"}, "flavors": ["cu128", "cu126", "cpu"]}
-TAG = "cp311"
+TAG = f"cp{sys.version_info.major}{sys.version_info.minor}"     # the reuse rules accept only wheels for the running Python
 
 
-def fake_site(site: Path, torch="2.11.0+cu128", audio="2.11.0+cu128", tag="cp311", plat="win_amd64", lib=True) -> Path:
+def fake_site(site: Path, torch="2.11.0+cu128", audio="2.11.0+cu128", tag=TAG, plat="win_amd64", lib=True) -> Path:
     """A site-packages folder that looks like an installed PyTorch (no real code)."""
     site.mkdir(parents=True, exist_ok=True)
     for name, ver in (("torch", torch), ("torchaudio", audio)):
@@ -49,7 +49,7 @@ def test_find_torch_reads_dist_info_without_running_anything(tmp_path):
     found = rr.find_torch([a, b, tmp_path / "nothing"])
     assert [e.torch for e in found] == ["2.11.0+cu128", "2.9.1+cu128"]          # newest first
     e = found[0]
-    assert (e.py_tag, e.platform, e.flavor, e.torchaudio) == ("cp311", "win_amd64", "cu128", "2.11.0+cu128")
+    assert (e.py_tag, e.platform, e.flavor, e.torchaudio) == (TAG, "win_amd64", "cu128", "2.11.0+cu128")
     assert Path(e.site) == b / "Lib" / "site-packages"
 
 
@@ -68,7 +68,7 @@ def test_candidate_prefixes_find_project_venvs_and_pinokio(tmp_path):
     ({"torch": "2.11.0+cpu", "audio": "2.11.0+cpu"}, (12, 8), "cu128", False, "NVIDIA GPU"),
     ({"torch": "2.11.0+cpu", "audio": "2.11.0+cpu"}, None, "cpu", True, "ok"),
     ({"torch": "2.11.0+cu128", "audio": "2.11.0+cu128"}, None, "cpu", True, "ok"),                 # CUDA build, no GPU: runs on the CPU
-    ({"tag": "cp312"}, (12, 8), "cu128", False, "cp312"),
+    ({"tag": "cp310"}, (12, 8), "cu128", False, "cp310"),                                           # a wheel for another Python
     ({"torch": "2.4.0+cu128", "audio": "2.4.0+cu128"}, (12, 8), "cu128", False, "range"),
     ({"torch": "3.0.0+cu128", "audio": "3.0.0+cu128"}, (12, 8), "cu128", False, "range"),
     ({"audio": None}, (12, 8), "cu128", False, "torchaudio is not installed"),
