@@ -306,3 +306,28 @@ def test_try_latest_falls_back_to_pinned_and_a_missing_pinned_set_falls_back_to_
     assert mods.install() >= 1
     assert mods._channel_state()["installed_from"].endswith("/manifest-latest.json")
     assert all(m.installed for m in mods.modules(mods.load_manifest()) if m.required)
+
+
+def test_a_newer_pinned_set_is_offered_as_an_update_in_the_components_window(thin, app):     # noqa: F811
+    from core import i18n
+    from ui.modules_dialog import ModulesDialog
+
+    i18n.set_language("en")
+    mods.install(["audio"])                               # an optional-or-not module installed from this manifest
+    st = mods.runtime_dir() / of.STATE_FILE
+    d = json.loads(st.read_text(encoding="utf-8"))
+    cid = next(c for c in d["components"] if c.startswith("rt-audio-"))
+    d["components"][cid], d["app_version"] = "f" * 64, "0.0.9"          # as if it came from an older release
+    st.write_text(json.dumps(d), encoding="utf-8")
+    man = mods.load_manifest()
+    audio = next(m for m in mods.modules(man) if m.id == "audio")
+    assert audio.update and not audio.installed and audio in mods.pending(mods.modules(man))
+    assert mods.versions(man) == ("0.0.9", man["app_version"])
+    dlg = ModulesDialog()
+    dlg.refresh()
+    assert wait_for(lambda: dlg.modules and not dlg.busy, 20)
+    dlg.modules = [m for m in dlg.modules if m.id == "audio"]          # only the update is pending
+    dlg._on_listed(dlg.modules)
+    assert dlg.updates() and dlg.lbl_status.text().startswith("Updates available: ") and "0.0.9 \u2192" in dlg.lbl_status.text()
+    assert dlg.btn_download.isEnabled()
+    dlg.shutdown()

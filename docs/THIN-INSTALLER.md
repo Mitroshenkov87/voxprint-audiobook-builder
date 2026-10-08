@@ -65,6 +65,10 @@ The flavor we download follows the driver (`nvidia-smi`): CUDA ≥ 12.8 → `cu1
 Finished components are recorded (SHA-256) and skipped next time; a broken one is deleted and fetched again; closing the window or going offline just
 stops (press Download again); the runtime folder can be deleted at any time. A new release has a new manifest — changed files get new hashes, the rest stays.
 
+## Component updates in the app
+
+The Components window compares the installed runtime with the manifest: a module whose component ids are recorded with another SHA-256 (installed from an older release's manifest) is shown as an update - "Updates available: PyTorch (about 2.4 GB; version 0.1.0 -> 0.1.1)" - and Download fetches it with the missing required modules (`infra/modules.pending`, `versions`). Files that the new version no longer has stay in `runtime/` (harmless; Auto-repair checks by hash).
+
 ## Network probe
 
 Before the first download of a run, `voxprint-fetch` (installer and Components window) fetches the first 256 KB of a component (`Range` request) through every network route at once (default, no-proxy, each local interface; `infra/netroute.pick_fastest`, at most 4 s) and remembers the fastest; the others stay the connect fallback. Only with the *Auto* network setting. A component with several sources (`url` + `urls`) has its sources ranked the same way, once per host (`online_fetch.ranked`); equal speeds keep the manifest order.

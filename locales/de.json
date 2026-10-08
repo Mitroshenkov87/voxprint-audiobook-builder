@@ -795,5 +795,6 @@
  "train.checks_options": "Prüfungen und Clip-Optionen",
  "splash.loading_ui": "Oberfläche wird geladen…",
  "splash.checking": "Komponenten werden geprüft…",
- "modules.try_latest": "Neueste Komponentenversionen versuchen (bei einem Fehler zurück zu den geprüften)"
+ "modules.try_latest": "Neueste Komponentenversionen versuchen (bei einem Fehler zurück zu den geprüften)",
+ "modules.updates": "Updates verfügbar: {names} (etwa {size}; Version {old} → {new})."
 }

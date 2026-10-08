@@ -795,5 +795,6 @@
  "train.checks_options": "Checks and clip options",
  "splash.loading_ui": "Loading interface…",
  "splash.checking": "Checking components…",
- "modules.try_latest": "Try the latest component versions (falls back to the verified ones if a download fails)"
+ "modules.try_latest": "Try the latest component versions (falls back to the verified ones if a download fails)",
+ "modules.updates": "Updates available: {names} (about {size}; version {old} → {new})."
 }

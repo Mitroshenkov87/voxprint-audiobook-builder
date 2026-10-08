@@ -49,6 +49,7 @@ class Module:
     components: List[str] = field(default_factory=list)
     installed: bool = False
     reused: bool = False            # satisfied by a verified copy that another program installed
+    update: bool = False            # installed before, but the manifest now pins other files (an update is available)
 
 
 # ------------------------------------------------------------------------------------------------ configuration
@@ -221,8 +222,25 @@ def modules(manifest: Dict[str, Any]) -> List[Module]:
                      0 if reused else sum(int(c.get("unpacked_bytes", 0)) for c in comps),
                      [c["id"] for c in comps], ok)
         mod.reused = reused
+        # the component ids of a module are stable across releases (rt-<module>-NN) while their SHA-256 changes: an id
+        # recorded with another hash means this module was installed from an older manifest
+        mod.update = not ok and any(c["id"] in state for c in comps)
         out.append(mod)
     return out
+
+
+def versions(manifest: Dict[str, Any]) -> tuple:
+    """``(installed, available)`` app versions of the runtime: the manifest the installed components came from vs this one."""
+    try:
+        installed = str(json.loads((runtime_dir() / _fetch_module().STATE_FILE).read_text(encoding="utf-8")).get("app_version", ""))
+    except (OSError, ValueError, AttributeError):
+        installed = ""
+    return installed, str(manifest.get("app_version", ""))
+
+
+def pending(mods: List[Module]) -> List[Module]:
+    """What the Components window downloads: the missing required modules and every module with an update."""
+    return [m for m in mods if (m.required and not m.installed) or m.update]
 
 
 def installed_without_network() -> bool:

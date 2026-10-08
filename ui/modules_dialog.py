@@ -79,7 +79,10 @@ class ModulesWorker(QThread):
     def run(self) -> None:  # noqa: D401
         try:
             if self.kind == "list":
-                self.listed.emit(mods.modules(self.manifest_fn()))
+                man = self.manifest_fn()
+                listed = mods.modules(man)
+                self.versions = mods.versions(man)
+                self.listed.emit(listed)
                 return
             n = 0
             if self.ids:
@@ -135,6 +138,7 @@ class ModulesDialog(QDialog):
         self.extras_bytes_fn = extras_bytes_fn or ((lambda: 0) if extras_fn is None else default_extras_bytes)
         self.models_start, self.autostart = models_start, autostart
         self.modules: List[mods.Module] = []
+        self._versions = ("", "")        # (installed, available) runtime versions of the last listing
         self.worker: Optional[ModulesWorker] = None
         self.models_worker: Optional[Any] = None
         self._note = ""                  # the last failure / cancel message; it survives the list refresh that follows
@@ -207,7 +211,11 @@ class ModulesDialog(QDialog):
         return self._models_state == "running"
 
     def missing(self) -> List[mods.Module]:
-        return [m for m in self.modules if m.required and not m.installed]
+        """Modules a press on Download fetches: missing required ones and updates (:func:`infra.modules.pending`)."""
+        return mods.pending(self.modules)
+
+    def updates(self) -> List[mods.Module]:
+        return [m for m in self.modules if m.update]
 
     def extras_missing(self) -> bool:
         if self.extras_fn is None:
@@ -270,10 +278,14 @@ class ModulesDialog(QDialog):
                 size += self.extras_bytes_fn()
             except Exception:  # noqa: BLE001
                 pass
+        if names and miss and all(m.update for m in miss) and not self.extras_missing():
+            old, new = self._versions
+            return tr("modules.updates", names=", ".join(names), size=_gb(size), old=old or "?", new=new or "?")
         return tr("modules.to_download", names=", ".join(names), size=_gb(size)) if names else tr("modules.all_ready")
 
     def _on_listed(self, res) -> None:
         if self.worker is not None:
+            self._versions = getattr(self.worker, "versions", self._versions)
             self.worker.wait(2000)
         self.worker = None
         if isinstance(res, str):
@@ -296,7 +308,7 @@ class ModulesDialog(QDialog):
         else:
             self._set_line(self._summary())
         self._render()
-        if self.modules and not self.missing():
+        if self.modules and not any(m.required and not m.installed for m in self.modules):
             self.ready.emit()
             self._start_models()
 
