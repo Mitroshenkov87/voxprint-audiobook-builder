@@ -212,7 +212,7 @@ def test_runner_narrates_in_the_target_language(monkeypatch, tmp_path):
     from workers import narration_runner as nrun
     seen = {}
     monkeypatch.setattr(nrun.tts_engine, "make_engine_factory", lambda voice, language: seen.setdefault("lang", language) or (lambda: None))
-    monkeypatch.setattr(nrun.tts_engine, "engine_tag", lambda v: "t")
+    monkeypatch.setattr(nrun.tts_engine, "engine_tag", lambda v, language="": "t")
     monkeypatch.setattr(nrun, "ensure_ffmpeg", lambda: "ffmpeg")
     monkeypatch.setattr(nrun.nr, "narrate_book", lambda *a, **k: seen.setdefault("nb", k["language"]))
 

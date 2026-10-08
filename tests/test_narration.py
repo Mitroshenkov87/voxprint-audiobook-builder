@@ -459,7 +459,8 @@ def test_run_narration_wires_flag_and_engine(tmp_path, monkeypatch):
     monkeypatch.setenv("VOXPRINT_ENABLE_AAC", "0")
     voice = VoiceRecord("v1", tmp_path / "v1", {"name": "Anna", "language": "russian"})
     rn.run_narration(rn.NarrationJob(book3(), voice, tmp_path), lambda p: None, CancelToken(), nr.PauseToken())
-    assert seen["allow_aac"] is False and seen["narrator"] == "Anna" and seen["language"] == "russian" and seen["tag"]
+    assert seen["allow_aac"] is False and seen["narrator"] == "Anna" and seen["tag"]
+    assert seen["language"] == "English"          # the book's language, not the (Russian) voice's
 
 
 def test_engine_tag_changes_with_the_adapter(tmp_path):

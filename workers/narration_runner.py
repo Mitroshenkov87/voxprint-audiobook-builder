@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 from core import narration as nr
-from core import translate, tts_engine
+from core import languages, tts_engine
 from core.audio_utils import ensure_ffmpeg
 from core.book_parsers import Book
 from core.events import CancelToken
@@ -33,12 +33,15 @@ def run_narration(job: NarrationJob, progress: Callable[[nr.NarrationProgress], 
                   pause: nr.PauseToken) -> nr.NarrationResult:
     """Narrate ``job.book`` with ``job.voice`` (real engine).  Raises :class:`DatasetMakerError` subclasses on failure."""
     job.options.allow_aac = features.aac_enabled()
-    language = job.voice.language or job.book.language
     tp = job.options.translate
-    if tp is not None and tp.enabled:
-        language = translate.LANGUAGE_NAMES.get(tp.target, language)     # the translated book is narrated in this language
+    target = tp.target if tp is not None and tp.enabled else ""
+    # The token tells Qwen which language the TEXT is in (not the voice's own language): a Russian voice reading an
+    # English book must get "English".  Decided once per book (core.languages.narration_language).
+    language = languages.narration_language(job.book, job.voice.language, target)
     factory = tts_engine.make_engine_factory(job.voice, language)
-    return nr.narrate_book(job.book, factory, tts_engine.engine_tag(job.voice), job.out_dir, language=language,
+    # narrate_book uses its ``language`` for text preparation and the AI disclosure; "" there means "the book's own tag"
+    return nr.narrate_book(job.book, factory, tts_engine.engine_tag(job.voice, language), job.out_dir,
+                           language="" if language == languages.AUTO else language,
                            narrator=job.voice.name, options=job.options, progress=progress, cancel=cancel,
                            pause=pause, ffmpeg=ensure_ffmpeg(), chapters=job.chapters, on_plan=job.on_plan)
 

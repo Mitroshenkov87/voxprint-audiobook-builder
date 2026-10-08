@@ -20,6 +20,7 @@ import numpy as np
 from core.errors import NarrationError
 from core.events import ProgressCallback, Stage, noop_progress
 from core.i18n import tr
+from core.languages import AUTO, qwen_language
 from core.voice_library import VoiceRecord
 
 log = logging.getLogger("voxprint.tts")
@@ -66,8 +67,9 @@ def _attn_candidates(attn: str, use_cuda: bool) -> List[str]:
     return out + ["sdpa", "eager"]
 
 
-def engine_tag(voice: VoiceRecord) -> str:
-    """Identity of voice + adapter weights + base model: a retrained or replaced adapter invalidates cached audio."""
+def engine_tag(voice: VoiceRecord, language: str = "") -> str:
+    """Identity of voice + adapter weights + base model (+ language token): a retrained or replaced adapter, or a different
+    language token, invalidates cached audio."""
     adapter = voice.path / "adapter_model.safetensors"
     try:
         st = adapter.stat()
@@ -75,6 +77,11 @@ def engine_tag(voice: VoiceRecord) -> str:
     except OSError:
         fingerprint = "?"
     raw = f"{voice.id}|{voice.base_model}|{fingerprint}|clone-v1"
+    # Older versions always spoke with the voice's own language and did not put it into the tag.  The token joins the tag
+    # only when it differs from that, so chunks cached by older versions stay valid whenever they were made the same way.
+    token = qwen_language(language)
+    if token and token != (qwen_language(voice.language) or AUTO):
+        raw += f"|lang={token}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
@@ -87,8 +94,9 @@ class Qwen3AdapterEngine:
         from peft import PeftModel
         from qwen_tts import Qwen3TTSModel  # type: ignore
 
-        self.tag = engine_tag(voice)
-        self.language = (language or voice.language or "auto").strip().capitalize()
+        self.tag = engine_tag(voice, language)
+        # Exact Qwen3-TTS name ("English", "Russian" ... or "Auto"): voice.json stores codes like "ru" since schema 3
+        self.language = qwen_language(language) or qwen_language(voice.language) or AUTO
         use_cuda = device == "cuda" or (device == "auto" and torch.cuda.is_available())
         dtype = torch.bfloat16 if use_cuda else torch.float32
         self._q = None
