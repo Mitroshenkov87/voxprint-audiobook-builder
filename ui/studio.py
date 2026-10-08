@@ -356,8 +356,7 @@ class StudioWindow(SubWindow):
     def open_settings(self) -> None:
         """Show the Settings dialog (non-blocking under the offscreen test platform)."""
         dlg = self.settings_dialog()
-        dlg.setStyleSheet(self.styleSheet())
-        dlg.refresh()
+        dlg.refresh()                          # its look comes from apply_look on show (GlassDialog), not from this window
         dlg.refresh_preload()                  # RAM and installed models may have changed since the dialog was built
         if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
             dlg.show()

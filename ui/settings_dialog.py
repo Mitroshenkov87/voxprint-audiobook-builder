@@ -74,7 +74,8 @@ class SettingsDialog(GlassDialog):
         self._win = window
         self.setObjectName("root")
         self.setMinimumWidth(460)
-        self.setStyleSheet(window.styleSheet())     # same dark / acrylic look as the main window
+        # the look (Acrylic + transparency level) is set by GlassDialog on every show, for this dialog's own native
+        # window - not copied from the main window, which may be hidden (opened from the Studio) and still plain
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(18, 14, 18, 14)
@@ -95,11 +96,14 @@ class SettingsDialog(GlassDialog):
             col.setContentsMargins(0, 0, 0, 0)
             col.setSpacing(8)
         flow = ColumnFlow(min_two=0)
+        flow.setObjectName("content")           # QWidget#content: transparent, like the windows' scroll content
         scroll = QScrollArea()
-        scroll.setObjectName("content")
+        scroll.setObjectName("settingsScroll")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setWidget(flow)
+        scroll.setWidget(flow)                  # (setWidget turns on the palette fill: GlassDialog clears it on show)
+        scroll.viewport().setAutoFillBackground(False)
+        flow.setAutoFillBackground(False)
         lay.addWidget(scroll, 1)
 
         # --- the four choices (language, transparency, network, speech recognition): one aligned grid, label | combo; the

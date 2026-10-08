@@ -218,10 +218,10 @@ QListWidget {{{{ background: {control}; border: 1px solid {border}; border-radiu
 QListWidget::item {{{{ padding: 6px; }}}}
 QListWidget::item:selected {{{{ background: {strong}; color: #ffffff; }}}}
 QDialog#root, QTextBrowser {{{{ color: {text}; }}}}
-QDialog#root {{{{ background: {root_plain}; }}}}
+QTextBrowser {{{{ background: transparent; border: none; }}}}
 """.format(text=TEXT, muted=TEXT_MUTED, faint=TEXT_FAINT, disabled=TEXT_DISABLED, on_accent=TEXT_ON_ACCENT,
            accent=ACCENT, soft=ACCENT_SOFT, strong=ACCENT_STRONG,
-           control=CONTROL_BG, hover=CONTROL_HOVER, border=CONTROL_BORDER, root_plain=ROOT_PLAIN, amber=AMBER,
+           control=CONTROL_BG, hover=CONTROL_HOVER, border=CONTROL_BORDER, amber=AMBER,
            note_bg=NOTE_BG, note_border=NOTE_BORDER, green=GREEN, badge_green_text=BADGE_GREEN_TEXT,
            badge_amber_text=BADGE_AMBER_TEXT, primary=PRIMARY, primary_hover=PRIMARY_HOVER, primary_border=PRIMARY_BORDER,
            on_primary=TEXT_ON_PRIMARY, primary_dis_bg=PRIMARY_DISABLED_BG, primary_dis_text=PRIMARY_DISABLED_TEXT,
@@ -283,13 +283,32 @@ def apply_look(win: QWidget) -> None:
             # the first frame of a new window is painted grey by Windows before the backdrop and the stylesheet arrive:
             # show it fully transparent and fade it in once the first real frame is ready
             win.setWindowOpacity(0.0)
-            QTimer.singleShot(90, lambda w=win: w.setWindowOpacity(1.0))
-        win.backdrop = platform_win.apply_backdrop(int(win.winId()))  # type: ignore[attr-defined]
+            QTimer.singleShot(90, lambda w=win: _end_fade_in(w))
+        win._backdrop_hwnd = int(win.winId())  # type: ignore[attr-defined]
+        win.backdrop = platform_win.apply_backdrop(win._backdrop_hwnd)  # type: ignore[attr-defined]
         if win.backdrop != "acrylic":  # type: ignore[attr-defined]
             win.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+    elif sys.platform == "win32" and level != "off" and win.isVisible() and getattr(win, "backdrop", "") == "acrylic" \
+            and getattr(win, "_backdrop_hwnd", 0) != int(win.winId()):
+        # Qt re-created the native window (a re-shown dialog, a changed parent): the new HWND has no backdrop yet
+        win._backdrop_hwnd = int(win.winId())  # type: ignore[attr-defined]
+        platform_win.apply_backdrop(win._backdrop_hwnd)
     style = build_style(getattr(win, "backdrop", "plain") == "acrylic")
     if win.styleSheet() != style:      # re-polishing every widget is not free: only when something changed
         win.setStyleSheet(style)
+
+
+def _end_fade_in(win: QWidget) -> None:
+    """End the fade-in: full opacity, then ask for the Acrylic backdrop again.  ``setWindowOpacity(0)`` made the window
+    a layered window while the backdrop was requested, and Windows draws no system backdrop behind a layered window; once
+    the layered style is gone the request is repeated, so dialogs (shown modally right away) get it as the windows do."""
+    try:
+        win.setWindowOpacity(1.0)
+        if sys.platform == "win32" and getattr(win, "backdrop", "") == "acrylic" and win.isVisible():
+            platform_win.apply_backdrop(int(win.winId()))
+            win.update()
+    except RuntimeError:               # the window was deleted during the 90 ms
+        pass
 
 
 def audio_seconds(path: Path) -> Optional[float]:
@@ -951,8 +970,7 @@ class MainWindow(QWidget):
     def open_settings(self) -> None:
         """Show the Settings dialog (modal, except in the offscreen test platform where it must not block)."""
         dlg = self.settings_dialog()
-        dlg.setStyleSheet(self.styleSheet())
-        dlg.refresh()
+        dlg.refresh()                       # its look comes from apply_look on show (GlassDialog), not from this window
         if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
             dlg.show()
             return
