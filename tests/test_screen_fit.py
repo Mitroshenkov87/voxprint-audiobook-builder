@@ -3,6 +3,7 @@ from unittest import mock
 
 import pytest
 from PySide6.QtCore import QRect
+from PySide6.QtGui import QFontInfo
 from PySide6.QtWidgets import QApplication, QWidget
 
 from core import i18n
@@ -53,9 +54,11 @@ def test_every_window_fits_1707x1027_and_narrate_uses_two_columns(app, tmp_path,
         s.show()
         s.navigate("narrate")
         app.processEvents()
-        # a real Windows desktop caps a window at its own size (the CI runner's is 1024x768): two columns only if it can
-        wide_ok = app.platformName() == "offscreen" or app.primaryScreen().availableGeometry().width() >= s.narrate_window.wide_width()
-        assert (s.narrate_window.flow.two or not wide_ok) and AVAIL.contains(s.narrate_window.frameGeometry())
+        nw = s.narrate_window
+        # Qt's offscreen platform on Windows (CI) has no font database: the fallback font is about twice as wide, so the
+        # widths say nothing about the real (Segoe UI) layout - check the two columns only where a real font is found
+        real_font = bool(QFontInfo(nw.font()).family())
+        assert (nw.flow.two or not real_font) and AVAIL.contains(nw.frameGeometry()), (nw.wide_width(), nw.width())
     s.shutdown()
 
 
