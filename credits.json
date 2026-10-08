@@ -2,7 +2,7 @@
  "app": {
   "name": "Voxprint",
   "display_name": "Voxprint AI Audiobook Builder",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "channel": "beta",
   "codename": "Tikkun",
   "author": "Aleksandr Mitroshenkov"
@@ -147,9 +147,11 @@
    ],
    "url": "https://github.com/myshell-ai/OpenVoice",
    "purpose": {
-    "en": "Optional direct re-voice: converts a recording into a library voice while keeping timing and intonation (downloaded on request from the Re-voice window, about 125 MB, NVIDIA GPU when CUDA is available). MyShell OpenVoice V2; inference code and weights used unmodified",
-    "de": "Optionales direktes Neuvertonen: wandelt eine Aufnahme in eine Bibliotheksstimme um und behält Timing und Betonung (auf Wunsch im Fenster Neu vertonen geladen, ca. 125 MB, NVIDIA-GPU wenn CUDA verfügbar ist). MyShell OpenVoice V2; Inferenzcode und Gewichte unverändert verwendet",
-    "ru": "Необязательное прямое переозвучивание: преобразует запись в голос из библиотеки, сохраняя время и интонацию (скачивается по запросу в окне переозвучивания, около 125 МБ, GPU NVIDIA при наличии CUDA). MyShell OpenVoice V2; код и веса используются без изменений"
+    "en": "Direct re-voice: converts a recording into a library voice while keeping timing and intonation (part of the standard model download, about 130 MB; NVIDIA GPU when CUDA is available). MyShell OpenVoice V2; inference code and weights used unmodified",
+    "de": "Direktes Neuvertonen: wandelt eine Aufnahme in eine Bibliotheksstimme um und behält Timing und Betonung (Teil des Standard-Modelldownloads, ca. 130 MB; NVIDIA-GPU wenn CUDA verfügbar ist). MyShell OpenVoice V2; Inferenzcode und Gewichte unverändert verwendet",
+    "ru": "Прямое переозвучивание: преобразует запись в голос из библиотеки, сохраняя темп и интонацию (входит в стандартную загрузку моделей, около 130 МБ; GPU NVIDIA при наличии CUDA). MyShell OpenVoice V2; код и веса используются без изменений",
+    "uk": "Пряме переозвучення: перетворює запис на голос із бібліотеки, зберігаючи темп та інтонацію (входить до стандартного завантаження моделей, близько 130 МБ; GPU NVIDIA за наявності CUDA). MyShell OpenVoice V2; код і ваги використовуються без змін",
+    "lv": "Tieša pārbalsošana: pārvērš ierakstu bibliotēkas balsī, saglabājot tempu un intonāciju (daļa no standarta modeļu lejupielādes, aptuveni 130 MB; NVIDIA GPU, ja ir pieejama CUDA). MyShell OpenVoice V2; secinājumu kods un svari izmantoti bez izmaiņām"
    }
   },
   {

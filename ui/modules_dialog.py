@@ -139,10 +139,11 @@ class ModulesDialog(GlassDialog):
                  extras_fn: Optional[Callable[[Progress], Any]] = None,
                  extras_bytes_fn: Optional[Callable[[], int]] = None,
                  models_start: Optional[Callable[[Callable[[Any], None]], Any]] = None,
-                 autostart: bool = False) -> None:
+                 autostart: bool = False, offer_size: int = 0) -> None:
         """``extras_fn`` / ``extras_bytes_fn``: step 1 extras (:func:`default_extras`); ``models_start(hook)``: starts the step 2
         model download and returns its worker (signals ``progress(int, str)``, ``done(list)``, ``failed(str, str)``) or None;
-        ``hook(worker)`` is called BEFORE the worker starts, so no signal is missed.  ``autostart``: first start, no clicks."""
+        ``hook(worker)`` is called BEFORE the worker starts, so no signal is missed.  ``autostart``: first start, no clicks (Full setup).  Without it (Quick setup) the window only offers the download: the
+        line says what Download fetches (``offer_size`` bytes in total) and nothing starts before the click."""
         super().__init__(parent)
         self.setObjectName("root")
         self.setMinimumWidth(560)
@@ -151,7 +152,8 @@ class ModulesDialog(GlassDialog):
         self.manifest_fn, self.install_fn = manifest_fn, install_fn
         self.extras_fn = extras_fn
         self.extras_bytes_fn = extras_bytes_fn or ((lambda: 0) if extras_fn is None else default_extras_bytes)
-        self.models_start, self.autostart = models_start, autostart
+        self.models_start, self.autostart, self.offer_size = models_start, autostart, int(offer_size)
+        self._go = autostart             # the model step may start: autostart, or the user pressed Download
         self.modules: List[mods.Module] = []
         self._versions = ("", "")        # (installed, available) runtime versions of the last listing
         self.worker: Optional[ModulesWorker] = None
@@ -283,7 +285,8 @@ class ModulesDialog(GlassDialog):
         self.lbl_overall.setVisible(working)
         retry = self._list_failed or self._models_state == "failed"
         self.btn_download.setText(tr("modules.btn_retry") if retry else tr("modules.btn_download"))
-        can = bool(self.missing()) or self.extras_missing() or self._list_failed or self._models_state == "failed"
+        can = bool(self.missing()) or self.extras_missing() or self._list_failed or self._models_state == "failed" \
+            or self._offer_pending()
         self.btn_download.setEnabled(not working and can)
         self.btn_restore.setEnabled(not working)
         self.chk_link.setEnabled(not working)
@@ -316,6 +319,8 @@ class ModulesDialog(GlassDialog):
                 size += self.extras_bytes_fn()
             except Exception:  # noqa: BLE001
                 pass
+        if self._offer_pending() and self.offer_size:
+            return tr("modules.offer_all", size=_gb(self.offer_size))
         if names and miss and all(m.update for m in miss) and not self.extras_missing():
             old, new = self._versions
             return tr("modules.updates", names=", ".join(names), size=_gb(size), old=screen_fit.nobreak(old or "?"),
@@ -343,6 +348,8 @@ class ModulesDialog(GlassDialog):
             return
         if self._note:
             self._set_line(self._note, error=self._note_error)
+        elif self._offer_pending():
+            self._set_line(self._summary())
         elif not self.missing():
             self._set_line(tr("modules.all_ready"))
         else:
@@ -350,13 +357,19 @@ class ModulesDialog(GlassDialog):
         self._render()
         if self.modules and not any(m.required and not (m.installed or m.update) for m in self.modules):
             self.ready.emit()
-            self._start_models()
+            if self._go:
+                self._start_models()
 
     # ---------------------------------------------------------------- step 1: install
+    def _offer_pending(self) -> bool:
+        """Quick setup: the complete download is offered and waits for the Download click."""
+        return self.models_start is not None and not self._go and self._models_state == ""
+
     def on_download_clicked(self) -> None:
+        self._go = True
         if self.missing() or self.extras_missing():
             self.start_install()
-        elif self._models_state == "failed":
+        elif self.models_start is not None and self._models_state in ("", "failed"):
             self._models_state = ""
             self._start_models()
         elif self._list_failed:

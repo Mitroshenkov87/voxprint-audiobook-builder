@@ -815,6 +815,7 @@
  "splash.checking": "Checking components…",
  "modules.try_latest": "Try the latest component versions (falls back to the verified ones if a download fails)",
  "modules.updates": "Updates available: {names} (about {size}; version {old} → {new}).",
+ "modules.offer_all": "Quick setup: nothing has been downloaded yet. Press Download to get all components and models, including the optional ones (about {size} in total). Nothing starts without this click.",
  "autorepair.title": "Check and repair",
  "autorepair.desc": "Checks the program, its components and all models file by file (SHA-256 checksums) and downloads whatever is missing or damaged from the internet again (only the bad files). Your voices and books are not touched.",
  "autorepair.step": "Step {n} of {total}: {text}",

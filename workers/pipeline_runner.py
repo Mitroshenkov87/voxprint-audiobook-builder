@@ -655,15 +655,70 @@ def _prefetch_text_extras(progress: ProgressCallback) -> None:
         log.warning("translator / text model download failed: %s", exc)
 
 
+def all_model_repos() -> List[str]:
+    """Every pinned model repository (both TTS and both speech-recognition sizes, the aligner, SAGE, the translators): the
+    complete set of the Full / Quick setup (:mod:`infra.setup_mode`).  OpenVoice V2 lives in its own folder
+    (:mod:`infra.vc_model`) and the tc-big translators come with :func:`_prefetch_text_extras`."""
+    from infra import model_mirrors, vc_model
+
+    repos = list(required_model_repos())
+    for repo in sorted(model_mirrors.load()):
+        if repo != vc_model.REPO and repo not in repos:
+            repos.append(repo)
+    return repos
+
+
+def _prefetch_small_optional(progress: ProgressCallback) -> None:
+    """Small optional models are part of the standard download (decided 2026-10-08): OpenVoice V2 (~130 MB, Re-voice
+    recording) and the DeepFilterNet program (~27 MB, noise clean-up).  Best effort: their windows can fetch them later."""
+    from infra import denoise_tool, vc_model
+
+    for name, ready, ensure in (("OpenVoice V2", vc_model.ready, vc_model.ensure),
+                                ("DeepFilterNet", denoise_tool.ready, denoise_tool.ensure)):
+        try:
+            if not ready():
+                ensure(lambda f, m="": progress(Stage.MODEL, float(f), m))
+        except Exception as exc:  # noqa: BLE001 - never block the first-run model step
+            log.warning("%s download failed: %s", name, exc)
+
+
+def _prefetch_big_optional(progress: ProgressCallback) -> None:
+    """Full / Quick setup only: the big optional module (Gemma 12B text model + llama.cpp, ~7 GB).  Best effort."""
+    from infra import llm_tool
+
+    try:
+        if llm_tool.platform_key() is not None and (llm_tool.server_exe() is None or not llm_tool.model_ready()):
+            llm_tool.ensure(lambda f, m="": progress(Stage.MODEL, float(f), m))
+    except Exception as exc:  # noqa: BLE001 - never block the first-run model step
+        log.warning("AI text model download failed: %s", exc)
+
+
+def everything_missing() -> bool:
+    """True while anything of the complete set (:func:`all_model_repos` + the optional modules) is not on the disk."""
+    from infra import denoise_tool, llm_tool, quality_models, text_models, vc_model
+
+    return bool(models_missing(all_model_repos()) or text_models.missing_component_extras() or not vc_model.ready()
+                or (denoise_tool.platform_key() is not None and denoise_tool.ready() is None)
+                or not quality_models.dnsmos_ready()
+                or (llm_tool.platform_key() is not None and (llm_tool.server_exe() is None or not llm_tool.model_ready())))
+
+
 def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[List[str]] = None,
-                    ensure=None) -> List[str]:
+                    ensure=None, everything: Optional[bool] = None) -> List[str]:
     """First run: download ALL required models automatically (TTS, aligner, speech recognition, SAGE, the small DNSMOS file of
-    the voice check), with no "quality"
-    button in between.  A Voxprint backup chosen as models source is restored first, copies in the chosen models folder /
+    the voice check, the translators, the small optional OpenVoice V2 and DeepFilterNet), with no "quality" button in between.
+    ``everything`` (default: the Full / Quick setup type, :func:`infra.setup_mode.everything`) adds every other pinned model
+    and the big optional Gemma text model, so nothing is left to download later.
+    A Voxprint backup chosen as models source is restored first, copies in the chosen models folder /
     other programs are used as they are, and only what is still missing is downloaded (multi-connection, hash-checked).
     Returns the list of repositories that were downloaded."""
+    from infra import setup_mode
+
     ensure = ensure or md.ensure_model
-    repos = repos if repos is not None else required_model_repos()
+    if everything is None:
+        everything = repos is None and setup_mode.everything()
+    if repos is None:
+        repos = all_model_repos() if everything else required_model_repos()
     _restore_backup_source(progress)
     todo = models_missing(repos)
     for repo in repos:   # copies of other programs: instant, only the "found, using it" message is shown
@@ -679,6 +734,9 @@ def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[
     if ensure is md.ensure_model:
         _prefetch_dnsmos(progress)
         _prefetch_text_extras(progress)
+        _prefetch_small_optional(progress)
+        if everything:
+            _prefetch_big_optional(progress)
     if ensure is md.ensure_model and sys.platform == "win32":
         from infra import (
             assets,  # system ffmpeg, else the pinned LGPL build (best effort, never blocks)

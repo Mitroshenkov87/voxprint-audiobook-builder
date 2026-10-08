@@ -1,11 +1,12 @@
 """The "Re-voice" window: one recording or audio file, a voice from the library, then one of two actions.
 
 * **Convert to text** - the installed speech recogniser, an editable text, then *Voice this text* (the narrator, that voice).
-* **Re-voice recording** - direct conversion into the chosen voice (timing and intonation stay). The OpenVoice V2 model is
-  optional: until the user downloads it the button stays grey and *Download model* is the action.
+* **Re-voice recording** - direct conversion into the chosen voice (timing and intonation stay). The OpenVoice V2 model
+  (~130 MB) is part of the standard first-run download; when it is still missing the button is NOT grey: a click fetches it
+  first and then converts (*Download model* does only the download).
 
 Recording uses Qt Multimedia (record / stop / play). Recognition and conversion run on worker threads. Nothing here
-downloads a model unless the user asks.
+downloads a model without a click.
 """
 from __future__ import annotations
 
@@ -393,7 +394,7 @@ class RevoiceWindow(SubWindow):
         self.btn_add.setEnabled(not busy and not recording)
         self.btn_remove.setEnabled(not busy and self.lst_files.currentRow() >= 0)
         self.btn_to_text.setEnabled(not busy and not recording and bool(self.files))
-        self.btn_direct.setEnabled(not busy and not recording and ready and has_voice and self._has_ref()
+        self.btn_direct.setEnabled(not busy and not recording and has_voice and self._has_ref()
                                    and self._current_file() is not None)
         self.btn_vc_download.setVisible(not ready)
         self.btn_vc_download.setEnabled(not busy)
@@ -402,7 +403,7 @@ class RevoiceWindow(SubWindow):
         except Exception:  # noqa: BLE001 - a broken manifest must not blank the window
             mb = 0
         self.btn_vc_download.setText(tr("revoice.vc_download", mb=mb))
-        if has_voice and ready and not self._has_ref():
+        if has_voice and not self._has_ref():
             self.lbl_direct.setText(tr("revoice.no_ref"))
         else:
             self.lbl_direct.setText(tr("revoice.direct_hint"))
@@ -521,8 +522,10 @@ class RevoiceWindow(SubWindow):
         """Convert the selected recording into the chosen voice. No text step."""
         src = self._current_file()
         rec = self._voice_record()
-        if self.busy or src is None or rec is None or not rec.preview_path or not self._vc_ready():
+        if self.busy or src is None or rec is None or not rec.preview_path:
             return False
+        if not self._vc_ready():          # the small model is standard; if it is still missing, fetch it, then convert
+            return self.download_model(then_convert=True)
         w = ConvertWorker(src, rec.preview_path, self.out_dir, self.vc_factory, self)
         w.progress.connect(lambda f: self.progress.setValue(int(f * 100)))
         w.done.connect(self._on_converted)
@@ -541,10 +544,11 @@ class RevoiceWindow(SubWindow):
         self.lbl_rec.setText(tr("revoice.converted", name=self.output.name))
         self._refresh()
 
-    def download_model(self) -> bool:
-        """Fetch the optional converter. Does nothing while a job is running or the model is already there."""
+    def download_model(self, then_convert: bool = False) -> bool:
+        """Fetch the converter (``then_convert``: and convert right after). Nothing while a job runs or the model is there."""
         if self.busy or self._vc_ready():
             return False
+        self._convert_after = then_convert
         w = DownloadWorker(self.vc_ensure, self)
         w.progress.connect(lambda f, m: (self.progress.setValue(int(f * 100)), self.lbl_state.setText(m or self.lbl_state.text())))
         w.done.connect(self._on_downloaded)
@@ -561,6 +565,11 @@ class RevoiceWindow(SubWindow):
         else:
             self.lbl_state.setText(tr("revoice.download_ok"))
         self._refresh()
+        if not error and getattr(self, "_convert_after", False):
+            self._convert_after = False
+            from PySide6.QtCore import QTimer
+
+            QTimer.singleShot(0, self.convert_direct)   # after the download worker has finished (busy is False then)
 
     def narrate(self) -> Optional[Path]:
         """Save the edited text and ask the Studio to open it in the narrator with the chosen voice."""

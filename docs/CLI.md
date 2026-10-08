@@ -144,6 +144,7 @@ voxprint models download MODULE [--yes] [--json]
 | `denoise` | DeepFilterNet3 noise clean-up (optional; alias `deepfilternet`) |
 | `llm` | Gemma 4 12B text model (optional; alias `gemma`) |
 | `dnsmos` | DNSMOS file used by the voice check (alias `mos`) |
+| `openvoice` | OpenVoice V2 voice converter for *Re-voice recording* (~130 MB; aliases `vc`, `openvoice-v2`) |
 
 ```
 voxprint models list --json

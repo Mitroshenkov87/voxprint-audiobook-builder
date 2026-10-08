@@ -94,7 +94,7 @@ def test_direct_revoice_uses_the_fake_converter_and_the_voice_reference(app, lib
     rv.shutdown()
 
 
-def test_download_model_is_explicit_and_then_the_direct_button_wakes(app, lib, tmp_path):
+def test_download_model_is_explicit_and_hides_the_download_button(app, lib, tmp_path):
     from ui.revoice_window import RevoiceWindow
 
     i18n.set_language("en")
@@ -115,7 +115,8 @@ def test_download_model_is_explicit_and_then_the_direct_button_wakes(app, lib, t
     rv.show()
     app.processEvents()
     rv.add_files()
-    assert not rv.btn_direct.isEnabled() and rv.btn_vc_download.isVisible() and "131" in rv.btn_vc_download.text()
+    # the small model is standard: the direct button is NOT grey while it is missing (a click fetches it first)
+    assert rv.btn_direct.isEnabled() and rv.btn_vc_download.isVisible() and "131" in rv.btn_vc_download.text()
     assert calls == [] and rv.download_model()
     assert wait_for(lambda: state["ready"] and not rv.busy and rv.btn_direct.isEnabled(), 10), rv.lbl_state.text()
     assert calls == [1] and not rv.btn_vc_download.isVisible()
@@ -152,3 +153,31 @@ def test_dictaphone_recording_is_stored_as_opus(tmp_path):
     assert revoice.to_opus(keep, None) == keep and revoice.to_opus(out, "ffmpeg", run=run) == out
     failed = revoice.to_opus(keep, "ffmpeg", run=lambda cmd, **kw: type("R", (), {"returncode": 1})())
     assert failed == keep and keep.exists() and not (tmp_path / "b.opus").exists()
+
+
+def test_direct_click_without_the_model_downloads_it_then_converts(app, lib, tmp_path, monkeypatch):
+    from ui.revoice_window import RevoiceWindow
+
+    i18n.set_language("en")
+    monkeypatch.setattr("core.audio_utils.ensure_ffmpeg", lambda: None)
+    voice = add_voice(lib, tmp_path, name="Anna")
+    speech_like(voice.preview_path, seconds=(0.8,))
+    src = speech_like(tmp_path / "talk.wav", seconds=(1.2,))
+    state, made = {"ready": False}, []
+
+    def ensure(progress=None, **kw):
+        state["ready"] = True
+
+    def factory():
+        made.append(voice_convert.FakeVoiceConverter())
+        return made[-1]
+
+    rv = RevoiceWindow(asr_factory=lambda: None, pick_files=lambda: [str(src)], out_dir=tmp_path / "rv", library=lib,
+                       vc_status=lambda: "ready" if state["ready"] else "needs_download", vc_ensure=ensure,
+                       vc_factory=factory)
+    rv.add_files()
+    assert rv.btn_direct.isEnabled()
+    rv.btn_direct.click()
+    assert wait_for(lambda: rv.output is not None and rv.output.is_file() and not rv.busy, 10), rv.lbl_state.text()
+    assert state["ready"] and made
+    rv.shutdown()

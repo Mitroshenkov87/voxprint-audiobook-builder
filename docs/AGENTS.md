@@ -128,6 +128,19 @@ voxprint narrate ./revoice/Intro.txt --voice my-voice --out ./audiobooks --forma
 
 A folder of audio files becomes one book, one chapter per file. `--title` sets the file name. `--language en` (or `ru`, `de`, …) is optional.
 
+### Back up and restore models and voices
+
+Copy every heavy file (model snapshots, `llm/`, `deepfilternet/`, `dnsmos/`, the voice library) to a drive, and bring it back on another PC or after a reinstall. Both commands resume: a file already there with the same size and SHA-256 is skipped.
+
+```
+voxprint backup --out E:\ --json
+voxprint backup --out /mnt/usb --no-voices --json
+voxprint restore --from E:\ --json
+voxprint restore --from E:\ --link --json
+```
+
+`backup` writes `<DIR>/Voxprint-backup/` with the manifest `voxprint-backup.json` and stops before copying when the drive is too small. `--no-models` / `--no-voices` leave a part out. `restore` copies into the normal folders and checks every file against the manifest and the pinned hashes; a damaged or missing file is named in `problems` (and in `warnings`) and left for the normal download, so exit code 0 can still come with problems. `--link` copies the voices but reads the models from the backup in place: the drive must stay connected. A backup error (no room, no manifest, unreadable folder) exits 3.
+
 ### Diagnostics zip
 
 ```
@@ -165,7 +178,7 @@ Stdout with `--json` is newline-delimited JSON. Every line is one object. Progre
 |---|---|---|
 | `type` | yes | `"result"` |
 | `ok` | yes | `true` only when `exit_code` is 0 |
-| `command` | yes | `version`, `status`, `capabilities`, `narrate`, `train`, `voices list`, `voices export`, `diag`, `models list`, `models download`, `revoice` |
+| `command` | yes | `version`, `status`, `capabilities`, `narrate`, `train`, `voices list`, `voices export`, `diag`, `models list`, `models download`, `revoice`, `backup`, `restore` |
 | `exit_code` | yes | Same number the process returns |
 | `outputs` | yes | Paths written (may be empty) |
 | `warnings` | yes | Strings. Empty array when there are none |
@@ -187,6 +200,7 @@ Extra fields by command:
 | `models list` | `modules`: array of `{id, title, optional, installed, kind}` |
 | `models download` | `module`, `installed` (bool), `downloaded` (`false` when it was already there) |
 | `revoice` | `chapters` (integer). The text path is `outputs[0]` |
+| `backup`, `restore` | `target`, `copied_files`, `skipped_files`, `copied_bytes`, `problems`, `conflicts`, `external_models` (`--link`: the models folder in use, else empty). The backup folder is `outputs[0]` |
 
 ### `status` object
 
@@ -194,7 +208,7 @@ Extra fields by command:
 
 `formats`: canonical ids (`opus_single`, `mp3_chapters`, `m4b`, `flac_chapters`, …). `format_aliases` maps `mp3`, `opus`, `flac`, `m4b`, `wav` onto those ids.
 
-`modules`: one row per concrete model (`tts-1.7b`, `tts-0.6b`, `aligner`, `asr-0.6b`, `asr-1.7b`, text models such as `sage-ru` and `opus-big-en-ru`, `denoise`, `llm`, `dnsmos`). `optional: false` means a core speech model. `installed: true` means the files are on disk.
+`modules`: one row per concrete model (`tts-1.7b`, `tts-0.6b`, `aligner`, `asr-0.6b`, `asr-1.7b`, text models such as `sage-ru` and `opus-big-en-ru`, `denoise`, `llm`, `dnsmos`, `openvoice`). `optional: false` means a core speech model. `installed: true` means the files are on disk.
 
 `runtime.thin`: `false` on a normal install (Python libraries are already there). On a thin install, `runtime.modules` is filled only from a cached manifest. Otherwise use `Voxprint.exe --modules-status`.
 
@@ -221,7 +235,7 @@ Narrate and train often run for hours. Do not use a timeout of a few minutes.
 - After progress has started, `percent` should move. Narrate also sends `done` / `total`.
 - If you kill the process, it will not exit 6 (that code is the in-process cancel token, and the CLI has no cancel flag). Start the same `narrate` command again; cached chunks are skipped.
 - Train does not resume as a no-op. Starting it again trains another voice.
-- `models download` is safe to repeat.
+- `models download`, `backup` and `restore` are safe to repeat.
 
 ## Safety
 
@@ -244,4 +258,5 @@ A voice trained with this CLI is marked consent method `none` and scope `private
 | Linux launcher missing | The Linux package is temporarily unavailable. Use a source checkout: `python main.py …` |
 | Translation model missing | `voxprint models download translate --json` or one id such as `opus-big-en-ru` |
 | Re-voice says the recogniser is missing | `voxprint models download asr --json` |
+| Models must move to another PC or drive | `voxprint backup --out <drive> --json` there, `voxprint restore --from <drive> --json` here |
 | Help text is huge | You asked for the top-level page. Use `voxprint narrate --help` (or `train`, `models`, `revoice`) |

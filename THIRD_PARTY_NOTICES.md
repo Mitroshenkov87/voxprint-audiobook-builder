@@ -1,6 +1,6 @@
 # Third-party notices
 
-Voxprint AI Audiobook Builder (c) Aleksandr Mitroshenkov, built with AI assistance. Version 0.1.1.
+Voxprint AI Audiobook Builder (c) Aleksandr Mitroshenkov, built with AI assistance. Version 0.1.2.
 
 Voxprint stands on the open-source projects and models listed below. Every component keeps its own licence;
 the full licence texts are in the `licenses/` folder next to this file. This file is generated from
@@ -66,7 +66,7 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 
 ### OpenVoice V2 tone-colour converter (myshell-ai/OpenVoice)
 
-* Purpose: Optional direct re-voice: converts a recording into a library voice while keeping timing and intonation (downloaded on request from the Re-voice window, about 125 MB, NVIDIA GPU when CUDA is available). MyShell OpenVoice V2; inference code and weights used unmodified
+* Purpose: Direct re-voice: converts a recording into a library voice while keeping timing and intonation (part of the standard model download, about 130 MB; NVIDIA GPU when CUDA is available). MyShell OpenVoice V2; inference code and weights used unmodified
 * Licence: MIT
 * Project: <https://github.com/myshell-ai/OpenVoice>
 * Status: downloaded on first start

@@ -89,9 +89,14 @@ class OpenVoiceConverter:
         model = synthesizer(0, hps.data.filter_length // 2 + 1, n_speakers=int(hps.data.n_speakers), **config["model"])
         model = model.to(self._device)
         model.eval()
-        # The checkpoint is the SHA-256-pinned converter file, not an arbitrary path. weights_only cannot
-        # load this checkpoint (it is a training pickle, not a pure tensor archive).
-        checkpoint = torch.load(folder / "converter" / "checkpoint.pth", map_location=self._device, weights_only=False)
+        # The checkpoint is the SHA-256-pinned converter file (checked on download, size checked by vc_model.ready), not
+        # an arbitrary path. The safe tensor-only loader is tried first; the full unpickler is the fallback for a
+        # training pickle that holds more than tensors.
+        path = folder / "converter" / "checkpoint.pth"
+        try:
+            checkpoint = torch.load(path, map_location=self._device, weights_only=True)
+        except Exception:  # noqa: BLE001 - pickle.UnpicklingError and friends: not a pure tensor archive
+            checkpoint = torch.load(path, map_location=self._device, weights_only=False)  # nosec B614 - pinned SHA-256 file
         model.load_state_dict(checkpoint["model"], strict=False)
         self._model, self._hps = model, hps
         log.info("OpenVoice V2 converter on %s", self._device)

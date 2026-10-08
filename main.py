@@ -176,9 +176,10 @@ def _modules_cli(argv) -> int:
         return 1
 
 
-def _offer_components(win, app, then_prefetch: bool) -> None:
+def _offer_components(win, app, then_prefetch: bool, autostart: bool = True) -> None:
     """Thin build, first start: the Components window downloads the runtime modules and SAGE without a click (step 1) and then
-    starts the download of ALL heavy models (step 2, the main window's first-run prefetch), showing one live line throughout."""
+    starts the download of ALL heavy models (step 2, the main window's first-run prefetch), showing one live line throughout.
+    ``autostart=False`` (Quick setup, :mod:`infra.setup_mode`): the same download is only offered and starts on the click."""
     from PySide6.QtCore import QTimer
 
     from ui.modules_dialog import ModulesDialog, default_extras
@@ -188,8 +189,16 @@ def _offer_components(win, app, then_prefetch: bool) -> None:
         # this existed the call raised AttributeError inside the Qt slot and the models never started after the components.
         return win.start_prefetch(hook) if then_prefetch else None
 
+    offer = 0
+    if not autostart:
+        try:
+            from infra import setup_mode
+
+            offer = setup_mode.full_sizes()["total"]
+        except Exception:  # noqa: BLE001 - only the size on the line is missing then
+            offer = 0
     dlg = ModulesDialog(win.styleSheet(), win, extras_fn=default_extras, models_start=models_start if then_prefetch else None,
-                        autostart=True)
+                        autostart=autostart, offer_size=offer)
     win._components = dlg                    # keep a reference
 
     def ready() -> None:
@@ -369,6 +378,19 @@ def main(argv=None) -> int:
         except Exception:  # noqa: BLE001 - never get in the way of starting up
             importing = False
     want_prefetch = first_run or importing or "--prefetch" in argv
+    from infra import setup_mode
+
+    setup = "" if selftest else setup_mode.mode()       # Full / Quick setup type chosen in the installer
+    complete_set = False
+    if setup and not selftest:
+        try:   # both setup types aim at the complete set: the Components window stays the place to get it
+            from workers.pipeline_runner import everything_missing
+
+            complete_set = _mods.is_thin() and (thin_wait or everything_missing())
+        except Exception:  # noqa: BLE001 - never get in the way of starting up
+            complete_set = False
+    if complete_set:
+        thin_wait, want_prefetch = True, True
     if thin_wait:
         # the check above ran without PyTorch (GPU unknown, so possibly the wrong TTS size): after the components the
         # prefetch looks again and simply finds nothing to do when every model is already there
@@ -386,7 +408,7 @@ def main(argv=None) -> int:
 
         threading.Thread(target=projects.ensure_shortcut, name="projects-shortcut", daemon=True).start()
     if thin_wait:
-        _offer_components(win, app, want_prefetch)
+        _offer_components(win, app, want_prefetch, autostart=setup_mode.auto_download())
     if selftest:
         QTimer.singleShot(300, app.quit)
     return app.exec()

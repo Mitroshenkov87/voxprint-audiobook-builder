@@ -28,7 +28,7 @@ OpenVoice V2 is pinned in `infra/model_mirrors.json` (hashes only, no backup mir
 
 The inference code vendored under `third_party/openvoice/` is the upstream MIT modules at commit `74a1d147b17a8c3092dd5430504bd83ef6c7eb23` (`models`, `modules`, `attentions`, `commons`, `mel_processing`, `transforms`). The text-to-speech frontend, the watermark and the base-speaker checkpoints are not included. The watermark is not applied.
 
-It is **not** part of the first-run download, Check & repair, or the portable "all models" folder. Until you press *Download model* the direct button stays grey. The files go to `<models folder>/openvoice-v2` (not `myshell-ai--OpenVoiceV2`, so a repair pass does not try to fetch them through the generic model downloader). The button shows the size from the manifest. CUDA is used when PyTorch sees an NVIDIA GPU; otherwise the same checkpoint runs on the CPU.
+Since build 666 it is part of the standard first-run download (small optional models up to ~300 MB are, decided 2026-10-08), and of the Full / Quick setup's complete download. It is not in Check & repair or the portable "all models" folder. The direct button is never grey because of it: if the model is still missing, a click downloads it first and then converts; *Download model* only downloads. The files go to `<models folder>/openvoice-v2` (not `myshell-ai--OpenVoiceV2`, so a repair pass does not try to fetch them through the generic model downloader). The button shows the size from the manifest. CUDA is used when PyTorch sees an NVIDIA GPU; otherwise the same checkpoint runs on the CPU.
 
 ## A later model
 

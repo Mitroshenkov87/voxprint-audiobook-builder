@@ -2,6 +2,11 @@
 ; For the --onedir variant:  ISCC /DONEDIR installer\Voxprint.iss
 ; Windows 11 x64 only. The models are not part of the installer: the app downloads them itself on first start
 ; (after the installation, Voxprint can be started right away with the --prefetch flag).
+; Wizard page "Setup type" (decided 2026-10-08; infra/setup_mode.py): exactly two choices, written to state\install_mode.txt.
+;  * Full (default): the first start downloads EVERYTHING without a further click - the components and ALL models including the
+;    optional ones (about FullModelsMB + FullRuntimeMB below, from the pinned sizes); the page checks the free space first.
+;  * Quick: only the program is installed; the first start opens the Components window, which OFFERS the same complete download.
+;  Nothing is cut in either mode: the end result is identical.  Silent: /Mode=full (default) or /Mode=quick.
 ; Wizard page "Models folder" (after the install folder): where the voice models (~15 GB) live. Default = the current location
 ; %LOCALAPPDATA%\Voxprint\models; the user may pick another folder or drive.  Only paths are REMEMBERED; the installer copies no model.
 ; Two cases (decided 2026-10-05):
@@ -35,7 +40,7 @@
 #define AppName "Voxprint"
 ; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
 #define AppDisplayName "Voxprint AI Audiobook Builder"
-#define AppVersion "0.1.1"
+#define AppVersion "0.1.2"
 #define AppExe "Voxprint.exe"
 ; CI build number and codename (tools/build_number.py; build_online.ps1 passes /DAppBuild= /DAppCodename=); 0 = local build
 #ifndef AppBuild
@@ -44,6 +49,9 @@
 #ifndef AppCodename
 #define AppCodename ""
 #endif
+; Pinned sizes of the complete download in MiB (infra/setup_mode.py: full_sizes; tests/test_setup_modes.py keeps them in step)
+#define FullModelsMB "25369"
+#define FullRuntimeMB "2895"
 #ifndef ManifestUrl
 #define ManifestUrl "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/latest/download/manifest-stable.json"
 #endif
@@ -98,9 +106,27 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [CustomMessages]
-english.RunPrefetch=Start %1 and set up the models (downloads up to about 15 GB once, or imports your existing models folder)
-russian.RunPrefetch=Запустить %1 и подготовить модели (однократная загрузка до ~15 ГБ или импорт из вашей папки с моделями)
-german.RunPrefetch=%1 starten und die Modelle einrichten (einmaliger Download von bis zu ca. 15 GB oder Import aus Ihrem Modellordner)
+english.RunPrefetch=Start %1 now
+russian.RunPrefetch=Запустить %1 сейчас
+german.RunPrefetch=%1 jetzt starten
+english.ModePageCaption=Setup type
+russian.ModePageCaption=Тип установки
+german.ModePageCaption=Installationsart
+english.ModePageDescription=When should the components and models be downloaded?
+russian.ModePageDescription=Когда скачивать компоненты и модели?
+german.ModePageDescription=Wann sollen die Komponenten und Modelle geladen werden?
+english.ModePageSubCaption=Both choices end with the same complete program; only the moment of the download differs.
+russian.ModePageSubCaption=Оба варианта дают одну и ту же полную программу; отличается только момент загрузки.
+german.ModePageSubCaption=Beide Varianten ergeben dasselbe vollständige Programm; nur der Zeitpunkt des Downloads ist anders.
+english.ModeFull=Full (recommended): on the first start everything is downloaded without further questions - the components and ALL models, including the optional ones (about %1 GB)
+russian.ModeFull=Полная (рекомендуется): при первом запуске всё скачивается без лишних вопросов - компоненты и ВСЕ модели, включая дополнительные (около %1 ГБ)
+german.ModeFull=Vollständig (empfohlen): Beim ersten Start wird alles ohne weitere Fragen geladen - die Komponenten und ALLE Modelle, auch die optionalen (ca. %1 GB)
+english.ModeQuick=Quick: install only the program now; on the first start the Components window offers the same complete download (about %1 GB)
+russian.ModeQuick=Быстрая: сейчас установить только программу; при первом запуске окно «Компоненты» предложит ту же полную загрузку (около %1 ГБ)
+german.ModeQuick=Schnell: jetzt nur das Programm installieren; beim ersten Start bietet das Fenster „Komponenten" denselben vollständigen Download an (ca. %1 GB)
+english.ModeNoSpace=Not enough free space for the full download on %1: about %2 GB are needed, %3 GB are free.%n%nChoose a models folder on another drive (Back), free some space, or choose Quick setup.
+russian.ModeNoSpace=Недостаточно места для полной загрузки на %1: нужно около %2 ГБ, свободно %3 ГБ.%n%nВыберите папку моделей на другом диске (Назад), освободите место или выберите быструю установку.
+german.ModeNoSpace=Nicht genug freier Speicher für den vollständigen Download auf %1: etwa %2 GB werden benötigt, %3 GB sind frei.%n%nWählen Sie einen Modellordner auf einem anderen Laufwerk (Zurück), schaffen Sie Platz oder wählen Sie die schnelle Installation.
 english.VcRedistStatus=Installing Microsoft Visual C++ components...
 russian.VcRedistStatus=Устанавливаю компоненты Microsoft Visual C++…
 german.VcRedistStatus=Microsoft Visual C++-Komponenten werden installiert...
@@ -113,9 +139,9 @@ german.UninstallDataQuestion=Auch die heruntergeladenen Modelle und Protokolle (
 english.ModelsPageCaption=Models folder
 russian.ModelsPageCaption=Папка моделей
 german.ModelsPageCaption=Modellordner
-english.ModelsPageDescription=Where should the voice models (about 15 GB) be stored?
-russian.ModelsPageDescription=Где хранить голосовые модели (около 15 ГБ)?
-german.ModelsPageDescription=Wo sollen die Sprachmodelle (ca. 15 GB) gespeichert werden?
+english.ModelsPageDescription=Where should the models (all of them: about %1 GB) be stored?
+russian.ModelsPageDescription=Где хранить модели (все вместе: около %1 ГБ)?
+german.ModelsPageDescription=Wo sollen die Modelle (alle zusammen: ca. %1 GB) gespeichert werden?
 english.ModelsPageSubCaption=Keep the default or choose another folder or drive. An empty folder becomes the models folder (models are downloaded into it); models it already holds are used. A folder with a Voxprint backup (voxprint-backup.json) is only read: on the first start its models and voices are restored into the default folder. Your voices and settings stay in the user profile.
 russian.ModelsPageSubCaption=Оставьте папку по умолчанию или выберите другую папку или диск. Пустая папка становится папкой моделей (модели скачиваются в неё); уже имеющиеся в ней модели используются. Папка с резервной копией Voxprint (voxprint-backup.json) только читается: при первом запуске модели и голоса восстанавливаются из неё в папку по умолчанию. Ваши голоса и настройки остаются в профиле пользователя.
 german.ModelsPageSubCaption=Behalten Sie den Standard oder wählen Sie einen anderen Ordner oder ein anderes Laufwerk. Ein leerer Ordner wird zum Modellordner (die Modelle werden dorthin geladen); vorhandene Modelle werden verwendet. Ein Ordner mit einer Voxprint-Sicherung (voxprint-backup.json) wird nur gelesen: Beim ersten Start werden Modelle und Stimmen daraus in den Standardordner wiederhergestellt. Ihre Stimmen und Einstellungen bleiben im Benutzerprofil.
@@ -218,6 +244,7 @@ Filename: "{app}\{#AppExe}"; Parameters: "--prefetch"; Description: "{cm:RunPref
 var
   ModelsPage: TWizardPage;
   ModelsEdit: TNewEdit;
+  ModePage: TInputOptionWizardPage;
 #ifdef ONLINE
   LatestCheck: TNewCheckBox;
 #endif
@@ -434,6 +461,57 @@ end;
 
 #endif
 
+{ MiB as whole GB for the texts (rounded). }
+function GbText(const Mb: Int64): String;
+begin
+  Result := IntToStr((Mb + 512) div 1024);
+end;
+
+{ The setup type: 'full' (default) or 'quick' (infra/setup_mode.py reads state\install_mode.txt). }
+function SetupMode(): String;
+begin
+  if ModePage.Values[1] then Result := 'quick' else Result := 'full';
+end;
+
+{ Free MiB on the drive of Dir (-1 = unknown). }
+function FreeMb(const Dir: String): Int64;
+var
+  Free, Total: Int64;
+begin
+  Result := -1;
+  if GetSpaceOnDisk64(AddBackslash(ExtractFileDrive(Dir)), Free, Total) then
+    Result := Free div (1024 * 1024);
+end;
+
+{ Full setup: room for the models on the models drive and for the components (runtime) in the user profile (5 % margin).
+  Returns '' or the message.  Silent installs only log it (a script may free the space before the first start). }
+function SpaceProblem(const ModelsDir: String): String;
+var
+  ModelsDrive, RtDrive: String;
+  Need, Have: Int64;
+begin
+  Result := '';
+  ModelsDrive := ExtractFileDrive(ModelsDir);
+  RtDrive := ExtractFileDrive(ExpandConstant('{localappdata}'));
+  Need := StrToInt64('{#FullModelsMB}');
+  if CompareText(ModelsDrive, RtDrive) = 0 then Need := Need + StrToInt64('{#FullRuntimeMB}');
+  Need := Need + Need div 20;
+  Have := FreeMb(ModelsDir);
+  if (Have >= 0) and (Have < Need) then
+  begin
+    Result := FmtMessage(CustomMessage('ModeNoSpace'), [ModelsDrive, GbText(Need), GbText(Have)]);
+    Exit;
+  end;
+  if CompareText(ModelsDrive, RtDrive) <> 0 then
+  begin
+    Need := StrToInt64('{#FullRuntimeMB}');
+    Need := Need + Need div 20;
+    Have := FreeMb(ExpandConstant('{localappdata}'));
+    if (Have >= 0) and (Have < Need) then
+      Result := FmtMessage(CustomMessage('ModeNoSpace'), [RtDrive, GbText(Need), GbText(Have)]);
+  end;
+end;
+
 { Page after the install folder: the models folder (default = the current Local location).  Nothing is copied here.
   A plain custom page, NOT CreateInputDirPage (that one behaved badly in silent installs; found in the final installer test). }
 procedure InitializeWizard();
@@ -441,7 +519,8 @@ var
   Info, Prompt: TNewStaticText;
   Browse: TNewButton;
 begin
-  ModelsPage := CreateCustomPage(wpSelectDir, CustomMessage('ModelsPageCaption'), CustomMessage('ModelsPageDescription'));
+  ModelsPage := CreateCustomPage(wpSelectDir, CustomMessage('ModelsPageCaption'),
+    FmtMessage(CustomMessage('ModelsPageDescription'), [GbText(StrToInt64('{#FullModelsMB}'))]));
   Info := TNewStaticText.Create(ModelsPage);
   Info.Parent := ModelsPage.Surface;
   Info.WordWrap := True;
@@ -483,6 +562,15 @@ begin
     LatestCheck.Checked := ExpandConstant('{param:Latest|0}') = '1';
   end;
 #endif
+  { the setup type comes right after the models folder (its free-space check needs that folder) }
+  ModePage := CreateInputOptionPage(ModelsPage.ID, CustomMessage('ModePageCaption'), CustomMessage('ModePageDescription'),
+    CustomMessage('ModePageSubCaption'), True, False);
+  ModePage.Add(FmtMessage(CustomMessage('ModeFull'), [GbText(StrToInt64('{#FullModelsMB}') + StrToInt64('{#FullRuntimeMB}'))]));
+  ModePage.Add(FmtMessage(CustomMessage('ModeQuick'), [GbText(StrToInt64('{#FullModelsMB}') + StrToInt64('{#FullRuntimeMB}'))]));
+  if Lowercase(Trim(ExpandConstant('{param:Mode|full}'))) = 'quick' then
+    ModePage.SelectedValueIndex := 1
+  else
+    ModePage.SelectedValueIndex := 0;
 #ifdef PORTABLE
   CreatePortablePage();
 #endif
@@ -490,9 +578,25 @@ end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
-  Dir, Backup: String;
+  Dir, Backup, Problem: String;
 begin
   Result := True;
+  if (CurPageID = ModePage.ID) and (SetupMode() = 'full') then
+  begin
+    Dir := RemoveBackslash(Trim(ModelsEdit.Text));
+    if BackupRootOf(Dir) <> '' then Dir := DefaultModelsDir();     { a backup is restored into the default folder }
+    Problem := SpaceProblem(Dir);
+    if Problem <> '' then
+    begin
+      if WizardSilent then
+        Log(Problem)
+      else
+      begin
+        MsgBox(Problem, mbError, MB_OK);
+        Result := False;
+      end;
+    end;
+  end;
   if CurPageID = ModelsPage.ID then
   begin
     Dir := RemoveBackslash(Trim(ModelsEdit.Text));
@@ -748,6 +852,8 @@ begin
       Lines[0] := Dir;
       SaveStringsToUTF8File(StateDir + '\existing_models_dir.txt', Lines, False);
     end;
+    Lines[0] := SetupMode();                               { Full / Quick (infra/setup_mode.py) }
+    SaveStringsToUTF8File(StateDir + '\install_mode.txt', Lines, False);
   end;
 end;
 

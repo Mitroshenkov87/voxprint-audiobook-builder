@@ -43,7 +43,7 @@ from core.narration import NarrationOptions, NarrationProgress, PauseToken
 from core.voice_info import VOICE_TYPES, normalize_voice_type
 from core.voice_library import VoiceLibrary, VoiceRecord
 from infra import backup as backup_mod
-from infra import denoise_tool, diagnostics, keep_awake, llm_tool, projects, quality_models, text_models
+from infra import denoise_tool, diagnostics, keep_awake, llm_tool, projects, quality_models, text_models, vc_model
 from infra import model_downloader as md
 from infra import modules as runtime_modules
 from infra import paths as app_paths
@@ -100,7 +100,7 @@ CORE_MODULE_IDS = (
     "tts", "tts-1.7b", "tts-0.6b",
     "aligner",
     "asr", "asr-0.6b", "asr-1.7b",
-    "denoise", "llm", "dnsmos",
+    "denoise", "llm", "dnsmos", "openvoice",
     "translate", "required",
 )
 ALIASES = {
@@ -110,6 +110,8 @@ ALIASES = {
     "llm-gemma4-12b": "llm",
     "translation": "translate",
     "mos": "dnsmos",
+    "vc": "openvoice",
+    "openvoice-v2": "openvoice",
 }
 _SKIP_FLAGS = {"--json", "--yes", "-y"}
 _ENTRY_FLAGS = {"--version", "-V", "--help", "-h"}
@@ -942,6 +944,8 @@ def module_installed(module_id: str) -> bool:
         return bool(llm_tool.model_ready() and llm_tool.server_exe())
     if key == "dnsmos":
         return bool(quality_models.dnsmos_ready())
+    if key == "openvoice":
+        return bool(vc_model.ready())
     if key in _text_ids():
         return text_models.state(text_models.get(key)) == text_models.STATE_READY
     return _repo_installed(_repo_for(key))
@@ -983,6 +987,10 @@ def module_catalog() -> list[dict]:
         "id": "dnsmos", "title": quality_models.DNSMOS_LABEL, "optional": True, "kind": "tool",
         "installed": bool(quality_models.dnsmos_ready()),
     })
+    rows.append({
+        "id": "openvoice", "title": vc_model.LABEL, "optional": True, "kind": "model",
+        "installed": bool(vc_model.ready()),
+    })
     return rows
 
 
@@ -1004,6 +1012,8 @@ def _paths_for(key: str) -> list[str]:
         return [str(llm_tool.model_path())]
     if key == "dnsmos":
         return [str(quality_models.dnsmos_path())]
+    if key == "openvoice":
+        return [str(vc_model.model_dir())]
     if key in _text_ids():
         return [str(text_models.get(key).local_dir)]
     return [str(md.local_dir_for(_repo_for(key)))]
@@ -1025,6 +1035,8 @@ def _fetch_one(key: str, progress: Callable[[float, str], None]) -> Path:
             return Path(llm_tool.ensure(progress))
         if key == "dnsmos":
             return Path(quality_models.ensure_dnsmos(progress))
+        if key == "openvoice":
+            return Path(vc_model.ensure(progress))
         if key in _text_ids():
             return Path(text_models.ensure(text_models.get(key), stage_cb))
         return Path(md.ensure_model(_repo_for(key), stage_cb))
