@@ -5,6 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Added
+- **Agent-drivable CLI** (`cli.py`, [docs/CLI.md](docs/CLI.md), [docs/AGENTS.md](docs/AGENTS.md)): every command is non-interactive (`--yes` is accepted); `--json` prints progress as JSON lines and a final result (output paths, durations, warnings); stable exit codes for bad arguments, a missing model, GPU / out of memory, a bad input file, cancellation and an internal error, each with a `Fix:` line; layered `--help` with an example per command; `voxprint --version` prints the version, build number and codename from `BUILD.json`; `status` / `capabilities` lists installed models, the GPU, voices and formats as JSON; `models download <module>` fetches an optional module; `revoice` writes a transcript a later `narrate` can speak. Existing `train`, `narrate`, `voices` and `diag` arguments are unchanged. Tests use fake models only (`tests/test_user_cli.py`).
+
 ### Fixed
 - **Settings and the other dialogs were not translucent** (build 665 on Windows 11): the Settings content sat on an opaque grey block (`QScrollArea.setWidget` turns on the palette fill of the scrolled widget; the windows avoid it with the transparent `QWidget#content`), and a `QDialog#root` rule painted every dialog in the solid colour instead of the window tint. Dialogs now use the same tint, transparent scroll content and text browser, take their look from their own native window instead of copying the (possibly hidden, still plain) Train window's stylesheet, and ask for the Acrylic backdrop again once the fade-in has ended (the first request is made while the window is layered) or when Qt re-created the native window. Tests: `tests/test_dialog_glass.py`.
 

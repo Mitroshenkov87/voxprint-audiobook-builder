@@ -2,6 +2,8 @@
 
 **Project:** Voxprint AI Audiobook Builder - an offline desktop app (PySide6) that trains a voice (LoRA on Qwen3-TTS) from a short recording and narrates TXT/FB2/EPUB books in it; optional offline translation (Opus-MT). Beta. Apache-2.0.
 
+Driving the installed program (commands, JSON, exit codes, where the executable lives): [docs/AGENTS.md](docs/AGENTS.md). This file is for agents that change the source.
+
 ## Layout
 * `core/` - pipeline logic, no Qt (alignment, dataset, narration, translation, consent, export) · `workers/` - background threads · `ui/` - PySide6 windows (no heavy work)
 * `infra/` - downloads, mirrors, paths, updater, environment, platform code · `tools/` - build/maintenance scripts · `locales/` - `en.json`, `ru.json`, `de.json`
