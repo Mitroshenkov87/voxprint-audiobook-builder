@@ -443,9 +443,28 @@ def finalize_download(partial: Path, target: Path) -> None:
 _NETWORK_WORDS = ("Timeout", "Connection", "SSL", "Proxy", "HTTPError", "URLError", "Stalled", "Offline", "gaierror")
 
 
+def _locked(exc: BaseException) -> bool:
+    """A file was locked / access denied somewhere in the exception chain (a local problem, not the network's)."""
+    seen = 0
+    e: Optional[BaseException] = exc
+    while e is not None and seen < 10:
+        if isinstance(e, PermissionError):
+            return True
+        e, seen = e.__cause__ or e.__context__, seen + 1
+    return False
+
+
 def _is_network_failure(exc: BaseException) -> bool:
     """A network problem (timeout, reset, DNS, proxy, stall) - as opposed to a disk / permission / logic error."""
+    if _locked(exc):
+        return False
     return any(any(w in c.__name__ for w in _NETWORK_WORDS) for c in type(exc).__mro__)
+
+
+#: A source that stalled AFTER it had delivered data is resumed this many times (``STALL_PAUSE`` s apart) before the next
+#: source is tried (a long file on a flaky route stalls now and then; a source that gives nothing is left at once).
+STALL_RETRIES = 3
+STALL_PAUSE = 3.0
 
 
 #: Longest pre-download check of "is Hugging Face usable" (seconds); a slower answer counts as "slow".
@@ -726,8 +745,8 @@ def _ensure_model(
         except download_watch.Stalled:
             raise                       # the watchdog gave up on this source: the caller switches to the next one
         except Exception as exc:  # noqa: BLE001
-            if not revision:
-                raise
+            if not revision or _locked(exc):
+                raise                       # a locked file is not a revision problem
             log.warning("pinned revision %s of %s unavailable (%s) - trying latest", revision[:8], repo_id, exc)
             if not isinstance(exc, OSError):    # network failure: the files are still good for resuming; a revision error: discard them
                 shutil.rmtree(partial, ignore_errors=True)
@@ -842,7 +861,9 @@ def _ensure_model(
         cur["f"] = _frac(cur["f"])
         progress(stage, cur["f"], m.text(tr, short, int(cur["f"] * 100)))
 
-    for src in order:
+    attempts = [(src, 0) for src in order]
+    while attempts and not ok_source:
+        src, retry = attempts.pop(0)
         label = _SOURCE_NAMES[src]
         meter.set_source(label)
         cur["cancel"] = threading.Event()
@@ -851,7 +872,9 @@ def _ensure_model(
         try:
             if not meter.total:
                 meter.set_total(known_total(src))
-            if src == "hfm":
+            if retry:
+                log.info("resuming %s from %s (retry %d of %d)", repo_id, label, retry, STALL_RETRIES)
+            elif src == "hfm":
                 log.warning("download of %s from the original sources failed - trying the Hugging Face backup mirror", repo_id)
             elif src == "ms" and errors:
                 log.warning("download of %s from Hugging Face failed - trying ModelScope", repo_id)
@@ -864,10 +887,14 @@ def _ensure_model(
             log.info("%s from %s: %.0f MB in %.0f s (%.1f MB/s)", repo_id, label, got / 1e6, spent, got / 1e6 / max(spent, 0.1))
             if src == "hf" and mirror_ok:
                 modelscope_mirror.remember_hf(True)
-            break
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{src}: {type(exc).__name__}: {exc}")
             log.warning("download of %s from %s failed: %s", repo_id, src, exc)
+            if isinstance(exc, download_watch.Stalled) and exc.progressed and retry < STALL_RETRIES:
+                # the source delivered data and then stalled: resume it from the partial files before switching
+                attempts.insert(0, (src, retry + 1))
+                _sleep(STALL_PAUSE)
+                continue
             if src == "hf" and mirror_ok and _is_network_failure(exc) and not complete():
                 modelscope_mirror.remember_hf(False)      # measured: no data / network error; later models go to ModelScope first
     if not ok_source:

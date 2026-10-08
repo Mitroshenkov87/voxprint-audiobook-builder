@@ -128,6 +128,8 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
     ``expected_sizes`` are the sizes of the verified revision; every one of those files that exists on the mirror must
     have exactly that size, otherwise :class:`MirrorError` is raised.
     """
+    from infra import parallel_download
+
     files = list_files(repo_id, opener)
     sizes = dict(files)
     if expected_sizes:
@@ -155,7 +157,6 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
         if have < size:
             url = f"{BASE_URL}/api/v1/models/{repo_id}/repo?" + urllib.parse.urlencode(
                 {"Revision": REVISION, "FilePath": rel})
-            from infra import parallel_download
             if (parallel_download.enabled() and size >= parallel_download.parallel_min()
                     and have == 0 and opener is _open):
                 # multi-connection Range into ``target`` directly (parts dir beside it)
@@ -178,18 +179,20 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
                     status = getattr(r, "status", 200)
                     if have and status != 206:       # server ignored Range (no 206 Partial Content): start over
                         have = 0
-                    with open(part, "ab" if have else "wb") as f:
+                    with parallel_download.open_retry(part, "ab" if have else "wb") as f:
                         while True:
                             chunk = r.read(CHUNK)  # type: ignore[attr-defined]
                             if not chunk:
                                 break
                             f.write(chunk)
                             progress(min(1.0, (done + f.tell()) / total))
+            except parallel_download.Stalled:
+                raise                                           # abandoned by the watchdog: not a mirror error
             except (OSError, urllib.error.URLError) as exc:
                 raise MirrorError(f"{rel}: {exc}") from exc     # keep the .incomplete file: next run resumes
         if part.stat().st_size != size:
             raise MirrorError(f"{rel}: incomplete ({part.stat().st_size} of {size} bytes)")
-        os.replace(part, target)
+        parallel_download.replace_retry(part, target)
         done += size
         progress(min(1.0, done / total))
     return sizes

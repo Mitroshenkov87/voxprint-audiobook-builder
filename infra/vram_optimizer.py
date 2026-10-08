@@ -67,10 +67,20 @@ class TrainPlan:
         return self.batch_size * self.grad_accum
 
 
+_no_torch_logged = False
+
+
 def detect_gpu() -> GpuInfo:
     """Detect the NVIDIA GPU through torch (lazy import).  Without torch/CUDA returns ``available=False``."""
+    global _no_torch_logged
     try:
         import torch
+    except ImportError as exc:
+        if not _no_torch_logged:                  # normal before the components are installed: say it once, quietly
+            _no_torch_logged = True
+            log.info("GPU detection skipped: %s", exc)
+        return GpuInfo(False)
+    try:
 
         if not torch.cuda.is_available():
             return GpuInfo(False)

@@ -177,9 +177,22 @@ def log_startup(import_torch: bool = True) -> None:
     """One block at the start: system information and settings (the GPU probe imports torch: call it off the UI thread)."""
     try:
         log.info("start: %s", json.dumps(system_info(import_torch), ensure_ascii=False))
-        log.info("settings: %s", json.dumps(settings_snapshot(), ensure_ascii=False))
+        log.info("settings: %s", json.dumps(_short_values(settings_snapshot()), ensure_ascii=False))
     except Exception:  # noqa: BLE001 - diagnostics must never stop the program
         log.exception("start-up diagnostics failed")
+
+
+#: Longest settings entry written into the start-up log line (big manifests are only in the diagnostics report).
+LOG_VALUE_MAX = 300
+
+
+def _short_values(snap: Dict[str, object]) -> Dict[str, object]:
+    """The settings snapshot for the log: an entry longer than ``LOG_VALUE_MAX`` characters is replaced by its size."""
+    out: Dict[str, object] = {}
+    for k, v in snap.items():
+        n = len(json.dumps(v, ensure_ascii=False))
+        out[k] = v if n <= LOG_VALUE_MAX else f"<{n} chars, see the diagnostics report>"
+    return out
 
 
 def cuda_memory() -> str:

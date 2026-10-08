@@ -32,12 +32,15 @@ import logging
 import os
 import shutil
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+
+from infra.download_watch import Stalled
 
 log = logging.getLogger("voxprint.models")
 
@@ -126,9 +129,36 @@ def _plan_ranges(size: int, n: int) -> List[Tuple[int, int]]:
 
 def _check_cancel(cancel: Optional[threading.Event]) -> None:
     if cancel is not None and cancel.is_set():
-        from infra import download_watch
+        raise Stalled("download abandoned (no data)")
 
-        raise download_watch.Stalled("download abandoned (no data)")
+
+#: Windows "file in use" (32) / "access denied" (5): another handle (an abandoned download thread, an antivirus scan)
+#: still holds the file for a moment.  Retried ``LOCK_RETRIES`` times, ``LOCK_PAUSE`` seconds apart.
+LOCK_RETRIES = 5
+LOCK_PAUSE = 0.5
+
+
+def retry_locked(fn: Callable[[], Any], what: str = "") -> Any:
+    """Run ``fn`` again a few times while Windows reports the file as locked (WinError 32 / 5); other errors pass."""
+    for attempt in range(LOCK_RETRIES + 1):
+        try:
+            return fn()
+        except PermissionError as exc:
+            if getattr(exc, "winerror", None) not in (5, 32) or attempt >= LOCK_RETRIES:
+                raise
+            log.info("%s is locked (%s) - retrying", what or "file", exc)
+            time.sleep(LOCK_PAUSE)
+    return None  # pragma: no cover - the loop returns or raises
+
+
+def open_retry(path: Path, mode: str):
+    """``open(path, mode)`` with :func:`retry_locked`."""
+    return retry_locked(lambda: open(path, mode), Path(path).name)
+
+
+def replace_retry(src: Path, dst: Path) -> None:
+    """``os.replace(src, dst)`` with :func:`retry_locked`."""
+    retry_locked(lambda: os.replace(src, dst), Path(src).name)
 
 
 def _read_into(resp: Any, fh: Any, expected: Optional[int], on_bytes: ProgressBytes,
@@ -162,9 +192,11 @@ def _single_stream(url: str, part: Path, size: int, have: int, opener: Opener, t
                 have = 0
                 part.unlink(missing_ok=True)
             mode = "ab" if have else "wb"
-            with open(part, mode) as f:
+            with open_retry(part, mode) as f:
                 expect = None if size <= 0 else max(0, size - have)
                 _read_into(r, f, expect, on_bytes, cancel)
+    except Stalled:
+        raise                           # abandoned by the watchdog: no fallback, the caller switches the source
     except (OSError, urllib.error.URLError) as exc:
         raise ParallelError(f"{url}: {exc}") from exc
     got = part.stat().st_size if part.exists() else 0
@@ -197,9 +229,9 @@ def _fetch_part(url: str, part_path: Path, start: int, end: int, opener: Opener,
                 raise ParallelError("server ignored Range (HTTP 200)")
             if status != 206:
                 raise ParallelError(f"unexpected HTTP status {status} for Range")
-            with open(part_path, "ab" if have else "wb") as f:
+            with open_retry(part_path, "ab" if have else "wb") as f:
                 _read_into(r, f, need - have, on_bytes, cancel)
-    except ParallelError:
+    except (ParallelError, Stalled):
         raise
     except (OSError, urllib.error.URLError) as exc:
         raise ParallelError(f"{url} [{start}-{end}]: {exc}") from exc
@@ -212,11 +244,11 @@ def _assemble(parts_dir: Path, part_paths: List[Path], incomplete: Path) -> None
     """Concatenate part files into ``incomplete`` (atomic replace of a temp name)."""
     tmp = incomplete.with_name(incomplete.name + ".assembling")
     try:
-        with open(tmp, "wb") as out:
+        with open_retry(tmp, "wb") as out:
             for p in part_paths:
                 with open(p, "rb") as src:
                     shutil.copyfileobj(src, out, length=1 << 20)
-        os.replace(tmp, incomplete)
+        replace_retry(tmp, incomplete)
     finally:
         tmp.unlink(missing_ok=True)
 
@@ -253,7 +285,7 @@ def download_file(url: str, target: Path, size: int, *, opener: Optional[Opener]
             _single_stream(url, incomplete, size, have, opener, timeout, on_bytes, cancel)
         if size > 0 and incomplete.stat().st_size != size:
             raise ParallelError(f"{target.name}: incomplete ({incomplete.stat().st_size} of {size} bytes)")
-        os.replace(incomplete, target)
+        replace_retry(incomplete, target)
         return
 
     ranges = _plan_ranges(size, n_conn)
@@ -281,14 +313,14 @@ def download_file(url: str, target: Path, size: int, *, opener: Optional[Opener]
             _single_stream(url, incomplete, size, 0, opener, timeout, on_bytes, cancel)
             if incomplete.stat().st_size != size:
                 raise ParallelError(f"{target.name}: incomplete after single-stream fallback") from exc
-            os.replace(incomplete, target)
+            replace_retry(incomplete, target)
             return
         raise
 
     _assemble(parts_dir, part_paths, incomplete)
     if incomplete.stat().st_size != size:
         raise ParallelError(f"{target.name}: assembled size {incomplete.stat().st_size} != {size}")
-    os.replace(incomplete, target)
+    replace_retry(incomplete, target)
     shutil.rmtree(parts_dir, ignore_errors=True)
 
 

@@ -12,7 +12,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 log = logging.getLogger("voxprint.models")
 
@@ -22,10 +22,54 @@ STALL_SECONDS = float(os.environ.get("VOXPRINT_STALL_SECONDS", "45") or 45)
 ABORT_GRACE = 10.0
 #: Sampling interval of the watchdog / progress line (seconds).
 POLL = 1.0
+#: Longest wait for an abandoned helper thread to let go of the partial files before the next download starts in the same
+#: folder (it may sit in a socket read: read timeout 30 s + margin).
+RELEASE_WAIT = 45.0
+
+_abandoned: Dict[str, threading.Thread] = {}      # folder -> helper thread that was given up on while still running
+_abandoned_lock = threading.Lock()
 
 
 class Stalled(OSError):
-    """No data arrived for too long; the partial files are kept for the next source / the next run."""
+    """No data arrived for too long; the partial files are kept for the next source / the next run.
+
+    ``progressed`` tells whether the abandoned attempt had received data before it stalled (worth resuming the same source)."""
+
+    def __init__(self, *args: Any, progressed: bool = False) -> None:
+        super().__init__(*args)
+        self.progressed = progressed
+
+
+def _key(folder: Path) -> str:
+    return os.path.normcase(os.path.abspath(str(folder)))
+
+
+def _abandon(folder: Path, th: threading.Thread) -> None:
+    """Remember a helper thread that is still running after the abort grace (it keeps files open, e.g. on Windows)."""
+    if th.is_alive():
+        log.info("the abandoned download thread is still running (blocked in a read); the next download waits for it")
+        with _abandoned_lock:
+            _abandoned[_key(folder)] = th
+
+
+def wait_released(folder: Path, timeout: Optional[float] = None) -> bool:
+    """Wait until an abandoned helper thread of ``folder`` has ended (two downloads must never write the same partial
+    files: Windows refuses with WinError 32 / 5).  Returns False if it is still running after ``timeout``."""
+    key = _key(folder)
+    with _abandoned_lock:
+        th = _abandoned.get(key)
+    if th is None:
+        return True
+    if th.is_alive():
+        log.info("waiting for the previous download to release files in %s", Path(folder).name)
+        th.join(RELEASE_WAIT if timeout is None else timeout)
+    if th.is_alive():
+        log.warning("the previous download of %s is still running - continuing anyway", Path(folder).name)
+        return False
+    with _abandoned_lock:
+        if _abandoned.get(key) is th:
+            del _abandoned[key]
+    return True
 
 
 def dir_bytes(folder: Path) -> int:
@@ -175,6 +219,7 @@ def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threa
     grace = ABORT_GRACE if grace is None else grace
     poll = POLL if poll is None else poll
     box: dict = {}
+    wait_released(folder)
 
     def target() -> None:
         try:
@@ -211,10 +256,12 @@ def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threa
                 log.info("download via %s: all files are present, finishing", meter.source)
                 cancel.set()
                 th.join(grace)
+                _abandon(folder, th)
                 return box.get("result")
             cancel.set()
             th.join(grace)
-            raise Stalled(f"no data from {meter.source} for {int(stall)} s")
+            _abandon(folder, th)
+            raise Stalled(f"no data from {meter.source} for {int(stall)} s", progressed=last_size > base)
     if "error" in box:
         raise box["error"]
     return box.get("result")
