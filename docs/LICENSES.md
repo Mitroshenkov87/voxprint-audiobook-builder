@@ -20,7 +20,7 @@ packages (`tools\gen_notices.py --with-installed`, called by `build.bat`). Voxpr
 * **Source code: Apache License 2.0** - Copyright 2026 Aleksandr Mitroshenkov. Full text in [`LICENSE`](../LICENSE), attribution in [`NOTICE`](../NOTICE).
   You may use, modify and redistribute the code, also commercially, under the terms of that licence (keep the notices; it includes a patent grant). *(The choice may still change to MIT before the first public release.)*
 * **Models and voices have their own licences** - the Apache licence of the code does *not* cover them:
-  * the models Voxprint downloads (Qwen3-TTS, Qwen3-ASR and the optional text models) keep the licences of their authors;
+  * the models Voxprint downloads (Qwen3-TTS, Qwen3-ASR, the optional text models, and the optional OpenVoice V2 converter, MIT) keep the licences of their authors;
   * every **voice** carries its own licence in `voice.json` (see *My voices and licences*). Voices you train are `custom/personal-only` until you decide otherwise;
   * voice packages are not part of this repository or the installer; a voice marked **"test use only"** (`custom/test-use-only`) may be used to try the program only: do not publish audio made with it and do not use it commercially.
 * Third-party components: `THIRD_PARTY_NOTICES.md` and `licenses\`.
@@ -29,7 +29,7 @@ packages (`tools\gen_notices.py --with-installed`, called by `build.bat`). Voxpr
 * **Source code: Apache License 2.0** - Copyright 2026 Aleksandr Mitroshenkov. Full text in [`LICENSE`](../LICENSE), attribution in [`NOTICE`](../NOTICE).
   You may use, modify and redistribute the code, also commercially, under the terms of that licence (keep the notices; it includes a patent grant). *(The choice may still change to MIT before the first public release.)*
 * **Models and voices have their own licences** - the Apache licence of the code does *not* cover them:
-  * the models Voxprint downloads (Qwen3-TTS, Qwen3-ASR and the optional text models) keep the licences of their authors;
+  * the models Voxprint downloads (Qwen3-TTS, Qwen3-ASR, the optional text models, and the optional OpenVoice V2 converter, MIT) keep the licences of their authors;
   * every **voice** carries its own licence in `voice.json` (see *My voices and licences*). Voices you train are `custom/personal-only` until you decide otherwise;
   * voice packages are not part of this repository or the installer; a voice marked **"test use only"** (`custom/test-use-only`) may be used to try the program only: do not publish audio made with it and do not use it commercially.
 * Third-party components: `THIRD_PARTY_NOTICES.md` and `licenses\`.

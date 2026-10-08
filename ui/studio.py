@@ -3,7 +3,7 @@
 * **Narrate a book** (primary) -> :class:`ui.narrate_window.NarrateWindow`
 * **Train your voice**         -> the training window (:class:`ui.main_window.MainWindow`, unchanged workflow)
 * **My voices**                -> :class:`ui.voices_window.VoicesWindow`
-* **Re-voice**                 -> :class:`ui.revoice_window.RevoiceWindow` (speech -> text -> narrated with a chosen voice)
+* **Re-voice**                 -> :class:`ui.revoice_window.RevoiceWindow` (text path, or direct conversion into a library voice)
 * the gear (top right) opens the Settings dialog: language, updates, model/data folders, repair, About.
 
 The Studio owns the other windows and shows exactly one at a time.  A window asks for navigation with its ``go`` signal
@@ -96,7 +96,7 @@ class StudioWindow(SubWindow):
         self.trainer.library = self.library      # the Train window confirms the voice-owner consent in the same library
         self.voices_window = voices or VoicesWindow(self.library)
         self.narrate_window = narrate or NarrateWindow(self.library)
-        self.revoice_window = revoice or RevoiceWindow()
+        self.revoice_window = revoice or RevoiceWindow(library=self.library)
         self.pages: Dict[str, QWidget] = {"studio": self, "train": self.trainer, "voices": self.voices_window,
                                           "narrate": self.narrate_window, "revoice": self.revoice_window}
         self.current_page = "studio"
@@ -251,6 +251,8 @@ class StudioWindow(SubWindow):
             self.voices_window.refresh()
         elif page == "narrate":
             self.narrate_window.refresh_voices()
+        elif page == "revoice":
+            self.revoice_window.refresh_voices()
         if old is not new:
             size = old.size()
             if getattr(old, "wide_width", lambda: 0)() and self._normal_size is not None:
@@ -282,8 +284,11 @@ class StudioWindow(SubWindow):
         self.narrate_window.select_voice(voice_id)
 
     def narrate_file(self, path: str) -> None:
-        """Re-voice handed over its edited text: open the narrator with it loaded."""
+        """Re-voice handed over its edited text: open the narrator with that voice and that file."""
+        voice = self.revoice_window.selected_voice_id()
         self.navigate("narrate")
+        if voice:
+            self.narrate_window.select_voice(voice)
         self.narrate_window.load_book_file(Path(path))
 
     def show_studio(self) -> None:
