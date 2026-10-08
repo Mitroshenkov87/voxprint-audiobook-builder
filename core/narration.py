@@ -27,6 +27,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 import logging
 import os
 import shutil
@@ -46,6 +47,7 @@ from core.book_prep import PrepPlan, run_preparation
 from core import translate as tl
 from core import pauses as pz
 from core import ai_disclosure
+from core import cpu_budget
 from core.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_book
 from core.errors import CancelledByUser, DatasetMakerError, NarrationError
 from core.events import CancelToken
@@ -209,12 +211,22 @@ def default_normalizer(language: str) -> Optional[Callable[[str], str]]:
     return None
 
 
+#: FLAC writers of finished chunks, and how many finished-but-unwritten batches may wait for them (bounded memory).
+WRITER_THREADS = 2
+PENDING_WRITE_BATCHES = 2
+
+
 def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSEngine], engine_tag: str,
                       cache: ChunkCache, texts: Dict[int, str], progress: ProgressFn,
-                      cancel: CancelToken, pause: PauseToken) -> Dict[str, int]:
+                      cancel: CancelToken, pause: PauseToken, on_saved: Optional[Callable[[Chunk], None]] = None,
+                      engine_future: Optional[Future] = None,
+                      background_check: Optional[Callable[[], None]] = None) -> Dict[str, int]:
     """Synthesize every chunk that is not cached yet.  Returns ``{"cached": n, "made": m}``.
 
     ``texts`` maps a chunk index to the prepared text; ``engine_tag`` identifies the engine without creating it.
+    ``on_saved(chunk)`` runs (on a writer thread) once a chunk is on disk.  ``engine_future``: an engine already being
+    loaded in the background (used instead of calling ``engine_factory``).  ``background_check()`` raises the error of
+    other background work (chapter assembly, encodes) between batches.
     """
     total = len(chunks)
     keys = {c.index: cache.key(engine_tag, texts[c.index]) for c in chunks}
@@ -226,10 +238,21 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
     chars_done = 0
     remaining_chars = sum(len(texts[c.index]) for c in pending)
     progress(NarrationProgress(done, total, None, tr("narr.resuming", n=cached) if cached else ""))
-    # Pipeline: the GPU thread (this one) only generates; finished chunks are encoded to FLAC and written by a helper thread,
-    # so the disk/CPU work of chunk N overlaps with the generation of chunk N+1.  Errors of the writer surface at the next check.
-    saver = ThreadPoolExecutor(max_workers=1, thread_name_prefix="chunk-writer")
+    # Pipeline: the GPU thread (this one) only generates; finished chunks are encoded to FLAC and written by helper threads,
+    # so the disk/CPU work of batch N overlaps with the generation of batch N+1.  A semaphore bounds the chunks waiting for
+    # a writer (their audio is in memory), so a slow disk holds the GPU back instead of filling the RAM.
+    saver = ThreadPoolExecutor(max_workers=WRITER_THREADS, thread_name_prefix="chunk-writer")
+    slots: Optional[threading.BoundedSemaphore] = None
     futures: List[Future] = []
+
+    def save(c: Chunk, audio: np.ndarray, sr: int) -> None:
+        try:
+            cache.save(keys[c.index], audio, sr)
+        finally:
+            slots.release()  # type: ignore[union-attr]
+        if on_saved is not None:
+            on_saved(c)
+
     try:
         queue = list(pending)
         batch_limit = 0                                      # 0 = not known yet (the engine is created lazily)
@@ -239,8 +262,9 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
             cancel.check()
             if engine is None:
                 progress(NarrationProgress(done, total, None, tr("narr.loading_model")))
-                engine = engine_factory()
+                engine = _wait_engine(engine_future, cancel) if engine_future is not None else engine_factory()
                 batch_limit = _batch_limit(engine)
+                slots = threading.BoundedSemaphore(max(4, PENDING_WRITE_BATCHES * batch_limit))
             group = _next_group(queue, texts, batch_limit)
             # Say what is being generated *before* the (possibly minutes-long) batch call: otherwise the UI and the log
             # stay on "model loaded" until the first batch is finished and the job looks frozen.
@@ -252,23 +276,51 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
             audios, batch_limit = _synth_group(engine, [texts[c.index] for c in group], [c.index for c in group], batch_limit)
             spent += time.monotonic() - t0
             for c, audio in zip(group, audios):
-                futures.append(saver.submit(cache.save, keys[c.index], audio, engine.sample_rate))
+                while not slots.acquire(timeout=0.2):                    # type: ignore[union-attr]
+                    cancel.check()
+                    _raise_finished(futures)                            # a failed write never frees its wait
+                futures.append(saver.submit(save, c, audio, engine.sample_rate))
                 chars_done += max(1, len(texts[c.index]))
                 remaining_chars -= len(texts[c.index])
                 done += 1
             _raise_finished(futures)
+            futures = [f for f in futures if not f.done()]               # finished writes: nothing left to check
+            if background_check is not None:
+                background_check()
             eta = spent / chars_done * max(0, remaining_chars) if chars_done else None
             progress(NarrationProgress(done, total, eta, tr("narr.chunk_progress", done=done, total=total)))
         for f in futures:
             f.result()
     finally:
         saver.shutdown(wait=True)
+        if engine is None and engine_future is not None:
+            close_when_loaded(engine_future)                             # loading meanwhile but never used: free it
         if engine is not None:
             try:
                 engine.close()
             except Exception:  # noqa: BLE001
                 log.warning("engine close failed", exc_info=True)
     return {"cached": cached, "made": len(pending)}
+
+
+def _wait_engine(fut: Future, cancel: CancelToken) -> TTSEngine:
+    """The engine of a background load; ``cancel`` is honoured while waiting."""
+    while True:
+        try:
+            return fut.result(timeout=0.2)
+        except FutureTimeout:
+            cancel.check()
+
+
+def close_when_loaded(fut: Future) -> None:
+    """Close the engine of a background load once it is there (without waiting for it now)."""
+    def done(f: Future) -> None:
+        if not f.cancelled() and f.exception() is None and f.result() is not None:
+            try:
+                f.result().close()
+            except Exception:  # noqa: BLE001
+                log.warning("engine close failed", exc_info=True)
+    fut.add_done_callback(done)
 
 
 #: Chunks are sorted by length inside a window of this many batches (a batch runs until its longest item ends, so similar
@@ -366,44 +418,112 @@ def _synth_with_retry(engine: TTSEngine, text: str, index: int, attempts: int = 
     raise NarrationError(tr("err.narration_chunk", n=index + 1), details=repr(last))
 
 
+def assemble_chapter(book: Book, position: int, chapter: int, chunks: Sequence[Chunk], engine_tag: str,
+                     cache: ChunkCache, texts: Dict[int, str], work_dir: Path,
+                     pauses: Optional[pz.PauseProfile] = None) -> ex.ChapterAudio:
+    """Join the cached chunks of one chapter (``chunks``, in order) with their pauses into ``chapter_<position+1>.wav``."""
+    work_dir.mkdir(parents=True, exist_ok=True)
+    wav = work_dir / f"chapter_{position + 1:04d}.wav"
+    frames = 0
+    sr_out = 0
+    sf_out: Optional[sf.SoundFile] = None
+    try:
+        for c in chunks:
+            loaded = cache.load(cache.key(engine_tag, texts[c.index]))
+            if loaded is None:
+                raise NarrationError(tr("err.narration_chunk", n=c.index + 1), details="cache entry missing")
+            data, sr = loaded
+            if sf_out is None:
+                sr_out = sr
+                sf_out = sf.SoundFile(str(wav), "w", samplerate=sr_out, channels=1, subtype="PCM_16")
+            elif sr != sr_out:
+                data = resample(data, sr, sr_out)
+            sf_out.write(data)
+            frames += len(data)
+            is_last = c is chunks[-1]
+            tail_ms = pauses.ms(pz.CHAPTER) if pauses is not None else CHAPTER_TAIL_MS
+            gap = int(sr_out * (tail_ms if is_last else c.pause_ms) / 1000)
+            sf_out.write(np.zeros(gap, dtype=np.float32))
+            frames += gap
+    finally:
+        if sf_out is not None:
+            sf_out.close()
+    title = book.chapters[chapter].title.strip() or tr("book.chapter_n", n=chapter + 1)
+    return ex.ChapterAudio(position, title, wav, frames / sr_out if sr_out else 0.0)
+
+
+def _by_chapter(chunks: Sequence[Chunk]) -> Dict[int, List[Chunk]]:
+    """``{chapter: [chunks in order]}`` in chapter order."""
+    by: Dict[int, List[Chunk]] = {}
+    for c in chunks:
+        by.setdefault(c.chapter, []).append(c)
+    return {ci: by[ci] for ci in sorted(by)}
+
+
 def assemble_chapters(book: Book, chunks: Sequence[Chunk], engine_tag: str, cache: ChunkCache,
                       texts: Dict[int, str], work_dir: Path,
                       pauses: Optional[pz.PauseProfile] = None) -> List[ex.ChapterAudio]:
     """Join the cached chunks of every chapter with their pauses into lossless chapter WAV files (streamed to disk)."""
-    work_dir.mkdir(parents=True, exist_ok=True)
-    by_chapter: Dict[int, List[Chunk]] = {}
-    for c in chunks:
-        by_chapter.setdefault(c.chapter, []).append(c)
-    out: List[ex.ChapterAudio] = []
-    for ci in sorted(by_chapter):
-        wav = work_dir / f"chapter_{len(out) + 1:04d}.wav"
-        frames = 0
-        sr_out = 0
-        sf_out: Optional[sf.SoundFile] = None
-        try:
-            for c in by_chapter[ci]:
-                loaded = cache.load(cache.key(engine_tag, texts[c.index]))
-                if loaded is None:
-                    raise NarrationError(tr("err.narration_chunk", n=c.index + 1), details="cache entry missing")
-                data, sr = loaded
-                if sf_out is None:
-                    sr_out = sr
-                    sf_out = sf.SoundFile(str(wav), "w", samplerate=sr_out, channels=1, subtype="PCM_16")
-                elif sr != sr_out:
-                    data = resample(data, sr, sr_out)
-                sf_out.write(data)
-                frames += len(data)
-                is_last = c is by_chapter[ci][-1]
-                tail_ms = pauses.ms(pz.CHAPTER) if pauses is not None else CHAPTER_TAIL_MS
-                gap = int(sr_out * (tail_ms if is_last else c.pause_ms) / 1000)
-                sf_out.write(np.zeros(gap, dtype=np.float32))
-                frames += gap
-        finally:
-            if sf_out is not None:
-                sf_out.close()
-        title = book.chapters[ci].title.strip() or tr("book.chapter_n", n=ci + 1)
-        out.append(ex.ChapterAudio(len(out), title, wav, frames / sr_out if sr_out else 0.0))
-    return out
+    return [assemble_chapter(book, pos, ci, group, engine_tag, cache, texts, work_dir, pauses)
+            for pos, (ci, group) in enumerate(_by_chapter(chunks).items())]
+
+
+class _ChapterPipeline:
+    """Assembles each chapter as soon as its last chunk is on disk and hands it to the exporter - on the CPU pool, while
+    the GPU goes on with the next chapters.  Chapters are numbered by their place in the book, never by completion, so
+    the files are the same as after a serial run."""
+
+    def __init__(self, book: Book, chunks: Sequence[Chunk], engine_tag: str, cache: ChunkCache, texts: Dict[int, str],
+                 work: Path, pauses: Optional[pz.PauseProfile], exporter: ex.Exporter, pool: ThreadPoolExecutor,
+                 cancel: CancelToken, pause: PauseToken) -> None:
+        self.book, self.engine_tag, self.cache, self.texts, self.work, self.pauses = book, engine_tag, cache, texts, work, pauses
+        self.exporter, self.pool, self.cancel, self.pause = exporter, pool, cancel, pause
+        self.groups = _by_chapter(chunks)
+        self.position = {ci: pos for pos, ci in enumerate(self.groups)}
+        self.left = {ci: sum(1 for c in g if not cache.has(cache.key(engine_tag, texts[c.index])))
+                     for ci, g in self.groups.items()}
+        self.futures: Dict[int, Future] = {}
+        self._lock = threading.Lock()
+
+    def start(self) -> None:
+        """Chapters that are complete already (resumed job) start right away."""
+        for ci, n in self.left.items():
+            if n == 0:
+                self._submit(ci)
+
+    def chunk_saved(self, chunk: Chunk) -> None:
+        """Called by a cache writer: the last chunk of a chapter starts its assembly."""
+        with self._lock:
+            self.left[chunk.chapter] -= 1
+            ready = self.left[chunk.chapter] == 0
+        if ready:
+            self._submit(chunk.chapter)
+
+    def _submit(self, ci: int) -> None:
+        with self._lock:
+            if ci in self.futures:
+                return
+            self.futures[ci] = self.pool.submit(self._assemble, ci)
+
+    def _assemble(self, ci: int) -> ex.ChapterAudio:
+        self.pause.wait(self.cancel)               # paused: background work holds too (the user wants the machine back)
+        self.cancel.check()
+        ch = assemble_chapter(self.book, self.position[ci], ci, self.groups[ci], self.engine_tag, self.cache, self.texts,
+                              self.work, self.pauses)
+        self.exporter.add_chapter(ch)
+        return ch
+
+    def check(self) -> None:
+        """Raise the error of a finished background job (assembly or encode) early."""
+        for f in list(self.futures.values()) + self.exporter.pending():
+            if f.done() and not f.cancelled() and f.exception() is not None:
+                raise f.exception()  # type: ignore[misc]
+
+    def finish(self) -> List[ex.ChapterAudio]:
+        """All chapters in book order (any chapter not started yet is started now)."""
+        for ci in self.groups:
+            self._submit(ci)
+        return [self.futures[ci].result() for ci in self.groups]
 
 
 def _effective_translation(book: Book, options: NarrationOptions) -> Optional[tl.TranslatePlan]:
@@ -473,33 +593,62 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
     if options.ai_disclosure:              # in the narrated language (the translation target when translating)
         chunk_list = ai_disclosure.prepend(chunk_list, ai_disclosure.phrase(
             language or book.language, narrator, options.disclosure_date))
-    normalizer = None if (plan is not None and plan.spells_out_numbers) else default_normalizer(language)
-    texts = {c.index: prepare_text(c.text, options, normalizer) for c in chunk_list}
     cache = ChunkCache(job_dir / ".cache")
-    if on_plan is not None:
-        on_plan([cache.path(cache.key(engine_tag, texts[c.index])) for c in chunk_list])
-    counts = synthesize_chunks(chunk_list, engine_factory, engine_tag, cache, texts, progress, cancel, pause)
+    # A fresh job (nothing cached yet) certainly needs the model: start loading it now, on its own thread, so the
+    # loading (disk + GPU upload) overlaps with the text normalisation below.  With any cached chunk the load stays
+    # lazy - a fully cached job must never load the model.
+    loader: Optional[ThreadPoolExecutor] = None
+    engine_future: Optional[Future] = None
+    if not (cache.dir.is_dir() and any(cache.dir.glob("*.flac"))):
+        loader = ThreadPoolExecutor(max_workers=1, thread_name_prefix="engine-load")
+        engine_future = loader.submit(engine_factory)
+    budget = cpu_budget.plan(use_cuda=_cuda_available())
+    pool = ThreadPoolExecutor(max_workers=budget.workers, thread_name_prefix="narration-cpu")
+    try:
+        normalizer = None if (plan is not None and plan.spells_out_numbers) else default_normalizer(language)
+        texts = {c.index: prepare_text(c.text, options, normalizer) for c in chunk_list}
+        if on_plan is not None:
+            on_plan([cache.path(cache.key(engine_tag, texts[c.index])) for c in chunk_list])
+        work = job_dir / ".work"
+        shutil.rmtree(work, ignore_errors=True)
+        work.mkdir(parents=True, exist_ok=True)
+        cover_path: Optional[Path] = None
+        if source_book.cover:                               # before any chapter encode: MP3 chapters embed it
+            cover_path = work / f"cover.{source_book.cover_ext}"
+            cover_path.write_bytes(source_book.cover)
+        meta = ex.BookMeta(source_book.title, source_book.author, narrator, source_book.language, cover_path)
+        n_chapters = len({c.chapter for c in chunk_list})
+        exporter = ex.Exporter(ffmpeg, formats, meta, job_dir, n_chapters, options.bitrates, run, work, pool.submit)
+        chapters_pipe = _ChapterPipeline(source_book, chunk_list, engine_tag, cache, texts, work, options.pauses, exporter,
+                                         pool, cancel, pause)
+        chapters_pipe.start()
+        handed_over, engine_future = engine_future, None          # from here on synthesize_chunks owns (and closes) it
+        counts = synthesize_chunks(chunk_list, engine_factory, engine_tag, cache, texts, progress, cancel, pause,
+                                   on_saved=chapters_pipe.chunk_saved, engine_future=handed_over,
+                                   background_check=chapters_pipe.check)
 
-    total = len(chunk_list)
-    cancel.check()
-    progress(NarrationProgress(total, total, 0.0, tr("narr.assembling"), "assemble"))
-    work = job_dir / ".work"
-    shutil.rmtree(work, ignore_errors=True)
-    chapter_audio = assemble_chapters(source_book, chunk_list, engine_tag, cache, texts, work, options.pauses)
-    cancel.check()
-
-    cover_path: Optional[Path] = None
-    if source_book.cover:
-        cover_path = work / f"cover.{source_book.cover_ext}"
-        cover_path.write_bytes(source_book.cover)
-    meta = ex.BookMeta(source_book.title, source_book.author, narrator, source_book.language, cover_path)
-    result = ex.export_formats(
-        ffmpeg, formats, chapter_audio, meta, job_dir, options.bitrates, run,
-        progress=lambda f, m: progress(NarrationProgress(total, total, 0.0, tr("narr.exporting"), "export")),
-        work_dir=work)
+        total = len(chunk_list)
+        cancel.check()
+        progress(NarrationProgress(total, total, 0.0, tr("narr.assembling"), "assemble"))
+        chapter_audio = chapters_pipe.finish()
+        cancel.check()
+        result = exporter.finish(
+            chapter_audio, progress=lambda f, m: progress(NarrationProgress(total, total, 0.0, tr("narr.exporting"), "export")))
+    finally:
+        # On an error or cancel: queued background jobs are dropped, running ones (a chapter, one ffmpeg) end first
+        pool.shutdown(wait=True, cancel_futures=True)
+        if engine_future is not None:                   # failed before the synthesis started
+            close_when_loaded(engine_future)
+        if loader is not None:
+            loader.shutdown(wait=False)
     shutil.rmtree(work, ignore_errors=True)
     if not options.keep_cache:
         cache.clear()
     progress(NarrationProgress(total, total, 0.0, tr("narr.done"), "done"))
     return NarrationResult(job_dir, result.files, len(chapter_audio), total, counts["cached"],
                            sum(c.duration for c in chapter_audio))
+
+
+def _cuda_available() -> bool:
+    """True if synthesis will most likely run on a CUDA GPU (sizes the CPU pool; see :func:`core.cpu_budget.cuda_likely`)."""
+    return cpu_budget.cuda_likely()

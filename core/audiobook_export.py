@@ -27,10 +27,13 @@ Only encoders available in an LGPL ffmpeg build are used: native ``aac``, ``libm
 from __future__ import annotations
 
 import logging
+import os
 import re
 import shutil
 import subprocess
 import sys
+import threading
+from concurrent.futures import Future
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -61,6 +64,8 @@ ENCODER_FOR_FORMAT: Dict[str, Optional[str]] = {
 
 Run = Callable[[List[str]], Tuple[int, str]]
 Progress = Callable[[float, str], None]
+#: ``submit(fn) -> Future``: runs ``fn`` on a worker pool (``ThreadPoolExecutor.submit``); ``None`` = run inline.
+Submit = Callable[[Callable[[], object]], Future]
 
 
 @dataclass
@@ -315,10 +320,22 @@ def missing_encoders(ffmpeg: str, formats: Iterable[str], run: Optional[Run] = N
 
 
 def default_run(cmd: List[str]) -> Tuple[int, str]:
-    """Run a command, return ``(exit code, stdout+stderr text)``; no console window on Windows."""
-    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
-    p = subprocess.run(cmd, capture_output=True, text=True, errors="replace", creationflags=flags)  # noqa: S603
-    return p.returncode, (p.stdout or "") + (p.stderr or "")
+    """Run a command, return ``(exit code, stdout+stderr text)``; no console window on Windows.
+
+    The process runs at below-normal priority: several encoders run in parallel during narration and must not make the
+    UI stutter (the priority does not change a single output byte)."""
+    flags = 0
+    if sys.platform == "win32":
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace",  # noqa: S603
+                         creationflags=flags)
+    if sys.platform != "win32":
+        try:                                   # renice right after the start (preexec_fn is not safe with threads)
+            os.setpriority(os.PRIO_PROCESS, p.pid, 10)
+        except (OSError, AttributeError):
+            pass
+    out, _ = p.communicate()
+    return p.returncode, out or ""
 
 
 # --------------------------------------------------------------------------- the export
@@ -330,55 +347,125 @@ def _run_checked(run: Run, cmd: List[str], out: Path) -> None:
         raise NarrationError(tr("err.narration_export", name=out.name), details=text[-1500:])
 
 
+SINGLE_FORMATS = (FORMAT_M4B, FORMAT_M4B_OPUS, FORMAT_MP3_SINGLE, FORMAT_OPUS_SINGLE)
+_CHAPTER_EXT = {FORMAT_MP3_CHAPTERS: ("mp3", "MP3"), FORMAT_OPUS_CHAPTERS: ("opus", "Opus"),
+                FORMAT_FLAC_CHAPTERS: ("flac", "FLAC"), FORMAT_WAV_CHAPTERS: ("wav", "WAV")}
+
+
+class Exporter:
+    """Writes the requested formats; per-chapter files can be encoded as soon as a chapter exists.
+
+    :meth:`add_chapter` starts the per-chapter encodes of one finished chapter (on ``submit``'s pool, or inline), so the
+    narrator can encode chapter 1 while the GPU still speaks chapter 5.  :meth:`finish` waits for them, writes the
+    playlists, encodes the single-file formats (in parallel with each other when there is a pool: each is one ffmpeg
+    process with its own output) and returns the files in the same fixed order as a serial export.  Every ffmpeg call
+    is exactly the one a serial export would make, so the files are byte-identical - only *when* they run changes.
+    """
+
+    def __init__(self, ffmpeg: Optional[str], formats: Iterable[str], meta: BookMeta, out_dir: Path, total: int,
+                 rates: Optional[Bitrates] = None, run: Optional[Run] = None, work_dir: Optional[Path] = None,
+                 submit: Optional[Submit] = None) -> None:
+        """``total``: the number of chapters of the finished book (part of every per-chapter tag)."""
+        self.ffmpeg, self.meta, self.total = ffmpeg, meta, total
+        self.run = run or default_run
+        self.rates = (rates or Bitrates()).clamp()
+        self.wanted = [f for f in ALL_FORMATS if f in set(formats)]
+        self.out_dir = Path(out_dir)
+        self.out_dir.mkdir(parents=True, exist_ok=True)
+        self.work = Path(work_dir) if work_dir else self.out_dir / ".export"
+        if required_encoders(self.wanted) and not ffmpeg:
+            raise NarrationError(tr("err.narration_no_ffmpeg"))
+        self.base = book_basename(meta)
+        self.submit = submit
+        self._jobs: Dict[Tuple[str, int], Tuple[Path, Future]] = {}
+        self._lock = threading.Lock()
+
+    def _start(self, fn: Callable[[], object]) -> Future:
+        if self.submit is not None:
+            return self.submit(fn)
+        f: Future = Future()
+        try:
+            f.set_result(fn())
+        except BaseException as exc:  # noqa: BLE001 - stored and re-raised by finish(), like a pool would
+            f.set_exception(exc)
+        return f
+
+    def _folder(self, fmt: str) -> Path:
+        return self.out_dir / f"{self.base} - {_CHAPTER_EXT[fmt][1]}"
+
+    def add_chapter(self, ch: ChapterAudio) -> None:
+        """Start the per-chapter files of ``ch`` (no-op for formats without per-chapter files, or if already started)."""
+        for fmt in self.wanted:
+            if fmt in SINGLE_FORMATS:
+                continue
+            with self._lock:
+                if (fmt, ch.index) in self._jobs:
+                    continue
+                folder = self._folder(fmt)
+                folder.mkdir(parents=True, exist_ok=True)
+                out = folder / chapter_filename(ch.index, self.total, ch.title, _CHAPTER_EXT[fmt][0])
+                if fmt == FORMAT_WAV_CHAPTERS:
+                    job = (lambda src=ch.wav, dst=out: shutil.copyfile(src, dst))
+                else:
+                    cmd = cmd_chapter(self.ffmpeg or "", fmt, ch, self.total, self.meta, out, self.rates)
+                    job = (lambda cmd=cmd, out=out: _run_checked(self.run, cmd, out))
+                self._jobs[(fmt, ch.index)] = (out, self._start(job))
+
+    def finish(self, chapters: Sequence[ChapterAudio], progress: Optional[Progress] = None) -> ExportResult:
+        """Everything that needs the whole book, then the result in the fixed order (formats, then chapters)."""
+        for ch in chapters:
+            self.add_chapter(ch)
+        self.work.mkdir(parents=True, exist_ok=True)
+        meta_file, list_file = self.work / "chapters.ffmetadata", self.work / "chapters.txt"
+        meta_file.write_text(build_ffmetadata(self.meta, chapters), encoding="utf-8")
+        list_file.write_text(concat_list([c.wav for c in chapters]), encoding="utf-8")
+        singles: Dict[str, Tuple[Path, Future]] = {}
+        for fmt in self.wanted:
+            if fmt not in SINGLE_FORMATS:
+                continue
+            ext = {FORMAT_M4B: "m4b", FORMAT_M4B_OPUS: "m4b", FORMAT_MP3_SINGLE: "mp3", FORMAT_OPUS_SINGLE: "opus"}[fmt]
+            out = self.out_dir / (f"{self.base} (Opus).{ext}" if fmt == FORMAT_M4B_OPUS else f"{self.base}.{ext}")
+            cmd = cmd_single(self.ffmpeg or "", fmt, list_file, meta_file, self.meta, out, self.rates)
+            singles[fmt] = (out, self._start(lambda cmd=cmd, out=out: _run_checked(self.run, cmd, out)))
+        result = ExportResult()
+        for i, fmt in enumerate(self.wanted):
+            if progress:
+                progress(i / max(1, len(self.wanted)), fmt)
+            if fmt in singles:
+                out, fut = singles[fmt]
+                fut.result()                         # raises the encoder error of this format
+                result.files.append(out)
+                continue
+            folder = self._folder(fmt)
+            folder.mkdir(parents=True, exist_ok=True)
+            entries: List[Tuple[str, float, str]] = []
+            for ch in chapters:
+                out, fut = self._jobs[(fmt, ch.index)]
+                fut.result()
+                result.files.append(out)
+                entries.append((out.name, ch.duration, ch.title))
+            playlist = folder / f"{self.base}.m3u8"
+            playlist.write_text(build_m3u8(entries), encoding="utf-8")
+            result.files.append(playlist)
+            result.folders.append(folder)
+        if progress:
+            progress(1.0, "")
+        return result
+
+    def pending(self) -> List[Future]:
+        """Futures of the per-chapter jobs started so far (the narrator checks them for early errors)."""
+        with self._lock:
+            return [f for _, f in self._jobs.values()]
+
+
 def export_formats(ffmpeg: Optional[str], formats: Iterable[str], chapters: Sequence[ChapterAudio], meta: BookMeta,
                    out_dir: Path, rates: Optional[Bitrates] = None, run: Optional[Run] = None,
-                   progress: Optional[Progress] = None, work_dir: Optional[Path] = None) -> ExportResult:
-    """Write every requested format into ``out_dir`` and return what was produced.
+                   progress: Optional[Progress] = None, work_dir: Optional[Path] = None,
+                   submit: Optional[Submit] = None) -> ExportResult:
+    """Write every requested format into ``out_dir`` and return what was produced (see :class:`Exporter`).
 
     ``ffmpeg`` may be ``None`` only when nothing but ``wav_chapters`` is requested.  Chapter files go to sub-folders
     named after the book and format; single files go directly into ``out_dir``.
     """
-    run = run or default_run
-    rates = (rates or Bitrates()).clamp()
-    wanted = [f for f in ALL_FORMATS if f in set(formats)]
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    work = Path(work_dir) if work_dir else out_dir / ".export"
-    work.mkdir(parents=True, exist_ok=True)
-    if required_encoders(wanted) and not ffmpeg:
-        raise NarrationError(tr("err.narration_no_ffmpeg"))
-    base = book_basename(meta)
-    total = len(chapters)
-    result = ExportResult()
-    meta_file, list_file = work / "chapters.ffmetadata", work / "chapters.txt"
-    meta_file.write_text(build_ffmetadata(meta, chapters), encoding="utf-8")
-    list_file.write_text(concat_list([c.wav for c in chapters]), encoding="utf-8")
-    for i, fmt in enumerate(wanted):
-        if progress:
-            progress(i / max(1, len(wanted)), fmt)
-        if fmt in (FORMAT_M4B, FORMAT_M4B_OPUS, FORMAT_MP3_SINGLE, FORMAT_OPUS_SINGLE):
-            ext = {FORMAT_M4B: "m4b", FORMAT_M4B_OPUS: "m4b", FORMAT_MP3_SINGLE: "mp3", FORMAT_OPUS_SINGLE: "opus"}[fmt]
-            out = out_dir / (f"{base} (Opus).{ext}" if fmt == FORMAT_M4B_OPUS else f"{base}.{ext}")
-            _run_checked(run, cmd_single(ffmpeg or "", fmt, list_file, meta_file, meta, out, rates), out)
-            result.files.append(out)
-            continue
-        ext, label = {FORMAT_MP3_CHAPTERS: ("mp3", "MP3"), FORMAT_OPUS_CHAPTERS: ("opus", "Opus"),
-                      FORMAT_FLAC_CHAPTERS: ("flac", "FLAC"), FORMAT_WAV_CHAPTERS: ("wav", "WAV")}[fmt]
-        folder = out_dir / f"{base} - {label}"
-        folder.mkdir(parents=True, exist_ok=True)
-        entries: List[Tuple[str, float, str]] = []
-        for ch in chapters:
-            out = folder / chapter_filename(ch.index, total, ch.title, ext)
-            if fmt == FORMAT_WAV_CHAPTERS:
-                shutil.copyfile(ch.wav, out)
-            else:
-                _run_checked(run, cmd_chapter(ffmpeg or "", fmt, ch, total, meta, out, rates), out)
-            result.files.append(out)
-            entries.append((out.name, ch.duration, ch.title))
-        playlist = folder / f"{base}.m3u8"
-        playlist.write_text(build_m3u8(entries), encoding="utf-8")
-        result.files.append(playlist)
-        result.folders.append(folder)
-    if progress:
-        progress(1.0, "")
-    return result
+    exp = Exporter(ffmpeg, formats, meta, out_dir, len(chapters), rates, run, work_dir, submit)
+    return exp.finish(chapters, progress)

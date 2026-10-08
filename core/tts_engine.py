@@ -17,6 +17,7 @@ from typing import Callable, List, Optional, Sequence
 
 import numpy as np
 
+from core import cpu_budget
 from core.errors import NarrationError
 from core.events import ProgressCallback, Stage, noop_progress
 from core.i18n import tr
@@ -99,6 +100,10 @@ class Qwen3AdapterEngine:
         self.language = qwen_language(language) or qwen_language(voice.language) or AUTO
         use_cuda = device == "cuda" or (device == "auto" and torch.cuda.is_available())
         dtype = torch.bfloat16 if use_cuda else torch.float32
+        # torch's CPU thread pool would otherwise take every core and fight the narration pool (FLAC writes, chapter
+        # joins, ffmpeg encodes) - on a GPU it only needs a few; on the CPU it gets nearly all (core/cpu_budget.py).
+        self._threads_before = torch.get_num_threads()
+        torch.set_num_threads(cpu_budget.plan(use_cuda).torch_threads)
         self._q = None
         self.attn = ""
         # Attention backend: flash-attn 2 (if installed) > SDPA (PyTorch fused kernels) > eager.  Every step falls back to the
@@ -164,13 +169,14 @@ class Qwen3AdapterEngine:
             return 1
 
     def close(self) -> None:
-        """Free the model and the GPU cache."""
+        """Free the model and the GPU cache; give torch its CPU threads back."""
         self._q = None
         try:
             import torch
 
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+            torch.set_num_threads(getattr(self, "_threads_before", torch.get_num_threads()))
         except Exception:  # noqa: BLE001
             pass
 
