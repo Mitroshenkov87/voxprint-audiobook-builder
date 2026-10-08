@@ -1,5 +1,6 @@
 {
- "offset": 631,
+ "offset": 630,
+ "offset_note": "631 up to build 665 (run 34); 630 from run 36 on, because run 35 failed in CI before it published anything",
  "codename": "Zahav",
  "codename_meaning": "gold (Biblical Hebrew) - the complete set: two setup types that end with everything installed, backup and restore, Ukrainian and Latvian, the agent CLI, direct Re-voice"
 }

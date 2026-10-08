@@ -59,6 +59,7 @@ def test_backdrop_is_requested_again_after_the_fade_in_and_for_a_new_native_wind
     d = GlassDialog()
     d.show()
     QApplication.processEvents()
+    calls.clear()                               # on a real Windows runner show() already asked once
     monkeypatch.setattr(mw.sys, "platform", "win32")
     try:
         d.backdrop = "acrylic"
