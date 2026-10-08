@@ -1,6 +1,6 @@
 {
- "offset": 630,
- "offset_note": "631 up to build 665 (run 34); 630 from run 36 on, because run 35 failed in CI before it published anything (run 37 = build 667)",
- "codename": "Dror",
- "codename_meaning": "liberty, release (Biblical Hebrew, Leviticus 25:10 'proclaim liberty') - downloads let go of their files: no WinError 5 after a stalled attempt, a failed file is retried instead of failing the model, progress counted once, the setup language and the right button texts carried into the app"
+ "offset": 629,
+ "offset_note": "631 up to build 665 (run 34); 630 from run 36 on, because run 35 failed in CI before it published anything; 629 from run 38 on, because run 37 was cancelled before it published anything (codename change) (run 38 = build 667)",
+ "codename": "Menuchah",
+ "codename_meaning": "rest, calm (Biblical Hebrew, Genesis 49:15 'he saw that rest was good') - pauses that follow the text, downloads that settle without WinError 5, retries instead of failures, two open voices at rest in the library"
 }

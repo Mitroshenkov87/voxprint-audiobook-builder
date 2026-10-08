@@ -133,8 +133,9 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
 
     from tools import build_number as bn
 
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "36"}) == 666           # run 35 failed before publishing: offset 630
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "37"}) == 667 and bn.build_number({}) == 0
+    # runs 35 (failed) and 37 (cancelled for the codename change) published nothing: offset 629 from run 38 on
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "38"}) == 667 and bn.build_number({}) == 0
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "39"}) == 668
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34"}) == 700
     name = bn.info()["codename"]
     assert name.isascii() and name.isalpha()

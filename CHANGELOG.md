@@ -5,9 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
-## [0.1.3-beta] - 2026-10-08 - build 667 "Dror"
+## [0.1.3-beta] - 2026-10-08 - build 667 "Menuchah"
 
-Codename *Dror* (Biblical Hebrew: liberty, release - Leviticus 25:10). Fixes from the clean Full install of build 666 on a real PC (about 25 GB downloaded from zero): downloads now let go of their files, retry a single failed file and count every byte once. Plus two bundled open voices, narrated samples, pauses that follow punctuation and structure, and a reading speed that adapts to the text.
+Codename *Menuchah* (Biblical Hebrew: rest, calm - Genesis 49:15). Fixes from the clean Full install of build 666 on a real PC (about 25 GB downloaded from zero): downloads now let go of their files, retry a single failed file and count every byte once. Plus two bundled open voices, narrated samples, pauses that follow punctuation and structure, and a reading speed that adapts to the text.
 
 ### Added
 - **Two bundled open voices: Boaz (male) and Tirzah (female)**, Russian, CC0-1.0, trained only from public-domain LibriVox recordings (readers Mark Chulsky and Anastasiia Solokha). Each is one zip on the `voices-v1` release (SHA-256 pinned in `infra/bundled_voices.py` and `voices/index.json`; the weights are not in git) and part of the standard model download: the Full setup fetches them upfront, Quick with the first-launch download. They are imported into the voices library read-only (no edit, no delete) and the voice card shows the licence. Readers, sources and hashes: [voices/BUNDLED.md](voices/BUNDLED.md).
