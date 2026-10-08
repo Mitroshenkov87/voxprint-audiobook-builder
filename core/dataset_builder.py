@@ -11,7 +11,7 @@ The contract, read from Alexandria's ``train_lora.py``:
   (``text_raw``).
 
 Pipeline inside :meth:`DatasetBuilder.run`: read text -> normalize -> load audio (16 + 24 kHz) -> align -> slice ->
-quality filter -> choose the reference clip -> write files.
+quality filter -> optional speech-recognition cross-check (:mod:`core.clip_check`) -> choose the reference clip -> write files.
 """
 from __future__ import annotations
 
@@ -63,6 +63,9 @@ class BuildConfig:
     slice: SliceConfig = field(default_factory=SliceConfig)
     #: override of the normalization engine (for tests): (name, function)
     normalizer_engine: Optional[Tuple[str, Callable[[str], str]]] = None
+    #: speech-recognition cross-check of the clips (core/clip_check.py): CER threshold, 0 = off; needs an ``asr`` in the builder
+    clip_max_cer: float = 0.0
+    clip_min_keep: int = 20             # = core.clip_check.MIN_KEEP_CLIPS: never fewer clips because of the check
 
 
 @dataclass
@@ -77,6 +80,7 @@ class BuildResult:
     warnings: List[str] = field(default_factory=list)
     ref_text: str = ""
     n_dropped_quality: int = 0
+    clip_check: Optional[Dict[str, Any]] = None      # summary of the speech-recognition cross-check (None = not run)
 
     @property
     def training_language(self) -> str:
@@ -203,9 +207,11 @@ def with_trailing_silence(x: np.ndarray, sr: int, seconds: float) -> np.ndarray:
 class DatasetBuilder:
     """Runs the whole audio+text -> dataset pipeline with a given aligner."""
     def __init__(self, aligner: BaseAligner, config: Optional[BuildConfig] = None,
-                 save_stage: Stage = Stage.SAVE) -> None:
-        """``save_stage`` is the progress stage reported while the dataset files are written (the trainer reports SAVE itself)."""
+                 save_stage: Stage = Stage.SAVE, asr: Any = None) -> None:
+        """``save_stage`` is the progress stage reported while the dataset files are written (the trainer reports SAVE itself);
+        ``asr`` (a :class:`core.asr.BaseASR`) enables the clip cross-check when ``config.clip_max_cer`` > 0."""
         self.aligner = aligner
+        self.asr = asr
         self.cfg = config or BuildConfig()
         #: the stage under which file writing is shown (when training a LoRA, SAVE is reserved for the very end)
         self.save_stage = save_stage
@@ -297,6 +303,38 @@ class DatasetBuilder:
                 sg.index = k
         else:
             segments = sres.segments
+
+        # --- speech-recognition cross-check: drop clips whose words do not match their text (core/clip_check.py)
+        clip_summary: Optional[Dict[str, Any]] = None
+        clip_cer: Dict[int, Optional[float]] = {}
+        dropped_clips: List[Dict[str, Any]] = []
+        if self.asr is not None and cfg.clip_max_cer > 0 and segments:
+            from core import clip_check
+
+            self.aligner.unload()        # free the aligner's (V)RAM before the recogniser loads; nothing needs it any more
+            progress(Stage.SLICE, 0.0, tr("progress.clip_check", n=len(segments)))
+            norm_fn = ((lambda t: normalize_for_tts(t, language, cfg.normalizer_engine).spoken) if cfg.normalize else None)
+            keep, crep = clip_check.check_clips(
+                pieces, cfg.sample_rate, [sg.text for sg in segments], self.asr, language, cfg.clip_max_cer,
+                cfg.clip_min_keep, norm_fn, lambda f: progress(Stage.SLICE, f, tr("progress.clip_check", n=len(segments))),
+                cancel.check)
+            clip_summary = crep.as_dict()
+            for sg, c, heard, ok in zip(segments, crep.cers, crep.texts, keep):
+                if ok:
+                    clip_cer[id(sg)] = c
+                else:
+                    dropped_clips.append({"start": round(sg.start, 3), "end": round(sg.end, 3), "text": sg.text,
+                                          "heard": heard, "cer": round(c, 3) if c is not None else None})
+            clip_summary["dropped_clips"] = dropped_clips
+            if crep.dropped:
+                warnings.append(tr("warn.clip_check_dropped", n=crep.dropped, total=len(segments),
+                                   cer=int(round(cfg.clip_max_cer * 100))))
+            if crep.kept_over:
+                warnings.append(tr("warn.clip_check_limited", n=crep.kept_over, min=cfg.clip_min_keep))
+            segments = [sg for sg, ok in zip(segments, keep) if ok]
+            pieces = [p for p, ok in zip(pieces, keep) if ok]
+            for k, sg in enumerate(segments, start=1):
+                sg.index = k
         progress(Stage.SLICE, 1.0, tr("progress.pieces", n=len(segments)))
 
         # --- saving
@@ -328,17 +366,19 @@ class DatasetBuilder:
             "normalizer": {"engine": norm.engine, "changed": norm.changed},
             "quality_dropped": n_dropped_q,
             "quality_dropped_reasons": q_summary,
+            "clip_check": clip_summary,
             "ref": {"start": round(ref.start, 3), "end": round(ref.end, 3), "score_db": round(ref.score, 1),
                     "text": ref.text},
             "warnings": warnings,
             "segment_times": [{"file": s.filename, "start": round(s.start, 3), "end": round(s.end, 3),
-                               "text": s.text, "text_raw": s.extra.get("text_raw", s.text)}
+                               "text": s.text, "text_raw": s.extra.get("text_raw", s.text),
+                               **({"cer": round(clip_cer[id(s)], 3)} if clip_cer.get(id(s)) is not None else {})}
                               for s in segments],
         }
         (out / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         progress(self.save_stage, 1.0, tr("progress.dataset_saved"))
         return BuildResult(out, len(segments), total_seg, out / "ref.wav", meta_path, language, warnings,
-                           ref_text=ref.text, n_dropped_quality=n_dropped_q)
+                           ref_text=ref.text, n_dropped_quality=n_dropped_q, clip_check=clip_summary)
 
     @staticmethod
     def _clean_old(out: Path) -> None:

@@ -727,5 +727,11 @@
  "asrmodel.both": "Beide herunterladen (automatische Wahl)",
  "asrmodel.tip": "Die Spracherkennung prüft Aufnahmen und Proben. Automatisch: das genauere 1.7B-Modell auf NVIDIA-Grafikkarten mit mindestens 8 GB Grafikspeicher, sonst das 0.6B-Modell. Ein noch nicht installiertes Modell wird sofort mit den anderen Modellen heruntergeladen.",
  "asrmodel.note_ready": "Verwendet: {model}",
- "asrmodel.note_missing": "{model} ist noch nicht installiert; es wird mit den anderen Modellen heruntergeladen (bis dahin wird das installierte Modell verwendet)."
+ "asrmodel.note_missing": "{model} ist noch nicht installiert; es wird mit den anderen Modellen heruntergeladen (bis dahin wird das installierte Modell verwendet).",
+ "clipcheck.checkbox": "Clips per Spracherkennung prüfen, Abweichungen verwerfen über",
+ "clipcheck.tip": "Vor dem Training wird jeder Clip per Spracherkennung neu gelesen und mit seinem Text verglichen. Clips, die um mehr als den angegebenen Zeichenanteil abweichen (Versprecher, ausgelassene oder wiederholte Wörter, Ausrichtungsfehler), werden weggelassen, weil die Stimme sie sonst lernt. Durch diese Prüfung bleiben nie weniger als 20 Clips übrig. Nur mit Transkript.",
+ "progress.clip_check": "{n} Clips werden per Spracherkennung geprüft…",
+ "warn.clip_check_dropped": "Prüfung per Spracherkennung: {n} von {total} Clips passten nicht zu ihrem Text (mehr als {cer} % der Zeichen weichen ab) und wurden weggelassen.",
+ "warn.clip_check_limited": "Prüfung per Spracherkennung: {n} weitere zweifelhafte Clips wurden behalten, damit mindestens {min} Clips bleiben. Prüfen Sie Aufnahme und Text auf Abweichungen.",
+ "warn.clip_check_no_asr": "Die Clips wurden nicht per Spracherkennung geprüft: Das Erkennungsmodell ist noch nicht installiert (es kommt mit dem Modell-Download)."
 }

@@ -120,3 +120,22 @@ than the 0.6B model (Qwen's tables: ru Fleurs 9.9 -> 6.0 % WER, CommonVoice 14.1
 
 Needs the GPU laptop: VRAM and load time of 1.7B next to the TTS model (the preview estimate still assumes the 8 s load of 0.6B,
 `preview_runner.ASR_LOAD_SEC`), and whether 1.7B really lowers the CER on our own recordings / samples.
+
+## B2. Dataset clips cross-checked by speech recognition (research item 6)
+
+`core/clip_check.py`, called by `core/dataset_builder.py` after the quality filter (audio + text mode only; the quick preview
+skips it to stay quick). The aligner always places the script's words somewhere, so a clip with a slip, a skipped / repeated word
+or an alignment error still gets the script's text; the recogniser re-reads each clip and its CER against that text decides.
+
+| | Value |
+| --- | --- |
+| Threshold | CER 12 % by default, 10-15 % (Train window spin box; `TaskRequest.clip_max_cer`, 0 = off) |
+| Normalisation | the recognised text goes through the same normaliser as the script (digits -> words), so number spelling is not an error |
+| Safe minimum | never below 20 clips because of the check: then only the worst go, and a warning names how many doubtful clips stayed |
+| Failures | a clip whose recognition fails is kept; no installed recogniser -> the check is skipped with a warning (never a download) |
+| Memory | the aligner is unloaded before the recogniser loads; the recogniser is unloaded afterwards |
+| Report | `report.json` -> `clip_check` (counts, dropped clips with the heard text and CER) and `cer` per kept segment |
+| Auto-transcribed datasets | not checked (their text is the recogniser's output; `core/asr_dataset.py` has its own plausibility gate) |
+
+Needs the GPU laptop: how many clips a real recording loses at 12 % (should be a few percent; if far more, the normaliser or the
+threshold is off for that language), the extra time (one recognition per clip), and whether the dropped clips are really bad.

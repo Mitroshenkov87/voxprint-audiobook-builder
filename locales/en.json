@@ -727,5 +727,11 @@
  "asrmodel.both": "Download both (use automatic choice)",
  "asrmodel.tip": "Speech recognition checks recordings and samples. Automatic: the more accurate 1.7B model on NVIDIA graphics cards with 8 GB of video memory or more, otherwise the 0.6B model. A model that is not installed yet is downloaded right away with the other models.",
  "asrmodel.note_ready": "In use: {model}",
- "asrmodel.note_missing": "{model} is not installed yet; it is downloaded with the other models (until then the installed model is used)."
+ "asrmodel.note_missing": "{model} is not installed yet; it is downloaded with the other models (until then the installed model is used).",
+ "clipcheck.checkbox": "Check the clips by speech recognition, drop mismatches above",
+ "clipcheck.tip": "Before training, every clip is re-read by speech recognition and compared with its text. Clips that differ by more than the given share of characters (slips of the tongue, skipped or repeated words, alignment errors) are left out, because the voice would learn them. The dataset never shrinks below 20 clips because of this check. Only with a transcript.",
+ "progress.clip_check": "Checking {n} clips by speech recognition…",
+ "warn.clip_check_dropped": "Speech recognition check: {n} of {total} clips did not match their text (more than {cer} % of the characters differ) and were left out.",
+ "warn.clip_check_limited": "Speech recognition check: {n} more doubtful clips were kept so that at least {min} clips remain. Check the recording and the text for differences.",
+ "warn.clip_check_no_asr": "The clips were not checked by speech recognition: the recognition model is not installed yet (it comes with the model download)."
 }

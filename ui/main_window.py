@@ -538,6 +538,23 @@ class MainWindow(QWidget):
         root.addLayout(prev)
         root.addWidget(self.chk_check)
         root.addWidget(self.chk_pick)
+        # speech-recognition cross-check of the dataset clips (core/clip_check.py): text mode only, CER threshold 10-15 %
+        crow = QHBoxLayout()
+        self.chk_clipcheck = QCheckBox()
+        self.chk_clipcheck.setChecked(True)
+        mark_recommended(self.chk_clipcheck)
+        self.sp_clipcer = QSpinBox()
+        self.sp_clipcer.setRange(10, 15)
+        self.sp_clipcer.setValue(12)
+        self.sp_clipcer.setSuffix(" %")
+        crow.addWidget(self.chk_clipcheck)
+        crow.addWidget(self.sp_clipcer)
+        crow.addStretch(1)
+        self.clipcheck_row = QWidget()
+        self.clipcheck_row.setLayout(crow)
+        crow.setContentsMargins(0, 0, 0, 0)
+        root.addWidget(self.clipcheck_row)
+        self.chk_clipcheck.toggled.connect(lambda on: self.sp_clipcer.setEnabled(on and not self.busy))
         self.lbl_preview_estimate = QLabel()
         self.lbl_preview_estimate.setObjectName("hint")
         self.lbl_preview_estimate.setWordWrap(True)
@@ -732,6 +749,9 @@ class MainWindow(QWidget):
         self.chk_check.setText(tr("check.checkbox"))
         self.chk_pick.setText(tr("pick.checkbox"))
         self.chk_pick.setToolTip(tr("pick.tip"))
+        self.chk_clipcheck.setText(tr("clipcheck.checkbox"))
+        self.chk_clipcheck.setToolTip(tr("clipcheck.tip"))
+        self.sp_clipcer.setToolTip(tr("clipcheck.tip"))
         self.btn_lora.setText(tr("ui.btn_lora"))
         self.btn_lora.setToolTip(tr("ui.tip_lora"))
         self.lbl_hint_lora.setText(tr("ui.hint_lora"))
@@ -897,6 +917,7 @@ class MainWindow(QWidget):
         self.chk_compare.setChecked(True)
         self.chk_check.setChecked(True)
         self.chk_pick.setChecked(True)
+        self.chk_clipcheck.setChecked(True)
 
     # ------------------------------------------------------------------ quick preview
     def show_previews(self, items: list) -> None:
@@ -1017,7 +1038,8 @@ class MainWindow(QWidget):
 
     def _task_extras(self) -> dict:
         return dict(compare=self.chk_compare.isChecked(), quality_check=self.chk_check.isChecked(),
-                    auto_pick=self.chk_pick.isChecked(), adapter_scale=getattr(self, "preview_scale", None))
+                    auto_pick=self.chk_pick.isChecked(), adapter_scale=getattr(self, "preview_scale", None),
+                    clip_max_cer=self.sp_clipcer.value() / 100.0 if self.chk_clipcheck.isChecked() else 0.0)
 
     def _consent_kwargs(self) -> dict:
         return dict(consent_mode=self.consent_mode, consent_scope=str(self.cmb_consent_scope.currentData()),
@@ -1132,6 +1154,7 @@ class MainWindow(QWidget):
             return
         self.chk_asr_ok.setChecked(False)
         self.asr_box.setVisible(on)
+        self.clipcheck_row.setVisible(not on)     # the clip cross-check needs a transcript (core/clip_check.py)
         self._apply_text_row()      # the text row stays: in this mode it is the OPTIONAL script that was read aloud
         self._show_audio_label()
         self._refresh_buttons()
@@ -1254,6 +1277,8 @@ class MainWindow(QWidget):
         self.chk_compare.setEnabled(not busy)
         self.chk_check.setEnabled(not busy)
         self.chk_pick.setEnabled(not busy)
+        self.chk_clipcheck.setEnabled(not busy)
+        self.sp_clipcer.setEnabled(not busy and self.chk_clipcheck.isChecked())
         if self._settings is not None:
             self._settings.refresh()
         self.btn_cancel.setVisible(bool(self.worker and self.worker.isRunning()))

@@ -78,6 +78,7 @@ class TaskRequest:
     manual: Optional[object] = None      # core.train_presets.Manual for the "manual" preset
     adapter_scale: Optional[float] = None  # LoRA strength chosen in the preview (None = automatic, core/adapter_strength.py)
     auto_pick: bool = False              # LoRA: hold out ~5 % of the clips, then pick the best checkpoint + strength (core/checkpoint_pick.py)
+    clip_max_cer: float = 0.0            # audio + text, LoRA / dataset: drop clips whose ASR re-reading differs by more (core/clip_check.py; 0 = off)
 
     def voice_name(self) -> str:
         """Voice name = the recording's file name (or the adapter folder's name); also the result folder name in ``output/``."""
@@ -227,6 +228,17 @@ def _register_voice(adapter_dir: Path, info: dict, library=None, typed_id: bool 
     except Exception as exc:  # noqa: BLE001 - the adapter itself is already saved; never fail the run for the library
         log.warning("cannot register the voice in the library: %s", exc)
         return ""
+
+
+def _asr_for_clip_check(req: TaskRequest, asr_factory, preview: bool):
+    """``(asr, warning)`` for the dataset clip cross-check (core/clip_check.py): only for a full training / dataset with a text
+    (the quick preview stays quick); uses an installed recogniser only (``None`` + a warning when none is installed yet)."""
+    from core import clip_check
+
+    if preview or req.no_transcript or clip_check.clamp_threshold(req.clip_max_cer) <= 0:
+        return None, ""
+    asr = _asr_for_check(req, asr_factory)
+    return (asr, "") if asr is not None else (None, tr("warn.clip_check_no_asr"))
 
 
 def _asr_for_check(req: TaskRequest, asr_factory, progress=None):
@@ -464,9 +476,16 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
             path = md.ensure_aligner_model(progress)
             aligner = make_default_aligner(str(path), "cpu" if req.force_cpu else "auto")
         cfg = BuildConfig(max_edge_gap=60.0 if req.consent_mode == "auto" else BuildConfig.max_edge_gap)
+        clip_asr, clip_warn = _asr_for_clip_check(req, asr_factory, preview)
+        if clip_asr is not None:
+            from core import clip_check
+
+            cfg.clip_max_cer = clip_check.clamp_threshold(req.clip_max_cer)
         try:
-            build = DatasetBuilder(aligner, cfg, save_stage=Stage.SLICE if (lora or preview) else Stage.SAVE).run(
-                req.audio, req.text, dataset_dir, progress, cancel)
+            build = DatasetBuilder(aligner, cfg, save_stage=Stage.SLICE if (lora or preview) else Stage.SAVE,
+                                   asr=clip_asr).run(req.audio, req.text, dataset_dir, progress, cancel)
+            if clip_warn:
+                build.warnings.append(clip_warn)
         finally:
             try:
                 aligner.unload()
