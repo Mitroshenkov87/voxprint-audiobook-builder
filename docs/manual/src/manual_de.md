@@ -43,7 +43,7 @@ Stille Installation für Administratoren: `Voxprint-Setup.exe /VERYSILENT /Model
 
 ## Erster Start
 
-Beim ersten Start bereitet sich Voxprint vor: Die Statuszeile zeigt „{{ui.prefetch_start}}“ Es lädt die benötigten Modelle herunter (etwa 10 GB, einmalig). Ist Hugging Face langsam oder nicht erreichbar, wechselt Voxprint automatisch zum ModelScope-Spiegel. Der Download kann unterbrochen werden und läuft an der gleichen Stelle weiter. Modelle, die schon auf dem Computer liegen (zum Beispiel im Hugging-Face-Cache oder bei Alexandria/Pinokio), werden ohne erneuten Download nur lesend weiterverwendet.
+Beim ersten Start bereitet sich Voxprint vor. Mit dem Online-Installer öffnet sich das Fenster **{{modules.title}}** und arbeitet ohne Klick: Eine Zeile zeigt, was gerade geladen wird („{{modules.now_download}}“), danach die Prüfsummenprüfung, ein Balken den Gesamtfortschritt. Schritt 1 bringt die Programmkomponenten zusammen mit dem Textkorrektur-Modell SAGE, Schritt 2 direkt danach ALLE Modelle (Stimme, Ausrichtung, Spracherkennung) in Ihren Modellordner. Sonst zeigt die Statuszeile „{{ui.prefetch_start}}“ und Voxprint lädt die benötigten Modelle (etwa 10 GB, einmalig). Ist Hugging Face langsam oder nicht erreichbar, wechselt Voxprint automatisch zum ModelScope-Spiegel. Der Download kann unterbrochen werden und läuft an der gleichen Stelle weiter. Modelle, die schon auf dem Computer liegen (zum Beispiel im Hugging-Face-Cache oder bei Alexandria/Pinokio), werden ohne erneuten Download nur lesend weiterverwendet.
 
 Ist alles fertig, zeigt die Statuszeile „{{ui.prefetch_done}}“ Beim ersten Start erscheint ein Datenschutzhinweis; eine kurze Erinnerung („{{ui.footer_privacy}}“) bleibt am unteren Rand der Fenster.
 
@@ -365,7 +365,6 @@ Das Badge ist eine Information, keine Rechtsberatung. Die Lizenz gilt nur für d
 | Bedienelement | Was es tut |
 |---|---|
 | **{{ui.language}}** | Die Oberflächensprache: English, Deutsch, Русский. Sie ändert sich sofort in allen Fenstern. |
-| **{{auto.button}}** | Wählt alle empfohlenen automatischen Optionen und lädt die nötigen Modelle (siehe unten). |
 | **{{ui.btn_update}}** | Prüft, ob neuere verifizierte Versionen von Komponenten oder Modellen existieren, und installiert sie (mit Sicherheitsprüfung und automatischem Zurückrollen). Voxprint prüft außerdem einmal pro Woche unauffällig. Meldungen: „{{upd.up_to_date}}“, „{{upd.restart}}“ |
 | **{{ui.settings_models_folder}}** | Öffnet den Ordner mit den heruntergeladenen Modellen. |
 | **{{ui.settings_data_folder}}** | Öffnet den Daten- und Protokollordner – schicken Sie das Protokoll dem Entwickler, wenn ein Fehler wiederkehrt. |
@@ -381,9 +380,9 @@ Bemerkt das Programm eine beschädigte Installation, bietet ein Banner die Repar
 
 Findet das Programm eine ältere Komponente in einer Umgebung, die ihm nicht gehört (zum Beispiel Ihr eigenes Python), fragt es zuerst: „{{upg.title}}“ mit **{{upg.btn_upgrade}}** oder **{{upg.btn_later}}**; Ihre Umgebung ändert es nie stillschweigend.
 
-## {{auto.button}}
+## Maximale Qualität ab Werk
 
-Ab Werk ist alles, was automatisch laufen kann, **bereits gewählt** und mit einem Stern und dem Wort „{{auto.recommended}}“ markiert: Wenn Sie nichts anfassen, arbeitet Voxprint mit maximaler Qualität. Die Schaltfläche **{{auto.button}}** in den Einstellungen wählt diese Optionen erneut (falls Sie welche abgeschaltet haben) und lädt die dafür nötigen Modelle mit Fortschrittsbalken. Die einzelnen Kontrollkästchen bleiben in ihren Fenstern.
+Ab Werk ist alles, was automatisch laufen kann, **bereits gewählt** und mit einem Stern und dem Wort „{{auto.recommended}}“ markiert: Wenn Sie nichts anfassen, arbeitet Voxprint mit maximaler Qualität. Die dafür nötigen Modelle gehören zum Download beim ersten Start, es ist nichts extra anzuklicken. Die einzelnen Kontrollkästchen bleiben in ihren Fenstern.
 
 * Textaufbereitung („Buch vertonen“): die sieben regelbasierten Schritte – Layout, Fußnotenmarken und Seitenzahlen, Anführungszeichen und Striche, Links, Kapitelüberschriften, Zahlen in Worten, Abkürzungen.
 * KI-Korrektur von Tippfehlern (russische Bücher; einmaliger Download von etwa 365 MB).

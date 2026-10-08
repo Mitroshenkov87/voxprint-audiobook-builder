@@ -53,9 +53,12 @@ The flavor we download follows the driver (`nvidia-smi`): CUDA ≥ 12.8 → `cu1
    (manifest address `manifest-thin-<channel>.json`), installs the Visual C++ runtime if needed.
 2. The app starts, activates what is in the runtime folder (`infra/modules.activate()`), and opens the **Components** window (also Settings → Components).
 3. The window reads the manifest (last good copy cached offline), looks for a reusable PyTorch, and downloads the missing modules (`libs`, `text`,
-   `audio`, `torch`) with progress. No restart is needed afterwards; features that need a module work as soon as it is ready; the first-run model
-   download starts when all required modules are there.
-4. CLI for scripts and CI: `Voxprint.exe --modules-status`, `--install-modules [ids] [--own-torch]`, `--probe-torch` (results also in `logs\modules.txt`, `logs\probe_torch.txt`).
+   `audio`, `torch`) without a click, followed by the SAGE text clean-up model (step 1). One live line names what is downloaded right now
+   (percentage, speed), says when a file is being verified (SHA-256) or shows the error; a bar shows the overall progress. No restart is needed
+   afterwards; features that need a module work as soon as it is ready.
+4. Step 2 follows at once: the first-run download of ALL models (TTS, aligner, Qwen3-ASR, SAGE if step 1 could not get it) into the chosen models
+   folder, mirrored on the same live line (backup restore and existing copies first; no "maximum quality" button). Closing the window does not stop it.
+5. CLI for scripts and CI: `Voxprint.exe --modules-status`, `--install-modules [ids] [--own-torch]`, `--probe-torch` (results also in `logs\modules.txt`, `logs\probe_torch.txt`).
 
 ## Failure and resume
 

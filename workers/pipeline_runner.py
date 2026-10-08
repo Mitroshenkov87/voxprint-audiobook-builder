@@ -485,7 +485,10 @@ def _restore_backup_source(progress: ProgressCallback) -> None:
 
 def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[List[str]] = None,
                     ensure=None) -> List[str]:
-    """First run: download all required models automatically.  Returns the list of repositories that were downloaded."""
+    """First run: download ALL required models automatically (TTS, aligner, speech recognition, SAGE), with no "quality"
+    button in between.  A Voxprint backup chosen as models source is restored first, copies in the chosen models folder /
+    other programs are used as they are, and only what is still missing is downloaded (multi-connection, hash-checked).
+    Returns the list of repositories that were downloaded."""
     ensure = ensure or md.ensure_model
     repos = repos if repos is not None else required_model_repos()
     _restore_backup_source(progress)
@@ -493,8 +496,13 @@ def prefetch_models(progress: ProgressCallback = noop_progress, repos: Optional[
     for repo in repos:   # copies of other programs: instant, only the "found, using it" message is shown
         if repo not in todo and not md.verify_local_model(md.local_dir_for(repo)):
             ensure(repo, lambda s, f, m: progress(Stage.MODEL, 0.0, m))
-    for i, repo in enumerate(todo):
-        ensure(repo, lambda s, f, m, i=i: progress(Stage.MODEL, (i + f) / max(1, len(todo)), m))
+    # overall progress weighted by the approximate size, so the 0.5 GB SAGE does not count as much as the 4.5 GB TTS model
+    sizes = [md.APPROX_SIZE_GB.get(r, 2.0) for r in todo]
+    total = sum(sizes) or 1.0
+    base = 0.0
+    for repo, size in zip(todo, sizes):
+        ensure(repo, lambda s, f, m, b=base, sz=size: progress(Stage.MODEL, min(1.0, (b + sz * float(f)) / total), m))
+        base += size
     if ensure is md.ensure_model and sys.platform == "win32":
         from infra import assets   # system ffmpeg, else the pinned LGPL build (best effort, never blocks)
 

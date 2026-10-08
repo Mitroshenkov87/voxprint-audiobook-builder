@@ -43,7 +43,7 @@ Silent installation for administrators: `Voxprint-Setup.exe /VERYSILENT /ModelsD
 
 ## First start
 
-On the first start Voxprint prepares itself: the status line says *{{ui.prefetch_start}}* It downloads the models it needs (about 10 GB, once). If Hugging Face is slow or unreachable, Voxprint switches to the ModelScope mirror automatically. The download can be interrupted and continues where it stopped. Models already present on the computer (for example from the Hugging Face cache or Alexandria/Pinokio) are reused without downloading them again, read-only.
+On the first start Voxprint prepares itself. With the online installer the **{{modules.title}}** window opens and works without a click: one line shows what is being downloaded right now (*{{modules.now_download}}*), then the checksum check, and a bar shows the overall progress. Step 1 brings the program components together with the SAGE text clean-up model, step 2 right after it ALL models (voice, alignment, speech recognition) into your models folder. Otherwise the status line says *{{ui.prefetch_start}}* and downloads the models it needs (about 10 GB, once). If Hugging Face is slow or unreachable, Voxprint switches to the ModelScope mirror automatically. The download can be interrupted and continues where it stopped. Models already present on the computer (for example from the Hugging Face cache or Alexandria/Pinokio) are reused without downloading them again, read-only.
 
 When it is done, the status shows *{{ui.prefetch_done}}* A privacy notice is shown on the first start; a short reminder (*{{ui.footer_privacy}}*) stays at the bottom of the windows.
 
@@ -365,7 +365,6 @@ Open **{{ui.settings_title}}** with the gear button (top right of the Studio and
 | Control | What it does |
 |---|---|
 | **{{ui.language}}** | The interface language: English, Deutsch, Русский. It changes at once in all windows. |
-| **{{auto.button}}** | Selects every recommended automatic option and downloads the models they need (see below). |
 | **{{ui.btn_update}}** | Checks whether newer verified versions of components or models exist and installs them (with a safety check and automatic rollback). Voxprint also checks quietly once a week. Messages: *{{upd.up_to_date}}*, *{{upd.restart}}* |
 | **{{ui.settings_models_folder}}** | Opens the folder with the downloaded models. |
 | **{{ui.settings_data_folder}}** | Opens the data and log folder – send the log to the developer if an error repeats. |
@@ -381,9 +380,9 @@ If the program notices a damaged installation, a banner offers the repair (*{{ui
 
 When the program finds an older component in an environment it does not own (for example your own Python), it asks first: *{{upg.title}}* with **{{upg.btn_upgrade}}** or **{{upg.btn_later}}**; it never changes your environment silently.
 
-## {{auto.button}}
+## Maximum quality out of the box
 
-Out of the box, everything that can run automatically is **already selected** and marked with a star and the word *{{auto.recommended}}*: if you touch nothing, Voxprint works at maximum quality. The **{{auto.button}}** button in Settings selects all of these options again (after you have switched some off) and downloads the models they need, with a progress bar. The single check boxes stay in their windows.
+Out of the box, everything that can run automatically is **already selected** and marked with a star and the word *{{auto.recommended}}*: if you touch nothing, Voxprint works at maximum quality. The models these options need are part of the first-start download, so there is nothing extra to click. The single check boxes stay in their windows.
 
 * Text preparation (Narrate a book): the seven rule-based steps – layout, footnote marks and page numbers, quotes and dashes, links, chapter headings, numbers in words, abbreviations.
 * AI clean-up of typos (Russian books; one-time download of about 365 MB).

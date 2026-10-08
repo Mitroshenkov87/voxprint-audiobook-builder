@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -212,17 +213,53 @@ def missing_required(manifest: Optional[Dict[str, Any]] = None) -> List[Module]:
 
 
 # ------------------------------------------------------------------------------------------------ install
+def live_line(phase: str, name: str, done: int = 0, total: int = 0, speed: float = 0.0) -> str:
+    """The one translated status line of the Components window for a structured progress event of the downloader
+    (``tools/online_fetch.py``): what is being downloaded right now, its percentage and speed, or that it is being verified."""
+    from core.i18n import tr
+    from infra.download_watch import fmt_bytes
+
+    pct = int(100 * done / total) if total > 0 else 0
+    if phase == "download":
+        return tr("modules.now_download", name=name, pct=pct, speed=f"{fmt_bytes(speed)}/s" if speed > 0 else "\u2026")
+    if phase == "verify":
+        return tr("modules.now_verify", name=name)
+    if phase == "unpack":
+        return tr("modules.now_unpack", name=name, pct=pct)
+    if phase == "folder":
+        return tr("modules.now_folder", name=name)
+    return name
+
+
 class _Status:
-    """Duck-typed ``online_fetch.Status``: forwards progress, can cancel by raising."""
+    """Duck-typed ``online_fetch.Status``: forwards progress, can cancel by raising.  Its :meth:`event` receives the structured
+    values of the downloader, so the window shows ONE translated live line ("Downloading: PyTorch (torch-...whl) - 42% - 35 MB/s")."""
 
-    def __init__(self, progress: Progress, cancelled: Callable[[], bool]) -> None:
+    MIN_GAP = 0.15                   # seconds between two lines of the same file (a 1 MiB chunk arrives many times a second)
+
+    def __init__(self, progress: Progress, cancelled: Callable[[], bool], titles: Optional[Dict[str, str]] = None) -> None:
         self.progress, self.cancelled, self.was_cancelled = progress, cancelled, False
+        self.titles = titles or {}   # component id -> module title ("PyTorch"), so the line names more than a wheel file
+        self._last_key, self._last_t = ("", ""), 0.0
 
-    def write(self, state: str, fraction: float, text: str, force: bool = False) -> None:
+    def _check_cancel(self) -> None:
         if self.cancelled():
             self.was_cancelled = True
             raise _fetch_module().FetchError("cancelled")      # a FetchError is not retried by the downloader
+
+    def write(self, state: str, fraction: float, text: str, force: bool = False) -> None:
+        self._check_cancel()
         self.progress(max(0.0, min(1.0, fraction)), text)
+
+    def event(self, fraction: float, phase: str, comp_id: str, name: str, done: int, total: int, speed: float) -> None:
+        self._check_cancel()
+        now, key = time.monotonic(), (phase, comp_id)
+        if key == self._last_key and now - self._last_t < self.MIN_GAP and not (total and done >= total):
+            return
+        self._last_key, self._last_t = key, now
+        title = self.titles.get(comp_id, "")
+        shown = f"{title} ({name})" if title and title.lower() not in name.lower() else (name or title)
+        self.progress(max(0.0, min(1.0, fraction)), live_line(phase, shown, done, total, speed))
 
 
 def install(module_ids: Optional[List[str]] = None, progress: Optional[Progress] = None,
@@ -240,7 +277,8 @@ def install(module_ids: Optional[List[str]] = None, progress: Optional[Progress]
     if not comp_ids:
         activate()
         return 0
-    st = _Status(progress or (lambda f, t: None), cancelled)
+    titles = {cid: m.title for m in chosen for cid in m.components}
+    st = _Status(progress or (lambda f, t: None), cancelled, titles)
     try:
         # a setup folder (installer option "Keep a portable setup folder") is used first: valid files there need no download,
         # newly downloaded ones are kept in it; without internet its own manifest is used

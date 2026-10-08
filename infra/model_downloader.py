@@ -480,7 +480,7 @@ def _hf_fast(repo_id: str, hf_probe: Optional[Callable[[str], bool]]) -> bool:
 class ModelLock:
     """Cross-process lock for one model folder (an OS file lock: it disappears with a crashed process, so it is never stale).
 
-    The background workers (``auto_quality_worker`` and the main worker's prefetch) may ask for the same model at the same
+    Background workers (the Components window extras, the first-run prefetch, a task) may ask for the same model at the same
     moment; a second request waits here and then finds the finished model instead of downloading and renaming it in parallel.
     """
 

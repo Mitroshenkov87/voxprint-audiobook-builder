@@ -702,7 +702,7 @@ class NarrateWindow(SubWindow):
         return {text_models.STEP_SPELLFIX} if chk.isChecked() and chk.isEnabled() else set()
 
     def reload_auto_steps(self) -> None:
-        """"Maximum quality (auto)": select every recommended preparation step again (the AI step once its model is there)."""
+        """Select every recommended preparation step again (the AI step once its model is there)."""
         for key in RULE_STEPS:
             self.prep_checks[key].setChecked(True)
         self._spell_wanted = True

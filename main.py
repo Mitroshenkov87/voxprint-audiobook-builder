@@ -184,13 +184,19 @@ def _modules_cli(argv) -> int:
 
 
 def _offer_components(win, app, then_prefetch: bool) -> None:
-    """Thin build, first start: show the Components window (download the runtime modules) and, when they are ready,
-    start the first-run model download that was waiting for them."""
+    """Thin build, first start: the Components window downloads the runtime modules and SAGE without a click (step 1) and then
+    starts the download of ALL heavy models (step 2, the main window's first-run prefetch), showing one live line throughout."""
     from PySide6.QtCore import QTimer
 
-    from ui.modules_dialog import ModulesDialog
+    from ui.modules_dialog import ModulesDialog, default_extras
 
-    dlg = ModulesDialog(win.styleSheet(), win)
+    def models_start(hook):
+        # StudioWindow.start_prefetch delegates to the Train window (it owns the status line and the busy lock).  Before
+        # this existed the call raised AttributeError inside the Qt slot and the models never started after the components.
+        return win.start_prefetch(hook) if then_prefetch else None
+
+    dlg = ModulesDialog(win.styleSheet(), win, extras_fn=default_extras, models_start=models_start if then_prefetch else None,
+                        autostart=True)
     win._components = dlg                    # keep a reference
 
     def ready() -> None:
@@ -199,8 +205,6 @@ def _offer_components(win, app, then_prefetch: bool) -> None:
             win.trainer.refresh_estimate()
         except Exception:  # noqa: BLE001
             pass
-        if then_prefetch:
-            QTimer.singleShot(300, win.start_prefetch)
 
     dlg.ready.connect(ready)
     app.aboutToQuit.connect(dlg.shutdown)
@@ -352,6 +356,10 @@ def main(argv=None) -> int:
         except Exception:  # noqa: BLE001 - never get in the way of starting up
             importing = False
     want_prefetch = first_run or importing or "--prefetch" in argv
+    if thin_wait:
+        # the check above ran without PyTorch (GPU unknown, so possibly the wrong TTS size): after the components the
+        # prefetch looks again and simply finds nothing to do when every model is already there
+        want_prefetch = True
     win = StudioWindow(autocheck=not selftest and not thin_wait, prefetch=want_prefetch and not thin_wait)
     app.aboutToQuit.connect(win.shutdown)
     if not selftest:

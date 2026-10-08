@@ -122,6 +122,8 @@ QLabel#ready {{{{ font-size: 22px; font-weight: 600; color: #86efac; }}}}
 QLabel#footer {{{{ color: {faint}; font-size: 12px; }}}}
 QLabel#hint {{{{ color: {faint}; font-size: 12px; padding-left: 4px; }}}}
 QLabel#warn {{{{ color: #f2c14e; font-size: 12px; padding: 2px 4px; }}}}
+QLabel#liveline {{{{ font-weight: 600; }}}}
+QLabel#liveline[state="error"] {{{{ color: #f87171; }}}}
 QComboBox {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px;
             padding: 6px 12px; min-width: 110px; }}}}
 QComboBox:disabled {{{{ color: {disabled}; }}}}
@@ -836,7 +838,7 @@ class MainWindow(QWidget):
         self._refresh_buttons()
 
     def reload_auto_steps(self) -> None:
-        """"Maximum quality (auto)": select every recommended automatic option of this window again."""
+        """Select every recommended automatic option of this window again."""
         self.chk_compare.setChecked(True)
         self.chk_check.setChecked(True)
 
@@ -1463,10 +1465,13 @@ class MainWindow(QWidget):
         return True
 
     # ------------------------------------------------------------------ first run
-    def start_prefetch(self) -> None:
-        """Download the required models automatically on the first run (no questions asked)."""
+    def start_prefetch(self, hook: Optional[Callable[[Any], None]] = None) -> Optional[PrefetchWorker]:
+        """Download ALL required models automatically on the first run (no questions asked, no "quality" button).
+
+        ``hook(worker)`` runs before the worker starts (the Components window connects its live line there, so no signal is
+        lost).  Returns the worker, or None if a task is running."""
         if self.busy:
-            return
+            return None
         w = PrefetchWorker(self.prefetch_fn, parent=self)
         self.prefetch_worker = w
         self.lbl_status.setText(tr("ui.prefetch_start"))
@@ -1474,8 +1479,11 @@ class MainWindow(QWidget):
         w.done.connect(self._on_prefetch_done)
         w.failed.connect(self._on_prefetch_failed)
         w.finished.connect(self._refresh_buttons)
+        if hook is not None:
+            hook(w)
         w.start()
         self._refresh_buttons()
+        return w
 
     def _on_prefetch_done(self, downloaded: list) -> None:
         """First-run download finished."""

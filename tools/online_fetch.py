@@ -225,14 +225,16 @@ def sources(comp: dict) -> List[str]:
     return out
 
 
-def download(comp: dict, cache: Path, progress: Callable[[int, int], None], sleep: Callable[[float], None] = time.sleep) -> Path:
+def download(comp: dict, cache: Path, progress: Callable[[int, int], None], sleep: Callable[[float], None] = time.sleep,
+             verifying: Optional[Callable[[], None]] = None) -> Path:
     """Download one component into ``cache`` (resumable) and return the verified file path.  Every source is tried in turn (the
-    partial file is kept: all sources serve the same bytes, the SHA-256 decides)."""
+    partial file is kept: all sources serve the same bytes, the SHA-256 decides).  ``verifying()`` is called right before the
+    SHA-256 of a finished file is computed (it takes a few seconds for a big wheel), so the caller can say so."""
     srcs = sources(comp)
     last: Optional[FetchError] = None
     for i, url in enumerate(srcs):
         try:
-            return _download_from(comp, url, cache, progress, sleep, RETRIES if i == len(srcs) - 1 else 3)
+            return _download_from(comp, url, cache, progress, sleep, RETRIES if i == len(srcs) - 1 else 3, verifying)
         except FetchError as exc:
             if str(exc) == "cancelled":
                 raise
@@ -244,14 +246,17 @@ def download(comp: dict, cache: Path, progress: Callable[[int, int], None], slee
 
 
 def _download_from(comp: dict, url: str, cache: Path, progress: Callable[[int, int], None], sleep: Callable[[float], None],
-                   retries: int) -> Path:
+                   retries: int, verifying: Optional[Callable[[], None]] = None) -> Path:
     """Download one component from one address into ``cache`` (resumable) and return the verified file path."""
     size, sha = int(comp["size"]), comp["sha256"]
+    say_verify = verifying or (lambda: None)
     cache.mkdir(parents=True, exist_ok=True)
     final, part = cache / f"{sha}.zip", cache / f"{sha}.part"
-    if final.is_file() and final.stat().st_size == size and sha256_file(final) == sha:
-        progress(size, size)
-        return final
+    if final.is_file() and final.stat().st_size == size:
+        say_verify()
+        if sha256_file(final) == sha:
+            progress(size, size)
+            return final
     final.unlink(missing_ok=True)
     last_err = ""
     for attempt in range(retries):
@@ -278,6 +283,7 @@ def _download_from(comp: dict, url: str, cache: Path, progress: Callable[[int, i
             got = part.stat().st_size if part.is_file() else 0
             if got != size:
                 raise OSError(f"incomplete download ({got} of {size} bytes)")
+            say_verify()
             if sha256_file(part) != sha:
                 part.unlink(missing_ok=True)       # corrupt: never resume on top of a bad file
                 last_err = "the SHA-256 of the download does not match the manifest"
@@ -364,6 +370,48 @@ def extract_wheel(whl: Path, dest: Path, progress: Callable[[int, int], None]) -
                     progress(done, total)
             n += 1
     return n
+
+
+# --------------------------------------------------------------------------- live progress
+class _Rate:
+    """Smoothed download speed of ONE file (bytes per second).  An exponential moving average over ~3 s, so the number on the
+    live line does not jump with every 1 MiB chunk; a resumed file starts counting from the bytes it already had."""
+
+    TAU = 3.0
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        self.clock = clock
+        self.speed = 0.0
+        self._t: Optional[float] = None
+        self._done = 0
+
+    def update(self, done: int) -> float:
+        now = self.clock()
+        if self._t is None or done < self._done:
+            self._t, self._done = now, done
+            return self.speed
+        dt = now - self._t
+        if dt >= 0.25:
+            inst = (done - self._done) / dt
+            alpha = min(1.0, dt / self.TAU)
+            self.speed = inst if self.speed == 0 else self.speed + alpha * (inst - self.speed)
+            self._t, self._done = now, done
+        return self.speed
+
+
+def _mb_s(speed: float) -> str:
+    return f"{speed / (1 << 20):.1f} MB/s" if speed > 0 else "..."
+
+
+def _say(status, fraction: float, text: str, phase: str, comp: dict, name: str, done: int = 0, total: int = 0,
+         speed: float = 0.0, force: bool = False) -> None:
+    """One progress step.  A status object that has an ``event`` method (the app's Components window, ``infra/modules.py``)
+    gets the structured values and builds its own translated line; the installer's status file gets the short English ``text``."""
+    event = getattr(status, "event", None)
+    if callable(event):
+        event(fraction, phase, str(comp.get("id", "")), name, done, total, speed)
+    else:
+        status.write("running", fraction, text, force=force)      # force: a phase change must not be lost to the 0.2 s throttle
 
 
 # --------------------------------------------------------------------------- the whole job
@@ -477,17 +525,22 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
     for c, w in zip(fetch, weights):
         name = c.get("file") or c["id"]
         install = c in todo
+        rate = _Rate()
 
-        def dl(done: int, total: int, c=c, name=name, w=w, base=base) -> None:
-            status.write("running", (base + w / 2 * done / max(1, total)) / total_w,
-                         f"Downloading {name}: {done >> 20} of {total >> 20} MB")
+        def dl(done: int, total: int, c=c, name=name, w=w, base=base, rate=rate) -> None:
+            pct, speed = int(100 * done / max(1, total)), rate.update(done)
+            _say(status, (base + w / 2 * done / max(1, total)) / total_w,
+                 f"Downloading {name}: {pct}% - {done >> 20} of {total >> 20} MB - {_mb_s(speed)}", "download", c, name, done, total, speed)
+
+        def verifying(c=c, name=name, w=w, base=base) -> None:
+            _say(status, (base + w / 2) / total_w, f"Verifying {name} (SHA-256)", "verify", c, name, force=True)
 
         keepfile = portable_file(portable, c) if portable is not None else None
         if keepfile is not None and _portable_valid(keepfile, c):
             zpath = keepfile                                      # the folder already has it (no network)
-            status.write("running", base / total_w, f"Using {name} from the setup folder")
+            _say(status, base / total_w, f"Using {name} from the setup folder", "folder", c, name, force=True)
         else:
-            zpath = download(c, cache, dl, sleep)
+            zpath = download(c, cache, dl, sleep, verifying)
             if keepfile is not None:
                 keepfile.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(zpath, keepfile)
@@ -496,8 +549,8 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
         base += w / 2
 
         if install:
-            def ex(done: int, total: int, name=name, w=w, base=base) -> None:
-                status.write("running", (base + w / 2 * done / max(1, total)) / total_w, f"Unpacking {name}")
+            def ex(done: int, total: int, c=c, name=name, w=w, base=base) -> None:
+                _say(status, (base + w / 2 * done / max(1, total)) / total_w, f"Unpacking {name}", "unpack", c, name, done, total)
 
             (extract_wheel if c.get("kind") == "wheel" else extract)(zpath, dest, ex)
             state[c["id"]] = c["sha256"]

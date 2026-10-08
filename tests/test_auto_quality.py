@@ -1,5 +1,5 @@
-"""Maximum quality (auto): the step registry, the model needs, the Settings button, the pre-selected recommended options and
-the A/B recommendation."""
+"""Automatic quality steps: the step registry, the pre-selected recommended options and the A/B recommendation.  (The models
+these steps need come with the first-start download: tests/test_components_flow.py.)"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,44 +10,18 @@ pytest.importorskip("PySide6")
 
 from core import i18n, text_prep, voice_check
 from infra import auto_steps as au
-from infra import model_downloader as md
 from infra import text_models
-from tests.test_studio import app, lib, make_studio, wait_for  # noqa: F401
+from tests.test_studio import app, lib, make_studio  # noqa: F401
 from workers import preview_runner as pr
 
 
-# --------------------------------------------------------------------------- registry and model needs
+# --------------------------------------------------------------------------- registry
 def test_steps_are_the_implemented_ones():
     assert au.STEPS == text_prep.STEP_KEYS + ("spellfix", "quality_check", "compare")
     assert text_models.get("sage-ru").integrated
     # nothing that is only announced may be in the list
     for later in (text_models.STEP_PUNCT, text_models.STEP_STRESS, text_models.STEP_TRANSLATE, text_models.STEP_ROLES):
         assert later not in au.STEPS
-
-
-def test_needed_models_lists_only_what_is_missing(monkeypatch):
-    states = {md.ALIGNER_REPO: md.STATE_READY, md.ASR_REPO: md.STATE_MISSING}
-    monkeypatch.setattr(md, "model_state", lambda r: states[r])
-    monkeypatch.setattr(text_models, "state", lambda m: text_models.STATE_NEEDS_DOWNLOAD)
-    keys = [n.key for n in au.needed_models()]
-    assert keys == [md.ASR_REPO, "sage-ru"]
-    assert [n.key for n in au.needed_models(au.RULE_STEPS)] == []        # rule steps need no model
-    assert [n.key for n in au.needed_models({au.STEP_SPELLFIX})] == ["sage-ru"]
-    states[md.ASR_REPO] = md.STATE_PARTIAL                                  # a partial download is resumed
-    assert md.ASR_REPO in [n.key for n in au.needed_models({au.STEP_CHECK})]
-    monkeypatch.setattr(text_models, "state", lambda m: text_models.STATE_READY)
-    states[md.ASR_REPO] = md.STATE_READY
-    assert au.needed_models() == []
-
-
-def test_download_models_reports_overall_progress():
-    needs = [au.ModelNeed("a/b", "hf", "A", 3.0), au.ModelNeed("sage-ru", "text", "S", 1.0)]
-    seen, calls = [], []
-    n = au.download_models(needs, lambda f, m="": seen.append(f),
-                           ensure_hf=lambda repo, prog: (calls.append(repo), prog(None, 0.5, "x"), prog(None, 1.0, "y")),
-                           ensure_text=lambda model, prog: (calls.append(model.key), prog(None, 1.0, "z")))
-    assert n == 2 and calls == ["a/b", "sage-ru"]
-    assert seen == sorted(seen) and seen[-1] == pytest.approx(1.0) and seen[0] == pytest.approx(0.375)     # half of 3 of 4 GB
 
 
 # --------------------------------------------------------------------------- A/B recommendation
@@ -102,64 +76,5 @@ def test_narrate_window_preselects_and_marks_the_best(app, lib):
         n.prep_checks[text_prep.STEP_LINKS].setChecked(False)
         s.reload_auto_steps()
         assert n.prep_checks[text_prep.STEP_LINKS].isChecked()
-    finally:
-        s.shutdown()
-
-
-def test_settings_button_downloads_missing_models(app, lib):
-    i18n.set_language("en")
-    s = make_studio(lib)
-    try:
-        d = s.settings_dialog()
-        assert d.btn_max.text() == "Maximum quality (auto)"
-        s.trainer.chk_compare.setChecked(False)
-        d.needed_models = lambda: []
-        assert d.start_max_quality() is False                      # nothing to download, but the options are selected
-        assert s.trainer.chk_compare.isChecked()
-        assert "already downloaded" in d.lbl_max_status.text()
-
-        got = []
-
-        def job(needs, progress):
-            got.append([n.key for n in needs])
-            progress(0.5, "half")
-            progress(1.0, "full")
-            return len(needs)
-
-        d.needed_models = lambda: [au.ModelNeed("sage-ru", "text", "SAGE", 0.35)]
-        d.models_job = job
-        assert d.start_max_quality() is True
-        assert wait_for(lambda: not d.max_running)
-        from PySide6.QtWidgets import QApplication
-
-        for _ in range(5):
-            QApplication.processEvents()
-        assert got == [["sage-ru"]] and d.btn_max.isEnabled()
-        assert "1 model" in d.lbl_max_status.text() and not d.bar_max.isVisible()
-
-        def bad(needs, progress):
-            raise RuntimeError("offline")
-
-        d.models_job = bad
-        assert d.start_max_quality() is True
-        assert wait_for(lambda: not d.max_running)
-        for _ in range(5):
-            QApplication.processEvents()
-        assert "offline" in d.lbl_max_status.text() and d.btn_max.isEnabled()
-    finally:
-        s.shutdown()
-
-
-def test_texts_in_every_language(app, lib):
-    s = make_studio(lib)
-    try:
-        d = s.settings_dialog()
-        seen = set()
-        for lang in ("en", "ru", "de"):
-            i18n.set_language(lang)
-            d.retranslate()
-            assert d.btn_max.text() and d.lbl_max_hint.text() and "auto." not in d.btn_max.text()
-            seen.add(d.btn_max.text())
-        assert len(seen) == 3
     finally:
         s.shutdown()

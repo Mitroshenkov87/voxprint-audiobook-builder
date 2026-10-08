@@ -2,9 +2,9 @@
 
 Only models that are small, permissively licensed (MIT / Apache-2.0 / CC-BY) and testable behind a mockable interface are
 marked ``integrated``; the rest are listed as ``planned`` so the UI can show them greyed ("coming later") and so the
-extension point is visible in one place.  SAGE (Russian clean-up) is part of the first-run / ``--prefetch`` download-all
-alongside the main HF models; other integrated models (translation) stay on demand: the user ticks the option and presses
-*Download*; :func:`ensure` then fetches the pinned revision into the models folder (HF -> ModelScope fallback, resumable,
+extension point is visible in one place.  SAGE (Russian clean-up) is downloaded together with the runtime components in the thin
+build's Components window (:data:`COMPONENT_EXTRAS`) and is also part of the first-run / ``--prefetch`` download-all alongside the
+main HF models; other integrated models (translation) stay on demand: the user ticks the option and presses *Download*; :func:`ensure` then fetches the pinned revision into the models folder (HF -> ModelScope fallback, resumable,
 see :mod:`infra.model_downloader`).
 
 Sources of the choices: the research notes on Russian clean-up and translation models (2026-10-03).  Sizes are Hugging Face
@@ -140,6 +140,38 @@ def ensure(model: TextModel, progress: ProgressCallback = noop_progress, **kw) -
         shutil.rmtree(path, ignore_errors=True)
         raise err
     return path
+
+
+#: Text models that the thin build's Components window downloads in the same pass as the runtime libraries (no separate click
+#: in the Narrate window).  The first-run model download (``workers.pipeline_runner.prefetch_models``) lists them too, as a
+#: fallback for full builds and for a Components pass whose extra download failed.
+COMPONENT_EXTRAS: Tuple[str, ...] = ("sage-ru",)
+
+
+def missing_component_extras() -> List[TextModel]:
+    """Integrated :data:`COMPONENT_EXTRAS` that are not on the disk yet."""
+    out = []
+    for key in COMPONENT_EXTRAS:
+        m = get(key)
+        if state(m) == STATE_NEEDS_DOWNLOAD:
+            out.append(m)
+    return out
+
+
+def ensure_component_extras(progress: ProgressCallback = noop_progress, ensure_fn=None) -> List[str]:
+    """Download the missing :data:`COMPONENT_EXTRAS` one after another (pinned revision, hash-checked, existing models folder /
+    backup first: see :func:`ensure`).  ``progress(stage, overall_fraction, message)``; returns the keys that were fetched."""
+    ensure_fn = ensure_fn or ensure
+    todo = missing_component_extras()
+    total = float(sum(max(1, m.size_mb) for m in todo)) or 1.0
+    done = 0.0
+    for m in todo:
+        def sub(stage, f, msg="", base=done, share=max(1, m.size_mb)):
+            progress(stage, min(1.0, (base + share * float(f)) / total), msg)
+
+        ensure_fn(m, sub)
+        done += max(1, m.size_mb)
+    return [m.key for m in todo]
 
 
 def sha256_of(path: Path) -> str:

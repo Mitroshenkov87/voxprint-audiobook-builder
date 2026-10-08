@@ -260,8 +260,13 @@ class StudioWindow(SubWindow):
         self.trainer.retranslate()
         self.retranslate_all()
 
+    def start_prefetch(self, hook=None):
+        """The first-run download of all models (runs in the Train window, which owns the status line); see
+        :meth:`ui.main_window.MainWindow.start_prefetch`."""
+        return self.trainer.start_prefetch(hook)
+
     def reload_auto_steps(self) -> None:
-        """"Maximum quality (auto)": select the recommended options in the training and narration windows."""
+        """Select the recommended options in the training and narration windows again."""
         self.trainer.reload_auto_steps()
         self.narrate_window.reload_auto_steps()
 

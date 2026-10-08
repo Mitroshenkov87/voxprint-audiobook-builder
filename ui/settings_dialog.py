@@ -7,8 +7,6 @@ The main window only keeps "choose audio / choose text / create voice".  Service
 * shortcuts to the models folder and the data/log folder,
 * "Repair installation" and "Auto-repair" (every component and model checked by hash, missing / broken parts fetched
   again: :mod:`infra.auto_repair`),
-* "Maximum quality (auto)": re-selects every recommended automatic step in the windows and downloads the models they need
-  (:mod:`infra.auto_steps`),
 * backup / restore of the models and voices to any folder or drive, and the "existing models folder" that is imported
   before anything is downloaded (:mod:`infra.backup`, :mod:`infra.existing_models`),
 * "About".
@@ -28,9 +26,8 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QHBox
 from core import i18n
 from core.errors import BackupError
 from core.i18n import tr
-from infra import auto_steps, backup, existing_models, modules as runtime_modules, netroute
+from infra import backup, existing_models, modules as runtime_modules, netroute
 from workers import backup_runner
-from workers.auto_quality_worker import AutoQualityWorker
 from workers.auto_repair_worker import AutoRepairWorker
 from workers.backup_worker import BackupWorker
 
@@ -95,22 +92,8 @@ class SettingsDialog(QDialog):
         self.btn_components.setVisible(runtime_modules.is_thin())
         self.btn_components.clicked.connect(self.open_components)
 
-        # --- Maximum quality (auto) ---
-        self.needed_models: Callable[[], list] = auto_steps.needed_models          # injectable (tests)
-        self.models_job: Callable[..., int] = auto_steps.download_models
-        self.max_worker: Optional[AutoQualityWorker] = None
-        self.btn_max = QPushButton()
-        self.btn_max.setObjectName("primary")
-        self.lbl_max_hint = QLabel()
-        self.lbl_max_hint.setObjectName("cardnote")
-        self.lbl_max_hint.setWordWrap(True)
-        self.bar_max = QProgressBar()
-        self.bar_max.setRange(0, 100)
-        self.bar_max.setVisible(False)
-        self.lbl_max_status = QLabel()
-        self.lbl_max_status.setWordWrap(True)
-        for w in (self.btn_max, self.lbl_max_hint, self.bar_max, self.lbl_max_status):
-            lay.addWidget(w)
+        # (No "Maximum quality (auto)" button any more: every recommended option is pre-selected and the first start downloads
+        # ALL models automatically - see main._offer_components / workers.pipeline_runner.prefetch_models.)
 
         # --- backup / restore and the existing models folder ---
         self.pick_folder: Callable[[str], str] = self._default_pick_folder      # injectable (tests)
@@ -183,7 +166,6 @@ class SettingsDialog(QDialog):
         lay.addLayout(close_row)
 
         self.cmb_lang.currentIndexChanged.connect(self._on_language_changed)
-        self.btn_max.clicked.connect(self.start_max_quality)
         self.btn_update.clicked.connect(window.check_updates)
         self.btn_models.clicked.connect(window.open_models_folder)
         self.btn_data.clicked.connect(window.open_data_folder)
@@ -220,9 +202,6 @@ class SettingsDialog(QDialog):
         self.btn_about.setText(tr("ui.about"))
         self.btn_about.setToolTip(tr("ui.about_tip"))
         self.btn_close.setText(tr("about.btn_close"))
-        self.btn_max.setText(tr("auto.button"))
-        self.btn_max.setToolTip(tr("auto.button_tip"))
-        self.lbl_max_hint.setText(tr("auto.hint"))
         self.lbl_backup_title.setText(tr("backup.title"))
         self.chk_voices.setText(tr("backup.include_voices"))
         self.btn_backup.setText(tr("backup.btn_backup"))
@@ -237,9 +216,9 @@ class SettingsDialog(QDialog):
     # ------------------------------------------------------------------ runtime modules (thin build)
     def open_components(self) -> None:
         """Show the Components window (download / check the runtime modules)."""
-        from ui.modules_dialog import ModulesDialog
+        from ui.modules_dialog import ModulesDialog, default_extras
 
-        dlg = ModulesDialog(self.styleSheet(), self)
+        dlg = ModulesDialog(self.styleSheet(), self, extras_fn=default_extras)      # SAGE comes with the components
         self._components = dlg
         dlg.refresh()
         dlg.open()
@@ -278,64 +257,6 @@ class SettingsDialog(QDialog):
             netroute.forget()
         except OSError:
             log.warning("could not save the network interface choice")
-
-    # ------------------------------------------------------------------ Maximum quality (auto)
-    @property
-    def max_running(self) -> bool:
-        """True while the models of "Maximum quality (auto)" are being downloaded."""
-        return bool(self.max_worker and self.max_worker.isRunning())
-
-    def start_max_quality(self) -> bool:
-        """Select every recommended automatic step in the windows, then download the missing models with a progress bar.
-
-        Returns True when a download was started."""
-        if self.max_running:
-            return False
-        reload = getattr(self._win, "reload_auto_steps", None)
-        if callable(reload):
-            reload()
-        try:
-            needs = list(self.needed_models())
-        except Exception:  # noqa: BLE001 - an unreadable models folder must not break the button
-            log.exception("checking the models failed")
-            needs = []
-        if not needs:
-            self.lbl_max_status.setText(tr("auto.done_none"))
-            return False
-        gb = sum(n.size_gb for n in needs)
-        w = AutoQualityWorker(needs, self.models_job, parent=self)
-        w.progress.connect(self._on_max_progress)
-        w.done.connect(self._on_max_done)
-        w.failed.connect(self._on_max_failed)
-        self.max_worker = w
-        self.bar_max.setValue(0)
-        self.bar_max.setVisible(True)
-        self.btn_max.setEnabled(False)
-        self.lbl_max_status.setText(tr("auto.downloading", names=", ".join(n.label for n in needs), gb=f"{gb:.1f}"))
-        w.start()
-        return True
-
-    def _on_max_progress(self, fraction: float, message: str) -> None:
-        self.bar_max.setValue(int(max(0.0, min(1.0, fraction)) * 100))
-        if message:
-            self.lbl_max_status.setText(message)
-
-    def _max_finished(self, text: str) -> None:
-        if self.max_worker:
-            self.max_worker.wait(2000)
-        self.bar_max.setVisible(False)
-        self.btn_max.setEnabled(True)
-        self.lbl_max_status.setText(text)
-        reload = getattr(self._win, "reload_auto_steps", None)
-        if callable(reload):
-            reload()                    # the clean-up model may be usable now
-
-    def _on_max_done(self, count: int) -> None:
-        self.bar_max.setValue(100)
-        self._max_finished(tr("auto.done", n=count))
-
-    def _on_max_failed(self, message: str) -> None:
-        self._max_finished(tr("auto.failed", error=message))
 
     # ------------------------------------------------------------------ Auto-repair
     @property
@@ -536,7 +457,6 @@ class SettingsDialog(QDialog):
         self.btn_update.setEnabled(not busy and not self._win.updating)
         self.btn_repair.setEnabled(not busy and not self._win.repairing and not self.autorepair_running)
         self.btn_autorepair.setEnabled(self.autorepair_running or (not busy and not self._win.repairing))
-        self.btn_max.setEnabled(not busy and not self.max_running)
         idle = not busy and not self.backing_up
         for b in (self.btn_backup, self.btn_restore, self.btn_existing, self.chk_voices):
             b.setEnabled(idle)
