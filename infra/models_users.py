@@ -12,6 +12,9 @@ with the Movie Dubber (its ``dubber/infra/model_store.py`` reads and writes the 
 * The uninstaller runs ``Voxprint.exe --unregister-models-user --out FILE`` (:func:`unregister_cli`): our key is removed and
   FILE gets two lines, the number of OTHER programs still using the folder and the folder itself.  Only when that number is
   0 does the uninstaller offer to delete the models, and the default answer is "keep" (a silent uninstall keeps them).
+* The same file format is used for the runtime folder (``<app home>/runtime/.users.json``, :func:`runtime_root`):
+  ``--register-runtime-user`` / ``--unregister-runtime-user --out FILE``.  Only the bookkeeping exists so far; the runtime
+  is not shared between the programs yet.
 * Unknown keys are kept as they are; a damaged file counts as "no users" for reading and is rewritten on the next write.
 
 Stdlib only; nothing here may fail the start of the app.
@@ -38,6 +41,13 @@ def _root(root: Optional[Path] = None) -> Path:
     from infra import paths
 
     return paths.models_dir()
+
+
+def runtime_root() -> Path:
+    """``<app home>/runtime`` - the downloaded Python runtime modules (thin builds)."""
+    from infra import paths
+
+    return paths.app_home() / "runtime"
 
 
 def users_path(root: Optional[Path] = None) -> Path:
@@ -92,24 +102,34 @@ def unregister(key: str = USER_KEY, root: Optional[Path] = None) -> List[str]:
     return sorted(k for k, v in users.items() if v)
 
 
-def register_quietly() -> None:
+def register_quietly(root: Optional[Path] = None) -> None:
     """:func:`register` for the app start: any error is logged, never raised."""
     try:
-        register()
+        register(root=root)
     except Exception as exc:  # noqa: BLE001 - a read-only or missing models drive must not stop the program
-        log.warning("models users file not updated: %s", exc)
+        log.warning("users file not updated: %s", exc)
 
 
-def unregister_cli(out: Optional[str]) -> int:
+def register_runtime_quietly() -> None:
+    """Add our key to ``runtime/.users.json`` when this install has a runtime folder (thin builds); never raises."""
+    try:
+        if runtime_root().is_dir():
+            register(root=runtime_root())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("runtime users file not updated: %s", exc)
+
+
+def unregister_cli(out: Optional[str], root: Optional[Path] = None) -> int:
     """``--unregister-models-user --out FILE`` for the uninstaller: FILE gets ``<number of other users>\\n<models folder>\\n``.
 
     Exit code 0 when the file was written; on any error 1 and no FILE, so the uninstaller keeps the models."""
     try:
-        others = unregister()
+        others = unregister(root=root)
         if out:
-            Path(out).write_text(f"{len(others)}\n{_root()}\n", encoding="utf-8")
-        print(f"other programs using the models: {', '.join(others) or 'none'}", flush=True)
+            Path(out).write_text(f"{len(others)}\n{_root(root)}\n", encoding="utf-8")
+        what = "the runtime" if root is not None else "the models"
+        print(f"other programs using {what}: {', '.join(others) or 'none'}", flush=True)
         return 0
     except Exception as exc:  # noqa: BLE001
-        print(f"models users file: {exc}", flush=True)
+        print(f"users file: {exc}", flush=True)
         return 1

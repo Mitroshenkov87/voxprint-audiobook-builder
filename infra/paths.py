@@ -57,30 +57,55 @@ def default_models_dir() -> Path:
     return _sub("models")
 
 
-def configured_models_dir() -> Optional[Path]:
-    """The models folder chosen by the user (``$VOXPRINT_MODELS_DIR``, else ``state/models_dir.txt``), or ``None``.
-
-    Only absolute paths count (a relative one would depend on the working directory of whoever starts the program)."""
-    text = os.environ.get(MODELS_DIR_ENV, "").strip().strip('"')
-    if not text:
-        try:
-            lines = (app_home() / "state" / MODELS_DIR_FILE).read_text(encoding="utf-8-sig").splitlines()
-        except (OSError, UnicodeDecodeError):
-            lines = []
-        text = next((ln.strip().strip('"') for ln in lines if ln.strip()), "")
+def _absolute(text: str) -> Optional[Path]:
+    text = (text or "").strip().strip('"')
     if not text:
         return None
     p = Path(os.path.expandvars(os.path.expanduser(text)))
     return p if p.is_absolute() else None
 
 
+def app_models_dir_file() -> Optional[Path]:
+    """The folder in this program's own ``state/models_dir.txt`` (written by the installer), or ``None``."""
+    try:
+        lines = (app_home() / "state" / MODELS_DIR_FILE).read_text(encoding="utf-8-sig").splitlines()
+    except (OSError, UnicodeDecodeError):
+        lines = []
+    return _absolute(next((ln for ln in lines if ln.strip()), ""))
+
+
+def configured_models_dir() -> Optional[Path]:
+    """The models folder chosen by the user, or ``None`` (= the default folder).
+
+    Order: ``$VOXPRINT_MODELS_DIR``; the shared ``models_dir`` of ``state/suite.json`` (every Voxprint program uses the same
+    folder, :mod:`infra.suite_settings`); this program's ``state/models_dir.txt``.  ``models_dir: null`` in suite.json means
+    "no shared choice", so an older ``models_dir.txt`` still counts.  Only absolute paths count (a relative one would depend
+    on the working directory of whoever starts the program)."""
+    env = _absolute(os.environ.get(MODELS_DIR_ENV, ""))
+    if env is not None or os.environ.get(MODELS_DIR_ENV, "").strip():
+        return env
+    try:
+        from infra import suite_settings
+
+        shared = suite_settings.models_dir()
+    except Exception:  # noqa: BLE001 - a damaged shared file must not stop the program
+        shared = None
+    return shared if shared is not None else app_models_dir_file()
+
+
 def set_models_dir(folder: Optional[Path]) -> None:
-    """Remember ``folder`` as the models folder; ``None`` or the default folder forgets the choice."""
+    """Remember ``folder`` as the models folder (here and in the shared ``state/suite.json``); ``None`` or the default folder
+    forgets the choice."""
     f = state_dir() / MODELS_DIR_FILE
+    from infra import suite_settings
+
     if folder is None or _same(Path(folder), app_home() / "models"):
         f.unlink(missing_ok=True)
+        suite_settings.set_quietly("models_dir", None)
         return
     f.write_text(str(folder) + "\n", encoding="utf-8")
+    if backup_root_of(Path(folder)) is None:     # a backup is a restore source, never the shared live folder
+        suite_settings.set_quietly("models_dir", str(folder))
 
 
 def _same(a: Path, b: Path) -> bool:

@@ -5,6 +5,21 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+Draft for build 704 (codename to be chosen; `BUILD.json` is unchanged, offset **654**, so build-installer run 50 stamps build 704). Full installer. Upgrade: install over 703; models, voices and settings stay.
+
+### Added
+- **Shared suite settings** `state/suite.json` (`infra/suite_settings.py`), the format agreed with Voxprint AI Movie Dubber: `{"schema": 1, "ui_language": "ru", "theme": "glass-dark", "models_dir": null, "gpu": "auto"}`. UTF-8, atomic write, unknown keys kept, a missing key is its default (UI language: the OS language if supported, else English; theme `glass-dark`, our only look; `models_dir` null = default folder, `VOXPRINT_MODELS_DIR` always wins; GPU `auto` / `cpu` / `cuda:N`). Read at start, written when the UI language, the models folder or one of these settings changes. Choices made before 704 (`state/language`, `state/models_dir.txt`) are copied into the file at the first start; app-specific settings stay where they were. `voxprint settings` gains `theme`, `gpu`, `gpu.vram_fraction` and `gpu.fast_decode`.
+- **`voxprint bench`**: narrates a fixed text with the batched path and with CUDA Graphs and prints the realtime factor, batch size and peak video memory per mode (`--voice`, `--modes`, `--out` for WAVs, `--json`). `--install-graphs` downloads faster-qwen3-tts 0.3.2 first.
+- **Optional CUDA Graphs decode** (`gpu.fast_decode = graphs`, default `off`; `core/fast_decode.py`): one chunk at a time through faster-qwen3-tts 0.3.x (MIT, pure Python, works with our torch 2.11 cu128 + transformers 4.57.6 + qwen-tts 0.1.1). The adapter is merged before the graphs are captured. Missing package, CPU, an unmerged adapter or a failed capture fall back to the batched path. The package is not in the installer; it is fetched only with `voxprint bench --install-graphs` (or `pip install --no-deps faster-qwen3-tts==0.3.2`). A tolerant "default" RoPE initialiser is registered before every model load (for transformers >= 5.18, where the codec's `MimiConfig` has no `rope_theta`; no effect on 4.57).
+- **Runtime users file** `runtime\.users.json` (same format as `models\.users.json`): the app adds its key at start when the runtime folder exists, `Voxprint.exe --register-runtime-user` / `--unregister-runtime-user --out FILE`, and the uninstaller removes our key. Bookkeeping only: the runtime is not shared yet.
+
+### Changed
+- **Video memory rule** (suite rule, `core/vram_policy.py`): the narration batch is planned from the memory free at that moment and the card is never planned above 75 % of its total (`gpu.vram_fraction`, 70-80 %), counting what other programs hold; at least one chunk always runs. On a 16 GB card with the model loaded the batch is 7 (703: 10). The plan is logged when it changes.
+- **Start menu**: one folder *Voxprint* for every Voxprint program (`DefaultGroupName=Voxprint`); the entry of 703 and older in *Voxprint AI Audiobook Builder* is moved there.
+- **Setup finds Voxprint AI Movie Dubber** (Apps list entry or its key in `models\.users.json`): the models page says so and proposes the shared models folder from `suite.json`. After install `Voxprint.exe --sync-suite-settings` (as the user who started the setup) writes the chosen models folder into `suite.json`.
+- **Narration GPU**: the engine uses the shared `gpu` setting (`auto` = first GPU; `cuda:N`; `cpu`).
+- **Uninstall never touches a sibling program.** The online build no longer deletes its whole program folder (`[UninstallDelete]`): it removes the program files and skips any sub-folder with its own uninstaller or a Movie Dubber folder. Each program removes only its own Start menu entry. Models are still only offered for deletion when no other program uses them; voices, settings and `suite.json` are never deleted.
+
 ## [0.2.3-beta] - 2026-10-09 - build 703 "Toledot"
 
 Codename *Toledot* (Biblical Hebrew *toledot*, generations; Genesis 5:1). A new generation of bundled voices and fixes from the test of build 702 on a real PC. The `BUILD.json` offset stays **654**: build-installer run 49 stamps build 703. Upgrade: install over 700, 701 or 702; models, voices and settings stay, only Levi and Miriam are downloaded.

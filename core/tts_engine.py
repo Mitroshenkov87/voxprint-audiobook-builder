@@ -18,7 +18,7 @@ from typing import Any, Callable, List, Optional, Sequence
 
 import numpy as np
 
-from core import adapter_strength, cpu_budget, model_cache, speaker_centroid
+from core import adapter_strength, cpu_budget, model_cache, speaker_centroid, vram_policy
 from core.errors import NarrationError
 from core.events import ProgressCallback, Stage, noop_progress
 from core.i18n import tr
@@ -49,9 +49,50 @@ def max_tokens_for(text: str) -> int:
 
 #: Batched synthesis: at most this many chunks per generate call; VRAM per extra sequence (KV cache + activations; measured 0.5-0.6 GB
 #: for chunks up to ~150 characters on an RTX 4090, rounded up for longer ones) and a reserve that is never planned.
+#: The batch is planned from the memory actually free at that moment and never lets the card go above the suite cap
+#: (``gpu.vram_fraction``, default 75 % of the total, 70-80 %; :mod:`core.vram_policy`).
 MAX_BATCH = 12
 VRAM_PER_ITEM_GB = 0.9
 VRAM_RESERVE_GB = 2.0
+
+
+def resolve_device(device: str = "auto") -> str:
+    """``auto`` / ``cpu`` / ``cuda`` / ``cuda:N`` -> ``cpu`` or ``cuda:N``.  ``auto`` follows the shared ``gpu`` setting
+    (``state/suite.json``: auto / cpu / cuda:N); a GPU that is not there falls back to the first one, no CUDA to the CPU."""
+    import torch
+
+    want = (device or "auto").strip().lower()
+    if want == "auto":
+        try:
+            from infra import suite_settings
+
+            want = suite_settings.gpu()
+        except Exception:  # noqa: BLE001
+            want = "auto"
+    if want == "cpu" or not torch.cuda.is_available():
+        return "cpu"
+    if want in ("auto", "cuda"):
+        return "cuda:0"
+    try:
+        idx = int(want.split(":", 1)[1])
+    except (IndexError, ValueError):
+        return "cuda:0"
+    if idx >= torch.cuda.device_count():
+        log.warning("GPU %s is not there; using cuda:0", want)
+        return "cuda:0"
+    return f"cuda:{idx}"
+
+
+def plan_batch_now(device: str = "cuda:0", fraction: Optional[float] = None) -> vram_policy.VramPlan:
+    """The VRAM plan for ``device`` from its current free / total memory (``torch.cuda.mem_get_info``)."""
+    import torch
+
+    free, total = torch.cuda.mem_get_info(torch.device(device))
+    if fraction is None:
+        from infra import gpu_prefs
+
+        fraction = gpu_prefs.vram_fraction()
+    return vram_policy.plan(free / 1024 ** 3, total / 1024 ** 3, VRAM_PER_ITEM_GB, MAX_BATCH, fraction, VRAM_RESERVE_GB)
 
 
 def _attn_candidates(attn: str, use_cuda: bool) -> List[str]:
@@ -113,12 +154,14 @@ class Qwen3AdapterEngine:
     """Synthesizes with a LoRA voice.  Create it lazily (loading takes a while and ~4-7 GB of VRAM)."""
 
     def __init__(self, voice: VoiceRecord, base_dir: Path, language: str = "", device: str = "auto", attn: str = "auto",
-                 adapter_scale: Optional[float] = None, merge: bool = True) -> None:
+                 adapter_scale: Optional[float] = None, merge: bool = True, fast_decode: Optional[str] = None) -> None:
         """Load the model, apply the adapter and prepare the voice-clone prompt.
 
         ``adapter_scale`` overrides the voice's strength (:mod:`core.adapter_strength`).  ``merge=False`` keeps the adapter
         separate (a little slower) so :meth:`set_adapter_scale` / :meth:`switch_adapter` can change it without reloading the
-        base model - used by the quick preview and the automatic checkpoint pick."""
+        base model - used by the quick preview and the automatic checkpoint pick.  ``device``: auto (= the shared ``gpu``
+        setting) / cpu / cuda / cuda:N.  ``fast_decode``: ``off`` / ``graphs`` (default: the ``gpu.fast_decode`` setting;
+        only with a merged adapter on a GPU, :mod:`core.fast_decode`)."""
         import torch
         from peft import PeftModel
         from qwen_tts import Qwen3TTSModel  # type: ignore
@@ -127,7 +170,11 @@ class Qwen3AdapterEngine:
         self.tag = engine_tag(voice, language, self.adapter_scale)
         # Exact Qwen3-TTS name ("English", "Russian" ... or "Auto"): voice.json stores codes like "ru" since schema 3
         self.language = qwen_language(language) or qwen_language(voice.language) or AUTO
-        use_cuda = device == "cuda" or (device == "auto" and torch.cuda.is_available())
+        from core import fast_decode as fd
+
+        fd.install_rope_compat()                 # before any model is loaded (transformers >= 5.18, see core/fast_decode.py)
+        self.device = resolve_device(device)
+        use_cuda = self.device.startswith("cuda")
         dtype = torch.bfloat16 if use_cuda else torch.float32
         # torch's CPU thread pool would otherwise take every core and fight the narration pool (FLAC writes, chapter
         # joins, ffmpeg encodes) - on a GPU it only needs a few; on the CPU it gets nearly all (core/cpu_budget.py).
@@ -141,7 +188,7 @@ class Qwen3AdapterEngine:
         pre = model_cache.take(model_cache.key("tts", base_dir, use_cuda)) if attn == "auto" else None
         if pre is not None:
             try:
-                self._q, self.attn = (model_cache.to_device(pre[0], "cuda:0") if use_cuda else pre[0]), pre[1]
+                self._q, self.attn = (model_cache.to_device(pre[0], self.device) if use_cuda else pre[0]), pre[1]
                 log.info("using the preloaded base model (%s)", self.attn)
             except Exception:  # noqa: BLE001 - e.g. out of VRAM while moving: load normally below
                 log.warning("the preloaded model could not be used; loading it again", exc_info=True)
@@ -153,7 +200,7 @@ class Qwen3AdapterEngine:
         # next one if the model refuses to load with it, so an unusual GPU/driver never blocks narration.
         for impl in ([] if self._q is not None else _attn_candidates(attn, use_cuda)):
             try:
-                self._q = Qwen3TTSModel.from_pretrained(str(base_dir), device_map="cuda:0" if use_cuda else None, dtype=dtype,
+                self._q = Qwen3TTSModel.from_pretrained(str(base_dir), device_map=self.device if use_cuda else None, dtype=dtype,
                                                         attn_implementation=impl)
                 self.attn = impl
                 break
@@ -183,6 +230,28 @@ class Qwen3AdapterEngine:
         self._prompt = self._q.create_voice_clone_prompt(ref_audio=str(ref_audio), ref_text=voice.ref_text)
         self.centroid = use_centroid(self._prompt, speaker_centroid.load(voice.path))
         self.sample_rate = 24000
+        self._graph = None
+        self.decode_mode = "batched" if use_cuda else "single"
+        if fast_decode is None:
+            from infra import gpu_prefs
+
+            fast_decode = gpu_prefs.fast_decode()
+        if fast_decode == "graphs":
+            ok, why = fd.check() if use_cuda else (False, "CUDA Graphs need an NVIDIA GPU")
+            if not ok:
+                log.info("fast decode (CUDA Graphs) not used: %s", why)
+            elif self._peft is not None:
+                log.info("fast decode (CUDA Graphs) not used: the adapter is not merged")
+            else:
+                try:
+                    _t = time.monotonic()
+                    self._graph = fd.GraphDecoder(self._q, self.device, dtype)
+                    self.decode_mode = "graphs"
+                    log.info("fast decode: CUDA Graphs captured in %.1f s (%s)", time.monotonic() - _t, why)
+                except Exception:  # noqa: BLE001 - e.g. capture not permitted on this driver: keep the normal path
+                    log.warning("CUDA Graphs could not be captured; using batched generation", exc_info=True)
+                    self._graph = None
+                    torch.cuda.empty_cache()
 
     def set_adapter_scale(self, scale: float) -> None:
         """Change the adapter strength (only for an engine created with ``merge=False``)."""
@@ -220,6 +289,10 @@ class Qwen3AdapterEngine:
         """Mono float32 samples for ``text``."""
         import torch
 
+        if getattr(self, "_graph", None) is not None:
+            audio, sr = self._graph.synthesize(text, self.language, self._prompt, max_tokens_for(text))
+            self.sample_rate = sr
+            return audio
         with torch.inference_mode():
             wavs, sr = self._q.generate_voice_clone(text=text, language=self.language, voice_clone_prompt=self._prompt,
                                                     max_new_tokens=max_tokens_for(text))
@@ -246,6 +319,8 @@ class Qwen3AdapterEngine:
         """
         import torch
 
+        if getattr(self, "_graph", None) is not None:     # graphs decode one sequence; max_batch() is 1 then anyway
+            return [self.synthesize(t) for t in texts]
         n = len(texts)
         with torch.inference_mode():
             wavs, sr = self._q.generate_voice_clone(text=list(texts), language=[self.language] * n, voice_clone_prompt=self._prompt,
@@ -254,14 +329,20 @@ class Qwen3AdapterEngine:
         return [np.asarray(w, dtype=np.float32).reshape(-1) for w in wavs]
 
     def max_batch(self) -> int:
-        """How many chunks fit into the free VRAM at once (``VRAM_PER_ITEM_GB`` each, capped); 1 on CPU or if unknown."""
+        """How many chunks to put into one generate call: planned from the VRAM free right now, never above the suite cap
+        (:func:`plan_batch_now`); 1 on the CPU, with CUDA Graphs, or if unknown."""
+        if getattr(self, "_graph", None) is not None or not str(getattr(self, "device", "cuda:0")).startswith("cuda"):
+            return 1
         try:
             import torch
 
             if not torch.cuda.is_available():
                 return 1
-            free = torch.cuda.mem_get_info()[0] / 1024 ** 3
-            return int(max(1, min(MAX_BATCH, (free - VRAM_RESERVE_GB) // VRAM_PER_ITEM_GB)))
+            plan = plan_batch_now(self.device)
+            if plan.batch != getattr(self, "_last_batch", None):
+                self._last_batch = plan.batch
+                log.info("VRAM plan: %s", plan.describe())
+            return plan.batch
         except Exception:  # noqa: BLE001
             return 1
 
@@ -269,6 +350,7 @@ class Qwen3AdapterEngine:
         """Free the model and the GPU cache; give torch its CPU threads back."""
         self._q = None
         self._peft = None
+        self._graph = None
         try:
             import torch
 

@@ -77,4 +77,8 @@ Measured (RTX 4090, 12 English chunks of 20-170 characters, 80 s of audio, open 
 
 That is about **10x faster** on this GPU. Estimates for a book at RTF 0.31-0.5 (one narrated hour of audio = 60 min x RTF of GPU time): **5 hours of audio ≈ 1.6-2.5 h, 20 hours ≈ 6-10 h** (before: 15 h and 61 h). Longer chunks use more VRAM per item, so the real batch is smaller on 12-16 GB cards.
 Caveats: the WER differences between rows are within the sampling noise of 12 chunks (generation is random); speaker similarity was checked only through the pitch shift (the project has no speaker-embedding model); a small pitch drift (about 1 semitone lower than the single-chunk run) is visible with large batches - use the single-chunk
-path (`MAX_BATCH = 1` in `core/tts_engine.py`) if you prefer. `torch.compile` / CUDA graphs were not tried (no Triton on Windows).
+path (`MAX_BATCH = 1` in `core/tts_engine.py`) if you prefer. `torch.compile` was not tried (no Triton on Windows).
+
+**Video memory rule (from build 704, shared with the Movie Dubber).** The batch is planned from the memory free at that moment and never lets the whole card go above `gpu.vram_fraction` of its total (default 75 %, 70-80 %), whatever else is on the card: `budget = min(free - (1 - fraction) x total, free - 2 GB)`, `batch = budget // 0.9 GB`, 1-12 (`core/vram_policy.py`). On a 16 GB card with the model loaded (about 11 GB free) that is 7 instead of 10 before, so a second Voxprint program or a game still has room.
+
+**CUDA Graphs (optional, from build 704).** `gpu.fast_decode = graphs` decodes one chunk at a time through faster-qwen3-tts 0.3.x (pure `torch.cuda.CUDAGraph`, no Triton, MIT; `core/fast_decode.py`). The Movie Dubber measured 0.6x -> 3.0x realtime with it for single sequences on an RTX 4090 Laptop; the batched path above already gets about 3x with 12 chunks, so it stays off until `voxprint bench` has compared both on the same PC.

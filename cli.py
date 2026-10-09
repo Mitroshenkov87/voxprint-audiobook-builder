@@ -103,7 +103,7 @@ FORMAT_ALIASES = {
 
 USER_COMMANDS = frozenset({
     "narrate", "train", "voices", "diag", "status", "capabilities", "models", "revoice", "backup", "restore",
-    "speakers", "check", "repair", "prepare", "translate", "settings",
+    "speakers", "check", "repair", "prepare", "translate", "settings", "bench",
 })
 
 CORE_MODULE_IDS = (
@@ -766,6 +766,27 @@ def build_parser() -> argparse.ArgumentParser:
     se_set.add_argument("key", metavar="KEY")
     se_set.add_argument("value", metavar="VALUE")
     se.set_defaults(_handler="settings")
+
+    bn = sub.add_parser(
+        "bench", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
+        help="Speed test: batched generation vs CUDA Graphs (realtime factor, peak VRAM)",
+        description="Narrate a fixed Russian text (12 phrases) once per mode with the same voice and print the realtime "
+                    "factor and the peak video memory. 'batched' = several phrases per generate call (the default path); "
+                    "'graphs' = one phrase at a time through faster-qwen3-tts with CUDA Graphs (optional module). "
+                    "Each mode loads the model itself; nothing is saved unless --out is given.",
+        epilog=(
+            "Examples:\n"
+            "  voxprint bench\n"
+            "  voxprint bench --voice Levi --modes batched,graphs --out ./bench --json\n"
+            "  voxprint bench --install-graphs\n"
+        ),
+    )
+    bn.add_argument("--voice", default="Levi", metavar="VOICE", help="Voice id or name (default: Levi)")
+    bn.add_argument("--modes", default="batched,graphs", metavar="LIST", help="Comma-separated: batched, graphs")
+    bn.add_argument("--out", type=Path, default=None, metavar="DIR", help="Also save bench-<mode>.wav here to listen")
+    bn.add_argument("--install-graphs", action="store_true",
+                    help="First download faster-qwen3-tts 0.3.2 (MIT, 43 KB, SHA-256 checked) into the packages folder")
+    bn.set_defaults(_handler="bench")
     return ap
 
 
@@ -2086,6 +2107,10 @@ SETTINGS_HELP = {
     "narration.pauses": "Explicit pauses between phrases (on/off)",
     "narration.ordinals": "Read ordinal numbers by context (on/off)",
     "narration.ai_disclosure": "Speak the AI disclosure at the start (on/off)",
+    "theme": "Look shared by the Voxprint programs (glass-dark)",
+    "gpu": "GPU shared by the Voxprint programs: auto, cpu or cuda:N",
+    "gpu.vram_fraction": "Most of the video memory narration may plan for, 0.70-0.80 of the total",
+    "gpu.fast_decode": "Fast decode with CUDA Graphs (off/graphs; experimental, see voxprint bench)",
     **{f"narration.pause.{k}": f"Pause after a {k} in seconds (0-{pz.MAX_PAUSE_MS / 1000:g})" for k in pz.DEFAULT_LENGTHS_MS},
 }
 
@@ -2102,6 +2127,7 @@ def _parse_bool(value: str) -> bool:
 def settings_values() -> dict:
     """Every setting of :data:`SETTINGS_HELP` with its current value."""
     from core import ai_disclosure, i18n
+    from infra import gpu_prefs, suite_settings
 
     pace = pc.load()
     lengths = pz.load_lengths().to_dict()
@@ -2114,6 +2140,10 @@ def settings_values() -> dict:
         "narration.pauses": bool(pz.load_enabled()),
         "narration.ordinals": bool(ordinals.load_enabled()),
         "narration.ai_disclosure": bool(ai_disclosure.load_enabled()),
+        "theme": suite_settings.theme(),
+        "gpu": suite_settings.gpu(),
+        "gpu.vram_fraction": gpu_prefs.vram_fraction(),
+        "gpu.fast_decode": gpu_prefs.fast_decode(),
     }
     for kind, ms in lengths.items():
         out[f"narration.pause.{kind}"] = round(ms / 1000.0, 3)
@@ -2134,6 +2164,27 @@ def set_setting(key: str, value: str) -> object:
         if code is None:
             raise CliError(EXIT_BAD_ARGS, f"unsupported language {value!r}", hint="Choose en, de, ru, uk or lv")
         return i18n.set_language(code, persist=True)
+    if key in ("theme", "gpu"):
+        from infra import suite_settings
+
+        try:
+            return suite_settings.set_value(key, value)
+        except ValueError as exc:
+            raise CliError(EXIT_BAD_ARGS, str(exc)) from exc
+    if key == "gpu.vram_fraction":
+        from infra import gpu_prefs
+
+        try:
+            return gpu_prefs.set_vram_fraction(value)
+        except ValueError as exc:
+            raise CliError(EXIT_BAD_ARGS, f"expected a number such as 0.75, got {value!r}") from exc
+    if key == "gpu.fast_decode":
+        from infra import gpu_prefs
+
+        try:
+            return gpu_prefs.set_fast_decode(value)
+        except ValueError as exc:
+            raise CliError(EXIT_BAD_ARGS, f"gpu.fast_decode must be off or graphs, got {value!r}") from exc
     if key == "projects.folder":
         folder = Path(value).expanduser()
         if not folder.is_absolute():
@@ -2180,6 +2231,58 @@ def set_setting(key: str, value: str) -> object:
     lengths[kind] = round(sec * 1000)
     pz.save_lengths(pz.PauseLengths.from_dict(lengths))
     return round(lengths[kind] / 1000.0, 3)
+
+
+def cmd_bench(args: argparse.Namespace, *, library: Optional[VoiceLibrary] = None,
+              make_engine: Optional[Callable[[str], object]] = None) -> int:
+    """``bench``: the same voice and text through each mode (:mod:`core.bench`)."""
+    from core import bench
+
+    def body(json_mode: bool, started: float) -> int:
+        modes = [m.strip().lower() for m in str(args.modes).split(",") if m.strip()]
+        bad = [m for m in modes if m not in bench.MODES]
+        if not modes or bad:
+            raise CliError(EXIT_BAD_ARGS, f"unknown mode {', '.join(bad) or '(none)'}", hint="--modes batched,graphs")
+        if getattr(args, "install_graphs", False):
+            from core import fast_decode
+
+            where = fast_decode.install_wheel()
+            if not json_mode:
+                _write_stream(sys.stdout, f"faster-qwen3-tts {fast_decode.WHEEL['version']} installed into {where.parent}")
+            import importlib
+
+            importlib.invalidate_caches()
+            if str(where.parent) not in sys.path:
+                sys.path.insert(0, str(where.parent))
+        factory = make_engine
+        voice_name = ""
+        if factory is None:
+            from core import tts_engine
+
+            lib = library if library is not None else VoiceLibrary()
+            voice = resolve_voice(lib, args.voice)
+            voice_name = voice.name
+
+            def factory(mode: str):
+                return tts_engine.make_engine_factory(voice, "", fast_decode="off" if mode == "batched" else "graphs")()
+
+        def note(msg: str) -> None:
+            if not json_mode:
+                _write_stream(sys.stdout, msg)
+
+        results = bench.run(modes, factory, out_dir=args.out, log=note)
+        data = bench.summary(results)
+        data["voice"] = voice_name
+        human = [r.line() for r in results]
+        if "graphs_vs_batched" in data:
+            human.append(f"graphs / batched speed: {data['graphs_vs_batched']:.2f}x")
+        outputs = [w for r in results for w in r.wavs]
+        warnings = [f"{r.mode}: {r.reason}" for r in results if not r.ok]
+        if not any(r.ok for r in results):
+            raise CliError(EXIT_GPU, "no mode could run", hint="; ".join(warnings))
+        return _ok(json_mode, "bench", started, outputs=outputs, warnings=warnings, human=human, extra={"bench": data})
+
+    return _run("bench", args, body)
 
 
 def cmd_settings(args: argparse.Namespace) -> int:
@@ -2286,6 +2389,8 @@ def _dispatch(argv: Optional[Sequence[str]], *, run_narration_fn, run_task_fn, l
         return cmd_translate(args, plan_fn=plan_fn)
     if handler == "settings":
         return cmd_settings(args)
+    if handler == "bench":
+        return cmd_bench(args, library=library)
     if handler == "backup":
         return cmd_backup(args)
     if handler == "restore":

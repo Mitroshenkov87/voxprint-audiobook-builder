@@ -8,7 +8,8 @@ Languages: ``en`` (default), ``de``, ``ru``, ``uk``, ``lv``.  To add a language,
 The UI language is chosen in this order:
 
 1. the ``VOXPRINT_LANG`` environment variable,
-2. the user's saved choice (``state/language``),
+2. the user's saved choice: the shared ``ui_language`` of ``state/suite.json`` (every Voxprint program,
+   :mod:`infra.suite_settings`), else this program's ``state/language``,
 3. the OS language (Windows: ``GetUserDefaultLocaleName``; elsewhere ``LC_ALL``/``LC_MESSAGES``/``LANG``),
 4. English.
 
@@ -93,8 +94,17 @@ def _state_file() -> Path:
     return state_dir() / "language"
 
 
-def saved_language() -> Optional[str]:
-    """The language the user picked earlier, or ``None``."""
+def saved_language(include_suite: bool = True) -> Optional[str]:
+    """The language the user picked earlier (shared ``suite.json`` first, then ``state/language``), or ``None``."""
+    if include_suite:
+        try:
+            from infra import suite_settings
+
+            shared = suite_settings.normalize_language(suite_settings.read_raw().get("ui_language"))
+        except Exception:  # noqa: BLE001 - the UI language is not critical
+            shared = None
+        if shared:
+            return shared
     try:
         return normalize_code(_state_file().read_text(encoding="utf-8-sig"))   # the installer may have written it
     except OSError:
@@ -116,7 +126,8 @@ def get_language() -> str:
 
 
 def set_language(lang: str, *, persist: bool = False) -> str:
-    """Switch the language.  ``persist=True`` remembers the user's choice in ``state/language``."""
+    """Switch the language.  ``persist=True`` remembers the user's choice in ``state/language`` and in the shared
+    ``state/suite.json`` (so the other Voxprint programs follow it)."""
     global _current
     code = normalize_code(lang) or DEFAULT_LANG
     _current = code
@@ -125,6 +136,9 @@ def set_language(lang: str, *, persist: bool = False) -> str:
             _state_file().write_text(code, encoding="utf-8")
         except OSError as exc:
             log.warning("language choice not saved: %s", exc)
+        from infra import suite_settings
+
+        suite_settings.set_quietly("ui_language", code)
     return code
 
 

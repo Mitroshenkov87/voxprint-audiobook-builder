@@ -194,6 +194,14 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 * Status: optional, not bundled
 * Licence text: [`licenses/bitsandbytes.txt`](licenses/bitsandbytes.txt)
 
+### faster-qwen3-tts
+
+* Purpose: Optional fast speech decoding with CUDA Graphs (downloaded only on request)
+* Licence: MIT
+* Project: <https://github.com/andimarafioti/faster-qwen3-tts>
+* Status: optional, not bundled
+* Licence text: [`licenses/faster-qwen3-tts.txt`](licenses/faster-qwen3-tts.txt)
+
 ### PySide6 / Qt for Python
 
 * Purpose: The window and all interface elements

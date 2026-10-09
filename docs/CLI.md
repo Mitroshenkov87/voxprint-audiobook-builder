@@ -5,8 +5,8 @@ Headless entry points for servers, agents and scripts. Same runners as the Studi
 The file you can hand to an agent is [AGENTS.md](AGENTS.md) (what the program is, where the executable lives, recipes, JSON schemas, exit codes). This page is the command reference.
 
 ```
-python main.py narrate|prepare|translate|speakers|train|voices|settings|check|status|models|revoice|diag|backup|restore ...
-Voxprint.exe narrate|prepare|translate|speakers|train|voices|settings|check|status|models|revoice|diag|backup|restore ...    # packaged Windows build
+python main.py narrate|prepare|translate|speakers|train|voices|settings|bench|check|status|models|revoice|diag|backup|restore ...
+Voxprint.exe narrate|prepare|translate|speakers|train|voices|settings|bench|check|status|models|revoice|diag|backup|restore ...    # packaged Windows build
 voxprint ...                                                         # Linux launcher, when installed
 ```
 
@@ -204,8 +204,22 @@ voxprint settings set KEY VALUE [--json]
 | `narration.ordinals` | `on` / `off` |
 | `narration.ai_disclosure` | `on` / `off` |
 | `narration.pause.comma`, `.mid`, `.sentence`, `.paragraph`, `.chapter` | Seconds, 0-6 |
+| `theme` | Shared by the Voxprint programs (`state/suite.json`). This program has one look, `glass-dark`; another program's theme id is kept and read as `glass-dark` |
+| `gpu` | Shared by the Voxprint programs: `auto`, `cpu` or `cuda:N`. Narration uses it; a GPU that is not there falls back to `cuda:0` |
+| `gpu.vram_fraction` | 0.70-0.80 (default 0.75): the most of the card's total video memory narration plans for, counting what other programs hold. Environment: `VOXPRINT_VRAM_FRACTION` |
+| `gpu.fast_decode` | `off` (default) or `graphs`: one chunk at a time with CUDA Graphs (needs faster-qwen3-tts, see [Bench](#bench)). Environment: `VOXPRINT_FAST_DECODE` |
 
 These are the files Settings writes, so the window and `narrate` use them. An unknown key or a bad value is exit 2. `--json` adds `settings` (for `list`) or `key` and `value`.
+
+`language`, `theme` and `gpu` (and the models folder chosen in the installer) are also written to `state/suite.json`, the settings file shared with Voxprint AI Movie Dubber, so both programs follow one choice.
+
+## Bench
+
+```
+voxprint bench [--voice VOICE] [--modes batched,graphs] [--out DIR] [--install-graphs] [--json]
+```
+
+Narrates a fixed Russian text (12 phrases) with the same voice once per mode and prints, per mode, the realtime factor (`x_realtime` = seconds of audio per second of synthesis; `rtf` = the inverse), the batch size, load and warm-up time, and the peak video memory (`peak_vram_gb` held by PyTorch, `card_peak_used_gb` including other programs). `batched` is the normal path (several phrases per generate call, batch planned by the VRAM rule); `graphs` is one phrase at a time through faster-qwen3-tts with CUDA Graphs. A mode that cannot run is reported as skipped with the reason (warning); when no mode runs the exit code is 5. `--out` also saves `bench-<mode>.wav`. `--install-graphs` first downloads faster-qwen3-tts 0.3.2 (MIT, 43 KB, SHA-256 checked) into the packages folder; nothing else is installed. Default voice: Levi.
 
 ## Train a voice
 
