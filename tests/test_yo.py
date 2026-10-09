@@ -93,7 +93,7 @@ def test_real_dictionary_restores_only_sure_words_and_keeps_abbreviations():
 
 def test_prepare_step_is_russian_only_and_on_by_default():
     src = "В тексте еще все. мед. училище."
-    assert tp.prepare_text_block(src, "ru") == "В тексте ещё все. мед. училище."
+    assert tp.prepare_text_block(src, "ru") == "В тексте ещё всё. мед. училище."
     assert tp.prepare_text_block(src, "en") == src
     assert tp.prepare_text_block(src, "de", tp.PrepOptions(frozenset({tp.STEP_YO}))) == src
     book = Book("T", "", "en", [Chapter("Still.", src)])
@@ -102,7 +102,7 @@ def test_prepare_step_is_russian_only_and_on_by_default():
     ru = Book("T", "", "ru", [Chapter("Еще.", src)])
     prepared_ru, rep_ru = tp.prepare_book(ru, tp.PrepOptions(frozenset({tp.STEP_YO})))
     assert rep_ru.skipped == [] and prepared_ru.chapters[0].title == "Ещё."
-    assert prepared_ru.chapters[0].text == "В тексте ещё все. мед. училище."
+    assert prepared_ru.chapters[0].text == "В тексте ещё всё. мед. училище."
     assert tp.STEP_YO in tp.STEP_KEYS and tp.STEP_YO in tp.RU_ONLY_STEPS
 
 
@@ -129,7 +129,7 @@ def test_fake_engine_receives_the_restored_text(tmp_path):
     )
     _res, engine, _ff, _ev = run(tmp_path, engine=FakeEngine(), book=book, language="Russian", options=options)
     said = " ".join(engine.calls)
-    assert "В тексте ещё все. мед. училище." in said
+    assert "В тексте ещё всё. мед. училище." in said
     _res, engine2, _ff, _ev = run(
         tmp_path / "off", engine=FakeEngine(), book=book, language="Russian",
         options=nr.NarrationOptions(speak_titles=False, ordinals=False, yo=False))
@@ -154,3 +154,75 @@ def test_cli_restores_yo_by_default(tmp_path):
     assert user_cli.main(base + ["--no-yo"], run_narration_fn=fake_run, library=lib) == 0
     assert user_cli.main(base + ["--yo"], run_narration_fn=fake_run, library=lib) == 0
     assert seen == [(True, {tp.STEP_YO}), (False, None), (True, {tp.STEP_YO})]
+
+
+FIXTURES = ROOT / "tests" / "fixtures" / "yo"
+
+VSE_CASES = [
+    # kept as "vse": a plural word, pronoun, subject or verb next to it, or no rule fires
+    ("Все люди пришли.", "Все люди пришли."),
+    ("Пришли все.", "Пришли все."),
+    ("Мы все.", "Мы все."),
+    ("Все они знали.", "Все они знали."),
+    ("Все ее книги на полке.", "Все её книги на полке."),
+    ("Все пятеро молчали.", "Все пятеро молчали."),
+    ("Все громко засмеялись.", "Все громко засмеялись."),
+    ("Все, кто пришел, сели.", "Все, кто пришёл, сели."),
+    ("Все это знают.", "Все это знают."),
+    ("Все так делают.", "Все так делают."),
+    ("Все будут рады.", "Все будут рады."),
+    ("Все остальные ушли.", "Все остальные ушли."),
+    ("Все хорошо знают это.", "Все хорошо знают это."),
+    ("Он съел все яблоки.", "Он съел все яблоки."),
+    ("Все семь дней.", "Все семь дней."),
+    ("Все мы люди.", "Все мы люди."),
+    ("ВСЕ будет хорошо.", "ВСЕ будет хорошо."),
+    # written as "vsyo": a singular verb or neuter adjective, a clause end, ", chto", fixed phrases, comparatives
+    ("Он все понял.", "Он всё понял."),
+    ("Все равно я пойду.", "Всё равно я пойду."),
+    ("Он все-таки пришел.", "Он всё-таки пришёл."),
+    ("Все было тихо.", "Всё было тихо."),
+    ("Вот и все.", "Вот и всё."),
+    ("«Вот и все», — сказал он.", "«Вот и всё», — сказал он."),
+    ("Это все, что у меня есть.", "Это всё, что у меня есть."),
+    ("Все хорошо.", "Всё хорошо."),
+    ("Становилось все темнее.", "Становилось всё темнее."),
+    ("Она все говорила и говорила.", "Она всё говорила и говорила."),
+    ("Я все знаю.", "Я всё знаю."),
+    ("Все еще идет дождь.", "Всё ещё идёт дождь."),
+    ("Все дело в том, что он устал.", "Всё дело в том, что он устал."),
+    ("Все будет хорошо.", "Всё будет хорошо."),
+    ("Все новое пугает.", "Всё новое пугает."),
+    ("Там все: письма, книги.", "Там всё: письма, книги."),
+]
+
+
+@pytest.mark.parametrize("src,want", VSE_CASES)
+def test_vse_is_decided_by_context(src, want):
+    assert yo.restore(src) == want
+    assert yo.restore(want) == want
+
+
+def test_vse_context_can_be_turned_off_and_is_counted():
+    assert yo.restore("Вот и все.", context=False) == "Вот и все."
+    out, n = yo.restore_counted("Вот и все. Все люди здесь.")
+    assert out == "Вот и всё. Все люди здесь." and n == 1
+    assert yo.context_path().name == "yo_context.json" and yo.context_path().is_file()
+
+
+def test_dialog_fixture_restores_every_yo_and_adds_none():
+    """The 700 test dialogue: 22 yo in the reference (6 of them "vsyo"), none wrong."""
+    import re
+
+    src = (FIXTURES / "dialog-ai-torah-01.txt").read_text(encoding="utf-8")
+    ref = (FIXTURES / "dialog-ai-torah-01.yo-reference.txt").read_text(encoding="utf-8")
+    out = yo.restore(src)
+    words = re.compile(r"\w+")
+    a, b, c = words.findall(src), words.findall(ref), words.findall(out)
+    assert len(a) == len(b) == len(c)
+    yo_lo, yo_up = chr(0x0451), chr(0x0401)
+    needed = [i for i, w in enumerate(b) if yo_lo in w or yo_up in w]
+    assert len(needed) == 22
+    assert [i for i in needed if c[i] != b[i]] == []
+    assert [i for i, (r, o) in enumerate(zip(b, c)) if r != o] == []
+    assert out == ref

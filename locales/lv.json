@@ -855,6 +855,8 @@
  "spk.check": "Atzīmēt runātājus",
  "spk.narrator": "Stāstītājs: {name}",
  "spk.male": "Vīrieša balss",
+ "spk.male2": "Otrā vīrieša balss",
+ "spk.male2_tip": "Dažādi vīrieši pārmaiņus saņem vīrieša balsi un šo, pirmās parādīšanās secībā. Nav = viena balss visiem vīriešiem.",
  "spk.female": "Sievietes balss",
  "spk.none": "Nav",
  "spk.preview": "Skatīt un labot runātājus",

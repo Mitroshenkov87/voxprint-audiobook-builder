@@ -17,7 +17,7 @@ with the narrator, and the result carries a warning instead of looking like a su
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
 from core.book_parsers import Book
@@ -82,17 +82,27 @@ class SpeakerLine:
 
 @dataclass
 class SpeakerCast:
-    """Edited marks plus the library ids of the male and female voices ("" = the narrator's voice)."""
+    """Edited marks plus the library ids of the voices ("" = the narrator's voice).
+
+    ``male_id`` / ``female_id`` are the first voice of each role. ``male2_id`` / ``female2_id`` are an optional second
+    voice: different characters of that role then alternate between the two voices in order of first appearance
+    (the first man named in the marks gets ``male_id``, the second ``male2_id``, the third ``male_id`` again).
+    ``characters`` pins a character name (case-insensitive, as written in the marks) to a voice and wins over both.
+    A mark without a name uses the role's first voice.
+    """
     lines: Optional[List[SpeakerLine]] = None
     male_id: str = ""
     female_id: str = ""
     tagger: Optional[LLMPlan] = None
     narrator_id: str = ""
+    male2_id: str = ""
+    female2_id: str = ""
+    characters: Dict[str, str] = field(default_factory=dict)
 
     def extra_ids(self, narrator_id: str) -> List[str]:
         """Voice ids besides the narrator, in a stable order."""
         out: List[str] = []
-        for vid in (self.male_id, self.female_id):
+        for vid in (self.male_id, self.male2_id, self.female_id, self.female2_id, *self.characters.values()):
             if vid and vid != narrator_id and vid not in out:
                 out.append(vid)
         return out
@@ -100,6 +110,62 @@ class SpeakerCast:
     def uses_several(self, narrator_id: str) -> bool:
         """True when at least one selected voice is not the narrator."""
         return bool(self.extra_ids(narrator_id))
+
+    def voices_for(self, lines: Sequence[SpeakerLine]) -> List[str]:
+        """The voice id for each mark (``""`` = the narrator's voice)."""
+        pinned = {_name_key(k): v for k, v in self.characters.items() if _name_key(k)}
+        pools = {"male": [v for v in (self.male_id, self.male2_id) if v],
+                 "female": [v for v in (self.female_id, self.female2_id) if v]}
+        seen: Dict[str, Dict[str, int]] = {"male": {}, "female": {}}
+        out: List[str] = []
+        for line in lines:
+            if line.role not in ("male", "female"):
+                out.append("")
+                continue
+            key = _name_key(line.name)
+            if key and key in pinned:
+                out.append(pinned[key])
+                continue
+            pool = pools[line.role]
+            if not pool:
+                out.append("")
+                continue
+            if not key or len(pool) == 1:
+                out.append(pool[0])
+                continue
+            order = seen[line.role]
+            if key not in order:
+                order[key] = len(order)
+            out.append(pool[order[key] % len(pool)])
+        return out
+
+    def assignment(self, lines: Sequence[SpeakerLine]) -> Dict[str, str]:
+        """``{character name: voice id}`` as :meth:`voices_for` decides it (the first spelling of each name)."""
+        out: Dict[str, str] = {}
+        keys = set()
+        for line, vid in zip(lines, self.voices_for(lines)):
+            key = _name_key(line.name)
+            if key and key not in keys:
+                keys.add(key)
+                out[line.name] = vid
+        return out
+
+
+def _name_key(name: str) -> str:
+    """Case- and space-insensitive key of a character name."""
+    return " ".join((name or "").split()).casefold()
+
+
+def parse_character_map(items: Sequence[str]) -> Dict[str, str]:
+    """``["Name=voice", ...]`` as ``{Name: voice}``. Raises ``ValueError`` on an item without ``=`` or with an empty side."""
+    out: Dict[str, str] = {}
+    for item in items or ():
+        name, sep, voice = str(item).partition("=")
+        name, voice = name.strip(), voice.strip()
+        if not sep or not name or not voice:
+            raise ValueError(f"expected NAME=VOICE, got {item!r}")
+        out[name] = voice
+    return out
 
 
 def paragraphs(book: Book) -> List[Tuple[int, str]]:
@@ -232,30 +298,34 @@ def _norm(text: str) -> str:
 
 
 def assign(chunks: Sequence[Chunk], book: Book, lines: Sequence[SpeakerLine], voice_ids: Dict[str, str],
-           narrator_id: str = "") -> Tuple[List[Chunk], str]:
+           narrator_id: str = "", per_line: Optional[Sequence[str]] = None) -> Tuple[List[Chunk], str]:
     """Chunks with ``voice_id`` set from ``lines``.
 
-    ``voice_ids`` maps ``male`` / ``female`` to a library id. The narrator and any role whose voice is the narrator
-    stay on ``voice_id`` ``""`` (the job voice). When the paragraph count does not match ``lines``, the chunks are
-    returned unchanged and the note is ``"mismatch"``.
+    ``voice_ids`` maps ``male`` / ``female`` to a library id. ``per_line`` (one voice id per mark, as
+    :meth:`SpeakerCast.voices_for` returns) overrides that role map when given. The narrator and any mark whose voice is
+    the narrator stay on ``voice_id`` ``""`` (the job voice). When the paragraph count does not match ``lines``, the
+    chunks are returned unchanged and the note is ``"mismatch"``.
     """
     paras = paragraphs(book)
     if len(paras) != len(lines):
         return list(chunks), "mismatch"
-    rows = [(ci, _norm(text), line.role) for (ci, text), line in zip(paras, lines)]
+    if per_line is not None and len(per_line) != len(lines):
+        per_line = None
+    if per_line is None:
+        per_line = [voice_ids.get(line.role, "") if line.role in ("male", "female") else "" for line in lines]
+    rows = [(ci, _norm(text), vid) for (ci, text), vid in zip(paras, per_line)]
     cursor = 0
     out: List[Chunk] = []
     for chunk in chunks:
-        role = "narrator"
+        vid = ""
         if chunk.pause_kind != TITLE:
             wanted = _norm(chunk.text)
             for j in range(cursor, len(rows)):
-                ci, ptext, r = rows[j]
+                ci, ptext, v = rows[j]
                 if ci == chunk.chapter and wanted and wanted in ptext:
-                    role = r
+                    vid = v
                     cursor = j
                     break
-        vid = voice_ids.get(role, "") if role in ("male", "female") else ""
         if vid == narrator_id:
             vid = ""
         out.append(chunk if chunk.voice_id == vid else replace(chunk, voice_id=vid))

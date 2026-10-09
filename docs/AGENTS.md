@@ -127,7 +127,7 @@ voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann -
 
 Pauses and speed: `--pause-comma`, `--pause-mid`, `--pause-sentence`, `--pause-paragraph`, `--pause-chapter` (seconds), `--speed` (0.7-1.3) and `--style auto|scripture|fiction|dialogue`; defaults come from the app's Settings. For a Russian book, `--yo` (the default) restores the letter yo where a dictionary is sure; `--no-yo` leaves the letter e as written. Details: [CLI.md](CLI.md#narrate-a-book).
 
-Multi-voice: `--voice` is the narrator. `--speakers` asks Gemma to mark each paragraph; `--speaker-marks FILE` narrates a file you already edited (`voxprint speakers` writes it). `--male-voice` and `--female-voice` are the other two voices. The two speaker flags cannot be combined. If the marks do not match the prepared text, the narrator reads the whole book and the JSON `warnings` array says so. `<out>/<book>/.debug/speakers.txt` is listed in `outputs`.
+Multi-voice: `--voice` is the narrator. `--speakers` asks Gemma to mark each paragraph; `--speaker-marks FILE` narrates a file you already edited (`voxprint speakers` writes it). `--male-voice` and `--female-voice` are the role voices. `--male2-voice` / `--female2-voice` add a second voice per role: different characters (by the name in the marks) alternate between the two in order of first appearance. `--character NAME=VOICE` (repeatable) pins one character to a voice. Without those three flags every man and every woman share one voice, as before. The two speaker flags cannot be combined. If the marks do not match the prepared text, the narrator reads the whole book and the JSON `warnings` array says so. `<out>/<book>/.debug/speakers.txt` is listed in `outputs`.
 
 ### Speaker marks only
 
@@ -137,6 +137,18 @@ voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann -
 ```
 
 Does not synthesize. Exit 4 when Gemma is missing (`voxprint models download llm --json`).
+
+### Prepare text, translate, settings
+
+```
+voxprint prepare book.txt --out book.prepared.txt --json
+voxprint prepare book.txt --out yo-only.txt --steps yo --no-typos --json
+voxprint translate book.epub --to ru --out book.ru.txt --json
+voxprint settings list --json
+voxprint settings set narration.ordinals off --json
+```
+
+`prepare` is the window's Prepare text without narration: rule steps, the Russian letter yo, the Russian typo model when it is downloaded (`--typos` requires it, exit 4), and with `--llm` the text model's rewrite. It writes plain text and `<out stem>.prep_report.json` (`rule_counts` has the changes per step, for example `{"yo": 22}`). `translate` uses the offline Opus-MT models (`--literary`: Gemma, Opus-MT fallback); a missing model is exit 4 with the module to download. `settings` reads and writes the values Settings shows; `models.folder` is read-only. Details: [CLI.md](CLI.md#prepare-text).
 
 ### Check and repair
 
@@ -219,7 +231,7 @@ Stdout with `--json` is newline-delimited JSON. Every line is one object. Progre
 |---|---|---|
 | `type` | yes | `"result"` |
 | `ok` | yes | `true` only when `exit_code` is 0 |
-| `command` | yes | `version`, `status`, `capabilities`, `narrate`, `train`, `voices list`, `voices export`, `speakers`, `check`, `diag`, `models list`, `models download`, `revoice`, `backup`, `restore` |
+| `command` | yes | `version`, `status`, `capabilities`, `narrate`, `prepare`, `translate`, `train`, `voices list`, `voices export`, `speakers`, `settings`, `check`, `diag`, `models list`, `models download`, `revoice`, `backup`, `restore` |
 | `exit_code` | yes | Same number the process returns |
 | `outputs` | yes | Paths written (may be empty) |
 | `warnings` | yes | Strings. Empty array when there are none |
@@ -236,6 +248,9 @@ Extra fields by command:
 | `status`, `capabilities` | see below. Always JSON, one object, no progress lines |
 | `narrate` | `out_dir`. `outputs` includes `.debug/speakers.txt` when speaker marks were applied. `warnings` holds the mismatch sentence when the narrator read the whole book |
 | `speakers` | `paragraphs` (integer). The marks file is `outputs[0]` |
+| `prepare` | `report`: `{input, output, language, rules, rule_counts, rules_skipped, neural, typo_model, llm}`. `outputs` is the text, then the report file |
+| `translate` | `source`, `target`, `chapters` (integer), `model` |
+| `settings` | `settings` (object, for `list`) or `key` and `value` |
 | `check` | `items` (`{kind, name, status, detail}`), `checked`, `fixed`, `failed`. `command` is `check` for `voxprint repair` too |
 | `train` | `voice_id`, `adapter`, `root` |
 | `voices list` | `voices`: array of `{id, name, voice_type, language, license, consent_scope, commercial_use, gender, age_group}` |

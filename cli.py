@@ -44,7 +44,7 @@ from infra.stdio_guard import guard_stdio, install_cli_excepthook
 from core.asr import make_default_asr
 from core.book_parsers import load_book
 from core.book_prep import PrepPlan
-from core.text_prep import STEP_YO, PrepOptions
+from core.text_prep import STEP_KEYS, STEP_YO, PrepOptions
 from core.errors import BackupError, CancelledByUser, DatasetMakerError, OutOfMemoryError_
 from core.events import CancelToken, Stage, overall_percent
 from core.narration import NarrationOptions, NarrationProgress, PauseToken
@@ -103,7 +103,7 @@ FORMAT_ALIASES = {
 
 USER_COMMANDS = frozenset({
     "narrate", "train", "voices", "diag", "status", "capabilities", "models", "revoice", "backup", "restore",
-    "speakers", "check", "repair",
+    "speakers", "check", "repair", "prepare", "translate", "settings",
 })
 
 CORE_MODULE_IDS = (
@@ -389,6 +389,9 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint narrate --help\n"
             "  voxprint train --help\n"
             "  voxprint models list --json\n"
+            "  voxprint prepare book.txt --out book.prepared.txt --json\n"
+            "  voxprint translate book.txt --to ru --out book.ru.txt --json\n"
+            "  voxprint settings list --json\n"
             "  voxprint diag --out report.zip\n"
             "  voxprint backup --out E:\\ --json\n"
             "  voxprint restore --from E:\\ --json\n"
@@ -407,6 +410,8 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint narrate book.txt --voice my-voice --out ./audiobooks --pauses --ai-disclosure\n"
             "  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json\n"
             "  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks\n"
+            "  voxprint narrate book.txt --voice gideon --male-voice asher --male2-voice tom --female-voice noa --speakers --out ./out\n"
+            "  voxprint narrate book.txt --voice gideon --male-voice asher --character David=tom --speakers --out ./out\n"
         ),
     )
     n.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
@@ -451,6 +456,14 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Voice for paragraphs marked male (narrator is --voice)")
     n.add_argument("--female-voice", default="", metavar="ID_OR_NAME",
                    help="Voice for paragraphs marked female (narrator is --voice)")
+    n.add_argument("--male2-voice", default="", metavar="ID_OR_NAME",
+                   help="Second male voice: different male characters alternate between --male-voice and this one "
+                        "in order of first appearance")
+    n.add_argument("--female2-voice", default="", metavar="ID_OR_NAME",
+                   help="Second female voice, alternating with --female-voice the same way")
+    n.add_argument("--character", action="append", default=[], metavar="NAME=VOICE", dest="characters",
+                   help="Pin one character (the name as written in the marks) to a voice. Repeatable; "
+                        "wins over the male / female voices")
     n.add_argument("--speaker-marks", type=Path, default=None, metavar="FILE",
                    help="Narrate from this marks file instead of running Gemma (voxprint speakers writes it)")
     n.add_argument("--work-dir", type=Path, default=None, metavar="DIR",
@@ -650,6 +663,88 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     ck.set_defaults(_handler="check")
+
+    pr = sub.add_parser(
+        "prepare", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
+        help="Prepare a book's text for narration (rules, letter yo, typo fix; optional text-model rewrite)",
+        description=(
+            "The Narrate window's Prepare text step without narration: layout, footnotes, quotes, links, headings, "
+            "numbers, abbreviations and (Russian) the letter yo, then the Russian typo model when it is downloaded. "
+            "--llm adds the text model's narration rewrite. Writes plain text and a JSON report."
+        ),
+        epilog=(
+            "Steps: " + ", ".join(STEP_KEYS) + "\n"
+            "Examples:\n"
+            "  voxprint prepare book.txt --out book.prepared.txt --json\n"
+            "  voxprint prepare book.fb2 --out prepared.txt --report report.json --no-typos\n"
+            "  voxprint prepare book.txt --out yo-only.txt --steps yo\n"
+            "  voxprint prepare book.txt --out prepared.txt --llm --json\n"
+        ),
+    )
+    pr.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
+    pr.add_argument("--out", required=True, type=Path, metavar="FILE", help="Prepared text file to write (UTF-8)")
+    pr.add_argument("--report", type=Path, default=None, metavar="FILE",
+                    help="JSON report to write (default: <out stem>.prep_report.json next to --out)")
+    pr.add_argument("--language", default="", metavar="CODE", help="Book language hint: ru, en, de (default: detected)")
+    pr.add_argument("--steps", action="append", default=[], metavar="NAME",
+                    help="Only these rule steps (repeatable or comma-separated; default: all)")
+    pr.add_argument("--no-rules", action="store_true", help="Skip every rule step")
+    pr_yo = pr.add_mutually_exclusive_group()
+    pr_yo.add_argument("--yo", dest="yo", action="store_true", default=None, help="Restore the Russian letter yo (default: on)")
+    pr_yo.add_argument("--no-yo", dest="yo", action="store_false", help="Leave the letter e as written")
+    pr_typo = pr.add_mutually_exclusive_group()
+    pr_typo.add_argument("--typos", dest="typos", action="store_true", default=None,
+                         help="Require the Russian typo model (exit 4 when it is not downloaded)")
+    pr_typo.add_argument("--no-typos", dest="typos", action="store_false",
+                         help="Skip the typo model (default: used when downloaded)")
+    pr.add_argument("--llm", "--markup", dest="llm", action="store_true",
+                    help="Also run the text model's narration rewrite (Gemma; off by default)")
+    pr.add_argument("--work-dir", type=Path, default=None, metavar="DIR",
+                    help="Keep the text model's cache here (default: a temporary folder)")
+    pr.set_defaults(_handler="prepare")
+
+    tr_p = sub.add_parser(
+        "translate", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
+        help="Translate a book offline (Opus-MT; --literary uses the text model)",
+        description="Translate a book with the offline models the Narrate window uses and write plain text. Does not narrate.",
+        epilog=(
+            "Examples:\n"
+            "  voxprint translate book.epub --to ru --out book.ru.txt --json\n"
+            "  voxprint translate book.txt --from de --to en --out book.en.txt\n"
+            "  voxprint translate book.txt --to ru --out book.ru.txt --literary\n"
+        ),
+    )
+    tr_p.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
+    tr_p.add_argument("--to", required=True, choices=("en", "ru", "de"), help="Target language")
+    tr_p.add_argument("--from", dest="source", default="", choices=("", "en", "ru", "de", "uk"),
+                      help="Source language (default: detected)")
+    tr_p.add_argument("--out", required=True, type=Path, metavar="FILE", help="Translated text file to write (UTF-8)")
+    tr_p.add_argument("--literary", action="store_true",
+                      help="Literary translation by the text model (Gemma), Opus-MT as the fallback")
+    tr_p.add_argument("--work-dir", type=Path, default=None, metavar="DIR",
+                      help="Keep the sentence cache here, so a second run is quick (default: a temporary folder)")
+    tr_p.set_defaults(_handler="translate")
+
+    se = sub.add_parser(
+        "settings", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
+        help="Show or change the saved settings",
+        description="The values Settings shows: language, projects folder, reading speed and style, pauses, ordinals.",
+        epilog=(
+            "Examples:\n"
+            "  voxprint settings list --json\n"
+            "  voxprint settings get narration.speed\n"
+            "  voxprint settings set narration.ordinals off\n"
+            "  voxprint settings set narration.pause.sentence 0.8\n"
+        ),
+    )
+    se_sub = se.add_subparsers(dest="settings_action", required=True)
+    se_sub.add_parser("list", parents=[child], help="Every setting and its value")
+    se_get = se_sub.add_parser("get", parents=[child], help="One setting")
+    se_get.add_argument("key", metavar="KEY")
+    se_set = se_sub.add_parser("set", parents=[child], help="Change one setting")
+    se_set.add_argument("key", metavar="KEY")
+    se_set.add_argument("value", metavar="VALUE")
+    se.set_defaults(_handler="settings")
     return ap
 
 
@@ -834,13 +929,16 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
     The cast is the same object the Narrate window builds (:class:`core.speakers.SpeakerCast`). Narration applies it.
     """
     want = bool(getattr(args, "speakers", False)) or getattr(args, "speaker_marks", None) is not None
-    male_name = (getattr(args, "male_voice", "") or "").strip()
-    female_name = (getattr(args, "female_voice", "") or "").strip()
-    if not want and not male_name and not female_name:
+    names = {flag: (getattr(args, attr, "") or "").strip() for flag, attr in (
+        ("--male-voice", "male_voice"), ("--female-voice", "female_voice"),
+        ("--male2-voice", "male2_voice"), ("--female2-voice", "female2_voice"))}
+    raw_characters = list(getattr(args, "characters", None) or [])
+    if not want and not any(names.values()) and not raw_characters:
         return None, {}
     if not want:
         raise CliError(
-            EXIT_BAD_ARGS, "--male-voice and --female-voice need --speakers or --speaker-marks",
+            EXIT_BAD_ARGS, "--male-voice, --female-voice, --male2-voice, --female2-voice and --character need "
+                           "--speakers or --speaker-marks",
             hint="Example: voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann "
                  "--speakers --out ./audiobooks",
         )
@@ -849,8 +947,20 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
             EXIT_BAD_ARGS, "--speakers and --speaker-marks cannot be used together",
             hint="Use --speakers to ask Gemma, or --speaker-marks FILE to narrate marks you already edited.",
         )
-    male = resolve_voice(library, male_name) if male_name else None
-    female = resolve_voice(library, female_name) if female_name else None
+    for second, first in (("--male2-voice", "--male-voice"), ("--female2-voice", "--female-voice")):
+        if names[second] and not names[first]:
+            raise CliError(
+                EXIT_BAD_ARGS, f"{second} needs {first}",
+                hint="Example: voxprint narrate book.txt --voice gideon --male-voice asher --male2-voice tom "
+                     "--speakers --out ./out",
+            )
+    try:
+        character_names = spk.parse_character_map(raw_characters)
+    except ValueError as exc:
+        raise CliError(EXIT_BAD_ARGS, f"--character: {exc}",
+                       hint="Example: --character David=asher --character Hannah=noa") from exc
+    recs = {flag: (resolve_voice(library, name) if name else None) for flag, name in names.items()}
+    characters = {who: resolve_voice(library, vname) for who, vname in character_names.items()}
     lines = None
     tagger = None
     if args.speaker_marks is not None:
@@ -875,9 +985,16 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
                 hint="voxprint models download llm --json",
             )
         tagger = plan
+
+    def vid(flag: str) -> str:
+        rec = recs[flag]
+        return rec.id if rec is not None else ""
+
     cast = spk.SpeakerCast(
-        lines=lines, male_id=male.id if male is not None else "", female_id=female.id if female is not None else "",
+        lines=lines, male_id=vid("--male-voice"), female_id=vid("--female-voice"),
         tagger=tagger, narrator_id=narrator.id,
+        male2_id=vid("--male2-voice"), female2_id=vid("--female2-voice"),
+        characters={who: rec.id for who, rec in characters.items()},
     )
     if not cast.uses_several(narrator.id):
         raise CliError(
@@ -886,7 +1003,7 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
                  "--speakers --out ./audiobooks",
         )
     extra = {}
-    for rec in (male, female):
+    for rec in [*recs.values(), *characters.values()]:
         if rec is not None and rec.id != narrator.id:
             extra[rec.id] = rec
     return cast, extra
@@ -1621,6 +1738,351 @@ def cmd_check(args: argparse.Namespace, *,
     return _run("check", args, body)
 
 
+# ----------------------------------------------------------------------------------------- prepare / translate / settings
+def _load_book_or_fail(path_text: str, example: str):
+    book_path = Path(path_text)
+    if not book_path.is_file():
+        raise CliError(EXIT_INPUT, f"book not found: {book_path}", hint=f"Pass a TXT, FB2, FB2.ZIP or EPUB file. Example: {example}")
+    return load_book(book_path)
+
+
+def book_plain_text(book, like=None) -> str:
+    """The book as plain text: chapters separated by two blank lines, a chapter title on its own line above its text.
+
+    A chapter whose title equals the book title (a one-chapter TXT is titled after its file) gets no title line.
+    ``like`` is the book before preparation or translation, whose titles decide that (the prepared title may differ).
+    """
+    src = like if like is not None else book
+    book_title = (src.title or "").strip()
+    parts = []
+    for i, ch in enumerate(book.chapters):
+        title = (ch.title or "").strip()
+        orig = src.chapters[i].title.strip() if i < len(src.chapters) and src.chapters[i].title else title
+        text = (ch.text or "").strip()
+        if title and orig != book_title:
+            parts.append(f"{title}\n\n{text}" if text else title)
+        elif text:
+            parts.append(text)
+    return "\n\n\n".join(parts) + ("\n" if parts else "")
+
+
+def _write_text(dest: Path, text: str) -> Path:
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_name(dest.name + ".part")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(dest)
+    return dest
+
+
+def _prep_steps(args) -> frozenset:
+    """Rule steps from ``--steps`` / ``--no-rules`` / ``--no-yo`` (default: all, as the Prepare text switch)."""
+    from core import text_prep as tp
+
+    if getattr(args, "no_rules", False):
+        steps = set()
+    elif getattr(args, "steps", None):
+        steps = set()
+        for item in args.steps:
+            for part in str(item).split(","):
+                key = part.strip().lower()
+                if not key:
+                    continue
+                if key not in tp.STEP_KEYS:
+                    raise CliError(EXIT_BAD_ARGS, f"unknown step {part!r}",
+                                   hint=f"Choose from: {', '.join(tp.STEP_KEYS)}")
+                steps.add(key)
+    else:
+        steps = set(tp.STEP_KEYS)
+    if getattr(args, "yo", None) is False:
+        steps.discard(tp.STEP_YO)
+    elif getattr(args, "yo", None) is True:
+        steps.add(tp.STEP_YO)
+    return frozenset(steps)
+
+
+def _typo_state(language: str):
+    """``(model, ready)`` of the Russian typo model for ``language`` (``(None, False)`` when no model covers it)."""
+    model = text_models.for_step(text_models.STEP_SPELLFIX, language)
+    if model is None or not model.integrated:
+        return None, False
+    return model, text_models.state(model) == text_models.STATE_READY
+
+
+def cmd_prepare(args: argparse.Namespace, *,
+                plan_fn: Optional[Callable[[], object]] = None,
+                typo_state_fn: Optional[Callable[[str], tuple]] = None,
+                cleanup_factory: Optional[Callable[[str], object]] = None) -> int:
+    """``prepare BOOK --out FILE``: the Narrate window's Prepare text (rules, letter yo, Russian typo model) and,
+    with ``--llm``, the text model's narration rewrite. Writes plain text and a JSON report; does not narrate."""
+    from core import llm_text
+    from core.book_prep import NEURAL_SPELLFIX, run_preparation
+    from core.text_prep import resolve_language
+
+    example = "voxprint prepare book.txt --out book.prepared.txt --json"
+
+    def body(json_mode: bool, started: float) -> int:
+        book = _load_book_or_fail(args.book, example)
+        language = resolve_language(book, args.language or "")
+        steps = _prep_steps(args)
+        warnings: list = []
+        neural: frozenset = frozenset()
+        typo_model = None
+        if args.typos is not False:
+            model, ready = (typo_state_fn or _typo_state)(language)
+            if model is not None and ready:
+                neural = frozenset({NEURAL_SPELLFIX})
+                typo_model = getattr(model, "key", str(model))
+            elif args.typos is True:
+                if model is None:
+                    raise CliError(EXIT_BAD_ARGS, f"no typo model for language {language or '?'}",
+                                   hint="The typo model covers Russian books only. Drop --typos.")
+                raise CliError(EXIT_MISSING, "the Russian typo model is not installed",
+                               hint=f"voxprint models download {getattr(model, 'key', 'sage-ru')} --json")
+            elif model is not None:
+                warnings.append(f"Typo fix skipped: the model {getattr(model, 'key', '')} is not downloaded "
+                                f"(voxprint models download {getattr(model, 'key', '')}).")
+        factory = cleanup_factory or (text_models.cleanup_engine_for if neural else None)
+        plan = PrepPlan(PrepOptions(steps), neural, factory)
+        if json_mode:
+            _emit_progress("prepare", 0.0, "Preparing the text")
+
+        def progress(frac: float, message: str) -> None:
+            if json_mode:
+                _emit_progress("prepare", float(frac) * 100.0, message or "Preparing the text")
+
+        prepared, report = run_preparation(book, plan, language, progress=progress)
+        report = dict(report)
+        report["typo_model"] = typo_model or ""
+        llm_tag = ""
+        if args.llm:
+            llm_plan = (plan_fn or llm_tool.make_plan)()
+            if llm_plan is None:
+                raise CliError(EXIT_MISSING, "text model is not installed", hint="voxprint models download llm --json")
+            import tempfile
+
+            with tempfile.TemporaryDirectory(prefix="voxprint-prepare-") as tmp:
+                work = Path(args.work_dir) if args.work_dir else Path(tmp)
+                prepared = llm_text.prepare_book(
+                    prepared, llm_plan, report.get("language") or language or "en", work,
+                    lambda f: progress(0.5 + 0.5 * float(f), "Text model: narration rewrite"))
+            llm_tag = str(getattr(llm_plan, "tag", "") or "text model")
+        report["llm"] = llm_tag
+        dest = _write_text(Path(args.out), book_plain_text(prepared, book))
+        report_path = Path(args.report) if args.report else dest.with_name(dest.stem + ".prep_report.json")
+        report_doc = {"input": str(Path(args.book)), "output": str(dest), **report}
+        _write_text(report_path, json.dumps(report_doc, ensure_ascii=False, indent=1, sort_keys=True) + "\n")
+        counts = report.get("rule_counts") or {}
+        human = [f"Prepared: {dest}", f"Report: {report_path}", f"  language: {report.get('language') or '?'}",
+                 "  steps: " + (", ".join(report.get("rules") or []) or "none")]
+        if counts:
+            human.append("  changes: " + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())))
+        human += [f"  ! {w}" for w in warnings]
+        return _ok(json_mode, "prepare", started, outputs=[dest, report_path], warnings=warnings, human=human,
+                   extra={"report": report_doc})
+
+    return _run("prepare", args, body)
+
+
+def _translate_ready(source: str, target: str) -> list:
+    """Module ids of the Opus-MT models still missing for ``source -> target`` (``[]`` = ready)."""
+    missing = []
+    for model in text_models.translate_models(source, target):
+        if text_models.state(model) != text_models.STATE_READY:
+            missing.append(model.key)
+    return missing
+
+
+def cmd_translate(args: argparse.Namespace, *,
+                  factory: Optional[Callable[[str, str], object]] = None,
+                  plan_fn: Optional[Callable[[], object]] = None,
+                  missing_fn: Optional[Callable[[str, str], list]] = None) -> int:
+    """``translate BOOK --to LANG --out FILE``: the offline translation the Narrate window runs (Opus-MT; with
+    ``--literary`` the text model translates paragraphs and Opus-MT is the fallback). Does not narrate."""
+    from core import translate as tl
+
+    example = "voxprint translate book.txt --to ru --out book.ru.txt --json"
+
+    def body(json_mode: bool, started: float) -> int:
+        book = _load_book_or_fail(args.book, example)
+        target = args.to
+        source = args.source or tl.detect_book_language(book)
+        if not source:
+            raise CliError(EXIT_INPUT, "the book language could not be detected", hint="Pass --from en|ru|de|uk")
+        if source == target:
+            raise CliError(EXIT_BAD_ARGS, f"the book is already in {target}", hint="Choose another --to language.")
+        try:
+            tl.route(source, target)
+        except tl.TranslateError as exc:
+            raise CliError(EXIT_BAD_ARGS, f"unsupported language pair {source} -> {target}",
+                           hint="Supported: en, ru, de (and uk as a source).") from exc
+        if factory is None:
+            try:
+                missing = (missing_fn or _translate_ready)(source, target)
+            except ValueError as exc:
+                raise CliError(EXIT_BAD_ARGS, str(exc)) from exc
+            if missing:
+                raise CliError(EXIT_MISSING, "translation model not installed: " + ", ".join(missing),
+                               hint="voxprint models download " + missing[0] + " --json")
+        llm = None
+        if args.literary:
+            llm = (plan_fn or llm_tool.make_plan)()
+            if llm is None:
+                raise CliError(EXIT_MISSING, "text model is not installed", hint="voxprint models download llm --json")
+        plan = tl.TranslatePlan(target, source, factory or text_models.make_translator, llm=llm)
+        if json_mode:
+            _emit_progress("translate", 0.0, "Translating")
+
+        def progress(frac: float, message: str) -> None:
+            if json_mode:
+                _emit_progress("translate", float(frac) * 100.0, message or "Translating")
+
+        import tempfile
+
+        with tempfile.TemporaryDirectory(prefix="voxprint-translate-") as tmp:
+            work = Path(args.work_dir) if args.work_dir else Path(tmp)
+            work.mkdir(parents=True, exist_ok=True)
+            cache = tl.TranslationCache(work / "translation_cache.json")
+            translated = tl.translate_book(book, plan, source, cache, progress,
+                                           glossary_file=work / f"names_{target}.txt")
+        dest = _write_text(Path(args.out), book_plain_text(translated, book))
+        model = (str(getattr(llm, "tag", "") or "text model") + " literary, Opus-MT fallback") if llm else "Opus-MT"
+        extra = {"source": source, "target": target, "chapters": len(translated.chapters), "model": model}
+        human = [f"Translated {source} -> {target}: {dest}", f"  model: {model}"]
+        return _ok(json_mode, "translate", started, outputs=[dest], human=human, extra=extra)
+
+    return _run("translate", args, body)
+
+
+# Settings -> Narration, Language and Projects, as ``key: (kind, help)``. ``kind`` is bool, float, choice or path.
+SETTINGS_HELP = {
+    "language": "UI language (en, de, ru, uk, lv)",
+    "projects.folder": "Projects (working) folder for new jobs",
+    "models.folder": "Models folder (read-only: set by the installer or by VOXPRINT_MODELS_DIR)",
+    "narration.speed": "Reading speed 0.7-1.3 (1 = the voice's own)",
+    "narration.style": "Reading style: auto, scripture, fiction, dialogue",
+    "narration.pauses": "Explicit pauses between phrases (on/off)",
+    "narration.ordinals": "Read ordinal numbers by context (on/off)",
+    "narration.ai_disclosure": "Speak the AI disclosure at the start (on/off)",
+    **{f"narration.pause.{k}": f"Pause after a {k} in seconds (0-{pz.MAX_PAUSE_MS / 1000:g})" for k in pz.DEFAULT_LENGTHS_MS},
+}
+
+
+def _parse_bool(value: str) -> bool:
+    low = str(value).strip().lower()
+    if low in ("1", "on", "true", "yes", "y"):
+        return True
+    if low in ("0", "off", "false", "no", "n"):
+        return False
+    raise CliError(EXIT_BAD_ARGS, f"expected on or off, got {value!r}")
+
+
+def settings_values() -> dict:
+    """Every setting of :data:`SETTINGS_HELP` with its current value."""
+    from core import ai_disclosure, i18n
+
+    pace = pc.load()
+    lengths = pz.load_lengths().to_dict()
+    out = {
+        "language": i18n.saved_language() or i18n.get_language(),
+        "projects.folder": str(ws.load_folder(app_paths.default_results_dir())),
+        "models.folder": str(app_paths.models_dir()),
+        "narration.speed": float(pace.speed),
+        "narration.style": pace.style,
+        "narration.pauses": bool(pz.load_enabled()),
+        "narration.ordinals": bool(ordinals.load_enabled()),
+        "narration.ai_disclosure": bool(ai_disclosure.load_enabled()),
+    }
+    for kind, ms in lengths.items():
+        out[f"narration.pause.{kind}"] = round(ms / 1000.0, 3)
+    return out
+
+
+def set_setting(key: str, value: str) -> object:
+    """Validate and save one setting; returns the stored value."""
+    from core import ai_disclosure, i18n
+
+    if key not in SETTINGS_HELP:
+        raise CliError(EXIT_BAD_ARGS, f"unknown setting {key!r}", hint="voxprint settings list")
+    if key == "models.folder":
+        raise CliError(EXIT_BAD_ARGS, "models.folder is read-only here",
+                       hint="The installer chooses it; for one session set the VOXPRINT_MODELS_DIR environment variable.")
+    if key == "language":
+        code = i18n.normalize_code(value)
+        if code is None:
+            raise CliError(EXIT_BAD_ARGS, f"unsupported language {value!r}", hint="Choose en, de, ru, uk or lv")
+        return i18n.set_language(code, persist=True)
+    if key == "projects.folder":
+        folder = Path(value).expanduser()
+        if not folder.is_absolute():
+            raise CliError(EXIT_BAD_ARGS, "projects.folder needs an absolute path")
+        folder.mkdir(parents=True, exist_ok=True)
+        ws.save_folder(folder)
+        return str(folder)
+    if key in ("narration.speed", "narration.style"):
+        pace = pc.load()
+        if key == "narration.speed":
+            try:
+                speed = float(value)
+            except ValueError as exc:
+                raise CliError(EXIT_BAD_ARGS, f"expected a number, got {value!r}") from exc
+            if not pc.MIN_SPEED <= speed <= pc.MAX_SPEED:
+                raise CliError(EXIT_BAD_ARGS, f"narration.speed must be {pc.MIN_SPEED:g}-{pc.MAX_SPEED:g}")
+            pace.speed = speed
+        else:
+            if value not in pc.STYLES:
+                raise CliError(EXIT_BAD_ARGS, f"narration.style must be one of {', '.join(pc.STYLES)}")
+            pace.style = value
+        pc.save(pc.Pace(pace.speed, pace.style))
+        return pace.speed if key == "narration.speed" else pace.style
+    if key == "narration.pauses":
+        on = _parse_bool(value)
+        pz.save_enabled(on)
+        return on
+    if key == "narration.ordinals":
+        on = _parse_bool(value)
+        ordinals.save_enabled(on)
+        return on
+    if key == "narration.ai_disclosure":
+        on = _parse_bool(value)
+        ai_disclosure.save_enabled(on)
+        return on
+    kind = key.rsplit(".", 1)[1]
+    try:
+        sec = float(value)
+    except ValueError as exc:
+        raise CliError(EXIT_BAD_ARGS, f"expected seconds, got {value!r}") from exc
+    if not 0 <= sec <= pz.MAX_PAUSE_MS / 1000:
+        raise CliError(EXIT_BAD_ARGS, f"{key} must be 0-{pz.MAX_PAUSE_MS / 1000:g} seconds")
+    lengths = pz.load_lengths().to_dict()
+    lengths[kind] = round(sec * 1000)
+    pz.save_lengths(pz.PauseLengths.from_dict(lengths))
+    return round(lengths[kind] / 1000.0, 3)
+
+
+def cmd_settings(args: argparse.Namespace) -> int:
+    """``settings list | get KEY | set KEY VALUE``: the values Settings shows, for scripts."""
+
+    def body(json_mode: bool, started: float) -> int:
+        action = args.settings_action
+        if action == "list":
+            values = settings_values()
+            human = [f"{k} = {v}    # {SETTINGS_HELP[k]}" for k, v in values.items()]
+            return _ok(json_mode, "settings", started, outputs=[], human=human, extra={"settings": values})
+        key = args.key
+        if key not in SETTINGS_HELP:
+            raise CliError(EXIT_BAD_ARGS, f"unknown setting {key!r}", hint="voxprint settings list")
+        if action == "get":
+            value = settings_values()[key]
+            return _ok(json_mode, "settings", started, outputs=[], human=[str(value)],
+                       extra={"key": key, "value": value})
+        stored = set_setting(key, args.value)
+        return _ok(json_mode, "settings", started, outputs=[], human=[f"{key} = {stored}"],
+                   extra={"key": key, "value": stored})
+
+    return _run("settings", args, body)
+
+
 def main(argv: Optional[Sequence[str]] = None, *,
          run_narration_fn: Callable[..., object] = run_narration,
          run_task_fn: Callable[..., object] = run_task,
@@ -1692,6 +2154,12 @@ def _dispatch(argv: Optional[Sequence[str]], *, run_narration_fn, run_task_fn, l
         return cmd_speakers(args, plan_fn=plan_fn)
     if handler == "check":
         return cmd_check(args, repair_fn=repair_fn)
+    if handler == "prepare":
+        return cmd_prepare(args, plan_fn=plan_fn)
+    if handler == "translate":
+        return cmd_translate(args, plan_fn=plan_fn)
+    if handler == "settings":
+        return cmd_settings(args)
     if handler == "backup":
         return cmd_backup(args)
     if handler == "restore":

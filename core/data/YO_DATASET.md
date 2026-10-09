@@ -14,6 +14,7 @@ The speech model in this project is stock Qwen3-TTS. It does not read stress mar
 | `yo_not_safe.txt` | Ambiguous source list from the same project (`dictionary/not_safe.txt`). Not applied at runtime. |
 | `yo_additions.json` | Project words. `текст` stays `текст` (plain e, stress on the first vowel). |
 | `yo_safe.LICENSE` | MIT notice for the two source lists. |
+| `yo_context.json` | Project rules for `все` / `всё` by the neighbouring words (Apache-2.0). Read by `core/yo.py`. |
 
 Rebuild (no network): `python tools/build_yo_dataset.py`
 
@@ -21,7 +22,7 @@ Rebuild (no network): `python tools/build_yo_dataset.py`
 
 `word` (ye spelling), `yo_form`, `stress` (0-based index of the stressed vowel; yo is always stressed), `type` (`unambiguous` or `homograph`), `source` (`eyo-kernel` or `project`). Homographs also have `variants`, each `{form, hint}`. The source lists do not give context, so those hints are empty. A project addition may set `hint`.
 
-Unambiguous rows are safe to apply. Homograph rows are not: `все` / `всё` and `берег` / `берёг` stay as written unless a later model can choose.
+Unambiguous rows are safe to apply. Homograph rows are not: `берег` / `берёг` and the other homographs stay as written. The one exception is `все` / `всё`, the most frequent one: `core/yo.py` decides it from the neighbouring words with the rules in `yo_context.json` (`всё` before a singular verb or a neuter adjective, at the end of a clause, before `, что`, in `всё равно`, `всё-таки`, `всё ещё` and before a comparative; `все` before a plural word or pronoun, after a plural subject or verb, and whenever no rule applies).
 
 ## Licence
 

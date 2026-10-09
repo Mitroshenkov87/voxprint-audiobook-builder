@@ -798,7 +798,8 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
         raise NarrationError(tr("err.book_empty"))
     if cast is not None and speaker_lines:
         voice_ids = {"male": cast.male_id, "female": cast.female_id}
-        chunk_list, speaker_note = spk.assign(chunk_list, book, speaker_lines, voice_ids, cast.narrator_id)
+        chunk_list, speaker_note = spk.assign(chunk_list, book, speaker_lines, voice_ids, cast.narrator_id,
+                                              per_line=cast.voices_for(speaker_lines))
         codes = [part for part in (tag_warning, speaker_note) if part]
         speaker_note = ";".join(codes)
         debug = job_dir / ".debug"

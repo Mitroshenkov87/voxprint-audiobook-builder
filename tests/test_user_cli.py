@@ -947,3 +947,41 @@ def test_speakers_json_warns_and_saves_the_raw_reply(tmp_path, capsys):
     assert saved.is_file() and "cannot tell" in saved.read_text(encoding="utf-8")
     assert user_cli.speaker_warning_lines("unparsed;no_speakers") == [
         user_cli.SPEAKER_UNPARSED, user_cli.SPEAKER_NO_SPEAKERS]
+
+
+def test_narrate_second_male_voice_and_character_pins(tmp_path, capsys):
+    lib = _make_voice(tmp_path, name="Narrator", voice_id="narrator")
+    for name, vid, kind in (("Tom", "tom", "male"), ("Bob", "bob", "male"), ("Ann", "ann", "female")):
+        _add_voice(lib, name, vid, kind)
+    lib = VoiceLibrary(lib.root)
+    book = tmp_path / "book.txt"
+    book.write_text(
+        'They sat down.\n\n"I start," David said.\n\n"I follow," Michael said.\n\n"And I," Hannah said.\n',
+        encoding="utf-8")
+    marks = tmp_path / "marks.txt"
+    marks.write_text("1. NARRATOR\n2. MALE: David\n3. MALE: Michael\n4. FEMALE: Hannah\n", encoding="utf-8")
+    base = ["narrate", str(book), "--voice", "narrator", "--speaker-marks", str(marks),
+            "--out", str(tmp_path / "audiobooks"), "--format", "wav", "--json"]
+    engines = {}
+    code = user_cli.main(base + ["--male-voice", "tom", "--male2-voice", "bob", "--female-voice", "ann"],
+                         run_narration_fn=_narrate_with_fakes(engines), library=lib)
+    assert code == 0, capsys.readouterr().err
+    capsys.readouterr()
+    assert any("I start" in c for c in engines["tom"].calls)
+    assert any("I follow" in c for c in engines["bob"].calls)
+    assert any("And I" in c for c in engines["ann"].calls)
+
+    engines = {}
+    code = user_cli.main(base + ["--male-voice", "tom", "--character", "Michael=Bob", "--character", "David=tom"],
+                         run_narration_fn=_narrate_with_fakes(engines), library=lib)
+    assert code == 0
+    capsys.readouterr()
+    assert any("I follow" in c for c in engines["bob"].calls)
+    assert any("I start" in c for c in engines["tom"].calls)
+    assert any("And I" in c for c in engines["narr"].calls)
+
+    assert user_cli.main(base + ["--male2-voice", "bob"], library=lib) == 2
+    assert user_cli.main(base + ["--male-voice", "tom", "--character", "Michael"], library=lib) == 2
+    plain = ["narrate", str(book), "--voice", "narrator", "--out", str(tmp_path / "o")]
+    assert user_cli.main(plain + ["--character", "David=tom"], library=lib) == 2
+    capsys.readouterr()

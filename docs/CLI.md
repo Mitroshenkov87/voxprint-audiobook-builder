@@ -5,8 +5,8 @@ Headless entry points for servers, agents and scripts. Same runners as the Studi
 The file you can hand to an agent is [AGENTS.md](AGENTS.md) (what the program is, where the executable lives, recipes, JSON schemas, exit codes). This page is the command reference.
 
 ```
-python main.py narrate|train|voices|speakers|check|status|models|revoice|diag|backup|restore ...
-Voxprint.exe narrate|train|voices|speakers|check|status|models|revoice|diag|backup|restore ...    # packaged Windows build
+python main.py narrate|prepare|translate|speakers|train|voices|settings|check|status|models|revoice|diag|backup|restore ...
+Voxprint.exe narrate|prepare|translate|speakers|train|voices|settings|check|status|models|revoice|diag|backup|restore ...    # packaged Windows build
 voxprint ...                                                         # Linux launcher, when installed
 ```
 
@@ -74,7 +74,8 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
     [--format NAME] [--no-pauses|--pauses] [--pause-comma SEC] [--pause-mid SEC] [--pause-sentence SEC]
     [--pause-paragraph SEC] [--pause-chapter SEC] [--speed X] [--style auto|scripture|fiction|dialogue]
     [--ordinals|--no-ordinals] [--yo|--no-yo] [--ai-disclosure] [--work-dir DIR]
-    [--speakers] [--male-voice ID] [--female-voice ID] [--speaker-marks FILE] [--json]
+    [--speakers] [--male-voice ID] [--male2-voice ID] [--female-voice ID] [--female2-voice ID]
+    [--character NAME=ID ...] [--speaker-marks FILE] [--json]
 ```
 
 | Argument | Meaning |
@@ -93,21 +94,26 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 | `--speed X` | Global reading speed 0.7-1.3 (1 = the voice's own speed) |
 | `--style NAME` | `auto` (detected), `scripture` (solemn, a little slower), `fiction`, `dialogue` |
 | `--no-ordinals` / `--ordinals` | Read numbers after words like chapter / day / verse as ordinals by context ("день 1" -> "день первый", "21st", "3. Kapitel"); default: Settings (on). See [ORDINALS.md](ORDINALS.md) |
-| `--no-yo` / `--yo` | For a Russian book, restore the letter yo where a dictionary is sure ("еще" -> "ещё"). Words the dictionary does not list, including "текст" and ambiguous pairs ("все", "берег"), stay as written. Default: on. Stress marks are not inserted; the base speech model does not read them. |
+| `--no-yo` / `--yo` | For a Russian book, restore the letter yo where a dictionary is sure ("еще" -> "ещё"). "все" / "всё" is decided from the neighbouring words ("всё равно", "вот и всё", "всё было", "всё, что"; "все люди", "пришли все" stay). Other words the dictionary does not list, including "текст" and ambiguous pairs such as "берег", stay as written. Default: on. Stress marks are not inserted; the base speech model does not read them. |
 | `--ai-disclosure` | Speak a short AI note at the start (opt-in) |
 | `--work-dir DIR` | Remember this folder as the app working folder |
 | `--speakers` | Ask the text model (Gemma) to mark each paragraph narrator, male or female, then narrate those voices. Same path as the Narrate window |
 | `--male-voice ID` | Voice for paragraphs marked male. The narrator is `--voice` |
 | `--female-voice ID` | Voice for paragraphs marked female |
+| `--male2-voice ID` | Second male voice. Different male characters (by the name in the marks) alternate between `--male-voice` and this voice in order of first appearance: the first man gets `--male-voice`, the second this one, the third `--male-voice` again. A mark without a name uses `--male-voice`. Needs `--male-voice` |
+| `--female2-voice ID` | Second female voice, the same way. Needs `--female-voice` |
+| `--character NAME=ID` | Pin one character to a voice. Repeatable. The name is matched case-insensitively against the marks and wins over the role voices |
 | `--speaker-marks FILE` | Narrate this marks file and do not run Gemma. `voxprint speakers` writes the file |
 
 ```
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
 voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json
 voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks --json
+voxprint narrate dialog.txt --voice gideon --male-voice asher --male2-voice tom --female-voice noa --speakers --out ./out --json
+voxprint narrate dialog.txt --voice gideon --male-voice asher --character Michael=tom --female-voice noa --speaker-marks marks.txt --out ./out
 ```
 
-`--speakers` and `--speaker-marks` cannot be used together. At least one of `--male-voice` and `--female-voice` must be a voice other than the narrator (exit code 2 otherwise). Voices are loaded one at a time, in book order. When the marks do not match the prepared paragraph count, the narrator reads the whole book, the exit code stays 0, and the JSON `warnings` array contains `Speaker marks do not match the prepared text, so the narrator reads the whole book.` The job writes `<out>/<book>/.debug/speakers.txt` and lists that file in `outputs`.
+Without `--male2-voice`, `--female2-voice` and `--character`, every man is `--male-voice` and every woman `--female-voice`, as before. `--speakers` and `--speaker-marks` cannot be used together. At least one of the voice flags must name a voice other than the narrator (exit code 2 otherwise). `--male2-voice` without `--male-voice`, a `--character` value without `=`, and any voice flag without `--speakers` or `--speaker-marks` are exit code 2. Voices are loaded one at a time, in book order. When the marks do not match the prepared paragraph count, the narrator reads the whole book, the exit code stays 0, and the JSON `warnings` array contains `Speaker marks do not match the prepared text, so the narrator reads the whole book.` The job writes `<out>/<book>/.debug/speakers.txt` and lists that file in `outputs`.
 
 Every narration cuts the text per sentence and at strong transitions, trims each spoken piece of its own silence and joins the pieces with the pause lengths above; long, comma-rich, descriptive or scripture-like sentences are time-stretched a little slower (pitch kept), dialogue stays at the voice's speed. Defaults come from Settings (*Narration: pauses and speed*); the flags override them for one run.
 
@@ -135,6 +141,70 @@ If the model's reply cannot be read as marks, or the text has dialogue (quotes o
 voxprint speakers book.txt --out marks.txt --json
 voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks --format wav --json
 ```
+
+## Prepare text
+
+```
+voxprint prepare BOOK --out FILE [--report FILE] [--language ru|en|de]
+    [--steps NAME,...] [--no-rules] [--yo|--no-yo] [--typos|--no-typos] [--llm] [--work-dir DIR] [--json]
+```
+
+The Narrate window's *Prepare text* step without narration. It writes the prepared book as plain UTF-8 text (chapters separated by two blank lines) and a JSON report. Nothing is synthesized.
+
+| Argument | Meaning |
+|---|---|
+| `--out FILE` | Prepared text |
+| `--report FILE` | JSON report. Default: `<out stem>.prep_report.json` next to `--out` |
+| `--language` | Book language hint. Default: detected |
+| `--steps` | Only these rule steps (repeatable or comma-separated): `layout`, `noise`, `quotes`, `links`, `headings`, `numbers`, `abbrev`, `yo`. Default: all, as the Prepare text switch |
+| `--no-rules` | No rule step |
+| `--yo` / `--no-yo` | Add or remove the letter-yo step (Russian only) |
+| `--typos` / `--no-typos` | Russian typo model. Default: used when downloaded, otherwise skipped with a warning. `--typos` exits 4 when the model is missing |
+| `--llm` (alias `--markup`) | Also run the text model's narration rewrite (Gemma, off by default, as in the window). Exit 4 when Gemma is not installed |
+| `--work-dir DIR` | Keep the text model's cache. Default: a temporary folder |
+
+The report has `language`, `rules` (steps that ran), `rule_counts` (changes per step, for example `{"yo": 22}`), `rules_skipped` (steps the language does not have), `neural` (typo model statistics), `typo_model` and `llm`. With `--json`, the result object carries the same report as `report`.
+
+```
+voxprint prepare book.txt --out book.prepared.txt --json
+voxprint prepare book.txt --out yo-only.txt --steps yo --no-typos
+voxprint prepare book.fb2 --out prepared.txt --llm --json
+```
+
+## Translate
+
+```
+voxprint translate BOOK --to en|ru|de --out FILE [--from en|ru|de|uk] [--literary] [--work-dir DIR] [--json]
+```
+
+The offline translation the Narrate window uses (Opus-MT, through English when there is no direct model). `--literary` lets the text model (Gemma) translate whole paragraphs, with Opus-MT for titles and as the fallback. Writes plain UTF-8 text; nothing is synthesized. A missing translation model is exit 4, and the hint names the module (`voxprint models download opus-big-en-ru --json`). The same language on both sides, or an unsupported pair, is exit 2. `--work-dir` keeps the sentence cache, so a second run is quick. The JSON result adds `source`, `target`, `chapters` and `model`.
+
+```
+voxprint translate book.epub --to ru --out book.ru.txt --json
+voxprint translate book.txt --from de --to en --out book.en.txt --literary
+```
+
+## Settings
+
+```
+voxprint settings list [--json]
+voxprint settings get KEY [--json]
+voxprint settings set KEY VALUE [--json]
+```
+
+| Key | Value |
+|---|---|
+| `language` | UI language: `en`, `de`, `ru`, `uk`, `lv` |
+| `projects.folder` | Projects (working) folder, an absolute path. Created when missing |
+| `models.folder` | Read-only. Set by the installer or by `VOXPRINT_MODELS_DIR` |
+| `narration.speed` | 0.7-1.3 |
+| `narration.style` | `auto`, `scripture`, `fiction`, `dialogue` |
+| `narration.pauses` | `on` / `off` |
+| `narration.ordinals` | `on` / `off` |
+| `narration.ai_disclosure` | `on` / `off` |
+| `narration.pause.comma`, `.mid`, `.sentence`, `.paragraph`, `.chapter` | Seconds, 0-6 |
+
+These are the files Settings writes, so the window and `narrate` use them. An unknown key or a bad value is exit 2. `--json` adds `settings` (for `list`) or `key` and `value`.
 
 ## Train a voice
 

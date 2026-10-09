@@ -85,8 +85,8 @@ Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) (for 
 ## Reusable parts
 A few large pieces can be copied on their own. Each file's docstring says what it does, how to call it, and how to credit Voxprint. Small helpers are not listed.
 
-* [`core/yo.py`](core/yo.py) - Russian letter yo, only where the dictionary is sure. Data: [`core/data/`](core/data/YO_DATASET.md).
-* [`core/speakers.py`](core/speakers.py) - paragraph speaker marks (narrator, male, female) and the reply parser.
+* [`core/yo.py`](core/yo.py) - Russian letter yo, only where the dictionary is sure, plus "все" / "всё" by context. Data: [`core/data/`](core/data/YO_DATASET.md) (the context rules are `core/data/yo_context.json`).
+* [`core/speakers.py`](core/speakers.py) - paragraph speaker marks (narrator, male, female), the reply parser, and the voice cast (a second voice per role, characters pinned by name).
 * [`infra/model_downloader.py`](infra/model_downloader.py) - resumable, hash-checked model downloads.
 
 ## ☕ Support the Project
