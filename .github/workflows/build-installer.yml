@@ -27,6 +27,40 @@ permissions:
   contents: write      # attach the installer to the release
 
 jobs:
+  install-script:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: install.ps1 dry run against a local release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dir = Join-Path $env:TEMP "voxprint-fake-release"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $bytes = [byte[]](1, 2, 3, 4, 5)
+          [IO.File]::WriteAllBytes((Join-Path $dir "Voxprint-Setup-online.exe"), $bytes)
+          $hash = (Get-FileHash (Join-Path $dir "Voxprint-Setup-online.exe") -Algorithm SHA256).Hash.ToLower()
+          "$hash  Voxprint-Setup-online.exe" | Set-Content -Encoding ascii (Join-Path $dir "Voxprint-Setup-online.exe.sha256")
+          $server = Start-Process python -ArgumentList "-m","http.server","8765","--bind","127.0.0.1","--directory",$dir -PassThru -WindowStyle Hidden
+          Start-Sleep -Seconds 2
+          $script = (Resolve-Path .\install.ps1).Path
+          try {
+            & pwsh -NoProfile -File $script -DryRun -SourceUrl "http://127.0.0.1:8765/"
+            if ($LASTEXITCODE -ne 0) { throw "matching dry run failed: $LASTEXITCODE" }
+            "0000000000000000000000000000000000000000000000000000000000000000  Voxprint-Setup-online.exe" | Set-Content -Encoding ascii (Join-Path $dir "Voxprint-Setup-online.exe.sha256")
+            & pwsh -NoProfile -File $script -DryRun -SourceUrl "http://127.0.0.1:8765/"
+            if ($LASTEXITCODE -eq 0) { throw "a bad SHA-256 was accepted" }
+            & pwsh -NoProfile -File $script -DryRun -SourceUrl "https://example.com/Voxprint-Setup-online.exe"
+            if ($LASTEXITCODE -eq 0) { throw "a non-local source was accepted" }
+            & pwsh -NoProfile -File $script -SourceUrl "http://127.0.0.1:8765/"
+            if ($LASTEXITCODE -eq 0) { throw "-SourceUrl was accepted without -DryRun" }
+          } finally {
+            if ($server -and -not $server.HasExited) { Stop-Process -Id $server.Id -Force }
+          }
   online-smoke:
     runs-on: windows-latest
     timeout-minutes: 15

@@ -54,6 +54,14 @@ Chrome and other browsers may show a similar download warning. When you start th
 
 Code signing is being applied for (SignPath Foundation). The warning will go away later.
 
+**Option 1.** Download `Voxprint-Setup-online.exe` from the table above and run it.
+
+**Option 2: one command in PowerShell (as Administrator).** Read [install.ps1](install.ps1) first. It downloads the installer and its `.sha256` file only from the official GitHub releases, checks the hash, then starts setup. `-Silent` passes `/VERYSILENT`. `-Version v0.1.3-beta` picks that tag; otherwise the latest pre-release is used.
+
+```powershell
+irm https://raw.githubusercontent.com/Mitroshenkov87/voxprint-audiobook-builder/main/install.ps1 | iex
+```
+
 ## Quick start
 1. Install and start Voxprint - the **Studio** opens. Under *Train your voice* choose your recording and the text you read, press **Create voice (LoRA)**.
 2. Open *Narrate a book*, choose a TXT / FB2 / EPUB file and your voice (optionally tick *Translate the book*).
