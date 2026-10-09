@@ -159,7 +159,7 @@ The Narrate window's *Prepare text* step without narration. It writes the prepar
 | `--steps` | Only these rule steps (repeatable or comma-separated): `layout`, `noise`, `quotes`, `links`, `headings`, `numbers`, `abbrev`, `yo`. Default: all, as the Prepare text switch |
 | `--no-rules` | No rule step |
 | `--yo` / `--no-yo` | Add or remove the letter-yo step (Russian only) |
-| `--typos` / `--no-typos` | Russian typo model. Default: used when downloaded, otherwise skipped with a warning. `--typos` exits 4 when the model is missing |
+| `--typos` / `--no-typos` | Russian typo model. Default: used on a full preparation when downloaded, otherwise skipped with a warning. With `--steps` it runs only when `--typos` is given, so `--steps yo` changes nothing but the letter yo. `--typos` exits 4 when the model is missing |
 | `--llm` (alias `--markup`) | Also run the text model's narration rewrite (Gemma, off by default, as in the window). Exit 4 when Gemma is not installed |
 | `--work-dir DIR` | Keep the text model's cache. Default: a temporary folder |
 
@@ -167,7 +167,7 @@ The report has `language`, `rules` (steps that ran), `rule_counts` (changes per 
 
 ```
 voxprint prepare book.txt --out book.prepared.txt --json
-voxprint prepare book.txt --out yo-only.txt --steps yo --no-typos
+voxprint prepare book.txt --out yo-only.txt --steps yo
 voxprint prepare book.fb2 --out prepared.txt --llm --json
 ```
 
@@ -234,6 +234,8 @@ voxprint train ./clips --name MyVoice --language ru --consent commercial --speak
 ```
 voxprint voices list [--json]
 voxprint voices export VOICE --out ZIP [--json]
+voxprint voices catalog [--json]
+voxprint voices download VOICE [--json]
 ```
 
 Without `--json`, `voices list` prints one tab-separated line per voice: id, name, type, language code, licence, gender, age group (`-` = not set).
@@ -242,6 +244,13 @@ Without `--json`, `voices list` prints one tab-separated line per voice: id, nam
 
 ```
 voxprint voices export my-voice --out my-voice.zip
+```
+
+`voices catalog` lists the online voice catalog (`voices/index.json` in this repository; the cached copy when offline): id, name, gender, language, licence, size, and `installed`. `voices download VOICE` downloads one catalog voice by id or name, checks its SHA-256, imports it, and exits 0 without downloading when it is already installed. Exit 4: the catalog cannot be fetched and there is no cached copy. Exit 3: no such voice in the catalog.
+
+```
+voxprint voices catalog
+voxprint voices download eitan --json
 ```
 
 ## Models

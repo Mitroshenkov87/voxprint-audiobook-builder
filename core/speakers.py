@@ -376,3 +376,20 @@ def load_marks(text: str) -> List[SpeakerLine]:
     if not rows:
         raise ValueError("speaker marks file is empty")
     return rows
+
+
+def default_role_picks(records, narrator_id: str = "") -> dict:
+    """Default ``{"male", "male2", "female"}`` voice ids: the first male / female voice that is not the narrator (the
+    narrator's own voice when it is the only one of that gender), and a second, different male voice when there is one."""
+    def of(gender):
+        return [str(r.id) for r in records if str((getattr(r, "info", None) or {}).get("gender") or "") == gender]
+
+    out = {}
+    for role, gender in (("male", "male"), ("female", "female")):
+        ids = of(gender)
+        others = [i for i in ids if i != narrator_id]
+        out[role] = (others or ids or [""])[0]
+    rest = [i for i in of("male") if i not in (out["male"], narrator_id)]
+    out["male2"] = rest[0] if rest else ""
+    return out
+

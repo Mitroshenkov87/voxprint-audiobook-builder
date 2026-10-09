@@ -118,3 +118,48 @@ def test_settings_list_get_set(capsys):
     assert user_cli.is_user_cli(["Voxprint.exe", "prepare", "b.txt", "--out", "p.txt"])
     assert user_cli.is_user_cli(["Voxprint.exe", "translate", "b.txt", "--to", "ru", "--out", "p.txt"])
     capsys.readouterr()
+
+
+class _CorruptingCleaner:
+    """A typo model that would break the yo-only output: doubles the yo of "стерёг" and inserts a comma."""
+    tag = "corrupting@1"
+
+    def __init__(self):
+        self.calls = 0
+
+    def correct(self, texts):
+        self.calls += 1
+        return [t.replace("стерёг", "стёрёг").replace("бодает отвечает", "бодает, отвечает") for t in texts]
+
+    def close(self):
+        pass
+
+
+def test_prepare_steps_yo_skips_the_typo_model_unless_asked(tmp_path, capsys):
+    """``--steps yo`` changes nothing but the letter yo even when the typo model is downloaded (701 bug)."""
+    src = FIXTURES / "dialog-ai-torah-01.txt"
+    ref = (FIXTURES / "dialog-ai-torah-01.yo-reference.txt").read_text(encoding="utf-8")
+    ready = lambda lang: (type("M", (), {"key": "sage-ru"})(), True)
+    cleaners = []
+
+    def factory(lang):
+        cleaners.append(_CorruptingCleaner())
+        return cleaners[-1]
+
+    out = tmp_path / "yo.txt"
+    code = user_cli.cmd_prepare(
+        user_cli.build_parser().parse_args(["prepare", str(src), "--out", str(out), "--steps", "yo", "--json"]),
+        typo_state_fn=ready, cleanup_factory=factory)
+    assert code == 0
+    assert out.read_text(encoding="utf-8") == ref
+    data = _json_lines(capsys.readouterr().out)[-1]
+    assert data["report"]["typo_model"] == "" and data["report"]["rule_counts"] == {"yo": 22} and not cleaners
+
+    out2 = tmp_path / "yo-typos.txt"
+    code = user_cli.cmd_prepare(
+        user_cli.build_parser().parse_args(["prepare", str(src), "--out", str(out2), "--steps", "yo", "--typos", "--json"]),
+        typo_state_fn=ready, cleanup_factory=factory)
+    assert code == 0 and cleaners and cleaners[0].calls > 0
+    text = out2.read_text(encoding="utf-8")
+    assert "стёрёг" not in text and "стерёг" in text                    # the validator refuses a second yo
+    assert _json_lines(capsys.readouterr().out)[-1]["report"]["typo_model"] == "sage-ru"

@@ -1000,3 +1000,37 @@ def test_resolve_voice_returns_the_library_id_when_the_folder_lookup_ignores_cas
 
     assert user_cli.resolve_voice(Lib(), "Bob") is listed
     assert user_cli.resolve_voice(Lib(), "bob") is listed
+
+
+def test_voices_catalog_and_download(tmp_path, capsys):
+    """``voices catalog`` lists the index, ``voices download`` imports one entry once (fake index and download)."""
+    from infra import voice_repository as repo
+
+    lib = _make_voice(tmp_path)
+    entries = repo.parse_index({"schema": repo.INDEX_SCHEMA, "voices": [
+        {"id": "eitan", "name": "Eitan", "language": "ru", "license": "CC0-1.0", "gender": "male",
+         "url": "https://example.org/eitan.zip", "sha256": "0" * 64, "size_bytes": 53_000_000},
+        {"id": "noa", "name": "Noa", "language": "ru", "license": "CC0-1.0", "gender": "female",
+         "url": "https://example.org/noa.zip", "sha256": "1" * 64, "size_bytes": 53_000_000}]})
+    fetch = lambda: repo.IndexResult(voices=entries)
+    parse = user_cli.build_parser().parse_args
+
+    assert user_cli.cmd_voices_catalog(parse(["voices", "catalog", "--json"]), library=lib, fetch_fn=fetch) == 0
+    rows = json.loads(capsys.readouterr().out.strip().splitlines()[-1])["voices"]
+    assert [(r["id"], r["installed"]) for r in rows] == [("eitan", False), ("noa", False)]
+
+    calls = []
+
+    def fake_download(entry, library, progress=None):
+        calls.append(entry.id)
+        rec = library.list_voices()[0]
+        rec.info["repo_id"] = entry.id
+        return rec
+
+    code = user_cli.cmd_voices_download(parse(["voices", "download", "Eitan", "--json"]), library=lib, fetch_fn=fetch,
+                                        download_fn=fake_download)
+    assert code == 0 and calls == ["eitan"]
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1])["downloaded"] is True
+    assert user_cli.cmd_voices_download(parse(["voices", "download", "nobody"]), library=lib, fetch_fn=fetch) == 3
+    empty = lambda: repo.IndexResult(error="unreachable")
+    assert user_cli.cmd_voices_catalog(parse(["voices", "catalog"]), library=lib, fetch_fn=empty) == 4

@@ -5,6 +5,23 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+## [0.2.2-beta] - 2026-10-09 - build 702 "Shelishi"
+
+Codename *Shelishi* (Biblical Hebrew *shelishi*, third; Genesis 1:13). A third male voice and fixes from the test of build 701 on a real PC. The `BUILD.json` offset stays **654**: build-installer run 48 stamps build 702. Upgrade: install over 700 or 701; models, voices and settings stay.
+
+### Added
+- **Catalog voice Eitan** (male, Russian, optional, not installed automatically). Trained with `voxprint train` (no-transcript mode) only from the public-domain LibriVox recording of Ivan Turgenev's *Записки охотника (Zapiski Okhotnika)* read by **tovarisch** (LibriVox, solo project; Internet Archive `zapiskiohotnika_2409_librivox`, Public Domain Mark 1.0), sections 02 and 04, 28.6 min of audio cut at pauses (`tools/voice_specs/eitan.json` records the source files and their SHA-1). CC0-1.0. The package is `eitan.zip` on the `voices-v1` release and is listed in `voices/index.json`.
+- **`voxprint voices catalog` and `voxprint voices download VOICE`.** List the online voice catalog and download one voice into the library (SHA-256 checked, resumable, skipped when already installed), as Voices -> Download voices does.
+- **Default cast** (`core.speakers.default_role_picks`): the male and female lists of the Narrate window start with a voice other than the narrator; *Second male voice* starts with a third male voice when there is one (None otherwise, as before).
+
+### Changed
+- **Boaz is no longer offered for the multi-voice roles** (`infra.bundled_voices.RETIRED`, `offered_for_roles`). A copy left in the library by an older build still works as a narrator.
+
+### Fixed
+- **`voxprint prepare --steps ...` ran the Russian typo model** (SAGE) when it was downloaded, so `--steps yo` also changed spelling and commas. With `--steps` the model now runs only with `--typos`. Without `--steps` the default is unchanged (used when downloaded).
+- **The typo model added a second yo** ("стерёг" -> "стёрёг" on the 701 test). The validator (`core.text_cleanup`) refuses a proposal that changes a word that already has a yo, moves or drops a yo, gives a word two, or adds one together with a spelling fix.
+- **"Setting `pad_token_id` to `eos_token_id` ... for open-end generation"** was logged once per narration chunk. It is dropped from the `transformers.generation.utils` logger and, as a handler filter, from every logger (`infra.diagnostics.drop_known_noise`).
+
 ## [0.2.1-beta] - 2026-10-09 - build 701 "Shalem"
 
 Codename *Shalem* (Biblical Hebrew *shalem*, whole, complete; Genesis 33:18). Fixes from the test of build 700 on a real PC. Build-installer run 46 failed in the Windows unit tests (a voice id looked up with different capitals) and published nothing, so the `BUILD.json` offset is **654** and run 47 stamps build 701. Upgrade: uninstall 700, then install 701; models, voices and settings stay.

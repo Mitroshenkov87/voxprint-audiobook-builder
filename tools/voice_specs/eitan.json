@@ -1,0 +1,34 @@
+{
+  "id": "eitan",
+  "name": "Eitan",
+  "language": "ru",
+  "author": "tovarisch (LibriVox) - public domain",
+  "speaker": "tovarisch",
+  "prepared_by": "Voxprint",
+  "project_url": "https://archive.org/details/zapiskiohotnika_2409_librivox",
+  "gender": "male",
+  "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "description": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Zapiski Okhotnika (A Sportsman's Sketches)' by Ivan Turgenev, read by tovarisch (https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Eitan is Voxprint's own and does not imply the reader's endorsement.",
+  "descriptions": {
+    "en": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Zapiski Okhotnika (A Sportsman's Sketches)' by Ivan Turgenev, read by tovarisch (https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Eitan is Voxprint's own and does not imply the reader's endorsement.",
+    "ru": "Необязательный мужской русский голос для каталога в программе, не входит в стандартную загрузку. Обучен только на записи LibriVox из общественного достояния «Записки охотника» (Иван Тургенев), читает tovarisch (https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Eitan дано Voxprint и не означает одобрения чтеца.",
+    "de": "Optionale männliche russische Stimme für den Stimmenkatalog in der App, nicht Teil des Standard-Downloads. Nur mit der gemeinfreien LibriVox-Aufnahme 'Zapiski Okhotnika (Aufzeichnungen eines Jägers)' von Ivan Turgenev trainiert, gelesen von tovarisch (https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Eitan stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+  },
+  "consent": {
+    "scope": "commercial",
+    "name": "tovarisch (LibriVox reader, recording in the public domain)",
+    "method": "manual",
+    "confirmed": true
+  },
+  "source": {
+    "librivox": "https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/",
+    "internet_archive": "https://archive.org/details/zapiskiohotnika_2409_librivox",
+    "files": [
+      "zapiskiohotnika_02_turgenev.mp3 (SHA-1 4d3414b9c910c63b22e6f1971d4b4fc561a40bc3)",
+      "zapiskiohotnika_04_turgenev.mp3 (SHA-1 f76d6b4bfc14bf34542a7d0abfe174e02a6581bb)"
+    ],
+    "licence": "LibriVox: Public Domain in the USA (volunteer public-domain dedication); Internet Archive licenseurl: Public Domain Mark 1.0; text by Ivan Turgenev (1852)"
+  }
+}

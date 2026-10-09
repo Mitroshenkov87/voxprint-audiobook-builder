@@ -8,7 +8,8 @@ source word by word and every difference is judged on its own.  Accepted:
 * a word replaced by a close spelling (Damerau-Levenshtein distance <= 2, <= 3 for long words) when the source word is
   *rare in this very book* (a typo occurs once or twice; a name or dialect word occurs often) and is not a mid-sentence
   capitalized word (names), digits untouched, same letter case;
-* ``е`` -> ``ё`` (helps the engine to stress the word) - not for the ambiguous "все";
+* ``е`` -> ``ё`` (helps the engine to stress the word) - not for the ambiguous "все", never in a word that already has a
+  ``ё`` (a Russian word has at most one) and never as a side effect of a spelling fix;
 * a comma / semicolon / colon / dash *inserted* between two words (never removed or replaced), at most one per four words.
 
 Everything else (deleted words, changed punctuation, case changes, rewording) is dropped, and a paragraph whose accepted
@@ -108,8 +109,13 @@ def _typo_ok(src: str, new: str, freq: Counter, mid_sentence: bool) -> str:
         return ""
     if src.lower() == new.lower():
         return ""                                                   # case-only change
+    s_yo, n_yo = src.lower().count("ё"), new.lower().count("ё")
+    if n_yo > 1 or (s_yo and n_yo != s_yo):
+        return ""                                                   # one yo per word; never move or add a second one
     if src.replace("ё", "е").replace("Ё", "Е") == new.replace("ё", "е").replace("Ё", "Е") and ("ё" in new.lower()):
-        return "yo" if src.lower() != "все" else ""
+        return "yo" if src.lower() != "все" and not s_yo else ""
+    if n_yo > s_yo:
+        return ""                                                   # a "typo" fix that also adds a yo: leave it
     if src[:1].isupper() != new[:1].isupper() or (src.isupper() != new.isupper() and len(src) > 1):
         return ""
     if src[:1].isupper() and mid_sentence:

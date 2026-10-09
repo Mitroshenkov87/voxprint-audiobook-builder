@@ -280,3 +280,22 @@ def test_narration_gives_two_men_two_voices(tmp_path):
     assert "I start" in said["m"] and "Me again" in said["m"] and "Third man" in said["m"]
     assert "I follow" in said["m2"] and "I follow" not in said["m"]
     assert "And I" in said["f"] and any("sat down" in c for c in narr.calls)
+
+
+class _Rec:
+    def __init__(self, vid, name, gender, repo_id=""):
+        self.id, self.name, self.info = vid, name, {"gender": gender, "repo_id": repo_id}
+
+
+def test_role_lists_drop_boaz_and_default_to_three_different_men():
+    from infra import bundled_voices
+
+    lib = [_Rec("v1", "Boaz", "male", "boaz"), _Rec("v2", "Gideon", "male", "gideon"), _Rec("v3", "Asher", "male", "asher"),
+           _Rec("v4", "Eitan", "male", "eitan"), _Rec("v5", "Noa", "female", "noa"), _Rec("v6", "Boaz copy", "male")]
+    offered = bundled_voices.offered_for_roles(lib)
+    assert [r.name for r in offered] == ["Gideon", "Asher", "Eitan", "Noa", "Boaz copy"]
+    assert bundled_voices.is_retired(_Rec("x", "Boaz", "male"))                 # an old copy without a repo id
+    picks = spk.default_role_picks(offered, narrator_id="v2")
+    assert picks == {"male": "v3", "male2": "v4", "female": "v5"}
+    assert spk.default_role_picks([_Rec("a", "Gideon", "male"), _Rec("b", "Noa", "female")], "a") == \
+        {"male": "a", "male2": "", "female": "b"}

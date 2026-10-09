@@ -504,13 +504,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     v = sub.add_parser(
         "voices", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
-        help="List or export voices from the library",
-        description="List installed voices or export one as a zip.",
+        help="List, export or download voices",
+        description="List installed voices, export one as a zip, or list and download the voices of the online catalog.",
         epilog=(
             "Examples:\n"
             "  voxprint voices list\n"
             "  voxprint voices list --json\n"
             "  voxprint voices export my-voice --out my-voice.zip\n"
+            "  voxprint voices catalog\n"
+            "  voxprint voices download eitan --json\n"
         ),
     )
     vsub = v.add_subparsers(dest="voices_command", required=True)
@@ -528,6 +530,21 @@ def build_parser() -> argparse.ArgumentParser:
     ve.add_argument("voice", metavar="VOICE", help="Voice id or display name")
     ve.add_argument("--out", required=True, type=Path, metavar="ZIP", help="Destination .zip path")
     ve.set_defaults(_handler="voices_export")
+    vsub.add_parser(
+        "catalog", parents=[child], help="List the voices of the online voice catalog (installed or not)",
+        description="Fetch the voice catalog (voices/index.json; the cached copy when offline) and list its voices.",
+        epilog="Examples:\n  voxprint voices catalog\n  voxprint voices catalog --json\n",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    ).set_defaults(_handler="voices_catalog")
+    vd = vsub.add_parser(
+        "download", parents=[child], help="Download a catalog voice into the library (hash-checked, resumable)",
+        description="Download one voice of the catalog by its id or name, check its SHA-256 and import it. "
+                    "A voice already in the library is skipped.",
+        epilog="Examples:\n  voxprint voices download eitan --json\n  voxprint voices download Noa\n",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    vd.add_argument("voice", metavar="VOICE", help="Catalog id or name (see: voxprint voices catalog)")
+    vd.set_defaults(_handler="voices_download")
 
     d = sub.add_parser(
         "diag", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -696,7 +713,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr_typo.add_argument("--typos", dest="typos", action="store_true", default=None,
                          help="Require the Russian typo model (exit 4 when it is not downloaded)")
     pr_typo.add_argument("--no-typos", dest="typos", action="store_false",
-                         help="Skip the typo model (default: used when downloaded)")
+                         help="Skip the typo model (default: used when downloaded, unless --steps is given)")
     pr.add_argument("--llm", "--markup", dest="llm", action="store_true",
                     help="Also run the text model's narration rewrite (Gemma; off by default)")
     pr.add_argument("--work-dir", type=Path, default=None, metavar="DIR",
@@ -1168,6 +1185,67 @@ def cmd_voices_export(args: argparse.Namespace, *, library: Optional[VoiceLibrar
         return _ok(json_mode, "voices export", started, outputs=[path], human=[f"Exported: {path}"])
 
     return _run("voices export", args, body)
+
+
+def _catalog_or_fail(fetch_fn=None):
+    """The catalog voices (``(voices, offline)``); exit 4 when it can be neither fetched nor read from the cache."""
+    from infra import voice_repository as repo
+
+    res = (fetch_fn or repo.fetch_index)()
+    if not res.voices:
+        raise CliError(EXIT_MISSING, f"voice catalog not available ({res.error or 'empty'})",
+                       hint="Check the internet connection, then: voxprint voices catalog", details=res.detail or "")
+    return res.voices, bool(res.offline)
+
+
+def cmd_voices_catalog(args: argparse.Namespace, *, library: Optional[VoiceLibrary] = None, fetch_fn=None) -> int:
+    """``voices catalog``: id, name, gender, language, licence, size and whether it is installed."""
+
+    def body(json_mode: bool, started: float) -> int:
+        lib = library if library is not None else VoiceLibrary()
+        voices, offline = _catalog_or_fail(fetch_fn)
+        have = {str(r.info.get("repo_id") or "") for r in lib.list_voices()}
+        rows = [{"id": e.id, "name": e.name, "language": e.language, "gender": e.gender or "", "license": e.license,
+                 "size_bytes": e.size_bytes, "bundled": bool(e.bundled), "installed": e.id in have} for e in voices]
+        warnings = ["The catalog could not be fetched; this is the cached copy."] if offline else []
+        human = [f"{r['id']}\t{r['name']}\t{r['gender'] or '-'}\t{r['language'] or '-'}\t{r['license']}\t"
+                 f"{r['size_bytes'] / 1e6:.0f} MB\t{'installed' if r['installed'] else '-'}" for r in rows]
+        return _ok(json_mode, "voices catalog", started, outputs=[], warnings=warnings,
+                   human=human + [f"! {w}" for w in warnings], extra={"voices": rows})
+
+    return _run("voices catalog", args, body)
+
+
+def cmd_voices_download(args: argparse.Namespace, *, library: Optional[VoiceLibrary] = None, fetch_fn=None,
+                        download_fn=None) -> int:
+    """``voices download VOICE``: download a catalog voice (SHA-256 checked) and import it into the library."""
+    from infra import voice_repository as repo
+
+    def body(json_mode: bool, started: float) -> int:
+        lib = library if library is not None else VoiceLibrary()
+        voices, _offline = _catalog_or_fail(fetch_fn)
+        want = str(args.voice).strip().lower()
+        entry = next((e for e in voices if e.id.lower() == want), None) or \
+            next((e for e in voices if e.name.strip().lower() == want), None)
+        if entry is None:
+            raise CliError(EXIT_INPUT, f"voice {args.voice!r} is not in the catalog",
+                           hint="List the catalog: voxprint voices catalog")
+        existing = next((r for r in lib.list_voices() if str(r.info.get("repo_id") or "") == entry.id), None)
+        if existing is not None:
+            return _ok(json_mode, "voices download", started, outputs=[], human=[f"Already installed: {existing.name} ({existing.id})"],
+                       extra={"voice": _voice_payload(existing), "downloaded": False})
+        if json_mode:
+            _emit_progress("download", 0.0, f"Downloading {entry.name}")
+
+        def progress(frac: float, name: str) -> None:
+            if json_mode:
+                _emit_progress("download", float(frac) * 100.0, f"Downloading {name}")
+
+        rec = (download_fn or repo.download_voice)(entry, lib, progress=progress)
+        return _ok(json_mode, "voices download", started, outputs=[], human=[f"Installed: {rec.name} ({rec.id})"],
+                   extra={"voice": _voice_payload(rec), "downloaded": True})
+
+    return _run("voices download", args, body)
 
 
 def cmd_diag(args) -> int:
@@ -1832,7 +1910,10 @@ def cmd_prepare(args: argparse.Namespace, *,
         warnings: list = []
         neural: frozenset = frozenset()
         typo_model = None
-        if args.typos is not False:
+        # The typo model runs on a full preparation (no --steps) when it is downloaded, and with --steps only when
+        # --typos asks for it: "--steps yo" must change nothing but the letter yo.
+        use_typos = args.typos is True or (args.typos is None and not getattr(args, "steps", None))
+        if use_typos:
             model, ready = (typo_state_fn or _typo_state)(language)
             if model is not None and ready:
                 neural = frozenset({NEURAL_SPELLFIX})
@@ -2144,6 +2225,10 @@ def _dispatch(argv: Optional[Sequence[str]], *, run_narration_fn, run_task_fn, l
         return cmd_voices_list(args, library=library)
     if handler == "voices_export":
         return cmd_voices_export(args, library=library)
+    if handler == "voices_catalog":
+        return cmd_voices_catalog(args, library=library)
+    if handler == "voices_download":
+        return cmd_voices_download(args, library=library)
     if handler == "diag":
         return cmd_diag(args)
     if handler == "status":

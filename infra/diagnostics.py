@@ -88,7 +88,8 @@ QT_NOISE = ("QFont::setPointSize: Point size <= 0", "QThreadStorage: entry")
 
 #: Harmless Python warnings that are not logged (pydub looks for ffmpeg on PATH when imported; Voxprint points it at its
 #: own ffmpeg right afterwards; optional accelerators of the speech libraries that Voxprint does not use).
-WARNING_NOISE = (r"Couldn't find ffmpeg or avconv", r"Couldn't find ffprobe or avprobe", r".*[Tt]riton", r".*SoX could not be found")
+WARNING_NOISE = (r"Couldn't find ffmpeg or avconv", r"Couldn't find ffprobe or avprobe", r".*[Tt]riton", r".*SoX could not be found",
+                 r".*Setting `?pad_token_id`? to `?eos_token_id`?")
 
 
 #: Log records (logger name -> message pattern) about optional accelerators Voxprint does not use. PyTorch's flop
@@ -101,7 +102,23 @@ LOG_NOISE = {
     "bitsandbytes.backends.xpu.ops": r"(?i)triton",
     "sox": r"SoX could not be found",
     "sox.log": r"SoX could not be found",
+    # transformers' generate() logs this once per call when a model has no pad token (every narration chunk of the
+    # speech model); the substitution is exactly what Voxprint wants, so the line is noise.
+    "transformers.generation.utils": r"Setting `?pad_token_id`? to `?eos_token_id`?",
 }
+
+#: Patterns dropped from every logger by :func:`drop_known_noise` (a handler filter, for records that reach the log
+#: from a logger the table above does not name, e.g. a library's own copy of the generation code).
+ANY_LOGGER_NOISE = (r"Setting `?pad_token_id`? to `?eos_token_id`?",)
+
+
+def drop_known_noise(record: logging.LogRecord) -> bool:
+    """Handler filter: ``False`` for the records in :data:`ANY_LOGGER_NOISE`."""
+    try:
+        msg = record.getMessage()
+    except Exception:  # noqa: BLE001 - a broken record is not ours to drop
+        return True
+    return not any(re.search(p, msg) for p in ANY_LOGGER_NOISE)
 
 
 class _PatternFilter(logging.Filter):

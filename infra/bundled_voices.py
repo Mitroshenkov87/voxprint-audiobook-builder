@@ -7,7 +7,7 @@ They are imported into the voices library read-only (``"bundled": true`` in ``vo
 shown in the Voices window.  The entries mirror ``voices/index.json``; fields left out here come from the zip's ``voice.json``.
 
 *Boaz* shipped with 0.1.3 and is retired. Gideon replaces it and is used as recorded, with no retraining. Optional catalog
-voices (Asher, Noa) live in ``voices/index.json`` and are not listed here, so they are never part of this download.
+voices (Asher, Noa, Eitan) live in ``voices/index.json`` and are not listed here, so they are never part of this download.
 """
 from __future__ import annotations
 
@@ -28,6 +28,24 @@ VOICES = (
     {"id": "gideon", "name": "Gideon", "language": "ru", "url": _URL + "gideon.zip", "size_bytes": 53031093,
      "sha256": "6ca0e6824080ee86c21a4b34472bd013bd182ef15bb393c6e494fd554e1c2266"},
 )
+
+
+#: Retired voices (index ids). A copy may still be in a user's library from an older build; it stays usable as a
+#: narrator, but the multi-voice role lists of the Narrate window do not offer it (the user asked for Boaz to go).
+RETIRED = ("boaz",)
+
+
+def is_retired(record) -> bool:
+    """True for a library record of a retired voice (by its index id, else by its name)."""
+    info = getattr(record, "info", None) or {}
+    rid = str(info.get("repo_id") or "").strip().lower()
+    name = str(getattr(record, "name", "") or info.get("name") or "").strip().lower()
+    return (rid or name) in RETIRED or name in RETIRED
+
+
+def offered_for_roles(records) -> list:
+    """Library records offered in the multi-voice role lists: every voice except the retired ones."""
+    return [r for r in records if not is_retired(r)]
 
 
 def entries() -> List[repo.RepoVoice]:

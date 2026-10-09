@@ -142,13 +142,13 @@ Does not synthesize. Exit 4 when Gemma is missing (`voxprint models download llm
 
 ```
 voxprint prepare book.txt --out book.prepared.txt --json
-voxprint prepare book.txt --out yo-only.txt --steps yo --no-typos --json
+voxprint prepare book.txt --out yo-only.txt --steps yo --json
 voxprint translate book.epub --to ru --out book.ru.txt --json
 voxprint settings list --json
 voxprint settings set narration.ordinals off --json
 ```
 
-`prepare` is the window's Prepare text without narration: rule steps, the Russian letter yo, the Russian typo model when it is downloaded (`--typos` requires it, exit 4), and with `--llm` the text model's rewrite. It writes plain text and `<out stem>.prep_report.json` (`rule_counts` has the changes per step, for example `{"yo": 22}`). `translate` uses the offline Opus-MT models (`--literary`: Gemma, Opus-MT fallback); a missing model is exit 4 with the module to download. `settings` reads and writes the values Settings shows; `models.folder` is read-only. Details: [CLI.md](CLI.md#prepare-text).
+`prepare` is the window's Prepare text without narration: rule steps, the Russian letter yo, the Russian typo model when it is downloaded (not with `--steps` unless `--typos` is given; `--typos` requires it, exit 4), and with `--llm` the text model's rewrite. It writes plain text and `<out stem>.prep_report.json` (`rule_counts` has the changes per step, for example `{"yo": 22}`). `translate` uses the offline Opus-MT models (`--literary`: Gemma, Opus-MT fallback); a missing model is exit 4 with the module to download. `settings` reads and writes the values Settings shows; `models.folder` is read-only. Details: [CLI.md](CLI.md#prepare-text).
 
 ### Check and repair
 
