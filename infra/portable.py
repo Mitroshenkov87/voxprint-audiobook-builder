@@ -146,7 +146,7 @@ def _run(cmd: List[str], timeout: float = 10.0) -> str:
 def detect_cuda(run: Callable[[List[str]], str] = _run) -> Optional[Tuple[int, int]]:
     """CUDA version the NVIDIA driver supports (``nvidia-smi``), or None without an NVIDIA driver."""
     exe = shutil.which("nvidia-smi")
-    m = re.search(r"CUDA Version:\s*(\d+)\.(\d+)", run([exe]) if exe else "")
+    m = re.search(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)", run([exe]) if exe else "")   # 6xx drivers print "CUDA UMD Version"
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 
