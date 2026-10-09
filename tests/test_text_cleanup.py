@@ -228,3 +228,17 @@ def test_a_missing_model_skips_the_neural_step_with_a_note(tmp_path):
     plan = book_prep.PrepPlan(PrepOptions.none(), frozenset({"spellfix"}), lambda lang: None)
     _, rep = book_prep.run_preparation(book, plan, debug_dir=tmp_path / "d")
     assert "spellfix" in rep["neural_skipped"] and rep["neural"] == []
+
+
+def test_yo_is_never_doubled_moved_or_added_by_a_spelling_fix():
+    # build 701 on the PC: the dictionary wrote "стерёг", then the typo model proposed "стёрёг"
+    out, st = judge("Хозяин не стерёг быка.", "Хозяин не стёрёг быка.")
+    assert out == "Хозяин не стерёг быка." and st.yo == 0
+    out, _ = judge("Он ещё пришёл.", "Он ёще пришёл.")                       # a yo moved inside the word
+    assert out == "Он ещё пришёл."
+    out, _ = judge("Он ещё пришёл.", "Он еще пришёл.")                       # a yo removed
+    assert out == "Он ещё пришёл."
+    out, _ = judge("Мы шли по дорге.", "Мы шли по дорёге.")                  # a "typo" fix that adds a yo
+    assert out == "Мы шли по дорге."
+    out, st = judge("Мы шли по дорге.", "Мы шли по дороге.")                 # a plain typo fix still works
+    assert out == "Мы шли по дороге." and st.typos == 1

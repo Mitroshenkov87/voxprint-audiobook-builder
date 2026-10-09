@@ -41,3 +41,18 @@ def test_triton_and_sox_log_records_are_dropped(caplog):
         flop.warning("something else")
     msgs = [r.getMessage() for r in caplog.records]
     assert msgs == ["something else"]
+
+
+def test_pad_token_warning_of_generate_is_dropped(caplog):
+    """transformers logs "Setting `pad_token_id` to `eos_token_id`" once per narration chunk (14 lines on the 701 test)."""
+    diagnostics.quiet_known_log_noise()
+    gen = logging.getLogger("transformers.generation.utils")
+    with caplog.at_level(logging.WARNING):
+        gen.warning("Setting `pad_token_id` to `eos_token_id`:2150 for open-end generation.")
+        gen.warning("a real generation warning")
+    assert [r.getMessage() for r in caplog.records] == ["a real generation warning"]
+    rec = logging.LogRecord("qwen_tts.x", logging.WARNING, __file__, 1,
+                            "Setting `pad_token_id` to `eos_token_id`:None for open-end generation.", None, None)
+    assert diagnostics.drop_known_noise(rec) is False
+    other = logging.LogRecord("qwen_tts.x", logging.WARNING, __file__, 1, "pad differs", None, None)
+    assert diagnostics.drop_known_noise(other) is True

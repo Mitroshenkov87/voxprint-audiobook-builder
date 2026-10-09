@@ -20,7 +20,7 @@ def _setup_logging() -> None:
     """Rotating ``logs/voxprint.log`` (5 MB x 6) with exception hooks (infra/diagnostics.py); the console if the file fails."""
     from infra import diagnostics
 
-    diagnostics.setup_logging(filters=(_drop_sox_warning,))
+    diagnostics.setup_logging(filters=(_drop_sox_warning, diagnostics.drop_known_noise))
     diagnostics.quiet_known_warnings()
 
 

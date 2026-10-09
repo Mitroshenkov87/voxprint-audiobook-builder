@@ -43,7 +43,7 @@ from core import voice_info
 from core.i18n import tr
 from core.languages import language_name
 from core.voice_library import VoiceLibrary
-from infra import features, llm_tool, text_models
+from infra import bundled_voices, features, llm_tool, text_models
 from infra import voice_catalog as catalog
 from infra import voice_repository as repo
 from ui.main_window import mark_recommended, open_folder, recommended_text
@@ -889,27 +889,27 @@ class NarrateWindow(SubWindow):
         self._spk_touched[which] = True
 
     def _fill_speaker_combos(self) -> None:
-        """Library voices in the male and female lists. A still-valid choice is kept; otherwise the first matching gender."""
-        voices = list(self.library.list_voices())
-        # The second male voice starts as None: one male voice stays the default, as before.
-        for which, combo, gender in (("male", self.cmb_spk_male, "male"), ("male2", self.cmb_spk_male2, ""),
-                                     ("female", self.cmb_spk_female, "female")):
+        """Library voices in the male and female lists (retired voices such as Boaz are left out). A still-valid choice is
+        kept; otherwise the first voice of that gender that is not the narrator, and for the second male voice the next
+        such male voice (None when there is no third male voice)."""
+        voices = bundled_voices.offered_for_roles(self.library.list_voices())
+        narrator = self.selected_voice_id()
+        defaults = spk.default_role_picks(voices, narrator)
+        for which, combo in (("male", self.cmb_spk_male), ("male2", self.cmb_spk_male2), ("female", self.cmb_spk_female)):
             current = str(combo.currentData() or "")
             combo.blockSignals(True)
             combo.clear()
             combo.addItem(tr("spk.none"), "")
-            pick = 0
-            for i, rec in enumerate(voices, start=1):
+            for rec in voices:
                 combo.addItem(rec.name, rec.id)
-                if pick == 0 and gender and str(rec.info.get("gender") or "") == gender:
-                    pick = i
             idx = combo.findData(current) if current else 0
             if self._spk_touched[which]:
                 combo.setCurrentIndex(idx if idx >= 0 else 0)
             else:
-                combo.setCurrentIndex(pick if pick else 0)
+                d = combo.findData(defaults[which]) if defaults[which] else 0
+                combo.setCurrentIndex(d if d >= 0 else 0)
             combo.blockSignals(False)
-        rec = self.library.get(self.selected_voice_id()) if self.selected_voice_id() else None
+        rec = self.library.get(narrator) if narrator else None
         self.lbl_spk_narrator.setText(tr("spk.narrator", name=rec.name if rec is not None else tr("spk.none")))
 
     def speaker_cast(self) -> Optional[spk.SpeakerCast]:
