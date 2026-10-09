@@ -51,20 +51,24 @@ jobs:
           $hash = (Get-FileHash (Join-Path $dir "Voxprint-Setup-online.exe") -Algorithm SHA256).Hash.ToLower()
           "$hash  Voxprint-Setup-online.exe" | Set-Content -Encoding ascii (Join-Path $dir "Voxprint-Setup-online.exe.sha256")
           $server = Start-Process python -ArgumentList "-m","http.server","8765","--bind","127.0.0.1","--directory",$dir -PassThru -WindowStyle Hidden
-          $ready = $false
-          foreach ($i in 1..50) {
-            try {
-              $probe = Invoke-WebRequest "http://127.0.0.1:8765/Voxprint-Setup-online.exe.sha256" -UseBasicParsing
-              if ($probe.StatusCode -eq 200 -and $probe.Content.StartsWith($hash)) { $ready = $true; break }
-            } catch { Start-Sleep -Milliseconds 200 }
-          }
-          if (-not $ready) { throw "local release server did not serve the matching hash" }
           $script = (Resolve-Path .\install.ps1).Path
           function Invoke-Install([string[]]$ArgList) {
-            & pwsh -NoProfile -File $script @ArgList
+            # The child's transcript must not join the exit code in the return value.
+            & pwsh -NoProfile -File $script @ArgList | Out-Host
             return $LASTEXITCODE
           }
           try {
+            # .sha256 is application/octet-stream, so pwsh 7 returns Content as bytes.
+            $ready = $false
+            foreach ($i in 1..50) {
+              try {
+                $probe = Invoke-WebRequest "http://127.0.0.1:8765/Voxprint-Setup-online.exe.sha256" -UseBasicParsing
+                $text = $probe.Content
+                if ($text -is [byte[]]) { $text = [Text.Encoding]::ASCII.GetString($text) }
+                if ($probe.StatusCode -eq 200 -and $text.StartsWith($hash)) { $ready = $true; break }
+              } catch { Start-Sleep -Milliseconds 200 }
+            }
+            if (-not $ready) { throw "local release server did not serve the matching hash" }
             $code = Invoke-Install @("-DryRun", "-SourceUrl", "http://127.0.0.1:8765/")
             if ($code -ne 0) { throw "matching dry run failed: $code" }
             "0000000000000000000000000000000000000000000000000000000000000000  Voxprint-Setup-online.exe" | Set-Content -Encoding ascii (Join-Path $dir "Voxprint-Setup-online.exe.sha256")
