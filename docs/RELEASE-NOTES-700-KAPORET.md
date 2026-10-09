@@ -32,7 +32,7 @@ New:
 
 - **Command line for speaker marks and Check & repair.** `voxprint narrate --speakers`, `--male-voice`, `--female-voice`, and `--speaker-marks`. `voxprint speakers` writes marks and does not narrate. `voxprint check` (alias `repair`) is Settings -> Check & repair.
 - **Russian letter yo.** Before synthesis, yo is restored only where the dictionary is sure. `текст`, `все` and `берег` stay as written. Stress marks are not sent to the stock Qwen3-TTS base model. No extra model download.
-- **Catalog voices Asher and Noa** (optional, not installed automatically). Hidden until `url`, `sha256` and `size_bytes` replace the placeholders.
+- **Catalog voices Asher and Noa** (optional, not installed automatically). `asher.zip` and `noa.zip` are on the `voices-v1` release.
 - **PowerShell install.** `install.ps1`, as above.
 - **Exe-only patch artifact.** A separate `Voxprint-patch` upload so the program exe can be replaced without the whole installer.
 
@@ -45,7 +45,7 @@ Fixed:
 
 Changed:
 
-- **Bundled voices.** Boaz is no longer installed. Tirzah stays. Gideon (LibriVox reader Kazbek, *Vekhi*, CC0) is the male voice that replaces Boaz, used as recorded, with no retraining. The Gideon package is not pinned in this draft (no url, SHA-256 or size yet).
+- **Bundled voices.** Boaz is retired. Tirzah stays. Gideon (LibriVox reader Kazbek, *Vekhi*, CC0) replaces Boaz, used as recorded, with no retraining. `voices-v1/gideon.zip` is 53,031,093 bytes, SHA-256 `6ca0e6824080ee86c21a4b34472bd013bd182ef15bb393c6e494fd554e1c2266`, and is part of the standard download. The 0.1.3 Boaz sample stays; it is not a Gideon recording.
 - **Windows install warnings.** Unsigned installer, Edge first, then SmartScreen. See the section above.
 - **Icon and splash.** New artwork. The already-built 668 installer does not contain it.
 

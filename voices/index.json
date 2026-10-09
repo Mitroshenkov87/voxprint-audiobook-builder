@@ -50,6 +50,30 @@
       "bundled": true
     },
     {
+      "id": "gideon",
+      "name": "Gideon",
+      "language": "ru",
+      "author": "Kazbek (LibriVox) - public domain",
+      "license": "CC0-1.0",
+      "voice_type": "male",
+      "description": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Вехи (Vekhi)', a 1909 essay collection, read by Kazbek (https://librivox.org/vekhi-by-various/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Gideon is Voxprint's own and does not imply the reader's endorsement.",
+      "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/gideon.zip",
+      "sha256": "6ca0e6824080ee86c21a4b34472bd013bd182ef15bb393c6e494fd554e1c2266",
+      "size_bytes": 53031093,
+      "descriptions": {
+        "en": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Вехи (Vekhi)', a 1909 essay collection, read by Kazbek (https://librivox.org/vekhi-by-various/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Gideon is Voxprint's own and does not imply the reader's endorsement.",
+        "ru": "Встроенный открытый мужской русский голос, обучен только на записи LibriVox из общественного достояния «Вехи» (сборник статей 1909 года), читает Kazbek (https://librivox.org/vekhi-by-various/). Свободен для любого использования, в том числе коммерческого (CC0-1.0). Атрибуция приветствуется. Имя Gideon дано Voxprint и не означает одобрения чтеца.",
+        "de": "Mitgelieferte offene männliche russische Stimme, nur mit der gemeinfreien LibriVox-Aufnahme 'Вехи (Vekhi)', einer Aufsatzsammlung von 1909, trainiert, gelesen von Kazbek (https://librivox.org/vekhi-by-various/). Frei für jede Nutzung, auch kommerziell (CC0-1.0). Namensnennung erwünscht. Der Name Gideon stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+      },
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "gender": "male",
+      "speaker": "Kazbek",
+      "prepared_by": "Voxprint",
+      "project_url": "https://librivox.org/vekhi-by-various/",
+      "bundled": true
+    },
+    {
       "id": "asher",
       "name": "Asher",
       "language": "ru",
@@ -58,9 +82,9 @@
       "voice_type": "male",
       "description": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Teachings of Christ' by Leo Tolstoy, read by Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Asher is Voxprint's own and does not imply the reader's endorsement.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-      "url": "https://PENDING_HOST/asher.zip",
-      "sha256": "PENDING_SHA256",
-      "size_bytes": 0,
+      "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/asher.zip",
+      "sha256": "795778a10b85495e5850d885484c313e3f7799f76ea4d81d41fe50162165a583",
+      "size_bytes": 53066747,
       "descriptions": {
         "en": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Teachings of Christ' by Leo Tolstoy, read by Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Asher is Voxprint's own and does not imply the reader's endorsement.",
         "ru": "Необязательный мужской русский голос для каталога в программе, не входит в стандартную загрузку. Обучен только на записи LibriVox из общественного достояния «Teachings of Christ» (Лев Толстой), читает Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Asher дано Voxprint и не означает одобрения чтеца.",
@@ -81,9 +105,9 @@
       "voice_type": "female",
       "description": "Optional female Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Izbrannye' by Sholem Aleichem, read by Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Noa is Voxprint's own and does not imply the reader's endorsement.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-      "url": "https://PENDING_HOST/noa.zip",
-      "sha256": "PENDING_SHA256",
-      "size_bytes": 0,
+      "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/noa.zip",
+      "sha256": "755aeb47cc90a7bfb03d9349ed0fa8effbcc270fda22e5e9dc7b9539a462beed",
+      "size_bytes": 53197567,
       "descriptions": {
         "en": "Optional female Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Izbrannye' by Sholem Aleichem, read by Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Noa is Voxprint's own and does not imply the reader's endorsement.",
         "ru": "Необязательный женский русский голос для каталога в программе, не входит в стандартную загрузку. Обучен только на записи LibriVox из общественного достояния «Izbrannye» (Шолом-Алейхем), читает Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Noa дано Voxprint и не означает одобрения чтеца.",

@@ -6,7 +6,7 @@
 
 > **Beta / experimental (v0.1.3, build 667 "Menuchah").** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs **Windows 11 (24H2+) and an NVIDIA GPU** (16 GB VRAM recommended). Details: [tests and caveats](docs/TESTING.md).
 
-<p align="center"><img src="docs/screenshots/en-667/01-main-window.png" alt="Voxprint Studio" width="420"> <img src="docs/screenshots/en-667/04-voice-library-boaz-tirzah.png" alt="My voices: build 667 screenshot; Tirzah is the bundled voice (Boaz is no longer installed)" width="420"></p>
+<p align="center"><img src="docs/screenshots/en-667/01-main-window.png" alt="Voxprint Studio" width="420"> <img src="docs/screenshots/en-667/04-voice-library-boaz-tirzah.png" alt="My voices: build 667 screenshot. Tirzah and Gideon are the bundled voices; the picture also shows Boaz, which is retired" width="420"></p>
 <p align="center"><img src="docs/screenshots/en-667/02-narrate-book-top.png" alt="Narrate a book" width="420"> <img src="docs/screenshots/en-667/07-settings-pauses-speed-repair.png" alt="Settings: pauses and reading speed" width="300"></p>
 
 ## 🎙 Train your own voice: read one of these scripts
@@ -25,7 +25,7 @@
 * **Train your voice** - give it a 5-15 minute recording (yours, or of someone who agreed) and the text you read; everything else is automatic ([Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) LoRA).
 * **Offline translation** before narrating: Russian, English, German ([details](docs/TRANSLATION.md)).
 * **Re-voice** a recording: turn it into editable text, or convert it directly into one of your voices ([details](docs/REVOICE.md)).
-* **Open voice included** - *Tirzah* (female), Russian, **CC0-1.0** (free for any use, also commercial), trained only from a public-domain LibriVox recording; part of the standard model download and read-only in the library ([details](voices/BUNDLED.md)). Listen: [Genesis 1:1-2:3 with Tirzah](samples/genesis-tirzah.mp3) ([samples](samples/README.md)). *Boaz* shipped with 0.1.3 and is no longer installed. *Asher* and *Noa* are optional catalog voices, not part of that download ([voices](voices/README.md)).
+* **Open voices included** - *Tirzah* (female) and *Gideon* (male), Russian, **CC0-1.0** (free for any use, also commercial), trained only from public-domain LibriVox recordings; part of the standard model download and read-only in the library ([details](voices/BUNDLED.md)). Listen: [Genesis 1:1-2:3 with Tirzah](samples/genesis-tirzah.mp3) ([samples](samples/README.md)). *Boaz* shipped with 0.1.3 and is retired; Gideon replaces it, used as recorded. *Asher* and *Noa* are optional catalog voices on the same `voices-v1` release, not part of that download ([voices](voices/README.md)).
 * **Per-voice licences and consent** - every voice carries a licence and a usage scope; the UI shows whether commercial use is allowed ([voices](docs/VOICES.md)).
 * **Resumable and safe** - downloads, narration and backups continue where they stopped; SHA-256 checks everywhere; *Check & repair* verifies every component and model file and re-downloads only the damaged ones.
 * **Local and private** - no account, no telemetry; your recordings never leave the computer ([privacy](docs/PRIVACY.md)).

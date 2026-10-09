@@ -45,7 +45,7 @@ voice recording and a text file to ready output files you can load into a neural
 ## Screenshots
 Real screenshots of build 667 "Menuchah" (0.1.3-beta) on **Windows 11 (RTX 4090, dark theme, English UI)**, in [`docs/screenshots/en-667/`](screenshots/en-667). Personal paths and network addresses are blurred. Older Russian and German screenshots (0.1.0) are in [`docs/screenshots/ru/`](screenshots/ru) and [`docs/screenshots/de/`](screenshots/de).
 
-| Studio | My voices (build 667 screenshot; Tirzah stays bundled, Boaz is no longer installed) |
+| Studio | My voices (build 667 screenshot; Tirzah and Gideon are bundled, the picture also shows Boaz, which is retired) |
 |---|---|
 | <img src="screenshots/en-667/01-main-window.png" width="330"> | <img src="screenshots/en-667/04-voice-library-boaz-tirzah.png" width="330"> |
 

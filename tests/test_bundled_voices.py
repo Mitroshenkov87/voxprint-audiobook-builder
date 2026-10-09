@@ -1,7 +1,6 @@
-"""Bundled open voice Tirzah: pinned entry, first-run download, read-only in the library (fake downloads only).
+"""Bundled open voices Tirzah and Gideon: pinned entries, first-run download, read-only in the library (fake downloads only).
 
-Asher and Noa are optional catalog voices. They stay out of the auto-install, and a placeholder hash hides them
-from the catalog until the package URL and SHA-256 are filled in.
+Asher and Noa are optional catalog voices. They stay out of the auto-install. Their packages are on voices-v1.
 """
 from __future__ import annotations
 
@@ -70,7 +69,7 @@ def test_pinned_entries_match_index_and_specs():
         assert len(spec["consent"]["name"]) <= 80 and spec["speaker"] in spec["consent"]["name"]
         assert spec["project_url"].startswith("https://librivox.org/")
         assert v["sha256"] in (ROOT / "voices" / "BUNDLED.md").read_text(encoding="utf-8")
-    assert {e.id for e in bv.entries()} == {"tirzah"} and all(e.bundled for e in bv.entries())
+    assert {e.id for e in bv.entries()} == {"tirzah", "gideon"} and all(e.bundled for e in bv.entries())
     assert not any(p.suffix in (".safetensors", ".zip") for p in (ROOT / "voices").iterdir())    # no weights in git
 
 
@@ -78,17 +77,21 @@ def test_ensure_imports_read_only_with_licence(tmp_path, served):
     download, calls = served
     lib = VoiceLibrary(tmp_path / "voices")
     seen = []
-    assert bv.ensure(lambda f, n: seen.append(f), library=lib, download=download) == ["tirzah"]
+    assert bv.ensure(lambda f, n: seen.append(f), library=lib, download=download) == ["tirzah", "gideon"]
     assert seen and max(seen) <= 1.0
     recs = {r.info["repo_id"]: r for r in lib.list_voices()}
     tirzah = recs["tirzah"]
+    gideon = recs["gideon"]
     assert tirzah.bundled and tirzah.license == "CC0-1.0" and tirzah.commercial_use
+    assert gideon.bundled and gideon.license == "CC0-1.0" and gideon.commercial_use
     assert tirzah.info["consent"]["method"] == "manual" and tirzah.info["consent"]["scope"] == "commercial"
     assert "Anastasiia Solokha" in tirzah.info["consent"]["name"]
-    with pytest.raises(VoiceLibraryError):
-        lib.update(tirzah.id, name="Mine")
-    with pytest.raises(VoiceLibraryError):
-        lib.delete(tirzah.id)
+    assert "Kazbek" in gideon.info["consent"]["name"]
+    for rec in (tirzah, gideon):
+        with pytest.raises(VoiceLibraryError):
+            lib.update(rec.id, name="Mine")
+        with pytest.raises(VoiceLibraryError):
+            lib.delete(rec.id)
     assert lib.update(tirzah.id, adapter_scale=0.7).info["adapter_scale"] == 0.7      # the strength stays adjustable
     assert bv.missing(lib) == []
     n = len(calls)
@@ -101,7 +104,7 @@ def test_ensure_is_best_effort_per_voice(tmp_path):
     def download(entry, library, **kw):
         raise OSError("offline")
     assert bv.ensure(library=lib, download=download) == []
-    assert [e.id for e in bv.missing(lib)] == ["tirzah"]
+    assert [e.id for e in bv.missing(lib)] == ["tirzah", "gideon"]
 
 
 def test_bundled_flag_is_only_true_or_absent():
@@ -127,7 +130,7 @@ def test_first_run_download_includes_bundled_voices(monkeypatch):
 def test_full_size_counts_bundled_voices():
     from infra import setup_mode
 
-    assert bv.total_bytes() == 53274433
+    assert bv.total_bytes() == 53274433 + 53031093
     assert setup_mode.full_sizes()["models"] > bv.total_bytes()
 
 
@@ -177,25 +180,34 @@ def test_remote_card_states_licence_of_bundled_voice(tmp_path):
     assert getattr(cards["repo:other"], "lbl_note", None) is None
 
 
-def test_asher_and_noa_are_catalog_only_until_the_hash_is_filled():
+def test_asher_and_noa_are_catalog_only():
     raw = json.loads((ROOT / "voices" / "index.json").read_text(encoding="utf-8"))
     by_id = {e["id"]: e for e in raw["voices"]}
-    assert "boaz" not in by_id
-    assert {v["id"] for v in bv.VOICES} == {"tirzah"}
+    assert "boaz" not in by_id and "PENDING" not in json.dumps(raw)
+    assert {v["id"] for v in bv.VOICES} == {"tirzah", "gideon"}
     shown = {e.id for e in repo.parse_index(raw)}
-    assert "asher" not in shown and "noa" not in shown and "tirzah" in shown
+    assert {"asher", "noa", "tirzah", "gideon"} <= shown
+    host = "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/"
+    pins = {
+        "asher": ("795778a10b85495e5850d885484c313e3f7799f76ea4d81d41fe50162165a583", 53066747),
+        "noa": ("755aeb47cc90a7bfb03d9349ed0fa8effbcc270fda22e5e9dc7b9539a462beed", 53197567),
+    }
     for vid, reader, url in (
             ("asher", "Vladimir Anyanov", "https://archive.org/details/teachingsofchrist_1204_librivox"),
             ("noa", "Hanna Ponomarenko", "https://archive.org/details/izbrannye_2212_librivox")):
         entry = by_id[vid]
-        assert entry["sha256"] == "PENDING_SHA256" and entry["url"].startswith("https://PENDING_HOST/")
+        sha, size = pins[vid]
+        assert entry["sha256"] == sha and entry["url"] == host + vid + ".zip"
         assert entry.get("bundled") is not True and entry["license"] == "CC0-1.0"
-        assert entry["size_bytes"] == 0 and entry["project_url"] == url and reader in entry["speaker"]
+        assert entry["size_bytes"] == size and entry["project_url"] == url and reader in entry["speaker"]
         spec = json.loads((ROOT / "tools" / "voice_specs" / f"{vid}.json").read_text(encoding="utf-8"))
         assert spec.get("bundled") is not True and spec["license"] == "CC0-1.0"
         assert spec["consent"]["scope"] == "commercial" and spec["consent"]["method"] == "manual"
         assert spec["consent"]["confirmed"] is True and reader in spec["consent"]["name"]
         assert len(spec["consent"]["name"]) <= 80 and spec["project_url"] == url
-        filled = {**entry, "sha256": "ab" * 32, "size_bytes": 1}
-        parsed = repo.parse_index({"schema": 1, "voices": [filled]})
+        parsed = repo.parse_index({"schema": 1, "voices": [entry]})
         assert len(parsed) == 1 and parsed[0].id == vid and parsed[0].bundled is False
+    gideon = by_id["gideon"]
+    assert gideon["bundled"] is True and gideon["size_bytes"] == 53031093
+    assert gideon["sha256"] == "6ca0e6824080ee86c21a4b34472bd013bd182ef15bb393c6e494fd554e1c2266"
+    assert gideon["url"] == host + "gideon.zip" and gideon["speaker"] == "Kazbek"
