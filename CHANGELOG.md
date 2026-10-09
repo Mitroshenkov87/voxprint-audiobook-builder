@@ -10,7 +10,7 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [0.1.4-beta] - 2026-10-08 - build 668 "Kolot"
 
-Codename *Kolot* (Biblical Hebrew *qolot*, plural of *qol*, "voice"; Exodus 19:16 also "thunder"). The next *build-installer* run is build 668: `GITHUB_RUN_NUMBER` 39 plus the offset 629 already in `BUILD.json`. This change does not publish a release.
+Codename *Kolot* (Biblical Hebrew *qolot*, plural of *qol*, "voice"; Exodus 19:16 also "thunder"). Run 39 stamped build 668 with offset 629, but that installer was built with an empty release tag and cannot be installed. `BUILD.json` offset is 628, so the next *build-installer* run (run 40) stamps build 668 again. This change does not publish a release.
 
 ### Added
 - **One Prepare text switch**, on by default. It runs the rule steps (layout, footnotes, quotes, links, headings, numbers, abbreviations) and, for a Russian book, the typo model when that model is already downloaded. Translation stays its own card and stays off until it is turned on.
