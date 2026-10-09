@@ -219,6 +219,30 @@ jobs:
       - name: Thin shell (PyInstaller, heavy libraries excluded)
         shell: cmd
         run: build_thin.bat
+      - name: Exe patch files (Voxprint.exe, its hash, patch.json)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -c @'
+          import hashlib, json, os
+          from pathlib import Path
+          exe = Path("dist/thin/Voxprint/Voxprint.exe")
+          if not exe.is_file():
+              raise SystemExit(f"thin shell exe is missing: {exe}")
+          sha = hashlib.sha256(exe.read_bytes()).hexdigest()
+          lock = hashlib.sha256(Path("infra/runtime_lock.json").read_bytes()).hexdigest()
+          (exe.parent / "Voxprint.exe.sha256").write_text(f"{sha}  Voxprint.exe\n", encoding="ascii")
+          credits = json.loads(Path("credits.json").read_text(encoding="utf-8"))
+          patch = {
+              "build": int(os.environ["VOXPRINT_BUILD"]),
+              "codename": os.environ.get("VOXPRINT_CODENAME", ""),
+              "version": str(credits["app"]["version"]),
+              "sha256": sha,
+              "runtime_lock_sha256": lock,
+          }
+          (exe.parent / "patch.json").write_text(json.dumps(patch) + "\n", encoding="ascii")
+          print(json.dumps(patch))
+          '@
       - name: Online installer = shell zip + manifest (libraries stay upstream) + Voxprint-Setup-online.exe
         shell: pwsh
         run: |
@@ -287,6 +311,14 @@ jobs:
             build/online-release/Voxprint-Setup-online*.exe.sha256
             build/online-release/manifest-thin-*.json
           retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Voxprint-patch
+          path: |
+            dist/thin/Voxprint/Voxprint.exe
+            dist/thin/Voxprint/Voxprint.exe.sha256
+            dist/thin/Voxprint/patch.json
+          retention-days: 14
       - name: Attach to the release (installer, hash, manifest, shell parts; older assets are not touched)
         if: ${{ env.REL_TAG != '' }}
         shell: pwsh
@@ -295,3 +327,16 @@ jobs:
         run: |
           $files = Get-ChildItem build\online-release -File | ForEach-Object { $_.FullName } | Sort-Object { (Get-Item $_).Length }
           foreach ($f in $files) { gh release upload $env:REL_TAG $f --clobber; if ($LASTEXITCODE -ne 0) { throw "upload failed: $f" } }
+          $build = [int]$env:VOXPRINT_BUILD
+          $stage = "build\voxprint-patch"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          $exeName = "Voxprint-patch-$build.exe"
+          Copy-Item dist\thin\Voxprint\Voxprint.exe (Join-Path $stage $exeName) -Force
+          $sha = (Get-Content dist\thin\Voxprint\Voxprint.exe.sha256 -Raw).Split(" ", [StringSplitOptions]::RemoveEmptyEntries)[0].Trim()
+          "$sha  $exeName" | Out-File -Encoding ascii (Join-Path $stage "$exeName.sha256")
+          Copy-Item dist\thin\Voxprint\patch.json (Join-Path $stage "patch-$build.json") -Force
+          foreach ($f in @(
+            (Join-Path $stage $exeName),
+            (Join-Path $stage "$exeName.sha256"),
+            (Join-Path $stage "patch-$build.json")
+          )) { gh release upload $env:REL_TAG $f --clobber; if ($LASTEXITCODE -ne 0) { throw "upload failed: $f" } }
