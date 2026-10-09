@@ -7,7 +7,7 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [0.2.1-beta] - 2026-10-09 - build 701 "Shalem"
 
-Codename *Shalem* (Biblical Hebrew *shalem*, whole, complete; Genesis 33:18). Fixes from the test of build 700 on a real PC. `BUILD.json` offset stays **655**, so build-installer run 46 stamps build 701. Upgrade: uninstall 700, then install 701; models, voices and settings stay.
+Codename *Shalem* (Biblical Hebrew *shalem*, whole, complete; Genesis 33:18). Fixes from the test of build 700 on a real PC. Build-installer run 46 failed in the Windows unit tests (a voice id looked up with different capitals) and published nothing, so the `BUILD.json` offset is **654** and run 47 stamps build 701. Upgrade: uninstall 700, then install 701; models, voices and settings stay.
 
 ### Added
 - **"все" / "всё" by context.** The letter-yo step (Prepare text and `voxprint narrate`) now decides the most frequent homograph from its neighbours. "всё": before a singular verb ("всё было", "всё скачивает", "всё рассказывал") or a neuter adjective ("всё остальное", "всё сущее"), at the end of a clause or before a colon ("вот и всё", "там всё:"), before ", что", in "всё равно", "всё-таки", "всё же", "всё ещё", before a comparative ("всё темнее"), and after a singular subject before its verb ("я всё знаю"). "все": before a plural word, pronoun or collective number ("все люди", "все они", "все её книги", "все пятеро"), after a plural subject or verb ("пришли все", "мы все"), and whenever no rule fires. The word lists are data, `core/data/yo_context.json` (Apache-2.0). `yo.restore(text, context=False)` keeps the dictionary-only behaviour. On the 700 test dialogue (`tests/fixtures/yo/`) the step restores **22/22** yo with none wrong; build 700 restored 16/22 and every miss was "всё". 33 unit cases cover both sides.
@@ -19,6 +19,7 @@ Codename *Shalem* (Biblical Hebrew *shalem*, whole, complete; Genesis 33:18). Fi
 
 ### Fixed
 - **"'sox' is not recognized as an internal or external command"** on a command-line caller's console. The `sox` package (imported by the speech package) runs `os.popen("sox -h")` at import. When SoX is not on `PATH`, that probe now gets an empty answer instead of a shell (`infra.diagnostics.skip_missing_sox_probe`). Voxprint never uses SoX.
+- **A voice named with different capitals on Windows (run 46).** `--male-voice Bob` (or `--character Michael=Bob`) opened the folder `bob` but used the id `Bob`, so one voice could get two ids and a second engine. The command line now uses the library's own id. The Windows unit test of the character pins caught it.
 - **"triton not found; flop counting will not work for triton kernels"** and bitsandbytes' Triton notice were logged on Windows. They are logging records, not Python warnings, so the existing warning filter did not catch them. A filter on those loggers drops them (`infra.diagnostics.LOG_NOISE`).
 
 ## [0.2.0-beta] - 2026-10-09 - build 700 "Kaporet"

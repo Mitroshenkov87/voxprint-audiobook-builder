@@ -779,7 +779,11 @@ def resolve_voice(library: VoiceLibrary, id_or_name: str) -> VoiceRecord:
         raise CliError(EXIT_INPUT, "voice id or name is required", hint="voxprint voices list --json")
     rec = library.get(needle)
     if rec is not None:
-        return rec
+        # Windows folders are case-insensitive: get("Bob") opens the folder "bob" but names the record "Bob".
+        # Return the library's own record so one voice has one id (one engine, one cast entry).
+        listed = library.list_voices()
+        same = [v for v in listed if v.id == rec.id] or [v for v in listed if v.id.lower() == rec.id.lower()]
+        return same[0] if len(same) == 1 else rec
     lower = needle.lower()
     matches = [v for v in library.list_voices() if v.id.lower() == lower or v.name.lower() == lower]
     if len(matches) == 1:

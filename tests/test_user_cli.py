@@ -985,3 +985,18 @@ def test_narrate_second_male_voice_and_character_pins(tmp_path, capsys):
     plain = ["narrate", str(book), "--voice", "narrator", "--out", str(tmp_path / "o")]
     assert user_cli.main(plain + ["--character", "David=tom"], library=lib) == 2
     capsys.readouterr()
+
+
+def test_resolve_voice_returns_the_library_id_when_the_folder_lookup_ignores_case():
+    """Windows: get("Bob") opens the folder "bob" and names the record "Bob". The listed record wins."""
+    listed = SimpleNamespace(id="bob", name="Bob")
+
+    class Lib:
+        def get(self, needle):
+            return SimpleNamespace(id=needle, name="Bob") if needle.lower() == "bob" else None
+
+        def list_voices(self):
+            return [listed]
+
+    assert user_cli.resolve_voice(Lib(), "Bob") is listed
+    assert user_cli.resolve_voice(Lib(), "bob") is listed
