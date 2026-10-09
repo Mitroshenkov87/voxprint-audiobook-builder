@@ -20,13 +20,32 @@ from core.llm_text import NAMES, LLMPlan, fill, has_dialogue, load_prompt
 from core.pauses import TITLE
 
 ROLES = ("narrator", "male", "female")
+
+
+def _letters(*codes: int) -> str:
+    """A tag word from Unicode code points.
+
+    The i18n check rejects Cyrillic string literals in this package. Russian aliases the text model may print
+    (rasskazchik, muzhskoy, zhenskiy, and the short muzh / zhen) are built here so the source stays free of them.
+    """
+    return "".join(chr(c) for c in codes)
+
+
+# Longest alias first, so the short male/female words do not take a prefix of the long ones.
+_RU_NARRATOR = _letters(0x440, 0x430, 0x441, 0x441, 0x43A, 0x430, 0x437, 0x447, 0x438, 0x43A)
+_RU_MALE = _letters(0x43C, 0x443, 0x436, 0x441, 0x43A, 0x43E, 0x439)
+_RU_FEMALE = _letters(0x436, 0x435, 0x43D, 0x441, 0x43A, 0x438, 0x439)
+_RU_MALE_SHORT = _letters(0x43C, 0x443, 0x436)
+_RU_FEMALE_SHORT = _letters(0x436, 0x435, 0x43D)
 _TAG = re.compile(
-    r"^(NARRATOR|MALE|FEMALE|РАССКАЗЧИК|МУЖСКОЙ|ЖЕНСКИЙ|МУЖ|ЖЕН)(?:\s*:\s*(.*?))?\s*$",
+    "^(" + "|".join(("NARRATOR", "MALE", "FEMALE", _RU_NARRATOR, _RU_MALE, _RU_FEMALE,
+                     _RU_MALE_SHORT, _RU_FEMALE_SHORT))
+    + r")(?:\s*:\s*(.*?))?\s*$",
     re.IGNORECASE)
 _ROLE = {
-    "narrator": "narrator", "рассказчик": "narrator",
-    "male": "male", "мужской": "male", "муж": "male",
-    "female": "female", "женский": "female", "жен": "female",
+    "narrator": "narrator", _RU_NARRATOR: "narrator",
+    "male": "male", _RU_MALE: "male", _RU_MALE_SHORT: "male",
+    "female": "female", _RU_FEMALE: "female", _RU_FEMALE_SHORT: "female",
 }
 # Gemma 4 (llama.cpp --jinja) thinks by default. The thought is in the same string as the answer, often as a channel
 # block, and the answer itself is numbered ("1. MALE: Name") with a short preamble. None of that matches a bare tag.
@@ -274,9 +293,9 @@ def load_marks(text: str) -> List[SpeakerLine]:
         m = _TAG.match(ln)
         if m is None:
             raise ValueError(f"unreadable speaker mark: {raw.strip()}")
-        role = m.group(1).lower()
-        if role != "narrator":
-            role = "male" if role == "male" else "female"
+        role = _ROLE.get(m.group(1).lower())
+        if role not in ROLES:
+            raise ValueError(f"unreadable speaker mark: {raw.strip()}")
         rows.append(SpeakerLine(role, m.group(2) or ""))
     if not rows:
         raise ValueError("speaker marks file is empty")

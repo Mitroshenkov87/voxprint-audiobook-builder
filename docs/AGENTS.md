@@ -104,7 +104,7 @@ On exit code 5, retry with `--force-cpu` (slow). When it finishes, `voices list 
 Licence, consent and language (all optional):
 
 ```
-voxprint train ./clips --name Boaz --type male --language ru --consent commercial --speaker "Reader Name" --license CC0-1.0 --json
+voxprint train ./clips --name MyVoice --type male --language ru --consent commercial --speaker "Reader Name" --license CC0-1.0 --json
 ```
 
 | Option | Meaning |
@@ -121,7 +121,7 @@ voxprint train ./clips --name Boaz --type male --language ru --consent commercia
 ```
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3 --json
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
-voxprint narrate genesis.txt --voice boaz --out ./audiobooks --style scripture --pause-sentence 0.7 --speed 0.95 --json
+voxprint narrate genesis.txt --voice tirzah --out ./audiobooks --style scripture --pause-sentence 0.7 --speed 0.95 --json
 voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json
 ```
 

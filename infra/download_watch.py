@@ -282,8 +282,8 @@ def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threa
             box["error"] = exc
 
     th = threading.Thread(target=target, daemon=True, name="vx-model-download")
+    base = dir_bytes(folder)                  # before the helper runs, so its first write still counts as progress
     th.start()
-    base = dir_bytes(folder)                  # raw growth = activity (stall watchdog)
     last_size, last_move, last_log = base, clock(), clock()
     meter.sample(progress_bytes(folder))      # each file once (progress line)
     while True:

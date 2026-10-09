@@ -50,7 +50,7 @@
 #define AppCodename ""
 #endif
 ; Pinned sizes of the complete download in MiB (infra/setup_mode.py: full_sizes; tests/test_setup_modes.py keeps them in step)
-#define FullModelsMB "25383"
+#define FullModelsMB "25332"
 #define FullRuntimeMB "2895"
 #ifndef ManifestUrl
 #define ManifestUrl "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/latest/download/manifest-stable.json"

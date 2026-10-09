@@ -125,7 +125,7 @@ Stille Installation für Administratoren: `Voxprint-Setup-online.exe /VERYSILENT
 
 ## Erster Start
 
-Beim ersten Start bereitet sich Voxprint vor. Mit dem Online-Installer öffnet sich das Fenster **{{modules.title}}** und arbeitet ohne Klick: Eine Zeile zeigt, was gerade geladen wird („{{modules.now_download}}“), danach die Prüfsummenprüfung, ein Balken den Gesamtfortschritt. Schritt 1 bringt die Programmkomponenten zusammen mit dem Textkorrektur-Modell SAGE und den Übersetzungsmodellen, Schritt 2 direkt danach ALLE Modelle (Stimme, Ausrichtung, Spracherkennung) in Ihren Modellordner. Sonst zeigt die Statuszeile „{{ui.prefetch_start}}“ und Voxprint lädt die benötigten Modelle (bis etwa 15 GB, einmalig). Ist Hugging Face langsam oder nicht erreichbar, wechselt Voxprint automatisch zum ModelScope-Spiegel. Der Download kann unterbrochen werden und läuft an der gleichen Stelle weiter. Modelle, die schon auf dem Computer liegen (zum Beispiel im Hugging-Face-Cache oder bei Alexandria/Pinokio), werden ohne erneuten Download nur lesend weiterverwendet. Die beiden mitgelieferten Stimmen *Boaz* und *Tirzah* (Kapitel 7) gehören zu diesem Download.
+Beim ersten Start bereitet sich Voxprint vor. Mit dem Online-Installer öffnet sich das Fenster **{{modules.title}}** und arbeitet ohne Klick: Eine Zeile zeigt, was gerade geladen wird („{{modules.now_download}}“), danach die Prüfsummenprüfung, ein Balken den Gesamtfortschritt. Schritt 1 bringt die Programmkomponenten zusammen mit dem Textkorrektur-Modell SAGE und den Übersetzungsmodellen, Schritt 2 direkt danach ALLE Modelle (Stimme, Ausrichtung, Spracherkennung) in Ihren Modellordner. Sonst zeigt die Statuszeile „{{ui.prefetch_start}}“ und Voxprint lädt die benötigten Modelle (bis etwa 15 GB, einmalig). Ist Hugging Face langsam oder nicht erreichbar, wechselt Voxprint automatisch zum ModelScope-Spiegel. Der Download kann unterbrochen werden und läuft an der gleichen Stelle weiter. Modelle, die schon auf dem Computer liegen (zum Beispiel im Hugging-Face-Cache oder bei Alexandria/Pinokio), werden ohne erneuten Download nur lesend weiterverwendet. Die mitgelieferte Stimme *Tirzah* (Kapitel 7) gehört zu diesem Download.
 
 Ist alles fertig, zeigt die Statuszeile „{{ui.prefetch_done}}“ Beim ersten Start erscheint ein Datenschutzhinweis; eine kurze Erinnerung („{{ui.footer_privacy}}“) bleibt am unteren Rand der Fenster.
 
@@ -156,7 +156,7 @@ Das Studio ist das erste Fenster. Es hat keine eigenen Einstellungen – es ist 
 | Titel und Untertitel | „Voxprint AI Audiobook Builder – {{studio.tagline}}“. Nur zur Information. |
 | Karte **{{studio.narrate_title}}** | {{studio.narrate_desc}} Öffnet das Vertonungsfenster. Das ist die Hauptkarte. Ist die Bibliothek leer, steht auf der Karte: „{{studio.narrate_no_voice}}“ Während ein Buch vertont wird, steht dort „{{studio.narrate_running}}“ |
 | Karte **{{studio.train_title}}** | {{studio.train_desc}} Öffnet das Trainingsfenster. Während des Trainings steht dort „{{studio.train_running}}“ |
-| Karte **{{studio.voices_title}}** | {{studio.voices_desc}} Unten auf der Karte zeigt ein Zähler, wie viele Stimmen Sie haben (zum Beispiel „Stimmen in der Bibliothek: 2“ – die beiden mitgelieferten Stimmen). |
+| Karte **{{studio.voices_title}}** | {{studio.voices_desc}} Unten auf der Karte zeigt ein Zähler, wie viele Stimmen Sie haben (zum Beispiel „Stimmen in der Bibliothek: 1“ – die mitgelieferte Stimme). |
 | Karte **{{studio.revoice_title}}** | {{studio.revoice_desc}} |
 | Zahnrad (oben rechts) | Öffnet **{{ui.settings_title}}** (Kapitel 8). |
 | Hinweis unten | „{{ui.footer_privacy}}“ |
@@ -167,7 +167,7 @@ Jedes andere Fenster hat oben links eine Schaltfläche **{{nav.back}}**, die Sie
 
 Öffnen Sie dieses Fenster über die Karte **{{studio.narrate_title}}**. {{narr.intro}}
 
-![Das Vertonungsfenster, obere Hälfte: Buch, Stimme (die mitgelieferte Stimme Boaz), Textvorbereitung, Übersetzung und das optionale KI-Textmodell.](@narrate_top)
+![Das Vertonungsfenster, obere Hälfte: Buch, Stimme, Textvorbereitung, Übersetzung und das optionale KI-Textmodell. Dieser Screenshot von Build 667 zeigt Boaz; diese Stimme wird nicht mehr installiert. Tirzah ist die mitgelieferte Stimme.](@narrate_top)
 
 ## Schritt 1 – das Buch
 
@@ -400,7 +400,7 @@ Der kleine Adapter (einige zehn MB) funktioniert nur in wenigen Apps (zum Beispi
 
 Öffnen Sie das Fenster über die Karte **{{studio.voices_title}}**. {{voices.intro}}
 
-![Meine Stimmen: die mitgelieferten Stimmen Boaz und Tirzah (CC0-1.0, schreibgeschützt) und die noch nicht geladene Offene Universalstimme.](@voices)
+![Meine Stimmen (Build 667): Tirzah ist die mitgelieferte Stimme (CC0-1.0, schreibgeschützt). Das Bild zeigt außerdem Boaz (diese Stimme wird nicht mehr installiert) und die noch nicht geladene Offene Universalstimme.](@voices)
 
 Jede Stimme ist eine Karte:
 
@@ -441,7 +441,8 @@ Die dritte Karte im Bild oben, die *Offene Universalstimme*, ist so eine Online-
 | custom/personal-only (Standard) | nicht erlaubt; Ergebnisse bleiben auf Ihrem Computer |
 | custom/test-use-only | nicht erlaubt; nur zum Testen, keine Veröffentlichung |
 
-* **Boaz** (männlich) und **Tirzah** (weiblich) – zwei offene **russische** Stimmen, die mit Voxprint kommen (Teil des Standard-Modelldownloads, jeweils etwa eine halbe Stunde Sprache). Sie sind nur mit gemeinfreien LibriVox-Aufnahmen trainiert: Boaz mit *Аграфена (Agrafena)* von Boris Saizew, gelesen von Mark Chulsky; Tirzah mit *Степные сказки (Stepnyia skazki)* von Grigori Danilewski, gelesen von Anastasiia Solokha. Lizenz **CC0-1.0** – für jede Nutzung frei, auch kommerziell; eine Namensnennung ist erwünscht. Die Namen stammen von Voxprint und bedeuten keine Billigung durch die Sprecher. In der Bibliothek sind sie schreibgeschützt („{{voices.bundled_note_plain}}“). Hörproben – Genesis 1,1–2,3 (russische Synodalübersetzung, gemeinfrei) mit beiden Stimmen, ebenfalls CC0 – liegen im Repository-Ordner `samples/`.
+* **Tirzah** (weiblich) – die offene **russische** Stimme, die mit Voxprint kommt (Teil des Standard-Modelldownloads, etwa eine halbe Stunde Sprache). Nur mit der gemeinfreien LibriVox-Aufnahme *Степные сказки (Stepnyia skazki)* von Grigori Danilewski trainiert, gelesen von Anastasiia Solokha. Lizenz **CC0-1.0** – für jede Nutzung frei, auch kommerziell; eine Namensnennung ist erwünscht. Der Name stammt von Voxprint und bedeutet keine Billigung durch die Sprecherin. In der Bibliothek ist sie schreibgeschützt („{{voices.bundled_note_plain}}“). Eine Hörprobe – Genesis 1,1–2,3 (russische Synodalübersetzung, gemeinfrei), ebenfalls CC0 – liegt im Repository-Ordner `samples/`. *Boaz* kam mit 0.1.3 und wird nicht mehr installiert.
+* **Asher** (männlich) und **Noa** (weiblich) – optionale russische Katalogstimmen, nicht Teil des Standard-Downloads. Sie erscheinen im Stimmenkatalog der App, sobald ihre Pakete veröffentlicht sind. Asher ist mit *Teachings of Christ* von Leo Tolstoi trainiert, gelesen von Vladimir Anyanov; Noa mit *Izbrannye* von Scholem Alejchem, gelesen von Hanna Ponomarenko. Lizenz **CC0-1.0**.
 * **Offene Universalstimme** (englisch: *Open universal voice*, russisch: *Открытый универсальный голос*) – eine englische Stimme für alle, die keine eigene Aufnahme haben. Nur mit dem gemeinfreien LJ-Speech-Datensatz trainiert (Sprecherin Linda Johnson, LibriVox); Lizenz **CC0-1.0** – für jede Nutzung frei, auch kommerziell; die Nennung des LJ-Speech-Datensatzes (Keith Ito) ist erwünscht.
 
 Die Offene Universalstimme wird getrennt aus dem Stimmen-Repository geladen.
@@ -573,7 +574,7 @@ Dieselbe Prüfung läuft ohne Fenster als `Voxprint.exe --auto-repair` (Kapitel 
 
 <dt>Exakte Pausen</dt><dd>Stille fester Länge, die Voxprint zwischen den gesprochenen Stücken einfügt – nach einem Komma, einem Satz, einem Absatz, einem Kapitel –, unabhängig davon, wie das Stimmmodell den Text phrasiert.</dd>
 
-<dt>Mitgelieferte Stimmen</dt><dd>Boaz und Tirzah: zwei offene russische Stimmen (CC0-1.0), die mit Voxprint kommen und in der Bibliothek schreibgeschützt sind.</dd>
+<dt>Mitgelieferte Stimmen</dt><dd>Tirzah: die offene russische Stimme (CC0-1.0), die mit Voxprint kommt und in der Bibliothek schreibgeschützt ist. Boaz kam mit 0.1.3 und wird nicht mehr installiert.</dd>
 
 </dl>
 
@@ -648,7 +649,7 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR [--format mp3,m4b,opus,...]
 Das Buch ist eine TXT-, FB2-, `.fb2.zip`- oder EPUB-Datei; das Ergebnis landet in `<DIR>/<Buchtitel>/`; Standardformat ist eine Opus-Datei. Die Pausen-Flags (Sekunden), `--speed` (0,7–1,3) und `--style` ersetzen für einen Lauf die Werte aus „{{ui.settings_title}}“ → „{{narrset.title}}“; `--pauses` schaltet das Schneiden an jedem Komma ein. Wird derselbe Befehl erneut ausgeführt, überspringt er bereits fertige Fragmente, und Änderungen an Pausen oder Tempo sprechen sie nie neu.
 
 ```
-voxprint narrate genesis.txt --voice Boaz --out ./audiobooks --format mp3 --json
+voxprint narrate genesis.txt --voice tirzah --out ./audiobooks --format mp3 --json
 ```
 
 ## Eine Stimme trainieren

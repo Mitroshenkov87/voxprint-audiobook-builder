@@ -40,6 +40,24 @@ def test_each_write_uses_its_own_temporary_file(tmp_path, monkeypatch):
     assert cache.has(key) and not list(cache.dir.glob("*.part.flac"))
 
 
+def test_temporary_names_differ_when_the_clock_does_not(tmp_path, monkeypatch):
+    """Windows monotonic_ns can return the same value twice (build-installer run 42). The counter still separates them."""
+    monkeypatch.setattr(nr.time, "monotonic_ns", lambda: 465609000000)
+    cache = nr.ChunkCache(tmp_path / "c")
+    seen = []
+    real_replace = os.replace
+
+    def spy(src, dst):
+        seen.append(Path(src).name)
+        real_replace(src, dst)
+
+    monkeypatch.setattr(nr.os, "replace", spy)
+    key = cache.key("t", "And God saw that it was good.")
+    for _ in range(2):
+        cache.save(key, np.full(100, 0.1, np.float32), SR)
+    assert seen[0] != seen[1] and "465609000000" in seen[0] and seen[0].endswith(".part.flac")
+
+
 def test_parallel_writes_of_one_key_do_not_collide(tmp_path):
     cache = nr.ChunkCache(tmp_path / "c")
     key = cache.key("t", "twin")

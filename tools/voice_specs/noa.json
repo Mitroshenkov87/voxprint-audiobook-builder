@@ -1,0 +1,25 @@
+{
+  "id": "noa",
+  "name": "Noa",
+  "language": "ru",
+  "author": "Hanna Ponomarenko (LibriVox) - public domain",
+  "speaker": "Hanna Ponomarenko",
+  "prepared_by": "Voxprint",
+  "project_url": "https://archive.org/details/izbrannye_2212_librivox",
+  "gender": "female",
+  "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "description": "Optional female Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Izbrannye' by Sholem Aleichem, read by Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Noa is Voxprint's own and does not imply the reader's endorsement.",
+  "descriptions": {
+    "en": "Optional female Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Izbrannye' by Sholem Aleichem, read by Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Noa is Voxprint's own and does not imply the reader's endorsement.",
+    "ru": "Необязательный женский русский голос для каталога в программе, не входит в стандартную загрузку. Обучен только на записи LibriVox из общественного достояния «Izbrannye» (Шолом-Алейхем), читает Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Noa дано Voxprint и не означает одобрения чтеца.",
+    "de": "Optionale weibliche russische Stimme für den Stimmenkatalog in der App, nicht Teil des Standard-Downloads. Nur mit der gemeinfreien LibriVox-Aufnahme 'Izbrannye' von Sholem Aleichem trainiert, gelesen von Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Noa stammt von Voxprint und bedeutet keine Billigung durch die Sprecherin."
+  },
+  "consent": {
+    "scope": "commercial",
+    "name": "Hanna Ponomarenko (LibriVox reader, recording in the public domain)",
+    "method": "manual",
+    "confirmed": true
+  }
+}
