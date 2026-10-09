@@ -16,6 +16,7 @@ import logging
 import logging.handlers
 import os
 import platform
+import re
 import sys
 import threading
 import time
@@ -90,12 +91,86 @@ QT_NOISE = ("QFont::setPointSize: Point size <= 0", "QThreadStorage: entry")
 WARNING_NOISE = (r"Couldn't find ffmpeg or avconv", r"Couldn't find ffprobe or avprobe", r".*[Tt]riton", r".*SoX could not be found")
 
 
+#: Log records (logger name -> message pattern) about optional accelerators Voxprint does not use. PyTorch's flop
+#: counter logs "triton not found" on Windows, bitsandbytes logs the same for its XPU kernels, and the SoX wrapper
+#: that the TTS package imports logs "SoX could not be found". These are logging records, not ``warnings``, so
+#: :data:`WARNING_NOISE` does not catch them.
+LOG_NOISE = {
+    "torch.utils.flop_counter": r"(?i)triton",
+    "bitsandbytes": r"(?i)triton",
+    "bitsandbytes.backends.xpu.ops": r"(?i)triton",
+    "sox": r"SoX could not be found",
+    "sox.log": r"SoX could not be found",
+}
+
+
+class _PatternFilter(logging.Filter):
+    """Drops records whose message matches ``pattern``."""
+
+    def __init__(self, pattern: str) -> None:
+        super().__init__()
+        self._rx = re.compile(pattern)
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003 - logging API name
+        try:
+            return self._rx.search(record.getMessage()) is None
+        except Exception:  # noqa: BLE001 - a broken record is not ours to drop
+            return True
+
+
+def quiet_known_log_noise() -> None:
+    """Attach a filter for :data:`LOG_NOISE` to each named logger (a logger filter sees its own records first)."""
+    for name, pattern in LOG_NOISE.items():
+        lg = logging.getLogger(name)
+        if not any(isinstance(f, _PatternFilter) for f in lg.filters):
+            lg.addFilter(_PatternFilter(pattern))
+
+
+def _sox_probe(cmd) -> bool:
+    return isinstance(cmd, str) and cmd.strip().split(" ", 1)[0].lower() in ("sox", "sox.exe")
+
+
+def skip_missing_sox_probe(which: Optional[Callable[[str], Optional[str]]] = None) -> bool:
+    """Do not run ``sox -h`` through the shell when SoX is not installed.
+
+    The ``sox`` package (imported by the TTS package) runs ``os.popen("sox -h")`` at import. On Windows without SoX,
+    cmd.exe prints "'sox' is not recognized as an internal or external command" to the console, which ends up in a
+    command-line caller's stderr. Voxprint never calls SoX. When ``sox`` is not on ``PATH``, that one probe gets an
+    empty answer instead of a shell; the package then marks SoX missing, as it would after the shell. Every other
+    ``os.popen`` call goes through unchanged. Returns True when the probe is short-circuited.
+    """
+    import io
+    import shutil
+
+    which = which or shutil.which
+    if which("sox"):
+        return False
+    current = os.popen
+    if getattr(current, "_voxprint_sox_guard", False):
+        return True
+
+    def popen(cmd, mode="r", buffering=-1):
+        if _sox_probe(cmd):
+            return io.StringIO("")
+        return current(cmd, mode, buffering)
+
+    popen._voxprint_sox_guard = True  # type: ignore[attr-defined]
+    os.popen = popen  # type: ignore[assignment]
+    return True
+
+
 def quiet_known_warnings() -> None:
-    """Drop the warnings of :data:`WARNING_NOISE` (called once at start-up, before the heavy imports)."""
+    """Drop the warnings of :data:`WARNING_NOISE` and the log records of :data:`LOG_NOISE`, and skip the SoX shell probe
+    when SoX is missing (called once at start-up, before the heavy imports)."""
     import warnings
 
     for pattern in WARNING_NOISE:
         warnings.filterwarnings("ignore", message=pattern)
+    quiet_known_log_noise()
+    try:
+        skip_missing_sox_probe()
+    except Exception:  # noqa: BLE001 - only noise reduction
+        pass
 
 
 def install_qt_message_handler() -> None:

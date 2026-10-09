@@ -40,7 +40,7 @@
 #define AppName "Voxprint"
 ; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
 #define AppDisplayName "Voxprint AI Audiobook Builder"
-#define AppVersion "0.2.0"
+#define AppVersion "0.2.1"
 #define AppExe "Voxprint.exe"
 ; CI build number and codename (tools/build_number.py; build_online.ps1 passes /DAppBuild= /DAppCodename=); 0 = local build
 #ifndef AppBuild

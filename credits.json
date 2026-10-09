@@ -2,9 +2,9 @@
  "app": {
   "name": "Voxprint",
   "display_name": "Voxprint AI Audiobook Builder",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "channel": "beta",
-  "codename": "Kaporet",
+  "codename": "Shalem",
   "author": "Aleksandr Mitroshenkov"
  },
  "repo_url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder",

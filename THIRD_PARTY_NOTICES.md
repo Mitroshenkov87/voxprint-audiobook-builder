@@ -1,6 +1,6 @@
 # Third-party notices
 
-Voxprint AI Audiobook Builder (c) Aleksandr Mitroshenkov, built with AI assistance. Version 0.2.0.
+Voxprint AI Audiobook Builder (c) Aleksandr Mitroshenkov, built with AI assistance. Version 0.2.1.
 
 Voxprint stands on the open-source projects and models listed below. Every component keeps its own licence;
 the full licence texts are in the `licenses/` folder next to this file. This file is generated from

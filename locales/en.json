@@ -855,6 +855,8 @@
  "spk.check": "Mark speakers",
  "spk.narrator": "Narrator: {name}",
  "spk.male": "Male voice",
+ "spk.male2": "Second male voice",
+ "spk.male2_tip": "Different men alternate between the male voice and this one, in order of first appearance. None = one voice for all men.",
  "spk.female": "Female voice",
  "spk.none": "None",
  "spk.preview": "Preview and edit speakers",

@@ -226,3 +226,57 @@ def test_an_unreadable_reply_warns_and_an_all_narrator_dialogue_warns(tmp_path):
     assert any("Hello" in call for call in narr.calls)
     marks = (res.out_dir / ".debug" / "speakers.txt").read_text(encoding="utf-8")
     assert "mismatch" not in marks and spk.load_marks(marks)
+
+
+def _three_men():
+    return Book("Men", "", "en", [Chapter("One",
+        'The three of them sat down.\n\n'
+        '"I start," David said.\n\n'
+        '"I follow," Michael said.\n\n'
+        '"And I," Hannah said.\n\n'
+        '"Me again," David said.\n\n'
+        '"Third man," Saul said.')])
+
+
+def _three_men_marks():
+    return [spk.SpeakerLine("narrator"), spk.SpeakerLine("male", "David"), spk.SpeakerLine("male", "Michael"),
+            spk.SpeakerLine("female", "Hannah"), spk.SpeakerLine("male", "david"), spk.SpeakerLine("male", "Saul")]
+
+
+def test_second_male_voice_alternates_by_character_and_old_casts_still_work():
+    lines = _three_men_marks()
+    one = spk.SpeakerCast(lines=lines, male_id="m", female_id="f", narrator_id="narr")
+    assert one.voices_for(lines) == ["", "m", "m", "f", "m", "m"]          # unchanged: one voice per role
+    two = spk.SpeakerCast(lines=lines, male_id="m", female_id="f", male2_id="m2", narrator_id="narr")
+    assert two.voices_for(lines) == ["", "m", "m2", "f", "m", "m"]         # David m, Michael m2, Saul m again
+    assert two.extra_ids("narr") == ["m", "m2", "f"] and two.uses_several("narr")
+    assert two.assignment(lines) == {"David": "m", "Michael": "m2", "Hannah": "f", "Saul": "m"}
+    pinned = spk.SpeakerCast(lines=lines, male_id="m", male2_id="m2", narrator_id="narr",
+                             characters={"SAUL": "s", "Michael": "m"})
+    assert pinned.voices_for(lines) == ["", "m", "m", "", "m", "s"]       # pins win; no female voice -> narrator
+    assert pinned.extra_ids("narr") == ["m", "m2", "s"]
+    unnamed = [spk.SpeakerLine("male"), spk.SpeakerLine("male", "Tom")]
+    assert two.voices_for(unnamed) == ["m", "m"]
+    assert spk.parse_character_map(["David = asher", "Hannah=noa"]) == {"David": "asher", "Hannah": "noa"}
+    for bad in (["David"], ["=x"], ["David="]):
+        try:
+            spk.parse_character_map(bad)
+        except ValueError:
+            continue
+        raise AssertionError(bad)
+
+
+def test_narration_gives_two_men_two_voices(tmp_path):
+    from core import narration as nr
+    from core import audiobook_export as ex
+
+    book = _three_men()
+    cast = spk.SpeakerCast(lines=_three_men_marks(), male_id="m", female_id="f", male2_id="m2", narrator_id="narr")
+    engines = {k: FakeEngine() for k in ("m", "m2", "f")}
+    extra = {k: (lambda e=e: e, k) for k, e in engines.items()}
+    opts = nr.NarrationOptions(speakers=cast, speak_titles=False, formats={ex.FORMAT_WAV_CHAPTERS})
+    _res, narr, _ff, _ev = run(tmp_path, book=book, options=opts, extra_engines=extra)
+    said = {k: " ".join(e.calls) for k, e in engines.items()}
+    assert "I start" in said["m"] and "Me again" in said["m"] and "Third man" in said["m"]
+    assert "I follow" in said["m2"] and "I follow" not in said["m"]
+    assert "And I" in said["f"] and any("sat down" in c for c in narr.calls)

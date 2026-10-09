@@ -855,6 +855,8 @@
  "spk.check": "Sprecher markieren",
  "spk.narrator": "Erzähler: {name}",
  "spk.male": "Männliche Stimme",
+ "spk.male2": "Zweite Männerstimme",
+ "spk.male2_tip": "Verschiedene Männer wechseln zwischen der Männerstimme und dieser, in der Reihenfolge ihres ersten Auftritts. Keine = eine Stimme für alle Männer.",
  "spk.female": "Weibliche Stimme",
  "spk.none": "Keine",
  "spk.preview": "Sprecher ansehen und bearbeiten",

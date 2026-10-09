@@ -133,20 +133,25 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
 
     from tools import build_number as bn
 
-    # Runs 41-44 published nothing. Offset 655: run 45 stamps 700 (Kaporet).
+    # Runs 41-44 published nothing. Offset 655: run 45 stamped 700 (Kaporet), run 46 stamps 701 (Shalem).
     assert bn.build_number({"GITHUB_RUN_NUMBER": "45"}) == 700 and bn.build_number({}) == 0
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "46"}) == 701
     assert bn.build_number({"GITHUB_RUN_NUMBER": "40"}) == 695
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34"}) == 700
     assert bn.info()["offset"] == 655
     name = bn.info()["codename"]
-    assert name == "Kaporet" and name.isascii() and name.isalpha()
+    assert name == "Shalem" and name.isascii() and name.isalpha()
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     credits = json.loads((root / "credits.json").read_text(encoding="utf-8"))
-    assert credits["app"]["version"] == "0.2.0" and credits["app"]["channel"] == "beta"
-    assert credits["app"]["codename"] == "Kaporet"
+    assert credits["app"]["version"] == "0.2.1" and credits["app"]["channel"] == "beta"
+    assert credits["app"]["codename"] == "Shalem"
+    iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8")
+    assert '#define AppVersion "0.2.1"' in iss
     notes = (root / "docs" / "RELEASE-NOTES-700-KAPORET.md").read_text(encoding="utf-8")
     assert "655" in notes and "run 45" in notes and "does not delete" in notes and "Kaporet" in notes
+    notes = (root / "docs" / "RELEASE-NOTES-701-SHALEM.md").read_text(encoding="utf-8")
+    assert "655" in notes and "run 46" in notes and "Shalem" in notes and "22/22" in notes
     c = tmp_path / "credits.json"
     c.write_text(json.dumps({"app": {"version": "0.1.1"}}), encoding="utf-8")
     bn.stamp(c, 665, "0123456789abcdef", "Tikkun")

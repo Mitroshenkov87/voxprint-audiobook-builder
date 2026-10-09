@@ -5,7 +5,25 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
-Draft for **0.2.0-beta**, build **700** "Kaporet" (Biblical Hebrew *kaporet*, כַּפֹּרֶת, the Ark cover; gematria 700; Numbers 7:89, the Voice spoke from above the kaporet). Not released. `BUILD.json` codename is Kaporet. The offset is **655**, so build-installer run 45 stamps build 700.
+## [0.2.1-beta] - 2026-10-09 - build 701 "Shalem"
+
+Codename *Shalem* (Biblical Hebrew *shalem*, whole, complete; Genesis 33:18). Fixes from the test of build 700 on a real PC. `BUILD.json` offset stays **655**, so build-installer run 46 stamps build 701. Upgrade: uninstall 700, then install 701; models, voices and settings stay.
+
+### Added
+- **"все" / "всё" by context.** The letter-yo step (Prepare text and `voxprint narrate`) now decides the most frequent homograph from its neighbours. "всё": before a singular verb ("всё было", "всё скачивает", "всё рассказывал") or a neuter adjective ("всё остальное", "всё сущее"), at the end of a clause or before a colon ("вот и всё", "там всё:"), before ", что", in "всё равно", "всё-таки", "всё же", "всё ещё", before a comparative ("всё темнее"), and after a singular subject before its verb ("я всё знаю"). "все": before a plural word, pronoun or collective number ("все люди", "все они", "все её книги", "все пятеро"), after a plural subject or verb ("пришли все", "мы все"), and whenever no rule fires. The word lists are data, `core/data/yo_context.json` (Apache-2.0). `yo.restore(text, context=False)` keeps the dictionary-only behaviour. On the 700 test dialogue (`tests/fixtures/yo/`) the step restores **22/22** yo with none wrong; build 700 restored 16/22 and every miss was "всё". 33 unit cases cover both sides.
+- **A second voice per role in multi-voice narration.** `voxprint narrate --male2-voice ID` (and `--female2-voice ID`): different characters of that role, by the name in the speaker marks, alternate between the two voices in order of first appearance (first man `--male-voice`, second man `--male2-voice`, third man `--male-voice` again). `--character NAME=ID` (repeatable) pins one character to a voice and wins over the role voices. The Narrate window has a *Second male voice* list next to the male voice (None by default; en, de, ru, uk, lv). `SpeakerCast` gains `male2_id`, `female2_id`, `characters` and `voices_for()`; `speakers.assign()` takes the per-mark voices. Without the new settings every man and every woman share one voice, as before.
+- **`voxprint prepare`.** The Narrate window's Prepare text without narration: the rule steps (`--steps`, `--no-rules`), the Russian letter yo (`--yo` / `--no-yo`), the Russian typo model when it is downloaded (`--typos` requires it, `--no-typos` skips it) and, with `--llm` (alias `--markup`), the text model's narration rewrite. Writes plain UTF-8 text and a JSON report (`<out stem>.prep_report.json`, or `--report`): language, steps, changes per step, typo-model statistics.
+- **`voxprint translate`.** Offline translation as the Narrate window runs it (Opus-MT; `--literary` with Gemma and Opus-MT as the fallback), written as plain text. A missing model is exit 4 with the module to download.
+- **`voxprint settings list | get KEY | set KEY VALUE`.** UI language, projects folder, reading speed and style, explicit pauses and their lengths, ordinals, the AI disclosure. `models.folder` is shown read-only.
+- [docs/CLI.md](docs/CLI.md) and [docs/AGENTS.md](docs/AGENTS.md) document the new commands and flags.
+
+### Fixed
+- **"'sox' is not recognized as an internal or external command"** on a command-line caller's console. The `sox` package (imported by the speech package) runs `os.popen("sox -h")` at import. When SoX is not on `PATH`, that probe now gets an empty answer instead of a shell (`infra.diagnostics.skip_missing_sox_probe`). Voxprint never uses SoX.
+- **"triton not found; flop counting will not work for triton kernels"** and bitsandbytes' Triton notice were logged on Windows. They are logging records, not Python warnings, so the existing warning filter did not catch them. A filter on those loggers drops them (`infra.diagnostics.LOG_NOISE`).
+
+## [0.2.0-beta] - 2026-10-09 - build 700 "Kaporet"
+
+Codename *Kaporet* (Biblical Hebrew *kaporet*, the Ark cover; gematria 700; Numbers 7:89, the Voice spoke from above the kaporet). `BUILD.json` offset **655**: build-installer run 45 stamped build 700.
 
 Upgrading from build 668: uninstall removes only the program folder. On 668, answer **No** to "Also delete the downloaded models and logs?" (that is the default; a silent uninstall already keeps the folder). Clicking Yes on 668 deletes `%LOCALAPPDATA%\Voxprint`, including models, voices and settings. The 700 uninstaller does not ask and does not delete that folder. A clean install of 700 then uses the same models (`models`), voices (`voices`) and settings (`state`). A models folder chosen outside that profile was never deleted by either uninstaller.
 

@@ -151,7 +151,7 @@ class NarrateWindow(SubWindow):
         self._model_msg = ""                    # last download message ("" = show the state text)
         self.speaker_lines: Optional[List[spk.SpeakerLine]] = None
         self._speaker_preview: Optional[SpeakerDialog] = None
-        self._spk_touched = {"male": False, "female": False}
+        self._spk_touched = {"male": False, "male2": False, "female": False}
         self._choice_status = True              # the idle / ready line, until a job writes its own status
         self._build()
         self.retranslate()
@@ -341,7 +341,8 @@ class NarrateWindow(SubWindow):
         sv.setSpacing(4)
         self.lbl_spk_narrator = hint_label()
         sv.addWidget(self.lbl_spk_narrator)
-        for attr, combo_name in (("lbl_spk_male", "cmb_spk_male"), ("lbl_spk_female", "cmb_spk_female")):
+        for attr, combo_name in (("lbl_spk_male", "cmb_spk_male"), ("lbl_spk_male2", "cmb_spk_male2"),
+                                 ("lbl_spk_female", "cmb_spk_female")):
             row = QHBoxLayout()
             label, combo = QLabel(), QComboBox()
             setattr(self, attr, label)
@@ -366,6 +367,7 @@ class NarrateWindow(SubWindow):
         self.chk_llm_prepare.toggled.connect(lambda _c: self._refresh_buttons())
         self.chk_speakers.toggled.connect(lambda _c: self._refresh_buttons())
         self.cmb_spk_male.currentIndexChanged.connect(lambda _i: self._on_spk_combo("male"))
+        self.cmb_spk_male2.currentIndexChanged.connect(lambda _i: self._on_spk_combo("male2"))
         self.cmb_spk_female.currentIndexChanged.connect(lambda _i: self._on_spk_combo("female"))
         self.btn_spk_preview.clicked.connect(self.preview_speakers)
         self.flow.add(c)
@@ -598,6 +600,8 @@ class NarrateWindow(SubWindow):
         self.chk_llm_prepare.setText(tr("llm.prepare"))
         self.chk_speakers.setText(tr("spk.check"))
         self.lbl_spk_male.setText(tr("spk.male"))
+        self.lbl_spk_male2.setText(tr("spk.male2"))
+        self.cmb_spk_male2.setToolTip(tr("spk.male2_tip"))
         self.lbl_spk_female.setText(tr("spk.female"))
         self.btn_spk_preview.setText(tr("spk.preview"))
         self.lbl_llm_note.setText(tr("llm.note"))
@@ -887,7 +891,9 @@ class NarrateWindow(SubWindow):
     def _fill_speaker_combos(self) -> None:
         """Library voices in the male and female lists. A still-valid choice is kept; otherwise the first matching gender."""
         voices = list(self.library.list_voices())
-        for which, combo, gender in (("male", self.cmb_spk_male, "male"), ("female", self.cmb_spk_female, "female")):
+        # The second male voice starts as None: one male voice stays the default, as before.
+        for which, combo, gender in (("male", self.cmb_spk_male, "male"), ("male2", self.cmb_spk_male2, ""),
+                                     ("female", self.cmb_spk_female, "female")):
             current = str(combo.currentData() or "")
             combo.blockSignals(True)
             combo.clear()
@@ -895,7 +901,7 @@ class NarrateWindow(SubWindow):
             pick = 0
             for i, rec in enumerate(voices, start=1):
                 combo.addItem(rec.name, rec.id)
-                if pick == 0 and str(rec.info.get("gender") or "") == gender:
+                if pick == 0 and gender and str(rec.info.get("gender") or "") == gender:
                     pick = i
             idx = combo.findData(current) if current else 0
             if self._spk_touched[which]:
@@ -911,8 +917,9 @@ class NarrateWindow(SubWindow):
         if not (self.chk_speakers.isChecked() and self.chk_speakers.isEnabled()):
             return None
         male, female = str(self.cmb_spk_male.currentData() or ""), str(self.cmb_spk_female.currentData() or "")
+        male2 = str(self.cmb_spk_male2.currentData() or "") if male else ""
         narr = self.selected_voice_id()
-        cast = spk.SpeakerCast(lines=self.speaker_lines, male_id=male, female_id=female,
+        cast = spk.SpeakerCast(lines=self.speaker_lines, male_id=male, female_id=female, male2_id=male2,
                                tagger=None if self.speaker_lines is not None else self.llm_plan(), narrator_id=narr)
         return cast if cast.uses_several(narr) else None
 
