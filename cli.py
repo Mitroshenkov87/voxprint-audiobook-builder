@@ -43,6 +43,8 @@ from core.build_stamp import read_trailer
 from infra.stdio_guard import guard_stdio, install_cli_excepthook
 from core.asr import make_default_asr
 from core.book_parsers import load_book
+from core.book_prep import PrepPlan
+from core.text_prep import STEP_YO, PrepOptions
 from core.errors import BackupError, CancelledByUser, DatasetMakerError, OutOfMemoryError_
 from core.events import CancelToken, Stage, overall_percent
 from core.narration import NarrationOptions, NarrationProgress, PauseToken
@@ -435,6 +437,12 @@ def build_parser() -> argparse.ArgumentParser:
     ords.add_argument("--no-ordinals", dest="ordinals", action="store_false",
                       help="Read every number as written (cardinal)")
     n.set_defaults(ordinals=None)
+    yo_flag = n.add_mutually_exclusive_group()
+    yo_flag.add_argument("--yo", dest="yo", action="store_true", default=None,
+                         help="Restore the Russian letter yo where a dictionary is sure (default: on)")
+    yo_flag.add_argument("--no-yo", dest="yo", action="store_false",
+                         help="Leave the letter e as written; do not restore yo")
+    n.set_defaults(yo=None)
     n.add_argument("--ai-disclosure", action="store_true",
                    help="Speak a short AI disclosure at the start (opt-in)")
     n.add_argument("--speakers", action="store_true",
@@ -764,12 +772,16 @@ def cmd_narrate(args: argparse.Namespace, *,
             ws.save_folder(Path(args.work_dir))
         formats = parse_formats(args.formats)
         lengths, pace = narration_shaping(args)
+        yo_on = True if getattr(args, "yo", None) is None else bool(args.yo)
         options = NarrationOptions(
             formats=formats,
             pauses=pz.PauseProfile(lengths=lengths) if args.pauses else None,
             pause_lengths=lengths, pace=pace,
             ai_disclosure=bool(args.ai_disclosure),
             ordinals=ordinals.load_enabled() if getattr(args, "ordinals", None) is None else bool(args.ordinals),
+            yo=yo_on,
+            # Yo only. The rest of Prepare text stays a window switch; this plan writes the restored book to .debug.
+            prep=PrepPlan(rules=PrepOptions(frozenset({STEP_YO}))) if yo_on else None,
         )
         cast, extra_voices = _speaker_job(args, voice, lib, plan_fn)
         if cast is not None:

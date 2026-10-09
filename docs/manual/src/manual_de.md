@@ -494,7 +494,7 @@ Ab Werk ist alles, was automatisch laufen kann, **bereits gewählt** und mit ein
 * Übersetzung des Buches vor dem Vertonen (Englisch, Russisch, Deutsch; Opus-MT-Modelle, etwa 300 MB je Richtung, einmal geladen). Aus, bis Sie sie einschalten.
 * Trainingsfenster: „{{check.checkbox}}“ und „{{preview.compare}}“ (beide brauchen das Spracherkennungsmodell, etwa 1,9 GB, einmal geladen).
 * Immer aktiv, ohne Schalter: Ausrichtung des Textes auf das Audio mit Plausibilitätsprüfung, Audio-Qualitätsfilter, Erkennungsfilter des Nur-Audio-Modus.
-* Nicht enthalten, weil es sie noch nicht gibt: Zeichensetzungsmodell und russische Betonungszeichen. Sprechermarken sind eine eigene Option auf der Karte des KI-Textmodells.
+* Nicht enthalten, weil es sie noch nicht gibt: ein Zeichensetzungsmodell. Russische Betonungszeichen werden nicht gesetzt, weil das Sprachmodell sie nicht liest; der Buchstabe jo gehört zu „Text vorbereiten“. Sprechermarken sind eine eigene Option auf der Karte des KI-Textmodells.
 
 Die Trainingsvorgabe bleibt absichtlich bei „{{preset.balanced}}“: In unseren Tests ließ längeres Training mit höherer Lernrate die Stimme nuscheln, mehr ist dort also nicht besser. Stattdessen wird nach „{{preview.compare}}“ die bessere der beiden Varianten als „{{auto.recommended}}“ markiert (zuerst das Urteil, dann weniger Erkennungsfehler, dann die kleinere Tonhöhenabweichung; ohne klaren Unterschied Variante A, die günstiger ist). Die Entscheidung bleibt bei Ihnen: Hören Sie immer hin.
 

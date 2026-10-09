@@ -848,7 +848,7 @@
  "narrset.hint": "Katram ierunātajam fragmentam vispirms tiek nogriezts paša klusums, tad ievietotas šīs pauzes. Gari, svinīgi un aprakstoši teikumi tiek lasīti nedaudz lēnāk, dialogi - parastā ātrumā. Attiecas uz nākamo ierunāšanu; gatavās daļas netiek sintezētas no jauna.",
  "narrset.defaults": "Noklusējuma pauzes un ātrums",
  "prep.one": "Sagatavot tekstu",
- "prep.one_d": "Sakārto izkārtojumu, pēdiņas, saites, virsrakstus, skaitļus un saīsinājumus un labo drukas kļūdas krievu grāmatā, ja modelis ir lejupielādēts. Ieslēgts pēc noklusējuma.",
+ "prep.one_d": "Sakārto izkārtojumu, pēdiņas, saites, virsrakstus, skaitļus un saīsinājumus, krievu tekstā atjauno burtu jo, kur vārdnīca ir droša, un labo drukas kļūdas krievu grāmatā, ja modelis ir lejupielādēts. Ieslēgts pēc noklusējuma.",
  "narr.ready": "Grāmata un balss ir izvēlētas. Nospiediet Sākt.",
  "llm.need_model": "Lejupielādējiet teksta modeli, lai to izmantotu.",
  "llm.literary_when": "Tiek izmantots, kad tulkojums ir ieslēgts un tā modeļi ir gatavi. Izslēgts pēc noklusējuma.",

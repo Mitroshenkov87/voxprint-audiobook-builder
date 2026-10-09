@@ -64,6 +64,7 @@ pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --paths . --paths third_party ^
   --add-data "infra\verified_manifest.json;infra" --add-data "infra\assets_manifest.json;infra" --add-data "infra\model_mirrors.json;infra" --add-data "infra\model_release.json;infra" ^
   --add-data "locales;locales" --add-data "prompts;prompts" --add-data "credits.json;." --add-data "licenses;licenses" ^
+  --add-data "core\data;core\data" ^
   --add-data "build\notices\THIRD_PARTY_NOTICES.md;." ^
   --hidden-import core.i18n --hidden-import core.appinfo --hidden-import core.model_export ^
   --hidden-import core.aligner --hidden-import core.slicer --hidden-import core.dataset_builder ^

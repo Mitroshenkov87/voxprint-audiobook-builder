@@ -76,6 +76,8 @@ REGISTRY: Tuple[TextModel, ...] = (
               "oliverguhr/spelling-correction-english-base", "", 535, "MIT", False),
     TextModel("spell-de", KIND_CLEANUP, STEP_SPELLFIX, "German spelling correction", ("de",),
               "oliverguhr/spelling-correction-german-base", "", 950, "Apache-2.0", False),
+    # The letter yo is the rule step ``yo`` (:mod:`core.yo`), shipped with the program. This entry stays off:
+    # a stress model would emit marks the base Qwen3-TTS model does not read.
     TextModel("stress-ru", KIND_STRESS, STEP_STRESS, "Russian stress marks and the letter yo", ("ru",), "", "", 0, "", False),
     # Opus-MT tc-big (2022-23, same Marian architecture): preferred; listed BEFORE the 2020 models of the same direction,
     # which stay as a fallback for installs that already have them (make_translator takes the first installed one).

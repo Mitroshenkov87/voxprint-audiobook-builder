@@ -14,14 +14,15 @@ Steps (keys of :data:`STEP_KEYS`, each can be switched off):
 ``links``      URLs and e-mail addresses become a short phrase ("ссылка", "link");
 ``numbers``    integers, decimals, ordinals ("5-му"), years, dates, percents, currency, units -> words;
 ``abbrev``     "т. д.", "г.", "им.", "Mr.", "Dr.", "etc." ... -> full words;
-``headings``   "Глава XII" -> "Глава двенадцатая", ALL-CAPS headings -> normal case, bare Roman numerals -> words.
+``headings``   "Глава XII" -> "Глава двенадцатая", ALL-CAPS headings -> normal case, bare Roman numerals -> words;
+``yo``         Russian only: restore the letter yo where the safe dictionary is sure (:mod:`core.yo`).
 
 Very long sentences need no step of their own: the chunker (:mod:`core.chunker`) always cuts them at clause boundaries
 with the aligner's clause splitter (:func:`core.text_utils.split_clauses`).
 
-Languages: ``ru`` and ``en`` get every step; for other languages only the language-neutral steps run (layout, quotes,
-noise, links) and digits are left for the engine.  Everything is deterministic, so a resumed job produces identical text
-(the narration cache is keyed by the prepared text).
+Languages: ``ru`` and ``en`` get the shared steps; ``yo`` runs for Russian only.  For other languages only the
+language-neutral steps run (layout, quotes, noise, links) and digits are left for the engine.  Everything is
+deterministic, so a resumed job produces identical text (the narration cache is keyed by the prepared text).
 """
 from __future__ import annotations
 
@@ -31,15 +32,21 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, FrozenSet, List, Optional, Tuple
 
 from core import num_words as nw
+from core import yo
 from core.book_parsers import Book, Chapter
 
-STEP_LAYOUT, STEP_QUOTES, STEP_NOISE, STEP_LINKS, STEP_NUMBERS, STEP_ABBREV, STEP_HEADINGS = (
-    "layout", "quotes", "noise", "links", "numbers", "abbrev", "headings")
-STEP_KEYS: Tuple[str, ...] = (STEP_LAYOUT, STEP_NOISE, STEP_QUOTES, STEP_LINKS, STEP_HEADINGS, STEP_NUMBERS, STEP_ABBREV)
-#: Steps that need language knowledge (digits / abbreviations / headings).
+STEP_LAYOUT, STEP_QUOTES, STEP_NOISE, STEP_LINKS, STEP_NUMBERS, STEP_ABBREV, STEP_HEADINGS, STEP_YO = (
+    "layout", "quotes", "noise", "links", "numbers", "abbrev", "headings", "yo")
+STEP_KEYS: Tuple[str, ...] = (STEP_LAYOUT, STEP_NOISE, STEP_QUOTES, STEP_LINKS, STEP_HEADINGS, STEP_NUMBERS,
+                              STEP_ABBREV, STEP_YO)
+#: Steps that need language knowledge (digits / abbreviations / headings).  Russian and English.
 LANGUAGE_STEPS = frozenset({STEP_NUMBERS, STEP_ABBREV, STEP_HEADINGS})
-#: Execution order (numbers before abbreviations: "1999 г." must still be seen as a year).
-_ORDER: Tuple[str, ...] = (STEP_LAYOUT, STEP_NOISE, STEP_QUOTES, STEP_LINKS, STEP_HEADINGS, STEP_NUMBERS, STEP_ABBREV)
+#: Russian only.  Not part of :data:`LANGUAGE_STEPS`, so an English book does not run it.
+RU_ONLY_STEPS = frozenset({STEP_YO})
+#: Execution order.  Numbers before abbreviations ("1999 г." must still be seen as a year).  Yo last, so a dotted
+#: abbreviation is still visible to the dictionary's lookahead and words produced by the earlier steps can be restored.
+_ORDER: Tuple[str, ...] = (STEP_LAYOUT, STEP_NOISE, STEP_QUOTES, STEP_LINKS, STEP_HEADINGS, STEP_NUMBERS,
+                           STEP_ABBREV, STEP_YO)
 
 
 @dataclass(frozen=True)
@@ -714,11 +721,33 @@ def step_headings(text: str, ctx: _Ctx) -> str:
     return "\n\n".join(out)
 
 
+# =========================================================================== letter yo (Russian)
+
+
+def step_yo(text: str, ctx: _Ctx) -> str:
+    """Restore yo where the safe dictionary is sure.  Other languages are unchanged."""
+    if ctx.lang != "ru":
+        return text
+    new, n = yo.restore_counted(text)
+    if n:
+        ctx.counts[STEP_YO] += n
+    return new
+
+
 # =========================================================================== public API
+
+def _runs(key: str, lang: str) -> bool:
+    """False when ``key`` needs a language ``lang`` does not have."""
+    if key in LANGUAGE_STEPS and lang not in ("ru", "en"):
+        return False
+    if key in RU_ONLY_STEPS and lang != "ru":
+        return False
+    return True
+
 
 _STEP_FUNCS: Dict[str, Callable[[str, _Ctx], str]] = {
     STEP_LAYOUT: step_layout, STEP_NOISE: step_noise, STEP_QUOTES: step_quotes, STEP_LINKS: step_links,
-    STEP_HEADINGS: step_headings, STEP_NUMBERS: step_numbers, STEP_ABBREV: step_abbrev,
+    STEP_HEADINGS: step_headings, STEP_NUMBERS: step_numbers, STEP_ABBREV: step_abbrev, STEP_YO: step_yo,
 }
 
 
@@ -740,9 +769,7 @@ def prepare_text_block(text: str, lang: str, options: Optional[PrepOptions] = No
     options = options or PrepOptions()
     ctx = _Ctx(lang, counts)
     for key in _ORDER:
-        if key not in options.steps:
-            continue
-        if key in LANGUAGE_STEPS and lang not in ("ru", "en"):
+        if key not in options.steps or not _runs(key, lang):
             continue
         text = _STEP_FUNCS[key](text, ctx)
     return text
@@ -752,14 +779,17 @@ def prepare_title(title: str, lang: str, options: Optional[PrepOptions] = None, 
     """Prepare a chapter title (single line): headings first, then the other steps, trailing dots removed."""
     options = options or PrepOptions()
     ctx = _Ctx(lang, counts)
-    text = re.sub(r"\s+", " ", title or "").strip()
+    tidy = bool(options.steps & {STEP_LAYOUT, STEP_HEADINGS})
+    text = re.sub(r"\s+", " ", title or "").strip() if tidy else (title or "")
     if STEP_LAYOUT in options.steps:
         text = step_layout(text, ctx)
     if STEP_HEADINGS in options.steps and lang in ("ru", "en"):
         text = prepare_heading(text, ctx)
     rest = PrepOptions(frozenset(options.steps - {STEP_LAYOUT, STEP_HEADINGS, STEP_NOISE}))
     text = prepare_text_block(text, lang, rest, ctx.counts)
-    return text.rstrip(" .:;,") if text.rstrip(" .:;,") else text
+    if tidy:
+        text = text.rstrip(" .:;,") or text
+    return text
 
 
 def prepare_book(book: Book, options: Optional[PrepOptions] = None, language_hint: str = "") -> Tuple[Book, PrepReport]:
@@ -772,6 +802,6 @@ def prepare_book(book: Book, options: Optional[PrepOptions] = None, language_hin
         chapters.append(Chapter(prepare_title(ch.title, lang, options, counts) if ch.title else ch.title,
                                 prepare_text_block(ch.text, lang, options, counts)))
     report = PrepReport(lang, [k for k in _ORDER if k in options.steps], dict(counts),
-                        [k for k in _ORDER if k in options.steps and k in LANGUAGE_STEPS and lang not in ("ru", "en")])
+                        [k for k in _ORDER if k in options.steps and not _runs(k, lang)])
     prepared = Book(book.title, book.author, book.language, chapters, book.cover, book.cover_ext)
     return prepared, report

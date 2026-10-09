@@ -848,7 +848,7 @@
  "narrset.hint": "Bei jedem gesprochenen Stück wird zuerst die eigene Stille abgeschnitten, dann werden diese Pausen eingefügt. Lange, feierliche und beschreibende Sätze werden etwas langsamer gelesen, Dialoge im normalen Tempo. Gilt für die nächste Vertonung; fertige Teile werden dabei nicht neu synthetisiert.",
  "narrset.defaults": "Standard-Pausen und -Tempo",
  "prep.one": "Text vorbereiten",
- "prep.one_d": "Räumt Layout, Anführungszeichen, Links, Überschriften, Zahlen und Abkürzungen auf und korrigiert Tippfehler in einem russischen Buch, wenn das Modell heruntergeladen ist. Standardmäßig an.",
+ "prep.one_d": "Räumt Layout, Anführungszeichen, Links, Überschriften, Zahlen und Abkürzungen auf, setzt im Russischen den Buchstaben jo, wo ein Wörterbuch sicher ist, und korrigiert Tippfehler in einem russischen Buch, wenn das Modell heruntergeladen ist. Standardmäßig an.",
  "narr.ready": "Buch und Stimme sind gewählt. Start drücken.",
  "llm.need_model": "Laden Sie das Textmodell herunter, um dies zu nutzen.",
  "llm.literary_when": "Wird verwendet, wenn die Übersetzung an ist und ihre Modelle bereit sind. Standardmäßig aus.",

@@ -73,7 +73,7 @@ voxprint capabilities
 voxprint narrate BOOK --voice ID_OR_NAME --out DIR
     [--format NAME] [--no-pauses|--pauses] [--pause-comma SEC] [--pause-mid SEC] [--pause-sentence SEC]
     [--pause-paragraph SEC] [--pause-chapter SEC] [--speed X] [--style auto|scripture|fiction|dialogue]
-    [--ordinals|--no-ordinals] [--ai-disclosure] [--work-dir DIR]
+    [--ordinals|--no-ordinals] [--yo|--no-yo] [--ai-disclosure] [--work-dir DIR]
     [--speakers] [--male-voice ID] [--female-voice ID] [--speaker-marks FILE] [--json]
 ```
 
@@ -93,6 +93,7 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 | `--speed X` | Global reading speed 0.7-1.3 (1 = the voice's own speed) |
 | `--style NAME` | `auto` (detected), `scripture` (solemn, a little slower), `fiction`, `dialogue` |
 | `--no-ordinals` / `--ordinals` | Read numbers after words like chapter / day / verse as ordinals by context ("день 1" -> "день первый", "21st", "3. Kapitel"); default: Settings (on). See [ORDINALS.md](ORDINALS.md) |
+| `--no-yo` / `--yo` | For a Russian book, restore the letter yo where a dictionary is sure ("еще" -> "ещё"). Words the dictionary does not list, including "текст" and ambiguous pairs ("все", "берег"), stay as written. Default: on. Stress marks are not inserted; the base speech model does not read them. |
 | `--ai-disclosure` | Speak a short AI note at the start (opt-in) |
 | `--work-dir DIR` | Remember this folder as the app working folder |
 | `--speakers` | Ask the text model (Gemma) to mark each paragraph narrator, male or female, then narrate those voices. Same path as the Narrate window |

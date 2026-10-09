@@ -28,6 +28,10 @@ Not covered by that licence (each has its own terms):
     and -de-en under Apache-2.0), used unmodified. Tiedemann, Aulamo, Bakshandaeva, Boggia, Grönroos, Nieminen, Raganato, Scherrer,
     Vázquez, Virpioja: "Democratizing neural machine translation with OPUS-MT", Language Resources and Evaluation 58 (2024);
     Tiedemann, Thottingal: "OPUS-MT - Building open translation services for the World", EAMT 2020.
+  * Russian letter-yo dictionary shipped with the program (`core/data/yo_safe.txt`): dictionary/safe.txt from
+    eyo-kernel (c) 2026 Denis Seleznev, https://github.com/e2yo/eyo-kernel, MIT (core/data/yo_safe.LICENSE).
+    SHA-256 11fc6d9c3cc6d0fff6a21cd642fa6aecbf3f9eb784f84ccd78141f32e51e0693. The lookup is reimplemented in
+    core/yo.py. Ambiguous homographs are not in this file.
   * Optional AI text model (downloaded only on request): Gemma 4 12B Instruct by Google DeepMind, Apache-2.0
     (https://huggingface.co/google/gemma-4-12B-it), as the GGUF Q4_K_M conversion by Unsloth
     (unsloth/gemma-4-12b-it-GGUF, revision fc034cff), used unmodified; run by llama.cpp (llama-server build b11476,

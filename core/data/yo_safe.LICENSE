@@ -1,0 +1,39 @@
+The MIT License (MIT)
+
+Copyright (c) 2026 Denis Seleznev
+
+`yo_safe.txt` is `dictionary/safe.txt` from eyo-kernel 4.1.3
+(https://github.com/e2yo/eyo-kernel), file SHA-256
+11fc6d9c3cc6d0fff6a21cd642fa6aecbf3f9eb784f84ccd78141f32e51e0693
+(864903 bytes). It restores the Russian letter yo only where the word
+is unambiguous.
+
+`yo_not_safe.txt` is `dictionary/not_safe.txt` from the same project
+(242799 bytes). Those rows are ambiguous. They are published in the
+dataset as homographs and are not applied at runtime.
+
+Voxprint ships these files and reimplements the lookup in `core/yo.py`.
+It does not ship the TypeScript library.
+
+The eyo-kernel README says the dictionary was first taken from
+https://github.com/rin-nas/php-yoficator (that repository publishes no
+licence file) and is maintained and distributed by eyo-kernel under the
+MIT licence below.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

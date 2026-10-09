@@ -118,9 +118,10 @@ What the switch does:
 | Chapter headings | `ГЛАВА XII` -> "Глава двенадцатая", `CHAPTER IV` -> "Chapter four"; ALL-CAPS headings become normal text |
 | Numbers in words | integers, decimals, ordinals (`5-му` -> "пятому"), years ("в 1999 г." -> "в тысяча девятьсот девяносто девятом году"), dates, percents, money, units; Russian case/gender/number agreement is derived from the surrounding words |
 | Abbreviations | `т. д.`, `и т. п.`, `им.`, `г.`, `Dr.`, `etc.` ... (context-aware: "г." after a year vs. "г. Москва") |
+| Letter yo | Russian only. Restores `ё` where a dictionary is sure (`еще` -> `ещё`). `текст`, and ambiguous words such as `все` and `берег`, stay as written. A dotted abbreviation (`мед. училище`) is not rewritten. No stress marks: the base speech model does not read them |
 | Typos and missing commas | Russian only, and only when the model below is downloaded |
 
-Languages: the rule steps cover **Russian and English** completely (own number-to-words code in `core/num_words.py`; `num2words` was not used because it is LGPL-2.1 and does not decline numbers by the following word). For other languages
+Languages: the shared rule steps cover **Russian and English** completely (own number-to-words code in `core/num_words.py`; `num2words` was not used because it is LGPL-2.1 and does not decline numbers by the following word). The letter yo runs for Russian only. For other languages
 (German is the first one with a UI translation) only the language-neutral steps (layout, quotes, noise, links) run; digits and abbreviations are left for the TTS engine's own normalizer. The language is taken from the book's metadata, else
 detected from the text. Very long sentences are not split by the preparation step: the chunker already splits them at clause boundaries.
 
@@ -129,7 +130,7 @@ a word (edit distance <= 2-3, the source word rare in the book itself, no names,
 punctuation, case changes - is rejected, and a paragraph where the model wants to change more than 5 % of the words is left untouched. Results are cached per paragraph (`.cache\cleanup.json`), so a resumed job does not run the model again.
 *Not verified on real hardware*: the `SageEngine` (transformers `AutoModelForSeq2SeqLM`, greedy generation) and the real download have never run - tests use a fake engine and a fake `snapshot_download`.
 
-**Not in this version** (registry placeholders in `infra/text_models.py`, no check box): punctuation model for fluent reading pauses (RUPunct), Russian stress marks and `ё`, and English / German neural spell checkers. Speaker marks are a separate option on the AI text model card (see below).
+**Not in this version** (registry placeholders in `infra/text_models.py`, no check box): punctuation model for fluent reading pauses (RUPunct), Russian stress marks (the base speech model does not read them; the letter yo is the rule step above), and English / German neural spell checkers. Speaker marks are a separate option on the AI text model card (see below).
 
 **Mark speakers** (AI text model card, off by default, clickable only when Gemma is downloaded). An extra pass labels each paragraph narrator, male or female. Pick a male voice and a female voice, open *Preview and edit speakers*, change any row, then Start. Narration loads one voice at a time and reads each paragraph with the voice you assigned. With only the narrator voice selected, the marks stay in the preview and the narrator reads the whole book. The command line does the same thing: `voxprint speakers` writes the marks, and `voxprint narrate --speakers` or `--speaker-marks` narrates them ([CLI.md](CLI.md)).
 

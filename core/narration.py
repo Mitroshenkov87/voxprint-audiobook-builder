@@ -53,6 +53,8 @@ from core import ai_disclosure
 from core import cpu_budget
 from core import speakers as spk
 from core.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_book
+from core import ordinals
+from core import yo
 from core.errors import CancelledByUser, DatasetMakerError, NarrationError
 from core.events import CancelToken
 from core.i18n import tr
@@ -140,6 +142,9 @@ class NarrationOptions:
     #: Ordinal numbers by context ("глава 2" -> "глава вторая", "3-го" -> "третьего", "21st"), :mod:`core.ordinals`;
     #: Settings -> Narration / ``--no-ordinals``.  On by default.
     ordinals: bool = True
+    #: Russian letter yo where the safe dictionary is sure (:mod:`core.yo`).  On by default; ``--no-yo`` turns it off.
+    #: Stress marks are not written: the base TTS model does not read them.
+    yo: bool = True
     #: Speaker marks and the male / female voice ids (:mod:`core.speakers`).  ``None`` = the narrator voice only.
     speakers: Optional[spk.SpeakerCast] = None
 
@@ -305,14 +310,18 @@ def chain_steps(*steps: Optional[Callable[[str], str]]) -> Optional[Callable[[st
 
 def text_steps(language: Optional[str], book_language: Optional[str], options: NarrationOptions,
                numbers_spelled: bool = False) -> Optional[Callable[[str], str]]:
-    """The normalization run on every chunk before synthesis: ordinals by context first (they need the digits and the
-    noun next to them), then the language normalizer that reads the remaining numbers and abbreviations."""
-    from core import ordinals
+    """The normalization run on every chunk before synthesis.
 
+    Ordinals by context come first (they need the digits and the noun next to them).  Russian yo restoration comes
+    next, while a dotted abbreviation still has the following word in the case the book used (``мед. училище``).
+    The language normalizer runs last: it may capitalise after a full stop, and a second yo pass would then miss
+    the abbreviation.  The normalizer keeps a yo the dictionary already wrote.
+    """
     spoken = language if (language or "").strip().lower() not in ("", "auto") else book_language
     ordinal = ordinals.ordinal_step(spoken) if options.ordinals else None
+    letter = yo.as_step(spoken) if options.yo else None
     base = None if numbers_spelled else default_normalizer(language)
-    return chain_steps(ordinal, base)
+    return chain_steps(ordinal, letter, base)
 
 
 def default_normalizer(language: str) -> Optional[Callable[[str], str]]:

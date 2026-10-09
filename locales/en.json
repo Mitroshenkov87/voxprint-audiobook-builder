@@ -848,7 +848,7 @@
  "narrset.hint": "Every spoken piece is trimmed of its own silence, then these pauses are inserted. Long, solemn and descriptive sentences are read a little slower, dialogue at the normal speed. Applies to the next narration; changing it never re-synthesizes finished parts.",
  "narrset.defaults": "Default pauses and speed",
  "prep.one": "Prepare text",
- "prep.one_d": "Tidies the layout, quotes, links, headings, numbers and abbreviations, and fixes typos in a Russian book when that model is downloaded. On by default.",
+ "prep.one_d": "Tidies the layout, quotes, links, headings, numbers and abbreviations, restores the Russian letter yo where a dictionary is sure, and fixes typos in a Russian book when that model is downloaded. On by default.",
  "narr.ready": "Book and voice are chosen. Press Start.",
  "llm.need_model": "Download the text model to use this.",
  "llm.literary_when": "Used when translation is on and its models are ready. Off by default.",
