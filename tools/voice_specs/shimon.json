@@ -1,0 +1,35 @@
+{
+  "id": "shimon",
+  "name": "Shimon",
+  "language": "ru",
+  "author": "Create (LibriVox) - public domain",
+  "speaker": "Create",
+  "prepared_by": "Voxprint",
+  "project_url": "https://archive.org/details/multilingual_christmas_0912_librivox",
+  "gender": "male",
+  "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "description": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording 'Angelochek (The Little Angel)' by Leonid Andreyev (Christmas Short Works Collection 2009), read by Create (https://librivox.org/christmas-short-works-collection-2009-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Shimon is Voxprint's own and does not imply the reader's endorsement.",
+  "descriptions": {
+    "en": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording 'Angelochek (The Little Angel)' by Leonid Andreyev (Christmas Short Works Collection 2009), read by Create (https://librivox.org/christmas-short-works-collection-2009-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Shimon is Voxprint's own and does not imply the reader's endorsement.",
+    "ru": "Русский мужской голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: «Ангелочек» Леонида Андреева (сборник Christmas Short Works Collection 2009), читает Create (https://librivox.org/christmas-short-works-collection-2009-by-various/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Shimon дано Voxprint и не означает одобрения чтеца.",
+    "de": "Russische männliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Angelotschek (Das Engelchen)' von Leonid Andrejew (Christmas Short Works Collection 2009) trainiert, gelesen von Create (https://librivox.org/christmas-short-works-collection-2009-by-various/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Shimon stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+  },
+  "consent": {
+    "scope": "commercial",
+    "name": "Create (LibriVox reader, recording in the public domain)",
+    "method": "manual",
+    "confirmed": true
+  },
+  "source": {
+    "librivox": "https://librivox.org/christmas-short-works-collection-2009-by-various/",
+    "internet_archive": "https://archive.org/details/multilingual_christmas_0912_librivox",
+    "readers": "solo section (collection; the LibriVox API lists only Create for section 16)",
+    "files": [
+      "16_russian_angelochek_andreev.mp3 (SHA-1 709a517f96db8691a9481b11e302dd0b77981e41)"
+    ],
+    "licence": "LibriVox: Public Domain in the USA (volunteer public-domain dedication); Internet Archive licenseurl: creativecommons.org/licenses/publicdomain; text by Leonid Andreyev (1899, d. 1919)",
+    "prepared_audio_min": 28.28
+  }
+}

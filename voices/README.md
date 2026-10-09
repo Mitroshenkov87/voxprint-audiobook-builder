@@ -1,7 +1,7 @@
 # Voices index
 
 `index.json` is the default voices index of Voxprint (schema 1). Published packages are **release assets** of the tag `voices-v1`
-(`open-universal.zip`, `tirzah.zip`, `gideon.zip`, `asher.zip`, `noa.zip`, `eitan.zip`); the index carries their URL, size and SHA-256. Rebuild a package and its entry with
+(`open-universal.zip`, `tirzah.zip`, `gideon.zip`, `asher.zip`, `noa.zip`, `eitan.zip`) and `voices-v2` (`levi.zip`, `natan.zip`, `shimon.zip`, `miriam.zip`, `rivka.zip`); the index carries their URL, size and SHA-256. Rebuild a package and its entry with
 `tools/make_voice_package.py`.
 
 | id | licence | note |
@@ -11,9 +11,20 @@
 | `gideon` | `CC0-1.0` | open Russian male voice, bundled with Voxprint; replaces retired Boaz (see [BUNDLED.md](BUNDLED.md)) |
 | `asher` | `CC0-1.0` | optional Russian male catalog voice; not part of the standard download |
 | `noa` | `CC0-1.0` | optional Russian female catalog voice; not part of the standard download |
-| `eitan` | `CC0-1.0` | optional Russian male catalog voice (a third male voice for multi-voice narration); not part of the standard download |
+| `eitan` | `CC0-1.0` | **retired** (`"retired": true, "hidden": true`): kept for older builds, not offered by builds with the catalog fix |
+| `levi` | `CC0-1.0` | Russian male (LibriVox reader Виталий, Chekhov short stories); planned default male voice |
+| `natan` | `CC0-1.0` | Russian male (Victor Seremet, Tolstoy *Detstvo*) |
+| `shimon` | `CC0-1.0` | Russian male (Create, Andreyev *Angelochek*) |
+| `miriam` | `CC0-1.0` | Russian female (Maya S, Ehrenburg *Portraits of Russian Poets*); planned default female voice |
+| `rivka` | `CC0-1.0` | Russian female (Irina Grinberg, Griboyedov *Woe from Wit*) |
 
 *Boaz* shipped with 0.1.3 and is no longer in this index. It is not installed.
+
+**Voices v2 (2026-10-09).** Tirzah, Gideon, Asher and Eitan are marked `"retired": true, "hidden": true`; their entries stay so
+older builds keep working (bundled Gideon/Tirzah are still pinned in `infra/bundled_voices.py` until a build changes the defaults).
+New voices Levi, Natan, Shimon, Miriam, Rivka (assets of the `voices-v2` release; specs with source files and SHA-1 in
+`tools/voice_specs/<id>.json`) were trained on the PC with build 702 exactly like Eitan (`voxprint train <folder> --name <Name>
+--type <male|female> --language ru --consent commercial --speaker <reader> --license CC0-1.0`, no-transcript mode). Noa stays.
 
 ## Asher and Noa (catalog only)
 

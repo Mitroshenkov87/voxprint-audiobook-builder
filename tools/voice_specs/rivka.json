@@ -1,0 +1,37 @@
+{
+  "id": "rivka",
+  "name": "Rivka",
+  "language": "ru",
+  "author": "Irina Grinberg (LibriVox) - public domain",
+  "speaker": "Irina Grinberg",
+  "prepared_by": "Voxprint",
+  "project_url": "https://archive.org/details/woe_from_wit_ig_librivox",
+  "gender": "female",
+  "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "description": "Russian female voice for Voxprint. Trained only from the public-domain LibriVox recording 'Gore ot uma (Woe from Wit)' by Alexander Griboyedov, read by Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Rivka is Voxprint's own and does not imply the reader's endorsement.",
+  "descriptions": {
+    "en": "Russian female voice for Voxprint. Trained only from the public-domain LibriVox recording 'Gore ot uma (Woe from Wit)' by Alexander Griboyedov, read by Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Rivka is Voxprint's own and does not imply the reader's endorsement.",
+    "ru": "Русский женский голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: «Горе от ума» Александра Грибоедова, читает Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Rivka дано Voxprint и не означает одобрения чтеца.",
+    "de": "Russische weibliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Gore ot uma (Verstand schafft Leiden)' von Alexander Gribojedow trainiert, gelesen von Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Rivka stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+  },
+  "consent": {
+    "scope": "commercial",
+    "name": "Irina Grinberg (LibriVox reader, recording in the public domain)",
+    "method": "manual",
+    "confirmed": true
+  },
+  "source": {
+    "librivox": "https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/",
+    "internet_archive": "https://archive.org/details/woe_from_wit_ig_librivox",
+    "readers": "solo project (the LibriVox API lists only Irina Grinberg for all 10 sections)",
+    "files": [
+      "goreotuma_01_griboedov.mp3 (SHA-1 f08d359327bbf8f0e703722aa631628f3a04b5cb)",
+      "goreotuma_07_griboedov.mp3 (SHA-1 f89eeecdfbf120e6b69c27aa812cc8e6212ee300)",
+      "goreotuma_06_griboedov.mp3 (SHA-1 eb382f87224ff1b5c4ecbdada04c48597c0630df)"
+    ],
+    "licence": "LibriVox: Public Domain in the USA (volunteer public-domain dedication); Internet Archive licenseurl: Public Domain Mark 1.0; text by Alexander Griboyedov (d. 1829)",
+    "prepared_audio_min": 29.62
+  }
+}

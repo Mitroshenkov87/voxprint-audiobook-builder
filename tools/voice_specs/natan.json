@@ -1,0 +1,37 @@
+{
+  "id": "natan",
+  "name": "Natan",
+  "language": "ru",
+  "author": "Victor Seremet (LibriVox) - public domain",
+  "speaker": "Victor Seremet",
+  "prepared_by": "Voxprint",
+  "project_url": "https://archive.org/details/childhood_2312_librivox",
+  "gender": "male",
+  "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "description": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording 'Detstvo (Childhood)' by Leo Tolstoy, version 2, read by Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Natan is Voxprint's own and does not imply the reader's endorsement.",
+  "descriptions": {
+    "en": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording 'Detstvo (Childhood)' by Leo Tolstoy, version 2, read by Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Natan is Voxprint's own and does not imply the reader's endorsement.",
+    "ru": "Русский мужской голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: «Детство» Льва Толстого (версия 2), читает Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Natan дано Voxprint и не означает одобрения чтеца.",
+    "de": "Russische männliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Detstvo (Kindheit)' von Lew Tolstoi, Version 2 trainiert, gelesen von Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Natan stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+  },
+  "consent": {
+    "scope": "commercial",
+    "name": "Victor Seremet (LibriVox reader, recording in the public domain)",
+    "method": "manual",
+    "confirmed": true
+  },
+  "source": {
+    "librivox": "https://librivox.org/childhood-2-by-leo-tolstoy/",
+    "internet_archive": "https://archive.org/details/childhood_2312_librivox",
+    "readers": "solo sections (group project; the LibriVox API lists only Victor Seremet for the chapters used)",
+    "files": [
+      "detstvo_28_tolstoy.mp3 (SHA-1 83a86a2efa01fc6ccb28cb32b4ecd6530005cdb0)",
+      "detstvo_26_tolstoy.mp3 (SHA-1 d2f1efb4c7871b7bfe85df321008d01e90a06abc)",
+      "detstvo_03_tolstoy.mp3 (SHA-1 e0a8d3ed7ff0c919f1f49818fd7f8a1a4fb7acfd)"
+    ],
+    "licence": "LibriVox: Public Domain in the USA (volunteer public-domain dedication); Internet Archive: standard LibriVox item (no licenseurl field); text by Leo Tolstoy (1852)",
+    "prepared_audio_min": 28.65
+  }
+}

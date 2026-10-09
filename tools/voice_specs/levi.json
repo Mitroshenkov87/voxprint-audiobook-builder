@@ -1,0 +1,37 @@
+{
+  "id": "levi",
+  "name": "Levi",
+  "language": "ru",
+  "author": "Виталий (LibriVox) - public domain",
+  "speaker": "Виталий",
+  "prepared_by": "Voxprint",
+  "project_url": "https://archive.org/details/mlswc037_2502_librivox",
+  "gender": "male",
+  "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "description": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording Anton Chekhov's short stories 'Kapitanskiy mundir', 'Liberal' and 'Radost'' (Multilingual Short Works Collection 037), read by Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Levi is Voxprint's own and does not imply the reader's endorsement.",
+  "descriptions": {
+    "en": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording Anton Chekhov's short stories 'Kapitanskiy mundir', 'Liberal' and 'Radost'' (Multilingual Short Works Collection 037), read by Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Levi is Voxprint's own and does not imply the reader's endorsement.",
+    "ru": "Русский мужской голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: рассказы Антона Чехова «Капитанский мундир», «Либерал» и «Радость» (сборник Multilingual Short Works Collection 037), читает Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Levi дано Voxprint и не означает одобрения чтеца.",
+    "de": "Russische männliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme Anton Tschechows Erzählungen 'Kapitanski mundir', 'Liberal' und 'Radost'' (Multilingual Short Works Collection 037) trainiert, gelesen von Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Levi stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+  },
+  "consent": {
+    "scope": "commercial",
+    "name": "Виталий (LibriVox reader, recording in the public domain)",
+    "method": "manual",
+    "confirmed": true
+  },
+  "source": {
+    "librivox": "https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/",
+    "internet_archive": "https://archive.org/details/mlswc037_2502_librivox",
+    "readers": "solo sections (collection; the LibriVox API lists only Виталий for sections 17-19)",
+    "files": [
+      "msw037_17_kapitanskiymundir_chekhov_vit.mp3 (SHA-1 71a683aa4197b41cd760072b2f270277038484b8)",
+      "msw037_18_liberal_chekhov_vit.mp3 (SHA-1 9b55807eb0509fe336b1a6fdc5a1bc6e17381a31)",
+      "msw037_19_radost_chekhov_vit.mp3 (SHA-1 60e12eace6695f632764b1ac1e637918b88b4f91)"
+    ],
+    "licence": "LibriVox: Public Domain in the USA (volunteer public-domain dedication); Internet Archive licenseurl: Public Domain Mark 1.0; texts by Anton Chekhov (d. 1904)",
+    "prepared_audio_min": 24.69
+  }
+}

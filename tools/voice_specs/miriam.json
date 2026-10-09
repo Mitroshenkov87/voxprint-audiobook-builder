@@ -1,0 +1,39 @@
+{
+  "id": "miriam",
+  "name": "Miriam",
+  "language": "ru",
+  "author": "Maya S (LibriVox) - public domain",
+  "speaker": "Maya S",
+  "prepared_by": "Voxprint",
+  "project_url": "https://archive.org/details/portraitsrussianpoets_1612_librivox",
+  "gender": "female",
+  "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "description": "Russian female voice for Voxprint. Trained only from the public-domain LibriVox recording 'Portrety russkikh poetov (Portraits of Russian Poets)' by Ilya Ehrenburg, chapters on Blok, Bryusov and Sologub, read by Maya S (https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Miriam is Voxprint's own and does not imply the reader's endorsement.",
+  "descriptions": {
+    "en": "Russian female voice for Voxprint. Trained only from the public-domain LibriVox recording 'Portrety russkikh poetov (Portraits of Russian Poets)' by Ilya Ehrenburg, chapters on Blok, Bryusov and Sologub, read by Maya S (https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Miriam is Voxprint's own and does not imply the reader's endorsement.",
+    "ru": "Русский женский голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: «Портреты русских поэтов» Ильи Эренбурга, главы о Блоке, Брюсове и Сологубе, читает Maya S (https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Miriam дано Voxprint и не означает одобрения чтеца.",
+    "de": "Russische weibliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Porträts russischer Dichter' von Ilja Ehrenburg, Kapitel über Blok, Brjussow und Sologub trainiert, gelesen von Maya S (https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Miriam stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+  },
+  "consent": {
+    "scope": "commercial",
+    "name": "Maya S (LibriVox reader, recording in the public domain)",
+    "method": "manual",
+    "confirmed": true
+  },
+  "source": {
+    "librivox": "https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/",
+    "internet_archive": "https://archive.org/details/portraitsrussianpoets_1612_librivox",
+    "readers": "solo sections (group project; the LibriVox API lists only Maya S for the sections used)",
+    "files": [
+      "portraitsofrussianpoets_26_ehrenburg.mp3 (SHA-1 193b0d1f2170b50e5bfc8a1a4f3f1143520a2742)",
+      "portraitsofrussianpoets_08_ehrenburg.mp3 (SHA-1 271002d2f9acb0d2924653d5de5d6c5eb5e41dfd)",
+      "portraitsofrussianpoets_10_ehrenburg.mp3 (SHA-1 bb4961f07cdd004049bd3e3c806dd33c1687e050)",
+      "portraitsofrussianpoets_07_ehrenburg.mp3 (SHA-1 49adc95a6a73edcf412b0cc38bbcd8c4e837608b)",
+      "portraitsofrussianpoets_12_ehrenburg.mp3 (SHA-1 5f20887b99a22171b0ef2b899ea70f2d8640be64)"
+    ],
+    "licence": "LibriVox: Public Domain in the USA (volunteer public-domain dedication); Internet Archive licenseurl: Public Domain Mark 1.0; text published 1922 (public domain in the USA)",
+    "prepared_audio_min": 22.97
+  }
+}
