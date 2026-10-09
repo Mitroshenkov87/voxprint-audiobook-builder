@@ -1,6 +1,6 @@
 # Release notes: 0.2.4-beta, build 704 "Achim"
 
-`BUILD.json` codename is Achim. The offset stays 654, so build-installer run 50 stamps build 704. The body below is the GitHub release text. Keep the Windows section.
+`BUILD.json` codename is Achim. Run 50 failed in CI before it published anything, so the offset is 653 and build-installer run 51 stamps build 704. The body below is the GitHub release text. Keep the Windows section.
 
 **Voxprint 0.2.4-beta · build 704 "Achim"** (Biblical Hebrew *achim*, אַחִים, brothers; Genesis 13:8, *ki anashim achim anachnu*, "for we are brothers"). Voxprint AI Audiobook Builder and Voxprint AI Movie Dubber are now sibling programs: one models folder, one settings file, one Start menu folder, and neither one's uninstaller touches the other.
 

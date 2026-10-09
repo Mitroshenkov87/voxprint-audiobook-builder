@@ -53,6 +53,8 @@ def test_gpu_prefs_fraction_setting_and_env(monkeypatch):
 
 def test_engine_max_batch_uses_the_policy(monkeypatch):
     torch = pytest.importorskip("torch")
+    if not hasattr(torch, "cuda"):                    # the no-PyTorch CI job has only a stand-in torch module
+        pytest.skip("real PyTorch needed")
     from core import tts_engine
 
     gb = 1024 ** 3
