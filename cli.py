@@ -410,8 +410,9 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint narrate book.txt --voice my-voice --out ./audiobooks --pauses --ai-disclosure\n"
             "  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json\n"
             "  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks\n"
-            "  voxprint narrate book.txt --voice gideon --male-voice asher --male2-voice tom --female-voice noa --speakers --out ./out\n"
-            "  voxprint narrate book.txt --voice gideon --male-voice asher --character David=tom --speakers --out ./out\n"
+            "  voxprint narrate book.txt --voice levi --speakers --out ./out\n"
+            "  voxprint narrate book.txt --voice levi --male-voice natan --male2-voice shimon --female-voice noa --speakers --out ./out\n"
+            "  voxprint narrate book.txt --voice levi --male-voice natan --character David=shimon --speakers --out ./out\n"
         ),
     )
     n.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
@@ -451,7 +452,9 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("--ai-disclosure", action="store_true",
                    help="Speak a short AI disclosure at the start (opt-in)")
     n.add_argument("--speakers", action="store_true",
-                   help="Mark each paragraph narrator, male or female with the text model (Gemma), then narrate those voices")
+                   help="Mark each paragraph narrator, male or female with the text model (Gemma), then narrate those voices. "
+                        "Without --male-voice / --female-voice / --character the shipped cast is used when installed "
+                        "(men Natan and Shimon, woman Miriam), else the first library voices of each gender")
     n.add_argument("--male-voice", default="", metavar="ID_OR_NAME",
                    help="Voice for paragraphs marked male (narrator is --voice)")
     n.add_argument("--female-voice", default="", metavar="ID_OR_NAME",
@@ -645,7 +648,8 @@ def build_parser() -> argparse.ArgumentParser:
     rv.add_argument("--out", type=Path, default=None, metavar="DIR",
                     help="Folder for the text book (default: the Re-voice projects folder)")
     rv.add_argument("--title", default="", help="File name for the text book (default: the first clip's title)")
-    rv.add_argument("--language", default=None, help="Recognition language hint (default: automatic)")
+    rv.add_argument("--language", default=None,
+                    help="Recognition language hint: ISO code or name, any case (ru, en, de, Russian ...; default: automatic)")
     rv.set_defaults(_handler="revoice")
 
     sp = sub.add_parser(
@@ -980,6 +984,15 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
     except ValueError as exc:
         raise CliError(EXIT_BAD_ARGS, f"--character: {exc}",
                        hint="Example: --character David=asher --character Hannah=noa") from exc
+    if not any(names.values()) and not raw_characters:
+        # --speakers alone: the shipped cast (Natan, Shimon, Miriam) when installed, else the first voices by gender
+        from infra import bundled_voices
+
+        offered = bundled_voices.offered_for_roles(library.list_voices())
+        picks = spk.default_role_picks(offered, narrator.id, bundled_voices.preferred_ids(offered))
+        names["--male-voice"], names["--male2-voice"], names["--female-voice"] = picks["male"], picks["male2"], picks["female"]
+        if not names["--male-voice"] and names["--male2-voice"]:
+            names["--male-voice"], names["--male2-voice"] = names["--male2-voice"], ""
     recs = {flag: (resolve_voice(library, name) if name else None) for flag, name in names.items()}
     characters = {who: resolve_voice(library, vname) for who, vname in character_names.items()}
     lines = None
@@ -1707,6 +1720,27 @@ def _default_transcribe(files, language, progress, cancel):
     return revoice.transcribe_files(files, asr, language, prog, cancel)
 
 
+def revoice_language(value: Optional[str]) -> Optional[str]:
+    """``--language`` of ``revoice`` as the English name Qwen3-ASR expects, or ``None`` for automatic detection.
+
+    Accepts ISO codes in any case (``ru``, ``EN``, ``de-DE``, ``rus``), English names (``Russian``) and native names
+    (``русский``); ``auto`` or empty means automatic. Build 702 passed the raw value through, so ``--language ru`` failed in
+    the recogniser. Raises a usage error for a value that is not a language.
+    """
+    from core import languages
+
+    raw = (value or "").strip()
+    if not raw or raw.lower() == "auto":
+        return None
+    name = languages.language_name(raw)
+    if not name or name == languages.language_code(raw):     # unknown code: language_name echoes the code back
+        raise CliError(
+            EXIT_BAD_ARGS, f"--language: unknown language {raw!r}",
+            hint="Use an ISO code or name, e.g. --language ru, --language en, --language German, or leave it out (automatic).",
+        )
+    return name
+
+
 def cmd_revoice(args: argparse.Namespace, *,
                 transcribe_fn: Optional[Callable[..., object]] = None) -> int:
     """``revoice AUDIO... --out DIR``: write a TXT book.  Does not narrate it."""
@@ -1722,7 +1756,7 @@ def cmd_revoice(args: argparse.Namespace, *,
                 _write_stream(sys.stdout, f"[transcribe] {float(frac) * 100:5.1f}%  {title}")
 
         fn = transcribe_fn or _default_transcribe
-        chapters = list(fn(files, args.language, progress, CancelToken()))
+        chapters = list(fn(files, revoice_language(args.language), progress, CancelToken()))
         if not any(str(text).strip() for _title, text in chapters):
             raise CliError(
                 EXIT_INPUT, "recogniser returned no text",

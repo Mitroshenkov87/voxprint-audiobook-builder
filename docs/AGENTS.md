@@ -121,7 +121,7 @@ voxprint train ./clips --name MyVoice --type male --language ru --consent commer
 ```
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3 --json
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
-voxprint narrate genesis.txt --voice tirzah --out ./audiobooks --style scripture --pause-sentence 0.7 --speed 0.95 --json
+voxprint narrate genesis.txt --voice levi --out ./audiobooks --style scripture --pause-sentence 0.7 --speed 0.95 --json
 voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json
 ```
 

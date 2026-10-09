@@ -248,12 +248,38 @@ class TagResult:
         return bool(self.lines)
 
 
+def _tag_block(model, template: str, language: str, paras: Sequence[str], block: Sequence[int],
+               raw_parts: List[str]) -> List[Optional[SpeakerLine]]:
+    """Marks for the paragraphs ``block`` (indexes into ``paras``); ``None`` for a paragraph the model could not mark.
+
+    When the reply has a different number of tags than the block has paragraphs (Gemma sometimes merges a title with the
+    first paragraph, or splits one paragraph in two), the block is split in half and each half is asked again, down to
+    single paragraphs. One bad answer then costs only the paragraphs it really concerns, not the whole block (build 702
+    lost 10 of 26 marks to one merged title). Every reply is kept in ``raw_parts``.
+    """
+    text = "\n\n".join(paras[i] for i in block)
+    prompt = fill(template, language=NAMES.get(language, language or "English"), text=text)
+    answer = model.complete(prompt, max_tokens=min(2048, 48 * len(block) + 32))
+    raw_parts.append(answer or "")
+    parsed = parse_tags(answer or "", len(block))
+    if parsed is not None:
+        return list(parsed)
+    if len(block) == 1:
+        return [None]
+    mid = len(block) // 2
+    raw_parts.append(f"[retry] {len(block)} paragraphs -> {mid} + {len(block) - mid}")
+    return (_tag_block(model, template, language, paras, block[:mid], raw_parts)
+            + _tag_block(model, template, language, paras, block[mid:], raw_parts))
+
+
 def tag_paragraphs(paras: Sequence[str], language: str, plan: LLMPlan,
                    progress: Optional[Callable[[float], None]] = None) -> TagResult:
-    """Mark ``paras``. A block the model fails stays narrator, with a warning. The model is closed before return.
+    """Mark ``paras``. The model is closed before return.
 
-    ``warning`` is ``unparsed`` when a reply cannot be read (or the model raises), and ``no_speakers`` when every
-    paragraph is the narrator but the text obviously contains dialogue. The raw replies are kept either way.
+    A block whose reply does not fit is split and asked again (:func:`_tag_block`); only a single paragraph the model still
+    cannot mark stays narrator. ``warning`` is ``unparsed`` when such a paragraph is left (or the model raises), and
+    ``no_speakers`` when every paragraph is the narrator but the text obviously contains dialogue. The raw replies are kept
+    either way.
     """
     progress = progress or (lambda _f: None)
     lines = [SpeakerLine() for _ in paras]
@@ -267,18 +293,14 @@ def tag_paragraphs(paras: Sequence[str], language: str, plan: LLMPlan,
         model = plan.factory()
         batches = _batches(list(paras))
         for bi, block in enumerate(batches):
-            text = "\n\n".join(paras[i] for i in block)
-            prompt = fill(template, language=NAMES.get(language, language or "English"), text=text)
-            answer = model.complete(prompt, max_tokens=min(2048, 48 * len(block) + 32))
-            raw_parts.append(answer or "")
-            parsed = parse_tags(answer or "", len(block))
-            if parsed is None:
-                failed = True
-            else:
-                for i, line in zip(block, parsed):
+            marks = _tag_block(model, template, language, paras, block, raw_parts)
+            for i, line in zip(block, marks):
+                if line is None:
+                    failed = True
+                else:
                     lines[i] = line
             progress((bi + 1) / max(1, len(batches)))
-    except Exception as exc:  # noqa: BLE001 - a failed model leaves every paragraph with the narrator, and says so
+    except Exception as exc:  # noqa: BLE001 - a failed model leaves the unmarked paragraphs with the narrator, and says so
         failed = True
         raw_parts.append(f"[error] {type(exc).__name__}: {exc}")
         progress(1.0)
@@ -378,18 +400,32 @@ def load_marks(text: str) -> List[SpeakerLine]:
     return rows
 
 
-def default_role_picks(records, narrator_id: str = "") -> dict:
-    """Default ``{"male", "male2", "female"}`` voice ids: the first male / female voice that is not the narrator (the
-    narrator's own voice when it is the only one of that gender), and a second, different male voice when there is one."""
+def default_role_picks(records, narrator_id: str = "", preferred: Optional[Dict[str, str]] = None) -> dict:
+    """Default ``{"male", "male2", "female"}`` voice ids.
+
+    ``preferred`` maps a role to a library id (the shipped cast, :func:`infra.bundled_voices.preferred_ids`: men Natan and
+    Shimon, woman Miriam). A preferred voice is used when it is in ``records``, has the role's gender and is not the narrator
+    or already taken by another role. Every other role falls back to the generic rule: the first male / female voice that is
+    not the narrator (the narrator's own voice when it is the only one of that gender), and a second, different male voice
+    when there is one."""
+    preferred = preferred or {}
+
     def of(gender):
         return [str(r.id) for r in records if str((getattr(r, "info", None) or {}).get("gender") or "") == gender]
 
-    out = {}
+    out: Dict[str, str] = {}
     for role, gender in (("male", "male"), ("female", "female")):
         ids = of(gender)
+        want = str(preferred.get(role) or "")
+        if want and want in ids and want != narrator_id:
+            out[role] = want
+            continue
         others = [i for i in ids if i != narrator_id]
         out[role] = (others or ids or [""])[0]
-    rest = [i for i in of("male") if i not in (out["male"], narrator_id)]
-    out["male2"] = rest[0] if rest else ""
+    want2 = str(preferred.get("male2") or "")
+    if want2 and want2 in of("male") and want2 not in (out["male"], narrator_id):
+        out["male2"] = want2
+    else:
+        rest = [i for i in of("male") if i not in (out["male"], narrator_id)]
+        out["male2"] = rest[0] if rest else ""
     return out
-

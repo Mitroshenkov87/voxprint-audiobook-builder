@@ -890,11 +890,11 @@ class NarrateWindow(SubWindow):
 
     def _fill_speaker_combos(self) -> None:
         """Library voices in the male and female lists (retired voices such as Boaz are left out). A still-valid choice is
-        kept; otherwise the first voice of that gender that is not the narrator, and for the second male voice the next
-        such male voice (None when there is no third male voice)."""
+        kept; otherwise the shipped cast (Natan, Shimon, Miriam) when installed, else the first voice of that gender that is
+        not the narrator, and for the second male voice the next such male voice (None when there is no third male voice)."""
         voices = bundled_voices.offered_for_roles(self.library.list_voices())
         narrator = self.selected_voice_id()
-        defaults = spk.default_role_picks(voices, narrator)
+        defaults = spk.default_role_picks(voices, narrator, bundled_voices.preferred_ids(voices))   # Natan / Shimon / Miriam
         for which, combo in (("male", self.cmb_spk_male), ("male2", self.cmb_spk_male2), ("female", self.cmb_spk_female)):
             current = str(combo.currentData() or "")
             combo.blockSignals(True)
@@ -1132,9 +1132,12 @@ class NarrateWindow(SubWindow):
     def refresh_voices(self, select: str = "") -> None:
         """Reload the voice list (keeps the selection if possible)."""
         current = select or str(self.cmb_voice.currentData() or "")
+        items = catalog.build(self.library, self.entries)
+        if not current:   # nothing chosen yet: the shipped narrator (Levi) when it is installed, else the first voice
+            current = bundled_voices.preferred_ids([it.record for it in items if it.record is not None]).get("narrator", "")
         self.cmb_voice.blockSignals(True)
         self.cmb_voice.clear()
-        for it in catalog.build(self.library, self.entries):
+        for it in items:
             if it.installed:
                 self.cmb_voice.addItem(it.name, it.key)
             else:

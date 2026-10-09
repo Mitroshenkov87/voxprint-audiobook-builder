@@ -299,3 +299,46 @@ def test_role_lists_drop_boaz_and_default_to_three_different_men():
     assert picks == {"male": "v3", "male2": "v4", "female": "v5"}
     assert spk.default_role_picks([_Rec("a", "Gideon", "male"), _Rec("b", "Noa", "female")], "a") == \
         {"male": "a", "male2": "", "female": "b"}
+
+
+def test_a_merged_title_splits_the_block_instead_of_losing_it():
+    """Build 702 bug: Gemma merged the title with the first paragraph (11 tags for 12 paragraphs) and the whole block fell
+    back to the narrator (16 of 26 marks). Now the block is split and asked again; only the merged pair costs a retry."""
+    paras = ["Беседа вторая", "Исход субботы, трое задержались в синагоге.",
+             "— Ариэль, ты опять про модели? — спросила Яэль.", "— Про них, — ответил Ариэль.",
+             "— Модель ошибается, как ученик, — сказал Барух.", "— И учится, — сказала Яэль."]
+    roles = ["NARRATOR", "NARRATOR", "FEMALE: Яэль", "MALE: Ариэль", "MALE: Барух", "FEMALE: Яэль"]
+    asked = []
+
+    def answer(prompt):
+        text = prompt.rsplit("TEXT:\n", 1)[1]
+        block = [p for p in text.split("\n\n") if p.strip()]
+        asked.append(len(block))
+        idx = [next(i for i, p in enumerate(paras) if p in b) for b in block]
+        tags = [roles[i] for i in idx]
+        if 0 in idx and 1 in idx:          # the title and the intro come back as one line
+            tags = tags[1:]
+        return "\n".join(tags)
+
+    model = FakeModel(answer)
+    res = spk.tag_paragraphs(paras, "ru", LLMPlan(lambda: model, "fake"))
+    assert [ln.role for ln in res] == ["narrator", "narrator", "female", "male", "male", "female"]
+    assert [ln.name for ln in res][2:] == ["Яэль", "Ариэль", "Барух", "Яэль"]
+    assert res.warning == "" and model.closed
+    assert asked[0] == 6 and len(asked) > 1 and max(asked[1:]) < 6
+    assert "[retry] 6 paragraphs -> 3 + 3" in res.raw
+
+
+def test_only_a_paragraph_the_model_never_marks_stays_narrator():
+    paras = ["— Привет, — сказала Анна.", "Тихо было.", "— Здравствуй, — ответил Том."]
+
+    def answer(prompt):
+        text = prompt.rsplit("TEXT:\n", 1)[1]
+        block = [p for p in text.split("\n\n") if p.strip()]
+        if any("Тихо" in p for p in block):
+            return "This paragraph has no speaker."   # never a valid tag, not even alone
+        return "\n".join("FEMALE: Анна" if "Анна" in p else "MALE: Том" for p in block)
+
+    res = spk.tag_paragraphs(paras, "ru", LLMPlan(lambda: FakeModel(answer), "fake"))
+    assert [ln.role for ln in res] == ["female", "narrator", "male"]
+    assert res.warning == spk.WARN_UNPARSED

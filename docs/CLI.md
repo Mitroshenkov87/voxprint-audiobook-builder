@@ -97,7 +97,7 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 | `--no-yo` / `--yo` | For a Russian book, restore the letter yo where a dictionary is sure ("еще" -> "ещё"). "все" / "всё" is decided from the neighbouring words ("всё равно", "вот и всё", "всё было", "всё, что"; "все люди", "пришли все" stay). Other words the dictionary does not list, including "текст" and ambiguous pairs such as "берег", stay as written. Default: on. Stress marks are not inserted; the base speech model does not read them. |
 | `--ai-disclosure` | Speak a short AI note at the start (opt-in) |
 | `--work-dir DIR` | Remember this folder as the app working folder |
-| `--speakers` | Ask the text model (Gemma) to mark each paragraph narrator, male or female, then narrate those voices. Same path as the Narrate window |
+| `--speakers` | Ask the text model (Gemma) to mark each paragraph narrator, male or female, then narrate those voices. Same path as the Narrate window. Without any voice flag or `--character`, the default cast is used: Natan and Shimon for men, Miriam for women when they are installed, else the first library voices of each gender (never the narrator unless it is the only one). A block whose reply has the wrong number of marks is split and asked again, down to single paragraphs |
 | `--male-voice ID` | Voice for paragraphs marked male. The narrator is `--voice` |
 | `--female-voice ID` | Voice for paragraphs marked female |
 | `--male2-voice ID` | Second male voice. Different male characters (by the name in the marks) alternate between `--male-voice` and this voice in order of first appearance: the first man gets `--male-voice`, the second this one, the third `--male-voice` again. A mark without a name uses `--male-voice`. Needs `--male-voice` |
@@ -109,11 +109,12 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
 voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json
 voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks --json
-voxprint narrate dialog.txt --voice gideon --male-voice asher --male2-voice tom --female-voice noa --speakers --out ./out --json
-voxprint narrate dialog.txt --voice gideon --male-voice asher --character Michael=tom --female-voice noa --speaker-marks marks.txt --out ./out
+voxprint narrate dialog.txt --voice levi --speakers --out ./out --json        # default cast: Natan, Shimon, Miriam
+voxprint narrate dialog.txt --voice levi --male-voice natan --male2-voice shimon --female-voice rivka --speakers --out ./out --json
+voxprint narrate dialog.txt --voice levi --male-voice natan --character Michael=shimon --female-voice miriam --speaker-marks marks.txt --out ./out
 ```
 
-Without `--male2-voice`, `--female2-voice` and `--character`, every man is `--male-voice` and every woman `--female-voice`, as before. `--speakers` and `--speaker-marks` cannot be used together. At least one of the voice flags must name a voice other than the narrator (exit code 2 otherwise). `--male2-voice` without `--male-voice`, a `--character` value without `=`, and any voice flag without `--speakers` or `--speaker-marks` are exit code 2. Voices are loaded one at a time, in book order. When the marks do not match the prepared paragraph count, the narrator reads the whole book, the exit code stays 0, and the JSON `warnings` array contains `Speaker marks do not match the prepared text, so the narrator reads the whole book.` The job writes `<out>/<book>/.debug/speakers.txt` and lists that file in `outputs`.
+Without `--male2-voice`, `--female2-voice` and `--character`, every man is `--male-voice` and every woman `--female-voice`, as before. `--speakers` and `--speaker-marks` cannot be used together. At least one role voice must differ from the narrator (exit code 2 otherwise). `--male2-voice` without `--male-voice`, a `--character` value without `=`, and any voice flag without `--speakers` or `--speaker-marks` are exit code 2. Voices are loaded one at a time, in book order. When the marks do not match the prepared paragraph count, the narrator reads the whole book, the exit code stays 0, and the JSON `warnings` array contains `Speaker marks do not match the prepared text, so the narrator reads the whole book.` The job writes `<out>/<book>/.debug/speakers.txt` and lists that file in `outputs`.
 
 Every narration cuts the text per sentence and at strong transitions, trims each spoken piece of its own silence and joins the pieces with the pause lengths above; long, comma-rich, descriptive or scripture-like sentences are time-stretched a little slower (pitch kept), dialogue stays at the voice's speed. Defaults come from Settings (*Narration: pauses and speed*); the flags override them for one run.
 
@@ -291,7 +292,7 @@ Thin-build Python wheels (PyTorch and the rest) stay on `Voxprint.exe --modules-
 voxprint revoice AUDIO [AUDIO ...] [--out DIR] [--title NAME] [--language CODE] [--json]
 ```
 
-Recognises the files (or every audio file in a folder) with the installed speech model and writes a TXT book (`#` lines are chapter titles). It does not narrate. If the recogniser is missing, exit code is 4 and the fix is `voxprint models download asr`.
+Recognises the files (or every audio file in a folder) with the installed speech model and writes a TXT book (`#` lines are chapter titles). It does not narrate. `--language` takes an ISO code or a language name in any case (`ru`, `EN`, `de-DE`, `Russian`, `русский`); `auto` or no flag means automatic detection, and an unknown value is exit code 2. If the recogniser is missing, exit code is 4 and the fix is `voxprint models download asr`.
 
 ```
 voxprint revoice recording.wav --out ./revoice --json

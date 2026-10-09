@@ -47,7 +47,6 @@
       "speaker": "Anastasiia Solokha",
       "prepared_by": "Voxprint",
       "project_url": "https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/",
-      "bundled": true,
       "retired": true,
       "hidden": true
     },
@@ -73,7 +72,6 @@
       "speaker": "Kazbek",
       "prepared_by": "Voxprint",
       "project_url": "https://librivox.org/vekhi-by-various/",
-      "bundled": true,
       "retired": true,
       "hidden": true
     },
@@ -171,7 +169,8 @@
       "gender": "male",
       "speaker": "Виталий",
       "prepared_by": "Voxprint",
-      "project_url": "https://archive.org/details/mlswc037_2502_librivox"
+      "project_url": "https://archive.org/details/mlswc037_2502_librivox",
+      "bundled": true
     },
     {
       "id": "natan",
@@ -240,7 +239,8 @@
       "gender": "female",
       "speaker": "Maya S",
       "prepared_by": "Voxprint",
-      "project_url": "https://archive.org/details/portraitsrussianpoets_1612_librivox"
+      "project_url": "https://archive.org/details/portraitsrussianpoets_1612_librivox",
+      "bundled": true
     },
     {
       "id": "rivka",

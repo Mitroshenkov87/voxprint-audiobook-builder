@@ -131,9 +131,16 @@ jobs:
           }
           Get-Content C:\vxsmoke\voxprint-components.json
           if (Test-Path C:\vxsmoke\unins000.exe) { "uninstaller present" } else { throw "no uninstaller" }
+          # shared models folder: setup registers this program in models\.users.json (infra/models_users.py)
+          $users = "$env:LOCALAPPDATA\Voxprint\models\.users.json"
+          if (-not (Select-String -Path $users -Pattern '"audiobook-builder": true' -SimpleMatch -Quiet)) { throw "models users file has no audiobook-builder key" }
+          '{"movie-dubber": true}' | Set-Content -Encoding ascii $users
           # second run: everything is reused (no component is downloaded again)
           $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke2.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxsmoke2.log -Tail 60; throw "second install exit code $($p.ExitCode)" }
+          $text = Get-Content -Raw $users
+          Write-Host "users file after the second install: $text"
+          if (-not ($text.Contains('"audiobook-builder": true') -and $text.Contains('"movie-dubber": true'))) { throw "the other program's key was not kept" }
           # an unreachable manifest must fail the setup (and leave a message, not a crash)
           $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=C:\vxsmoke-bad","/Manifest=http://127.0.0.1:9/manifest.json","/LOG=C:\vxsmoke3.log" -Wait -PassThru
           Write-Host "unreachable manifest -> exit code $($p.ExitCode)"
@@ -144,6 +151,7 @@ jobs:
           for ($i = 0; $i -lt 60 -and (Test-Path C:\vxsmoke\Voxprint.exe); $i++) { Start-Sleep 2 }
           Get-Process | Where-Object { $_.ProcessName -like "unins*" -or $_.ProcessName -like "*vxsmoke*" } | Format-Table Id, ProcessName
           if (Test-Path C:\vxsmoke\Voxprint.exe) { if (Test-Path C:\vxsmoke-un.log) { Get-Content C:\vxsmoke-un.log -Tail 30 }; throw "files left after the uninstall" }
+          if (-not (Test-Path $users)) { throw "the uninstall deleted the shared models folder" }
           "uninstalled"
       - name: Logs
         if: always()

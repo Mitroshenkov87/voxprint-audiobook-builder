@@ -1034,3 +1034,59 @@ def test_voices_catalog_and_download(tmp_path, capsys):
     assert user_cli.cmd_voices_download(parse(["voices", "download", "nobody"]), library=lib, fetch_fn=fetch) == 3
     empty = lambda: repo.IndexResult(error="unreachable")
     assert user_cli.cmd_voices_catalog(parse(["voices", "catalog"]), library=lib, fetch_fn=empty) == 4
+
+
+def test_narrate_speakers_alone_uses_the_default_cast(tmp_path, capsys):
+    """Build 703: ``--speakers`` without voice flags picks the shipped cast (here: Natan and Miriam), else the first voice of
+    each gender. Tom and Ann come first in the library but are not the shipped cast."""
+    lib = _cast_library(tmp_path)
+    _add_voice(lib, "Natan", "natan", "male")
+    _add_voice(lib, "Miriam", "miriam", "female")
+    lib = VoiceLibrary(lib.root)
+    book = tmp_path / "book.txt"
+    book.write_text(DIALOGUE, encoding="utf-8")
+    engines = {}
+    code = user_cli.main(
+        ["narrate", str(book), "--voice", "narrator", "--speakers", "--out", str(tmp_path / "audiobooks"),
+         "--format", "wav", "--json"],
+        run_narration_fn=_narrate_with_fakes(engines), library=lib, plan_fn=_plan,
+    )
+    assert code == 0, capsys.readouterr().err
+    assert any("Hello" in c for c in engines["miriam"].calls)
+    assert any("Good day" in c for c in engines["natan"].calls)
+    assert "ann" not in engines                       # Tom may stand in for the missing Shimon as the second male voice
+
+
+def test_narrate_speakers_alone_falls_back_to_first_voices(tmp_path, capsys):
+    lib = _cast_library(tmp_path)
+    book = tmp_path / "book.txt"
+    book.write_text(DIALOGUE, encoding="utf-8")
+    engines = {}
+    code = user_cli.main(
+        ["narrate", str(book), "--voice", "narrator", "--speakers", "--out", str(tmp_path / "audiobooks"),
+         "--format", "wav", "--json"],
+        run_narration_fn=_narrate_with_fakes(engines), library=lib, plan_fn=_plan,
+    )
+    assert code == 0, capsys.readouterr().err
+    assert any("Hello" in c for c in engines["ann"].calls)
+    assert any("Good day" in c for c in engines["tom"].calls)
+
+
+def test_revoice_language_accepts_iso_codes(tmp_path, capsys):
+    """Build 702 bug: ``--language ru`` reached Qwen3-ASR as "ru". Codes and names in any case become the ASR's name."""
+    audio = tmp_path / "a.wav"
+    audio.write_bytes(b"x")
+    seen = []
+
+    def fake(files, language, progress, cancel):
+        seen.append(language)
+        return [("A", "text")]
+
+    for value, want in (("ru", "Russian"), ("EN", "English"), ("de-DE", "German"), ("Russian", "Russian"), ("auto", None)):
+        assert user_cli.main(["revoice", str(audio), "--out", str(tmp_path / "o"), "--language", value, "--json"],
+                             transcribe_fn=fake) == 0
+        assert seen[-1] == want
+    capsys.readouterr()
+    assert user_cli.main(["revoice", str(audio), "--out", str(tmp_path / "o"), "--language", "xx", "--json"],
+                         transcribe_fn=fake) == user_cli.EXIT_BAD_ARGS
+    assert len(seen) == 5

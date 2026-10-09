@@ -5,5 +5,65 @@
     "stress": 0,
     "type": "unambiguous",
     "hint": "Plain e, stressed on the first vowel. Do not write yo. The base speech model has read this word with yo."
+  },
+  {
+    "word": "твердо",
+    "yo_form": "твёрдо",
+    "type": "homograph",
+    "hint": "Project choice (build 703). eyo-kernel lists this as ambiguous only because of the old name of the letter T (tverdo), which modern prose does not use."
+  },
+  {
+    "word": "тверды",
+    "yo_form": "твёрды",
+    "type": "homograph",
+    "hint": "Project choice (build 703). eyo-kernel lists this as ambiguous only because of the old name of the letter T (tverdo), which modern prose does not use."
+  },
+  {
+    "word": "признает",
+    "yo_form": "признаёт",
+    "type": "homograph",
+    "hint": "Project choice (build 703). Homograph: the -ёт form is the present tense of the imperfective verb, the -ет form the future of the perfective one (stress on the stem). The present tense is the more common reading in modern prose and technical text, so yo is written; the rarer perfective future is then misread."
+  },
+  {
+    "word": "признаешь",
+    "yo_form": "признаёшь",
+    "type": "homograph",
+    "hint": "Project choice (build 703). Homograph: the -ёт form is the present tense of the imperfective verb, the -ет form the future of the perfective one (stress on the stem). The present tense is the more common reading in modern prose and technical text, so yo is written; the rarer perfective future is then misread."
+  },
+  {
+    "word": "признаете",
+    "yo_form": "признаёте",
+    "type": "homograph",
+    "hint": "Project choice (build 703). Homograph: the -ёт form is the present tense of the imperfective verb, the -ет form the future of the perfective one (stress on the stem). The present tense is the more common reading in modern prose and technical text, so yo is written; the rarer perfective future is then misread."
+  },
+  {
+    "word": "распознает",
+    "yo_form": "распознаёт",
+    "type": "homograph",
+    "hint": "Project choice (build 703). Homograph: the -ёт form is the present tense of the imperfective verb, the -ет form the future of the perfective one (stress on the stem). The present tense is the more common reading in modern prose and technical text, so yo is written; the rarer perfective future is then misread."
+  },
+  {
+    "word": "распознаешь",
+    "yo_form": "распознаёшь",
+    "type": "homograph",
+    "hint": "Project choice (build 703). Homograph: the -ёт form is the present tense of the imperfective verb, the -ет form the future of the perfective one (stress on the stem). The present tense is the more common reading in modern prose and technical text, so yo is written; the rarer perfective future is then misread."
+  },
+  {
+    "word": "распознается",
+    "yo_form": "распознаётся",
+    "type": "homograph",
+    "hint": "Project choice (build 703). Homograph: the -ёт form is the present tense of the imperfective verb, the -ет form the future of the perfective one (stress on the stem). The present tense is the more common reading in modern prose and technical text, so yo is written; the rarer perfective future is then misread."
+  },
+  {
+    "word": "осознает",
+    "yo_form": "осознаёт",
+    "type": "homograph",
+    "hint": "Project choice (build 703). Homograph: the -ёт form is the present tense of the imperfective verb, the -ет form the future of the perfective one (stress on the stem). The present tense is the more common reading in modern prose and technical text, so yo is written; the rarer perfective future is then misread."
+  },
+  {
+    "word": "осознаешь",
+    "yo_form": "осознаёшь",
+    "type": "homograph",
+    "hint": "Project choice (build 703). Homograph: the -ёт form is the present tense of the imperfective verb, the -ет form the future of the perfective one (stress on the stem). The present tense is the more common reading in modern prose and technical text, so yo is written; the rarer perfective future is then misread."
   }
 ]
