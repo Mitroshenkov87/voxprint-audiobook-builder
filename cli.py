@@ -1201,12 +1201,15 @@ def _catalog_or_fail(fetch_fn=None):
 def cmd_voices_catalog(args: argparse.Namespace, *, library: Optional[VoiceLibrary] = None, fetch_fn=None) -> int:
     """``voices catalog``: id, name, gender, language, licence, size and whether it is installed."""
 
+    from infra import voice_repository as repo
+
     def body(json_mode: bool, started: float) -> int:
         lib = library if library is not None else VoiceLibrary()
         voices, offline = _catalog_or_fail(fetch_fn)
-        have = {str(r.info.get("repo_id") or "") for r in lib.list_voices()}
+        have = repo.installed_entry_ids(voices, lib.list_voices())   # by repo_id, else a local voice with the same id / name
         rows = [{"id": e.id, "name": e.name, "language": e.language, "gender": e.gender or "", "license": e.license,
-                 "size_bytes": e.size_bytes, "bundled": bool(e.bundled), "installed": e.id in have} for e in voices]
+                 "size_bytes": e.size_bytes, "bundled": bool(e.bundled), "installed": e.id in have}
+                for e in voices if e.id in have or not e.hidden]   # retired voices only when still installed
         warnings = ["The catalog could not be fetched; this is the cached copy."] if offline else []
         human = [f"{r['id']}\t{r['name']}\t{r['gender'] or '-'}\t{r['language'] or '-'}\t{r['license']}\t"
                  f"{r['size_bytes'] / 1e6:.0f} MB\t{'installed' if r['installed'] else '-'}" for r in rows]
@@ -1230,7 +1233,7 @@ def cmd_voices_download(args: argparse.Namespace, *, library: Optional[VoiceLibr
         if entry is None:
             raise CliError(EXIT_INPUT, f"voice {args.voice!r} is not in the catalog",
                            hint="List the catalog: voxprint voices catalog")
-        existing = next((r for r in lib.list_voices() if str(r.info.get("repo_id") or "") == entry.id), None)
+        existing = repo.installed_record(entry, lib.list_voices())
         if existing is not None:
             return _ok(json_mode, "voices download", started, outputs=[], human=[f"Already installed: {existing.name} ({existing.id})"],
                        extra={"voice": _voice_payload(existing), "downloaded": False})

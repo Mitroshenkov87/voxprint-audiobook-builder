@@ -228,3 +228,35 @@ def test_offline_index_falls_back_to_the_last_good_one(tmp_path):
     bad = repo.fetch_index(url, opener=opener_for({url: b"<html>"}))
     assert bad.offline and bad.voices                                     # a broken index must not wipe the list
     assert repo.fetch_index(url, opener=opener_for({url: json.dumps(index_for(entry)).encode()})).voices[0].id == "open-voice"
+
+
+def test_locally_trained_voice_counts_as_the_catalog_voice_with_the_same_id_or_name(tmp_path):
+    """Build 702 bug: a locally trained Gideon/Noa (no repo_id) showed as 'not installed' and was downloaded a second time."""
+    _data, entry = package(tmp_path)
+    entries = repo.parse_index(index_for(entry) | {"voices": [
+        {**entry, "id": "gideon", "name": "Gideon", "names": {}},
+        {**entry, "id": "noa", "name": "Noa", "names": {}},
+        {**entry, "id": "boaz", "name": "Boaz", "names": {}, "retired": True, "hidden": True},
+        {**entry, "id": "levi", "name": "Levi", "names": {}}]})
+    assert [e.hidden for e in entries] == [False, False, True, False]
+    lib = VoiceLibrary(tmp_path / "lib")
+    lib.add_from_adapter(make_adapter(tmp_path / "g", name="Gideon"))      # folder id "gideon", no repo_id
+    lib.add_from_adapter(make_adapter(tmp_path / "n", name="NOA"))         # same name, other case
+    items = cat.build(lib, entries)
+    assert [(i.key, i.installed) for i in items] == [("gideon", True), ("noa", True), ("repo:levi", False)]  # boaz: retired
+    assert repo.installed_entry_ids(entries, lib.list_voices()) == {"gideon", "noa"}
+    assert repo.installed_record(entries[0], lib.list_voices()).id == "gideon"
+    assert repo.installed_record(entries[3], lib.list_voices()) is None
+
+
+def test_a_downloaded_voice_matches_only_its_own_repo_id(tmp_path):
+    _data, entry = package(tmp_path)
+    entries = repo.parse_index(index_for(entry) | {"voices": [{**entry, "id": "gideon", "name": "Gideon", "names": {}}]})
+
+    class Rec:
+        id = "gideon"
+        info = {"name": "Gideon", "repo_id": "other-voice"}
+
+    assert not repo.record_matches(entries[0], Rec())    # repo_id wins over a name that happens to be equal
+    Rec.info = {"name": "x", "repo_id": "GIDEON"}
+    assert repo.record_matches(entries[0], Rec())

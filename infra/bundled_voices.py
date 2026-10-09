@@ -60,9 +60,11 @@ def total_bytes() -> int:
 
 
 def missing(library: Optional[VoiceLibrary] = None) -> List[repo.RepoVoice]:
-    """Bundled voices not in the library yet (a downloaded voice carries its index id as ``repo_id``)."""
-    have = {str(r.info.get("repo_id") or "") for r in (library or VoiceLibrary()).list_voices()}
-    return [e for e in entries() if e.id not in have]
+    """Bundled voices not in the library yet (a downloaded voice carries its index id as ``repo_id``; a locally trained or
+    imported voice with the same id or name counts as present too, so it is not downloaded a second time)."""
+    all_entries = entries()
+    have = repo.installed_entry_ids(all_entries, (library or VoiceLibrary()).list_voices())
+    return [e for e in all_entries if e.id not in have]
 
 
 def ensure(progress: Optional[Callable[[float, str], None]] = None, library: Optional[VoiceLibrary] = None,
