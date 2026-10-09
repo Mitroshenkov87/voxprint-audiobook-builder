@@ -10,6 +10,7 @@
   "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
   "license": "CC0-1.0",
   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "bundled": true,
   "description": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording Anton Chekhov's short stories 'Kapitanskiy mundir', 'Liberal' and 'Radost'' (Multilingual Short Works Collection 037), read by Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Levi is Voxprint's own and does not imply the reader's endorsement.",
   "descriptions": {
     "en": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording Anton Chekhov's short stories 'Kapitanskiy mundir', 'Liberal' and 'Radost'' (Multilingual Short Works Collection 037), read by Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Levi is Voxprint's own and does not imply the reader's endorsement.",

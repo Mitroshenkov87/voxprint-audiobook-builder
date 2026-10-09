@@ -40,7 +40,7 @@
 #define AppName "Voxprint"
 ; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
 #define AppDisplayName "Voxprint AI Audiobook Builder"
-#define AppVersion "0.2.2"
+#define AppVersion "0.2.3"
 #define AppExe "Voxprint.exe"
 ; CI build number and codename (tools/build_number.py; build_online.ps1 passes /DAppBuild= /DAppCodename=); 0 = local build
 #ifndef AppBuild
@@ -190,6 +190,9 @@ english.PortableBadFolder=The folder %1 cannot be used (it cannot be created or 
 russian.PortableBadFolder=Папку %1 нельзя использовать (её нельзя создать или записать в неё). Выберите другую папку.
 german.PortableBadFolder=Der Ordner %1 kann nicht verwendet werden (er kann nicht angelegt oder beschrieben werden). Wählen Sie einen anderen Ordner.
 
+english.UninstallModelsQuestion=No other Voxprint program uses the models in%n%1%n%nDelete these models too (about 15-28 GB)? Choose No to keep them for a later install.
+russian.UninstallModelsQuestion=Модели в папке%n%1%nбольше не использует ни одна программа Voxprint.%n%nУдалить и их (около 15-28 ГБ)? Нажмите «Нет», чтобы оставить их для следующей установки.
+german.UninstallModelsQuestion=Kein anderes Voxprint-Programm verwendet die Modelle in%n%1%n%nDiese Modelle ebenfalls löschen (etwa 15-28 GB)? Wählen Sie Nein, um sie für eine spätere Installation zu behalten.
 english.PortableMissing=The setup folder %1 (from /FromFolder) was not found or has no manifest.json.
 russian.PortableMissing=Папка установки %1 (из /FromFolder) не найдена или в ней нет manifest.json.
 german.PortableMissing=Der Setup-Ordner %1 (aus /FromFolder) wurde nicht gefunden oder enthält keine manifest.json.
@@ -804,6 +807,43 @@ begin
     Result := 'en';
 end;
 
+{ Shared models folder: models\.users.json lists the Voxprint programs that use it (infra/models_users.py; the Movie Dubber
+  reads and writes the same file).  Setup adds our key; the app adds it again at every start, so a failure here only delays it.
+  The file is one small ASCII JSON object, so a plain text edit is enough. }
+procedure RegisterModelsUser(Folder: String);
+var
+  F, S, Inner: String;
+  Raw: AnsiString;
+  OpenPos, ClosePos, I: Integer;
+begin
+  if Folder = '' then Exit;
+  ForceDirectories(Folder);
+  F := AddBackslash(Folder) + '.users.json';
+  S := '';
+  if LoadStringFromFile(F, Raw) then
+    S := Trim(String(Raw));
+  if Pos('"audiobook-builder"', S) > 0 then Exit;
+  OpenPos := Pos('{', S);
+  ClosePos := 0;
+  for I := Length(S) downto 1 do
+    if S[I] = '}' then
+    begin
+      ClosePos := I;
+      Break;
+    end;
+  if (OpenPos = 0) or (ClosePos < OpenPos) then
+    S := '{"audiobook-builder": true}'
+  else
+  begin
+    Inner := Trim(Copy(S, OpenPos + 1, ClosePos - OpenPos - 1));
+    if Inner = '' then
+      S := '{"audiobook-builder": true}'
+    else
+      S := '{"audiobook-builder": true, ' + Inner + '}';
+  end;
+  SaveStringToFile(F, AnsiString(S), False);
+end;
+
 { Only paths are remembered (UTF-8 files in state\); no model is copied.  models_dir.txt = the models folder (deleted when it is the
   default, so the app follows its own default); existing_models_dir.txt = an optional folder to import models from (/ModelsDir=).
   A chosen folder with a Voxprint backup is NOT written to models_dir.txt: its root goes to existing_models_dir.txt and the app
@@ -860,6 +900,11 @@ begin
       Lines[0] := Dir;
       SaveStringsToUTF8File(StateDir + '\existing_models_dir.txt', Lines, False);
     end;
+    { register this program in the live models folder (a backup or the default choice = the default folder) }
+    Dir := RemoveBackslash(Trim(ModelsEdit.Text));
+    if (Backup <> '') or (Dir = '') then
+      Dir := DefaultModelsDir();
+    RegisterModelsUser(Dir);
     Lines[0] := SetupMode();                               { Full / Quick (infra/setup_mode.py); no BOM }
     SaveStringsToUTF8FileWithoutBOM(StateDir + '\install_mode.txt', Lines, False);
     { the wizard language becomes the app's UI language, unless the user already chose one (core/i18n.py reads state\language) }
@@ -869,4 +914,46 @@ begin
       SaveStringsToUTF8FileWithoutBOM(StateDir + '\language', Lines, False);
     end;
   end;
+end;
+
+{ Uninstall: remove our key with the program itself (Voxprint.exe --unregister-models-user --out FILE).  FILE gets the number of
+  OTHER programs still using the models and the models folder.  -1 (helper failed) means: never offer to delete. }
+var
+  OtherModelUsers: Integer;
+  SharedModelsDir: String;
+
+procedure UnregisterModelsUser;
+var
+  Rc: Integer;
+  OutFile: String;
+  Lines: TArrayOfString;
+begin
+  OtherModelUsers := -1;
+  SharedModelsDir := '';
+  OutFile := AddBackslash(GetTempDir()) + 'voxprint-models-users.txt';
+  DeleteFile(OutFile);
+  if not FileExists(ExpandConstant('{app}\{#AppExe}')) then Exit;
+  if Exec(ExpandConstant('{app}\{#AppExe}'), '--unregister-models-user --out "' + OutFile + '"', ExpandConstant('{app}'),
+          SW_HIDE, ewWaitUntilTerminated, Rc) and (Rc = 0) then
+    if LoadStringsFromFile(OutFile, Lines) and (GetArrayLength(Lines) >= 2) then
+    begin
+      OtherModelUsers := StrToIntDef(Trim(Lines[0]), -1);
+      SharedModelsDir := RemoveBackslash(Trim(Lines[1]));
+    end;
+  DeleteFile(OutFile);
+end;
+
+{ The models are deleted only when no other Voxprint program uses them AND the user says yes (default: keep; a silent uninstall
+  with /SUPPRESSMSGBOXES keeps them).  Only the default folder is ever offered: a folder the user chose stays untouched. Voices,
+  settings and projects in %LOCALAPPDATA%\Voxprint are never deleted here. }
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+    UnregisterModelsUser;
+  if CurUninstallStep = usPostUninstall then
+    if (OtherModelUsers = 0) and (SharedModelsDir <> '') and DirExists(SharedModelsDir) and
+       (CompareText(SharedModelsDir, DefaultModelsDir()) = 0) then
+      if SuppressibleMsgBox(FmtMessage(CustomMessage('UninstallModelsQuestion'), [SharedModelsDir]),
+         mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES then
+        DelTree(SharedModelsDir, True, True, True);
 end;

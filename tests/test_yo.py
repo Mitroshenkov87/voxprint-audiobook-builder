@@ -41,7 +41,7 @@ def test_shipped_dictionary_is_the_pinned_mit_file():
     assert "MIT" in licence and "Denis Seleznev" in licence and "e2yo/eyo-kernel" in licence
     runtime = ROOT / "core" / "data" / "yo_runtime.tsv.gz"
     dataset = ROOT / "core" / "data" / "yo_dataset.jsonl.gz"
-    assert runtime.stat().st_size == 1323641 and dataset.stat().st_size == 1257057
+    assert runtime.stat().st_size == 1323843 and dataset.stat().st_size == 1257996
     assert "core\\data;core\\data" in (ROOT / "build.bat").read_text(encoding="utf-8")
     assert "core\\data;core\\data" in (ROOT / "build_thin.bat").read_text(encoding="utf-8")
     from tools.make_linux_package import app_files
@@ -72,7 +72,7 @@ def test_dataset_records_plain_text_and_rebuilds_the_same_bytes():
     keys = {line.split("\t", 1)[0] for line in gzip.decompress(before).decode("utf-8").splitlines()}
     assert "текст" not in keys and "все" not in keys and "берег" not in keys
     stats = build()
-    assert stats["runtime_bytes"] == 1323641 and stats["dataset_rows"] == 139996
+    assert stats["runtime_bytes"] == 1323843 and stats["dataset_rows"] == 139996
     rebuilt = (ROOT / "core" / "data" / "yo_runtime.tsv.gz").read_bytes()
     rebuilt_dataset = (ROOT / "core" / "data" / "yo_dataset.jsonl.gz").read_bytes()
     # Python 3.12 gzip.compress(mtime=0) writes OS byte 3; GzipFile writes 255.
@@ -226,3 +226,32 @@ def test_dialog_fixture_restores_every_yo_and_adds_none():
     assert [i for i in needed if c[i] != b[i]] == []
     assert [i for i, (r, o) in enumerate(zip(b, c)) if r != o] == []
     assert out == ref
+
+
+def test_dialog_02_restores_every_yo():
+    """The build 702 dialogue (dialog-ai-torah-02): 21 yo in the reference. 702 missed "признаёт" and "твёрдо" (19/21)."""
+    import re
+
+    src = (FIXTURES / "dialog-ai-torah-02.txt").read_text(encoding="utf-8")
+    ref = (FIXTURES / "dialog-ai-torah-02.yo-reference.txt").read_text(encoding="utf-8")
+    out = yo.restore(src)
+    words = re.compile(r"\w+")
+    b, c = words.findall(ref), words.findall(out)
+    yo_lo, yo_up = chr(0x0451), chr(0x0401)
+    needed = [i for i, w in enumerate(b) if yo_lo in w or yo_up in w]
+    assert len(needed) == 21
+    assert [b[i] for i in needed if c[i] != b[i]] == []
+    assert out == ref
+
+
+def test_project_additions_for_present_tense_and_tvyordo():
+    """Build 703 additions: homographs where the yo reading is the common one (hint says so); capitalised forms too."""
+    cases = {
+        "Он признает ошибку.": "Он признаёт ошибку.",
+        "Модель распознает речь и осознает предел.": "Модель распознаёт речь и осознаёт предел.",
+        "Твердо стоит.": "Твёрдо стоит.",
+        "Ты признаешь, что они тверды?": "Ты признаёшь, что они твёрды?",
+    }
+    for src, want in cases.items():
+        assert yo.restore(src) == want
+    assert yo.restore("Он узнает завтра.") == "Он узнает завтра."   # perfective future stays: not in the additions

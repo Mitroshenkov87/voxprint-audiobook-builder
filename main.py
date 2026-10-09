@@ -5,7 +5,8 @@ Flags: ``--prefetch`` (force-download the models; used by the installer), ``--se
 ``--selftest-narrate [voice]`` (narrate two sentences headless; writes logs/selftest_narrate.txt),
 ``--verify-install`` (install check with reason codes; also written to logs/verify_install.txt),
 ``--repair`` (rebuild only Voxprint's own environment; logs/repair.txt),
-``--auto-repair`` (check every component and model by hash, fetch missing / broken parts; logs/auto_repair.txt).
+``--auto-repair`` (check every component and model by hash, fetch missing / broken parts; logs/auto_repair.txt),
+``--register-models-user`` / ``--unregister-models-user --out FILE`` (shared ``models/.users.json``, infra/models_users.py).
 User CLI subcommands (see ``cli.py`` / docs/CLI.md): ``narrate``, ``train``, ``voices``.
 """
 from __future__ import annotations
@@ -264,6 +265,15 @@ def main(argv=None) -> int:
             logging.getLogger("voxprint").info("adopted settings from a previous install: %s", adopted)
     except Exception:  # noqa: BLE001
         pass
+    if "--register-models-user" in argv or "--unregister-models-user" in argv:
+        # installer / uninstaller helper for the shared models\.users.json (infra/models_users.py, agreed with the Movie Dubber)
+        from infra import models_users
+
+        if "--register-models-user" in argv:
+            models_users.register_quietly()
+            return 0
+        i = argv.index("--out") if "--out" in argv else -1
+        return models_users.unregister_cli(argv[i + 1] if 0 <= i < len(argv) - 1 else None)
     # User-facing headless CLI: narrate / train / voices (see cli.py, docs/CLI.md). Keep before the GUI and
     # the maintenance flags so `python main.py narrate ...` and a packaged exe work the same way.
     try:
@@ -316,6 +326,9 @@ def main(argv=None) -> int:
         i = argv.index("--selftest-narrate")
         return selftest_narrate.run(argv[i + 1] if i + 1 < len(argv) and not argv[i + 1].startswith("--") else "")
     selftest = "--selftest" in argv  # start and quit automatically (used for the offscreen smoke check)
+    from infra import models_users
+
+    models_users.register_quietly()   # this program uses the shared models folder (models\.users.json)
 
     from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication

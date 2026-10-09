@@ -1,6 +1,6 @@
 # Samples
 
-Short audiobook samples narrated by Voxprint. **Tirzah** and **Gideon** are the bundled open voices ([voices/BUNDLED.md](../voices/BUNDLED.md)).
+Short audiobook samples narrated by Voxprint. From build 703 the bundled open voices are **Levi** and **Miriam** ([voices/BUNDLED.md](../voices/BUNDLED.md)); Tirzah and Gideon were bundled up to build 702.
 The Boaz file is the recording from 0.1.3. That voice is retired; Gideon replaces it, and this file is not a Gideon recording.
 
 | File | Voice | Length | Size (bytes) | SHA-256 |

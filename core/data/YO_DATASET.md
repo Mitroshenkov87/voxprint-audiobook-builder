@@ -8,11 +8,11 @@ The speech model in this project is stock Qwen3-TTS. It does not read stress mar
 
 | File | What it is |
 |---|---|
-| `yo_runtime.tsv.gz` | Lookup table, 1,323,641 bytes. Each line is `ye-form<TAB>yo-form`. This is what `core/yo.py` loads. |
-| `yo_dataset.jsonl.gz` | Published records, 1,257,057 bytes, 139,996 lines. |
+| `yo_runtime.tsv.gz` | Lookup table, 1,323,843 bytes. Each line is `ye-form<TAB>yo-form`. This is what `core/yo.py` loads. |
+| `yo_dataset.jsonl.gz` | Published records, 1,257,996 bytes, 139,996 lines. |
 | `yo_safe.txt` | Unambiguous source list, MIT, from [eyo-kernel](https://github.com/e2yo/eyo-kernel) `dictionary/safe.txt`. |
 | `yo_not_safe.txt` | Ambiguous source list from the same project (`dictionary/not_safe.txt`). Not applied at runtime. |
-| `yo_additions.json` | Project words. `текст` stays `текст` (plain e, stress on the first vowel). |
+| `yo_additions.json` | Project words. `текст` stays `текст` (plain e, stress on the first vowel). Build 703 adds `твёрдо`, `твёрды` and the present tense of `признавать`, `распознавать`, `осознавать` (`признаёт`, `распознаёт`, `осознаёт` ...): eyo-kernel lists them as homographs, the project writes yo because that reading is the common one (the hint in each record says so). |
 | `yo_safe.LICENSE` | MIT notice for the two source lists. |
 | `yo_context.json` | Project rules for `все` / `всё` by the neighbouring words (Apache-2.0). Read by `core/yo.py`. |
 

@@ -5,6 +5,22 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+## [0.2.3-beta] - 2026-10-09 - build 703 "Toledot"
+
+Codename *Toledot* (Biblical Hebrew *toledot*, generations; Genesis 5:1). A new generation of bundled voices and fixes from the test of build 702 on a real PC. The `BUILD.json` offset stays **654**: build-installer run 49 stamps build 703. Upgrade: install over 700, 701 or 702; models, voices and settings stay, only Levi and Miriam are downloaded.
+
+### Changed
+- **Bundled voices Levi (male) and Miriam (female)** from the `voices-v2` release replace Gideon and Tirzah in the standard download (`infra/bundled_voices.py`, `voices/index.json`, `voices/BUNDLED.md`): `levi.zip` 53,227,088 bytes `45d649f2665a0a98a7a69e6694e279745e2d9469245470f6681464fd02744ea3`, `miriam.zip` 53,215,075 bytes `a43a0e7e834603086e3aac623760e28271990a69074db6d968d2b1d2f1e9ef0c`. CC0-1.0, LibriVox readers Виталий (Chekhov) and Maya S (Ehrenburg). Existing installs keep Gideon, Tirzah and any other voice they have; a locally trained Levi or Miriam counts as installed and is not downloaded again.
+- **Default multi-voice cast** (`infra.bundled_voices.DEFAULT_CAST`, `core.speakers.default_role_picks(..., preferred)`): narrator Levi, male Natan, second male Shimon, female Miriam, each only when installed and of the right gender; otherwise the earlier rule (first voice of that gender that is not the narrator). The Narrate window selects Levi when no voice is chosen yet. `voxprint narrate --speakers` without `--male-voice` / `--female-voice` / `--character` uses the same cast instead of exit code 2.
+
+### Added
+- **Shared models users file** `models\.users.json` (`infra/models_users.py`), the format agreed with Voxprint AI Movie Dubber: `{"audiobook-builder": true, "movie-dubber": true}`. Setup and every app start add the `audiobook-builder` key (other keys are kept). The uninstaller runs `Voxprint.exe --unregister-models-user --out FILE`, removes only its own key and offers to delete the models only when no other key remains and the folder is the default one; the default answer is keep, and a silent uninstall keeps them. A failed helper never deletes anything. CI checks that the key is written and another program's key survives a reinstall.
+- **Letter-yo project words** (`core/data/yo_additions.json`): `твёрдо`, `твёрды`, and the present tense of признавать, распознавать and осознавать (`признаёт`, `признаёшь`, `признаёте`, `распознаёт`, `распознаёшь`, `распознаётся`, `осознаёт`, `осознаёшь`). eyo-kernel lists them as homographs (`признает` is also the perfective future); the project writes yo because that reading is the common one. `узнает`, `познает`, `опознает` stay unchanged. Test dialogue 02 is now a fixture: **21/21** (702: 19/21); dialogue 01 stays 22/22.
+
+### Fixed
+- **Speaker marks: a reply with the wrong number of marks sent the whole block to the narrator.** On the 702 test the text model merged the title with the first paragraph (11 marks for 12 paragraphs) and 10 of 26 marks were lost. `core.speakers.tag_paragraphs` now splits such a block in half and asks again, down to single paragraphs; only a paragraph the model still cannot mark stays narrator (warning `unparsed`). Retries are logged in `.debug/speakers-raw.txt`.
+- **`voxprint revoice --language ru`** passed `ru` to the recogniser, which expects a name. ISO codes, BCP-47 tags, English and native names are accepted in any case; `auto` means automatic; an unknown value is exit code 2.
+
 ## [0.2.2-beta] - 2026-10-09 - build 702 "Shelishi"
 
 Codename *Shelishi* (Biblical Hebrew *shelishi*, third; Genesis 1:13). A third male voice and fixes from the test of build 701 on a real PC. The `BUILD.json` offset stays **654**: build-installer run 48 stamps build 702. Upgrade: install over 700 or 701; models, voices and settings stay.

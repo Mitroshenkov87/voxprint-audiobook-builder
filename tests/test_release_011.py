@@ -134,27 +134,29 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     from tools import build_number as bn
 
     # Runs 41-44 published nothing. Offset 655: run 45 stamped 700 (Kaporet). Run 46 failed before publishing;
-    # offset 654: run 47 stamped 701 (Shalem), run 48 stamps 702 (Shelishi).
+    # offset 654: run 47 stamped 701 (Shalem), run 48 stamped 702 (Shelishi), run 49 stamps 703 (Toledot).
     assert bn.build_number({"GITHUB_RUN_NUMBER": "47"}) == 701 and bn.build_number({}) == 0
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "48"}) == 702
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "48"}) == 702 and bn.build_number({"GITHUB_RUN_NUMBER": "49"}) == 703
     assert bn.build_number({"GITHUB_RUN_NUMBER": "40"}) == 694
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34"}) == 700
     assert bn.info()["offset"] == 654
     name = bn.info()["codename"]
-    assert name == "Shelishi" and name.isascii() and name.isalpha()
+    assert name == "Toledot" and name.isascii() and name.isalpha()
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     credits = json.loads((root / "credits.json").read_text(encoding="utf-8"))
-    assert credits["app"]["version"] == "0.2.2" and credits["app"]["channel"] == "beta"
-    assert credits["app"]["codename"] == "Shelishi"
+    assert credits["app"]["version"] == "0.2.3" and credits["app"]["channel"] == "beta"
+    assert credits["app"]["codename"] == "Toledot"
     iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8")
-    assert '#define AppVersion "0.2.2"' in iss
+    assert '#define AppVersion "0.2.3"' in iss
     notes = (root / "docs" / "RELEASE-NOTES-700-KAPORET.md").read_text(encoding="utf-8")
     assert "655" in notes and "run 45" in notes and "does not delete" in notes and "Kaporet" in notes
     notes = (root / "docs" / "RELEASE-NOTES-701-SHALEM.md").read_text(encoding="utf-8")
     assert "654" in notes and "run 47" in notes and "Shalem" in notes and "22/22" in notes
     notes = (root / "docs" / "RELEASE-NOTES-702-SHELISHI.md").read_text(encoding="utf-8")
     assert "654" in notes and "run 48" in notes and "Shelishi" in notes and "Eitan" in notes
+    notes = (root / "docs" / "RELEASE-NOTES-703-TOLEDOT.md").read_text(encoding="utf-8")
+    assert "654" in notes and "run 49" in notes and "Toledot" in notes and "Levi" in notes and "Miriam" in notes
     c = tmp_path / "credits.json"
     c.write_text(json.dumps({"app": {"version": "0.1.1"}}), encoding="utf-8")
     bn.stamp(c, 665, "0123456789abcdef", "Tikkun")

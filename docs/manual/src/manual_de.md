@@ -125,7 +125,7 @@ Stille Installation für Administratoren: `Voxprint-Setup-online.exe /VERYSILENT
 
 ## Erster Start
 
-Beim ersten Start bereitet sich Voxprint vor. Mit dem Online-Installer öffnet sich das Fenster **{{modules.title}}** und arbeitet ohne Klick: Eine Zeile zeigt, was gerade geladen wird („{{modules.now_download}}“), danach die Prüfsummenprüfung, ein Balken den Gesamtfortschritt. Schritt 1 bringt die Programmkomponenten zusammen mit dem Textkorrektur-Modell SAGE und den Übersetzungsmodellen, Schritt 2 direkt danach ALLE Modelle (Stimme, Ausrichtung, Spracherkennung) in Ihren Modellordner. Sonst zeigt die Statuszeile „{{ui.prefetch_start}}“ und Voxprint lädt die benötigten Modelle (bis etwa 15 GB, einmalig). Ist Hugging Face langsam oder nicht erreichbar, wechselt Voxprint automatisch zum ModelScope-Spiegel. Der Download kann unterbrochen werden und läuft an der gleichen Stelle weiter. Modelle, die schon auf dem Computer liegen (zum Beispiel im Hugging-Face-Cache oder bei Alexandria/Pinokio), werden ohne erneuten Download nur lesend weiterverwendet. Die mitgelieferten Stimmen *Tirzah* und *Gideon* (Kapitel 7) gehören zu diesem Download.
+Beim ersten Start bereitet sich Voxprint vor. Mit dem Online-Installer öffnet sich das Fenster **{{modules.title}}** und arbeitet ohne Klick: Eine Zeile zeigt, was gerade geladen wird („{{modules.now_download}}“), danach die Prüfsummenprüfung, ein Balken den Gesamtfortschritt. Schritt 1 bringt die Programmkomponenten zusammen mit dem Textkorrektur-Modell SAGE und den Übersetzungsmodellen, Schritt 2 direkt danach ALLE Modelle (Stimme, Ausrichtung, Spracherkennung) in Ihren Modellordner. Sonst zeigt die Statuszeile „{{ui.prefetch_start}}“ und Voxprint lädt die benötigten Modelle (bis etwa 15 GB, einmalig). Ist Hugging Face langsam oder nicht erreichbar, wechselt Voxprint automatisch zum ModelScope-Spiegel. Der Download kann unterbrochen werden und läuft an der gleichen Stelle weiter. Modelle, die schon auf dem Computer liegen (zum Beispiel im Hugging-Face-Cache oder bei Alexandria/Pinokio), werden ohne erneuten Download nur lesend weiterverwendet. Die mitgelieferten Stimmen *Levi* und *Miriam* (Kapitel 7) gehören zu diesem Download.
 
 Ist alles fertig, zeigt die Statuszeile „{{ui.prefetch_done}}“ Beim ersten Start erscheint ein Datenschutzhinweis; eine kurze Erinnerung („{{ui.footer_privacy}}“) bleibt am unteren Rand der Fenster.
 
@@ -167,7 +167,7 @@ Jedes andere Fenster hat oben links eine Schaltfläche **{{nav.back}}**, die Sie
 
 Öffnen Sie dieses Fenster über die Karte **{{studio.narrate_title}}**. {{narr.intro}}
 
-![Das Vertonungsfenster, obere Hälfte: Buch, Stimme, Textvorbereitung, Übersetzung und das optionale KI-Textmodell. Dieser Screenshot von Build 667 zeigt Boaz; diese Stimme ist zurückgezogen. Tirzah und Gideon sind die mitgelieferten Stimmen.](@narrate_top)
+![Das Vertonungsfenster, obere Hälfte: Buch, Stimme, Textvorbereitung, Übersetzung und das optionale KI-Textmodell. Dieser Screenshot von Build 667 zeigt Boaz; diese Stimme ist zurückgezogen. Ab Build 703 sind Levi und Miriam die mitgelieferten Stimmen.](@narrate_top)
 
 ## Schritt 1 – das Buch
 
@@ -400,7 +400,7 @@ Der kleine Adapter (einige zehn MB) funktioniert nur in wenigen Apps (zum Beispi
 
 Öffnen Sie das Fenster über die Karte **{{studio.voices_title}}**. {{voices.intro}}
 
-![Meine Stimmen (Build 667): Tirzah ist als mitgelieferte Stimme zu sehen (CC0-1.0, schreibgeschützt). Gideon ist ebenfalls mitgeliefert und auf diesem Bild nicht zu sehen. Das Bild zeigt außerdem Boaz (diese Stimme ist zurückgezogen) und die noch nicht geladene Offene Universalstimme.](@voices)
+![Meine Stimmen (Build 667): Tirzah ist als mitgelieferte Stimme zu sehen (CC0-1.0, schreibgeschützt); sie war bis Build 702 mitgeliefert, ab Build 703 sind es Levi und Miriam. Das Bild zeigt außerdem Boaz (diese Stimme ist zurückgezogen) und die noch nicht geladene Offene Universalstimme.](@voices)
 
 Jede Stimme ist eine Karte:
 
@@ -441,7 +441,7 @@ Die dritte Karte im Bild oben, die *Offene Universalstimme*, ist so eine Online-
 | custom/personal-only (Standard) | nicht erlaubt; Ergebnisse bleiben auf Ihrem Computer |
 | custom/test-use-only | nicht erlaubt; nur zum Testen, keine Veröffentlichung |
 
-* **Tirzah** (weiblich) und **Gideon** (männlich) – die offenen **russischen** Stimmen, die mit Voxprint kommen (Teil des Standard-Modelldownloads). Tirzah ist nur mit der gemeinfreien LibriVox-Aufnahme *Степные сказки (Stepnyia skazki)* von Grigori Danilewski trainiert, gelesen von Anastasiia Solokha. Gideon ist nur mit *Вехи (Vekhi)*, einer Aufsatzsammlung von 1909, trainiert, gelesen von Kazbek, und ersetzt *Boaz*. Lizenz **CC0-1.0** – für jede Nutzung frei, auch kommerziell; eine Namensnennung ist erwünscht. Die Namen stammen von Voxprint und bedeuten keine Billigung durch die Sprecher. In der Bibliothek sind sie schreibgeschützt („{{voices.bundled_note_plain}}“). Eine Tirzah-Hörprobe – Genesis 1,1–2,3 (russische Synodalübersetzung, gemeinfrei), ebenfalls CC0 – liegt im Repository-Ordner `samples/`. *Boaz* kam mit 0.1.3 und ist zurückgezogen; die alte Boaz-Hörprobe ist keine Gideon-Aufnahme.
+* **Levi** (männlich) und **Miriam** (weiblich) – die offenen **russischen** Stimmen, die ab Build 703 mit Voxprint kommen (Teil des Standard-Modelldownloads). Levi ist nur mit der gemeinfreien LibriVox-Aufnahme von Erzählungen Anton Tschechows trainiert, gelesen von Виталий, Miriam nur mit *Портреты русских поэтов* von Ilja Ehrenburg, gelesen von Maya S. Levi ist der Standard-Erzähler; für mehrstimmige Vertonung nimmt Voxprint Natan und Shimon für Männer und Miriam für Frauen, wenn sie installiert sind (Natan, Shimon und Rivka sind mit einem Klick im Katalog). Lizenz **CC0-1.0**. Bis Build 702 waren **Tirzah** (weiblich) und **Gideon** (männlich) mitgeliefert; eine Installation, die sie hat, behält sie. Tirzah ist nur mit der gemeinfreien LibriVox-Aufnahme *Степные сказки (Stepnyia skazki)* von Grigori Danilewski trainiert, gelesen von Anastasiia Solokha. Gideon ist nur mit *Вехи (Vekhi)*, einer Aufsatzsammlung von 1909, trainiert, gelesen von Kazbek, und ersetzt *Boaz*. Lizenz **CC0-1.0** – für jede Nutzung frei, auch kommerziell; eine Namensnennung ist erwünscht. Die Namen stammen von Voxprint und bedeuten keine Billigung durch die Sprecher. In der Bibliothek sind sie schreibgeschützt („{{voices.bundled_note_plain}}“). Eine Tirzah-Hörprobe – Genesis 1,1–2,3 (russische Synodalübersetzung, gemeinfrei), ebenfalls CC0 – liegt im Repository-Ordner `samples/`. *Boaz* kam mit 0.1.3 und ist zurückgezogen; die alte Boaz-Hörprobe ist keine Gideon-Aufnahme.
 * **Asher** (männlich) und **Noa** (weiblich) – optionale russische Katalogstimmen, nicht Teil des Standard-Downloads. Die Pakete liegen auf der Veröffentlichung `voices-v1` und erscheinen im Stimmenkatalog der App. Asher ist mit *Teachings of Christ* von Leo Tolstoi trainiert, gelesen von Vladimir Anyanov; Noa mit *Izbrannye* von Scholem Alejchem, gelesen von Hanna Ponomarenko. Lizenz **CC0-1.0**.
 * **Offene Universalstimme** (englisch: *Open universal voice*, russisch: *Открытый универсальный голос*) – eine englische Stimme für alle, die keine eigene Aufnahme haben. Nur mit dem gemeinfreien LJ-Speech-Datensatz trainiert (Sprecherin Linda Johnson, LibriVox); Lizenz **CC0-1.0** – für jede Nutzung frei, auch kommerziell; die Nennung des LJ-Speech-Datensatzes (Keith Ito) ist erwünscht.
 
@@ -574,7 +574,7 @@ Dieselbe Prüfung läuft ohne Fenster als `Voxprint.exe --auto-repair` (Kapitel 
 
 <dt>Exakte Pausen</dt><dd>Stille fester Länge, die Voxprint zwischen den gesprochenen Stücken einfügt – nach einem Komma, einem Satz, einem Absatz, einem Kapitel –, unabhängig davon, wie das Stimmmodell den Text phrasiert.</dd>
 
-<dt>Mitgelieferte Stimmen</dt><dd>Tirzah und Gideon: die offenen russischen Stimmen (CC0-1.0), die mit Voxprint kommen und in der Bibliothek schreibgeschützt sind. Boaz kam mit 0.1.3 und ist zurückgezogen; Gideon ersetzt ihn.</dd>
+<dt>Mitgelieferte Stimmen</dt><dd>Levi und Miriam (ab Build 703): die offenen russischen Stimmen (CC0-1.0), die mit Voxprint kommen und in der Bibliothek schreibgeschützt sind. Tirzah und Gideon waren bis Build 702 mitgeliefert, Boaz mit 0.1.3; sie sind zurückgezogen.</dd>
 
 </dl>
 
@@ -649,7 +649,7 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR [--format mp3,m4b,opus,...]
 Das Buch ist eine TXT-, FB2-, `.fb2.zip`- oder EPUB-Datei; das Ergebnis landet in `<DIR>/<Buchtitel>/`; Standardformat ist eine Opus-Datei. Die Pausen-Flags (Sekunden), `--speed` (0,7–1,3) und `--style` ersetzen für einen Lauf die Werte aus „{{ui.settings_title}}“ → „{{narrset.title}}“; `--pauses` schaltet das Schneiden an jedem Komma ein. Wird derselbe Befehl erneut ausgeführt, überspringt er bereits fertige Fragmente, und Änderungen an Pausen oder Tempo sprechen sie nie neu.
 
 ```
-voxprint narrate genesis.txt --voice tirzah --out ./audiobooks --format mp3 --json
+voxprint narrate genesis.txt --voice levi --out ./audiobooks --format mp3 --json
 ```
 
 ## Eine Stimme trainieren

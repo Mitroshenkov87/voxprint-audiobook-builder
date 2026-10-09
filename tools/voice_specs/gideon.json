@@ -20,6 +20,5 @@
     "name": "Kazbek (LibriVox reader, recording in the public domain)",
     "method": "manual",
     "confirmed": true
-  },
-  "bundled": true
+  }
 }
