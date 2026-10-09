@@ -1,12 +1,12 @@
-"""Open voices that come with Voxprint: *Tirzah* (female), Russian, CC0-1.0.
+"""Open voices that come with Voxprint: *Tirzah* (female) and *Gideon* (male), Russian, CC0-1.0.
 
-Trained only from a public-domain LibriVox recording (reader, source and hash: ``voices/BUNDLED.md``).  The weights are not
-in git: the voice is one zip on the ``voices-v1`` release, SHA-256 pinned here, and is part of the standard model download
-(:func:`workers.pipeline_runner.prefetch_models`: the Full setup downloads it upfront, Quick with the first-launch download).
-It is imported into the voices library read-only (``"bundled": true`` in ``voice.json``: no edit, no delete) with its licence
-shown in the Voices window.  The entry mirrors ``voices/index.json``; fields left out here come from the zip's ``voice.json``.
+Trained only from public-domain LibriVox recordings (reader, source and hash: ``voices/BUNDLED.md``).  The weights are not
+in git: each voice is one zip on the ``voices-v1`` release, SHA-256 pinned here, and is part of the standard model download
+(:func:`workers.pipeline_runner.prefetch_models`: the Full setup downloads them upfront, Quick with the first-launch download).
+They are imported into the voices library read-only (``"bundled": true`` in ``voice.json``: no edit, no delete) with the licence
+shown in the Voices window.  The entries mirror ``voices/index.json``; fields left out here come from the zip's ``voice.json``.
 
-*Boaz* shipped with 0.1.3 and is no longer installed. A new male bundled voice will be trained later. Optional catalog
+*Boaz* shipped with 0.1.3 and is retired. Gideon replaces it and is used as recorded, with no retraining. Optional catalog
 voices (Asher, Noa) live in ``voices/index.json`` and are not listed here, so they are never part of this download.
 """
 from __future__ import annotations
@@ -25,6 +25,8 @@ _CC0 = ("CC0-1.0", "https://creativecommons.org/publicdomain/zero/1.0/")
 VOICES = (
     {"id": "tirzah", "name": "Tirzah", "language": "ru", "url": _URL + "tirzah.zip", "size_bytes": 53274433,
      "sha256": "aef7c849298ec6e3f2aac1114b993ca111b6297bfd9fef0bf1634527be7ab95f"},
+    {"id": "gideon", "name": "Gideon", "language": "ru", "url": _URL + "gideon.zip", "size_bytes": 53031093,
+     "sha256": "6ca0e6824080ee86c21a4b34472bd013bd182ef15bb393c6e494fd554e1c2266"},
 )
 
 

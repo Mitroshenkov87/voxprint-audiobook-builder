@@ -1,0 +1,25 @@
+{
+  "id": "gideon",
+  "name": "Gideon",
+  "language": "ru",
+  "author": "Kazbek (LibriVox) - public domain",
+  "speaker": "Kazbek",
+  "prepared_by": "Voxprint",
+  "project_url": "https://librivox.org/vekhi-by-various/",
+  "gender": "male",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "description": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Вехи (Vekhi)', a 1909 essay collection, read by Kazbek (https://librivox.org/vekhi-by-various/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Gideon is Voxprint's own and does not imply the reader's endorsement.",
+  "descriptions": {
+    "en": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Вехи (Vekhi)', a 1909 essay collection, read by Kazbek (https://librivox.org/vekhi-by-various/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Gideon is Voxprint's own and does not imply the reader's endorsement.",
+    "ru": "Встроенный открытый мужской русский голос, обучен только на записи LibriVox из общественного достояния «Вехи» (сборник статей 1909 года), читает Kazbek (https://librivox.org/vekhi-by-various/). Свободен для любого использования, в том числе коммерческого (CC0-1.0). Атрибуция приветствуется. Имя Gideon дано Voxprint и не означает одобрения чтеца.",
+    "de": "Mitgelieferte offene männliche russische Stimme, nur mit der gemeinfreien LibriVox-Aufnahme 'Вехи (Vekhi)', einer Aufsatzsammlung von 1909, trainiert, gelesen von Kazbek (https://librivox.org/vekhi-by-various/). Frei für jede Nutzung, auch kommerziell (CC0-1.0). Namensnennung erwünscht. Der Name Gideon stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+  },
+  "consent": {
+    "scope": "commercial",
+    "name": "Kazbek (LibriVox reader, recording in the public domain)",
+    "method": "manual",
+    "confirmed": true
+  },
+  "bundled": true
+}

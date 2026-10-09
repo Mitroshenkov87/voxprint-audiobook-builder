@@ -47,7 +47,7 @@ Silent installation for administrators: `Voxprint-Setup-online.exe /VERYSILENT /
 
 ## First start
 
-On the first start Voxprint prepares itself. With the online installer the **{{modules.title}}** window opens and works without a click: one line shows what is being downloaded right now (*{{modules.now_download}}*), then the checksum check, and a bar shows the overall progress. Step 1 brings the program components together with the SAGE text clean-up model and the translation models, step 2 right after it ALL models (voice, alignment, speech recognition) into your models folder. Otherwise the status line says *{{ui.prefetch_start}}* and downloads the models it needs (up to about 15 GB, once). If Hugging Face is slow or unreachable, Voxprint switches to the ModelScope mirror automatically. The download can be interrupted and continues where it stopped. Models already present on the computer (for example from the Hugging Face cache or Alexandria/Pinokio) are reused without downloading them again, read-only. The bundled voice *Tirzah* (chapter 7) is part of this download.
+On the first start Voxprint prepares itself. With the online installer the **{{modules.title}}** window opens and works without a click: one line shows what is being downloaded right now (*{{modules.now_download}}*), then the checksum check, and a bar shows the overall progress. Step 1 brings the program components together with the SAGE text clean-up model and the translation models, step 2 right after it ALL models (voice, alignment, speech recognition) into your models folder. Otherwise the status line says *{{ui.prefetch_start}}* and downloads the models it needs (up to about 15 GB, once). If Hugging Face is slow or unreachable, Voxprint switches to the ModelScope mirror automatically. The download can be interrupted and continues where it stopped. Models already present on the computer (for example from the Hugging Face cache or Alexandria/Pinokio) are reused without downloading them again, read-only. The bundled voices *Tirzah* and *Gideon* (chapter 7) are part of this download.
 
 When it is done, the status shows *{{ui.prefetch_done}}* A privacy notice is shown on the first start; a short reminder (*{{ui.footer_privacy}}*) stays at the bottom of the windows.
 
@@ -89,7 +89,7 @@ Every other window has a **{{nav.back}}** button at the top left that brings you
 
 Open this window from the **{{studio.narrate_title}}** card. {{narr.intro}}
 
-![The Narrate window, upper half: book, voice, text preparation, translation and the optional AI text model. This build 667 screenshot shows Boaz, which is no longer installed; Tirzah is the bundled voice.](@narrate_top)
+![The Narrate window, upper half: book, voice, text preparation, translation and the optional AI text model. This build 667 screenshot shows Boaz, which is retired; Tirzah and Gideon are the bundled voices.](@narrate_top)
 
 ## Step 1 – the book
 
@@ -322,7 +322,7 @@ The small adapter (tens of MB) works only in a few apps (for example Alexandria)
 
 Open this from the **{{studio.voices_title}}** card. {{voices.intro}}
 
-![My voices (build 667): Tirzah is the bundled voice (CC0-1.0, read-only). The picture also shows Boaz, which is no longer installed, and the Open universal voice, which is not downloaded yet.](@voices)
+![My voices (build 667): Tirzah is shown as the bundled voice (CC0-1.0, read-only). Gideon is bundled too and is not in this picture. The picture also shows Boaz, which is retired, and the Open universal voice, which is not downloaded yet.](@voices)
 
 Each voice is a card:
 
@@ -363,8 +363,8 @@ The third card in the picture above, the *Open universal voice*, is such an onli
 | custom/personal-only (default) | not allowed; results stay on your computer |
 | custom/test-use-only | not allowed; for testing only, no public release |
 
-* **Tirzah** (female) – the open **Russian** voice that comes with Voxprint (part of the standard model download, about half an hour of speech). Trained only from the public-domain LibriVox recording *Степные сказки (Stepnyia skazki)* by Grigory Danilevsky, read by Anastasiia Solokha. Licence **CC0-1.0** – free for any use, also commercial; attribution is appreciated. The name is Voxprint's own and does not imply the reader's endorsement. In the library it is read-only (*{{voices.bundled_note_plain}}*). A sample – Genesis 1:1–2:3 (Russian Synodal translation, public domain), also CC0 – is in the repository folder `samples/`. *Boaz* shipped with 0.1.3 and is no longer installed.
-* **Asher** (male) and **Noa** (female) – optional Russian catalog voices, not part of the standard download. They appear in the in-app catalog once their packages are published. Asher is trained from *Teachings of Christ* by Leo Tolstoy, read by Vladimir Anyanov; Noa from *Izbrannye* by Sholem Aleichem, read by Hanna Ponomarenko. Licence **CC0-1.0**.
+* **Tirzah** (female) and **Gideon** (male) – the open **Russian** voices that come with Voxprint (part of the standard model download). Tirzah is trained only from the public-domain LibriVox recording *Степные сказки (Stepnyia skazki)* by Grigory Danilevsky, read by Anastasiia Solokha. Gideon is trained only from *Вехи (Vekhi)*, a 1909 essay collection, read by Kazbek, and replaces *Boaz*. Licence **CC0-1.0** – free for any use, also commercial; attribution is appreciated. The names are Voxprint's own and do not imply the readers' endorsement. In the library they are read-only (*{{voices.bundled_note_plain}}*). A Tirzah sample – Genesis 1:1–2:3 (Russian Synodal translation, public domain), also CC0 – is in the repository folder `samples/`. *Boaz* shipped with 0.1.3 and is retired; the old Boaz sample is not a Gideon recording.
+* **Asher** (male) and **Noa** (female) – optional Russian catalog voices, not part of the standard download. They are on the `voices-v1` release and appear in the in-app catalog. Asher is trained from *Teachings of Christ* by Leo Tolstoy, read by Vladimir Anyanov; Noa from *Izbrannye* by Sholem Aleichem, read by Hanna Ponomarenko. Licence **CC0-1.0**.
 * **Open universal voice** (German UI: *Offene Universalstimme*, Russian UI: *Открытый универсальный голос*) – an English voice for people who have no recording of their own. Trained only from the public-domain LJ Speech dataset (reader Linda Johnson, LibriVox); licence **CC0-1.0** – free for any use, also commercial; attribution to the LJ Speech dataset (Keith Ito) is appreciated.
 
 The Open universal voice is downloaded separately from the voice repository.
@@ -496,7 +496,7 @@ The same check runs without the window as `Voxprint.exe --auto-repair` (chapter 
 
 <dt>Measured pauses</dt><dd>Silence of a fixed length that Voxprint inserts between the spoken pieces – after a comma, a sentence, a paragraph, a chapter – independent of how the voice model phrases the text.</dd>
 
-<dt>Bundled voices</dt><dd>Tirzah: the open Russian voice (CC0-1.0) that comes with Voxprint and is read-only in the library. Boaz shipped with 0.1.3 and is no longer installed.</dd>
+<dt>Bundled voices</dt><dd>Tirzah and Gideon: the open Russian voices (CC0-1.0) that come with Voxprint and are read-only in the library. Boaz shipped with 0.1.3 and is retired; Gideon replaces it.</dd>
 
 </dl>
 
