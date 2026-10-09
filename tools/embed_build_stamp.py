@@ -13,9 +13,12 @@ import re
 import sys
 from pathlib import Path
 
-from core.build_stamp import write_trailer
-
+# build_thin.bat runs this file (`python tools\embed_build_stamp.py`), so sys.path[0] is tools/, not the repo root.
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from core.build_stamp import write_trailer  # noqa: E402
 MODULE = ROOT / "core" / "build_stamp.py"
 _BUILD_RE = re.compile(r"^BUILD = \d+[ \t]*$", re.MULTILINE)
 _NAME_RE = re.compile(r'^CODENAME = "[^"]*"[ \t]*$', re.MULTILINE)
