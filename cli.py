@@ -38,7 +38,9 @@ from core import revoice
 from core import speakers as spk
 from core.translate import detect_book_language
 from core import workspace as ws
-from core.appinfo import APP_BUILD, APP_CHANNEL, APP_CODENAME, APP_VERSION
+from core import appinfo
+from core.build_stamp import read_trailer
+from infra.stdio_guard import guard_stdio, install_cli_excepthook
 from core.asr import make_default_asr
 from core.book_parsers import load_book
 from core.errors import BackupError, CancelledByUser, DatasetMakerError, OutOfMemoryError_
@@ -199,16 +201,26 @@ def _read_build_json() -> dict:
 
 
 def version_payload() -> dict:
-    """Version, build number and codename.  Codename comes from ``BUILD.json`` when that file is present."""
+    """Version, build number and codename.
+
+    A stamp on the running executable (an exe-only patch) wins over ``credits.json`` and over ``BUILD.json``.
+    With no stamp, the codename comes from ``BUILD.json`` when that file is present.
+    """
+    appinfo.apply_embedded_stamp()
     meta = _read_build_json()
-    codename = str(meta.get("codename") or APP_CODENAME or "")
-    build = int(APP_BUILD or 0)
-    if not build and build_number is not None:
-        try:
-            build = int(build_number())
-        except (OSError, ValueError, TypeError, KeyError):
-            build = 0
-    version = f"{APP_VERSION}-{APP_CHANNEL}" if APP_CHANNEL else str(APP_VERSION)
+    trailer = read_trailer(sys.executable)
+    if trailer is not None:
+        build, name = trailer
+        codename = name or str(meta.get("codename") or appinfo.APP_CODENAME or "")
+    else:
+        codename = str(meta.get("codename") or appinfo.APP_CODENAME or "")
+        build = int(appinfo.APP_BUILD or 0)
+        if not build and build_number is not None:
+            try:
+                build = int(build_number())
+            except (OSError, ValueError, TypeError, KeyError):
+                build = 0
+    version = f"{appinfo.APP_VERSION}-{appinfo.APP_CHANNEL}" if appinfo.APP_CHANNEL else str(appinfo.APP_VERSION)
     return {"name": "Voxprint", "version": version, "build": int(build), "codename": codename}
 
 
@@ -224,13 +236,14 @@ def version_line(info: Optional[dict] = None) -> str:
 def _write_stream(stream, text: str) -> None:
     """Write one line and flush it.
 
-    A packaged ``Voxprint.exe`` is a windowed program: stdout exists for a caller that redirects it, and
-    ``write`` raises when nothing is attached. The exit code must still be the command's code.
+    A packaged ``Voxprint.exe`` is a windowed program. Stdout may be missing, or it may be a live object whose
+    ``write`` fails with ``OSError`` errno 22 (invalid handle) when PowerShell redirects a windowed exe. Either way
+    the exit code must still be the command's code, and the error must not escape into a traceback window.
     """
     try:
         stream.write(text if str(text).endswith("\n") else str(text) + "\n")
         stream.flush()
-    except (OSError, ValueError, AttributeError):
+    except Exception:  # noqa: BLE001 - a dead console, including errno 22, must not escape
         pass
 
 
@@ -766,12 +779,12 @@ def cmd_narrate(args: argparse.Namespace, *,
             result = run_fn(job, _narration_progress(json_mode), CancelToken(), PauseToken())
         files = list(getattr(result, "files", None) or [])
         done = Path(getattr(result, "out_dir", out_dir))
-        marks = done / ".debug" / "speakers.txt"
-        if marks.is_file():
-            files.append(marks)
-        warnings = []
-        if getattr(result, "speaker_warning", "") == "mismatch":
-            warnings.append(SPEAKER_MISMATCH)
+        debug = done / ".debug"
+        for name in ("speakers.txt", "speakers-raw.txt"):
+            marks = debug / name
+            if marks.is_file():
+                files.append(marks)
+        warnings = speaker_warning_lines(getattr(result, "speaker_warning", ""))
         human = [f"Done: {done}"] + [f"  {f}" for f in files] + [f"  ! {w}" for w in warnings]
         return _ok(
             json_mode, "narrate", started, outputs=files, warnings=warnings,
@@ -782,6 +795,25 @@ def cmd_narrate(args: argparse.Namespace, *,
 
 
 SPEAKER_MISMATCH = "Speaker marks do not match the prepared text, so the narrator reads the whole book."
+SPEAKER_UNPARSED = (
+    "The text model's reply could not be read as speaker marks, so the narrator is used for every paragraph."
+)
+SPEAKER_NO_SPEAKERS = "The text has dialogue, but the text model marked every paragraph as the narrator."
+_SPEAKER_WARNING_TEXT = {
+    "mismatch": SPEAKER_MISMATCH,
+    "unparsed": SPEAKER_UNPARSED,
+    "no_speakers": SPEAKER_NO_SPEAKERS,
+}
+
+
+def speaker_warning_lines(code: str) -> list:
+    """English warning sentences for a ``speaker_warning`` code (several codes are joined with ``;``)."""
+    out = []
+    for part in (code or "").split(";"):
+        text = _SPEAKER_WARNING_TEXT.get(part.strip())
+        if text and text not in out:
+            out.append(text)
+    return out
 
 
 def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callable[[], object]]):
@@ -1523,14 +1555,17 @@ def cmd_speakers(args: argparse.Namespace, *,
             if json_mode:
                 _emit_progress("prepare", float(frac) * 100.0, "Marking speakers")
 
-        lines = spk.tag_paragraphs(paras, detect_book_language(book) or "en", plan, progress)
+        tagged = spk.tag_paragraphs(paras, detect_book_language(book) or "en", plan, progress)
         dest = Path(args.out)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(spk.dump_marks(lines), encoding="utf-8")
+        dest.write_text(spk.dump_marks(tagged), encoding="utf-8")
+        raw_path = dest.with_name(f"{dest.stem}.speakers-raw.txt")
+        raw_path.write_text(tagged.raw, encoding="utf-8")
+        warnings = speaker_warning_lines(tagged.warning)
+        human = [f"Marks: {dest}", f"  {len(tagged)} paragraphs"] + [f"  ! {w}" for w in warnings]
         return _ok(
-            json_mode, "speakers", started, outputs=[dest],
-            human=[f"Marks: {dest}", f"  {len(lines)} paragraphs"],
-            extra={"paragraphs": len(lines)},
+            json_mode, "speakers", started, outputs=[dest, raw_path], warnings=warnings,
+            human=human, extra={"paragraphs": len(tagged)},
         )
 
     return _run("speakers", args, body)
@@ -1584,6 +1619,22 @@ def main(argv: Optional[Sequence[str]] = None, *,
          plan_fn: Optional[Callable[[], object]] = None,
          repair_fn: Optional[Callable[..., object]] = None) -> int:
     """Parse ``argv`` and run the matching subcommand.  Returns the process exit code."""
+    guard_stdio()
+    previous_hook = sys.excepthook
+    install_cli_excepthook()
+    try:
+        return _dispatch(argv, run_narration_fn=run_narration_fn, run_task_fn=run_task_fn, library=library,
+                         transcribe_fn=transcribe_fn, download_fn=download_fn, installed_fn=installed_fn,
+                         plan_fn=plan_fn, repair_fn=repair_fn)
+    finally:
+        # A frozen windowed exe keeps the hook so a late exception does not open a traceback window.
+        # Tests and a developer ``python`` put the previous hook back.
+        if not getattr(sys, "frozen", False):
+            sys.excepthook = previous_hook
+
+
+def _dispatch(argv: Optional[Sequence[str]], *, run_narration_fn, run_task_fn, library, transcribe_fn, download_fn,
+              installed_fn, plan_fn, repair_fn) -> int:
     raw = list(sys.argv[1:] if argv is None else argv)
     try:
         sys.stdout.reconfigure(line_buffering=True)  # type: ignore[attr-defined]

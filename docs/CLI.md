@@ -25,7 +25,7 @@ Maintenance flags (`--selftest`, `--auto-repair`, `--modules-status`, `--install
 
 `--json` and `--yes` may sit before the command or after it. `--version` exits before the command runs.
 
-A packaged `Voxprint.exe` is a windowed program. Stdout reaches a caller that redirects it (a pipe or a file). Every line is flushed. When nothing is attached, the write is skipped and the process still exits with the command's code.
+A packaged `Voxprint.exe` is a windowed program. Stdout reaches a caller that redirects it (a pipe or a file). Every line is flushed. When nothing is attached, or the handle is invalid (Windows error 22, which PowerShell can leave on a windowed exe), the write is skipped and the process still exits with the command's code. It does not open a traceback window.
 
 `status` and `capabilities` always print one JSON object, even without `--json`.
 
@@ -127,6 +127,8 @@ Ask Gemma who speaks each paragraph and write an editable text file. This comman
 ```
 
 Blank lines are ignored. A trailing `mismatch` line (written when a previous narration could not apply the marks) is ignored. Edit the file, then pass it to `narrate --speaker-marks`. If Gemma is not installed the exit code is 4 and the fix is `voxprint models download llm --json`.
+
+If the model's reply cannot be read as marks, or the text has dialogue (quotes or a leading em dash) but every paragraph is marked `NARRATOR`, the exit code stays 0 and the JSON `warnings` array says so. The raw reply is saved next to the marks file as `<name>.speakers-raw.txt` and listed in `outputs`. Narration saves the same reply as `<out>/<book>/.debug/speakers-raw.txt`.
 
 ```
 voxprint speakers book.txt --out marks.txt --json

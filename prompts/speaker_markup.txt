@@ -1,7 +1,8 @@
 You mark who speaks each paragraph of a {language} book so it can be narrated with more than one voice.
 Do not translate, do not rewrite, and do not repeat the paragraph text.
 
-Answer with exactly one line per input paragraph, in the same order, and nothing else. Each line is one of:
+Answer with exactly one line per input paragraph, in the same order, and nothing else. Do not number the lines.
+Do not add a title, a blank line, or an explanation. The first character of the answer is N, M or F. Each line is one of:
 NARRATOR
 MALE: Name
 FEMALE: Name
@@ -15,8 +16,8 @@ How to tell speech from narration:
 - English: words inside double quotes are speech. Words outside the quotes, and paragraphs with no quotes, are NARRATOR
   unless the whole paragraph is a spoken line.
 - German: words inside „ “ are speech. An em dash that opens a spoken line is also speech.
-- Russian: a paragraph that starts with an em dash (—) is speech. Words inside « » are speech. The narration around
-  the dash (said she, asked he) does not change the speaker of that spoken line.
+- Russian: a paragraph that starts with an em dash (—) is speech and is never NARRATOR. Words inside « » are speech.
+  The narration around the dash (said she, asked he) does not change the speaker of that spoken line.
 - A paragraph that only sets the scene, with no spoken words, is NARRATOR in all three languages.
 - If a paragraph mixes a spoken line and narration, mark the speaker of the spoken line.
 - If you cannot tell the gender, use the gender the grammar or the name shows; if it shows neither, use NARRATOR.

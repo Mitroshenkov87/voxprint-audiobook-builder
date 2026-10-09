@@ -873,3 +873,77 @@ def test_json_flushes_and_a_missing_console_keeps_the_exit_code(tmp_path, monkey
     monkeypatch.setattr(sys, "stderr", DeadStream())
     assert user_cli.main(["voices", "list", "--json"], library=lib) == 0
     assert user_cli.main(["check", "--json"], repair_fn=lambda progress: auto_repair.Report([])) == 0
+
+
+def test_errno_22_invalid_handle_exits_without_a_traceback_window(tmp_path, monkeypatch):
+    """PowerShell ``& Voxprint.exe status --json > file`` leaves a non-None stdout whose write raises errno 22."""
+    from infra.stdio_guard import install_cli_excepthook
+
+    class InvalidHandle:
+        def write(self, _text):
+            raise OSError(22, "Invalid argument")
+
+        def flush(self):
+            raise OSError(22, "Invalid argument")
+
+        def fileno(self):
+            return 1
+
+    shown = []
+    monkeypatch.setenv("VOXPRINT_NO_ENV_PROBE", "1")
+    monkeypatch.setattr(sys, "__excepthook__", lambda *args: shown.append(args))
+    monkeypatch.setattr(sys, "stdout", InvalidHandle())
+    monkeypatch.setattr(sys, "stderr", InvalidHandle())
+    lib = _make_voice(tmp_path)
+    assert user_cli.main(["voices", "list", "--json"], library=lib) == 0
+    assert user_cli.main(["status", "--json"], library=lib) == 0
+    sys.stdout.flush()
+    sys.stderr.flush()
+    assert shown == []
+    previous = sys.excepthook
+    install_cli_excepthook()
+    try:
+        sys.excepthook(RuntimeError, RuntimeError("boom"), None)
+        assert shown == []
+    finally:
+        sys.excepthook = previous
+
+
+def test_speakers_json_warns_and_saves_the_raw_reply(tmp_path, capsys):
+    from core import speakers as spk
+    from core.book_parsers import parse_txt
+    from core.llm_text import LLMPlan
+    from tests.test_llm_text import FakeModel
+    from tests.test_speakers import _FIXTURE, _expected_roles, _gemma_reply
+
+    book = parse_txt(_FIXTURE.read_text(encoding="utf-8"), "spor")
+    paras = [text for _ci, text in spk.paragraphs(book)]
+    dest = tmp_path / "marks.txt"
+
+    def plan():
+        return LLMPlan(lambda: FakeModel(lambda prompt: _gemma_reply(prompt, paras)), "fake")
+
+    code = user_cli.main(["speakers", str(_FIXTURE), "--out", str(dest), "--json"], plan_fn=plan)
+    assert code == 0
+    data = _json_lines(capsys.readouterr().out)[-1]
+    assert data["ok"] and data["warnings"] == [] and data["paragraphs"] == 21
+    raw = dest.with_name("marks.speakers-raw.txt")
+    assert str(dest) in data["outputs"] and str(raw) in data["outputs"]
+    assert raw.is_file() and "<|channel>thought" in raw.read_text(encoding="utf-8")
+    assert spk.load_marks(dest.read_text(encoding="utf-8")) == _expected_roles(21)
+
+    def garbage(_prompt):
+        return "I cannot tell who is speaking."
+
+    bad = tmp_path / "bad.txt"
+    code = user_cli.main(
+        ["speakers", str(_FIXTURE), "--out", str(bad), "--json"],
+        plan_fn=lambda: LLMPlan(lambda: FakeModel(garbage), "fake"),
+    )
+    assert code == 0
+    data = _json_lines(capsys.readouterr().out)[-1]
+    assert data["warnings"] == [user_cli.SPEAKER_UNPARSED]
+    saved = bad.with_name("bad.speakers-raw.txt")
+    assert saved.is_file() and "cannot tell" in saved.read_text(encoding="utf-8")
+    assert user_cli.speaker_warning_lines("unparsed;no_speakers") == [
+        user_cli.SPEAKER_UNPARSED, user_cli.SPEAKER_NO_SPEAKERS]

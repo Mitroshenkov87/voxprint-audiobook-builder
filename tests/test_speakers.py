@@ -1,6 +1,8 @@
 """Speaker marks and multi-voice narration with fake models and fake engines. No GPU, no download."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from core import speakers as spk
 from core.book_parsers import Book, Chapter
 from core.chunker import chunk_book
@@ -106,3 +108,117 @@ def test_marks_file_round_trip():
         assert "unreadable" in str(exc)
     else:
         raise AssertionError("a bad mark line must be rejected")
+
+
+_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "spor-multivoice-ru.txt"
+# 1-based indexes from the real-PC dialogue: the rest are the narrator.
+_MALE = {3, 5, 8, 10, 12, 15, 18, 21}
+_FEMALE = {4, 6, 9, 11, 14, 16, 19}
+
+
+def _expected_roles(n: int):
+    roles = []
+    for i in range(1, n + 1):
+        if i in _MALE:
+            roles.append(spk.SpeakerLine("male", "Марк"))
+        elif i in _FEMALE:
+            roles.append(spk.SpeakerLine("female", "Анна"))
+        else:
+            roles.append(spk.SpeakerLine("narrator"))
+    return roles
+
+
+def _gemma_reply(prompt: str, paras) -> str:
+    """A Gemma 4 reply: a thought channel (with tag-shaped lines), a preamble, then numbered marks.
+
+    This is what ``parse_tags`` used to reject, leaving every paragraph as the narrator.
+    """
+    body = prompt.rsplit("TEXT:\n", 1)[1]
+    block = [p.strip() for p in body.split("\n\n") if p.strip()]
+    start = next(i for i, para in enumerate(paras) if para == block[0])
+    chosen = _expected_roles(len(paras))[start:start + len(block)]
+    numbered = "\n".join(
+        f"{n}. " + ("NARRATOR" if line.role == "narrator" else f"{line.role.upper()}: {line.name}")
+        for n, line in enumerate(chosen, 1))
+    return (
+        "<|channel>thought\n"
+        "A paragraph that starts with an em dash is speech. Марк is male, Анна is female.\n"
+        "NARRATOR\n"
+        "MALE: Марк\n"
+        "<channel|>\n"
+        "Here are the speaker marks:\n\n"
+        + numbered + "\n"
+    )
+
+
+def test_a_realistic_gemma_reply_marks_the_russian_dialogue():
+    """The parse path that returned 21 narrators on the real PC."""
+    from core.book_parsers import parse_txt
+
+    text = _FIXTURE.read_text(encoding="utf-8")
+    book = parse_txt(text, "spor")
+    paras = [para for _ci, para in spk.paragraphs(book)]
+    assert len(paras) == 21
+    assert len(spk._batches(paras)) >= 2
+    bare = (
+        "<|channel>thought\nNARRATOR\n<channel|>\nHere are the speaker marks:\n\n"
+        "1. NARRATOR\n2. MALE: Марк\n"
+    )
+    assert spk.parse_tags(bare, 2) == [spk.SpeakerLine("narrator"), spk.SpeakerLine("male", "Марк")]
+    assert spk.parse_tags("<think>\nMALE: Марк\n</think>\nРАССКАЗЧИК\nЖЕН: Анна\n", 2) == [
+        spk.SpeakerLine("narrator"), spk.SpeakerLine("female", "Анна")]
+    model = FakeModel(lambda prompt: _gemma_reply(prompt, paras))
+    tagged = spk.tag_paragraphs(paras, "ru", LLMPlan(lambda: model, "fake"))
+    assert tagged.warning == "" and model.closed
+    assert model.calls == len(spk._batches(paras))
+    assert list(tagged) == _expected_roles(21)
+    assert tagged[2].role == "male" and tagged[3].name == "Анна"
+    assert "<|channel>thought" in tagged.raw and "3. MALE: Марк" in tagged.raw
+    flat = spk.tag_paragraphs(
+        paras, "ru", LLMPlan(lambda: FakeModel(lambda prompt: "\n".join(
+            ["NARRATOR"] * len([p for p in prompt.rsplit("TEXT:\n", 1)[1].split("\n\n") if p.strip()]))), "fake"))
+    assert flat.warning == spk.WARN_NO_SPEAKERS and all(ln.role == "narrator" for ln in flat)
+
+
+def test_an_unreadable_reply_warns_and_an_all_narrator_dialogue_warns(tmp_path):
+    from core import audiobook_export as ex
+    from core import narration as nr
+
+    paras = ["He walked along the quiet road.", '"Hello," she said to him today.']
+
+    def garbage(_prompt):
+        return "Sure, I can help with that story."
+
+    missed = spk.tag_paragraphs(paras, "en", LLMPlan(lambda: FakeModel(garbage), "fake"))
+    assert missed.warning == spk.WARN_UNPARSED
+    assert [ln.role for ln in missed] == ["narrator", "narrator"]
+    assert "Sure, I can help" in missed.raw
+
+    def all_narrator(prompt):
+        n = len([p for p in prompt.rsplit("TEXT:\n", 1)[1].split("\n\n") if p.strip()])
+        return "\n".join(["NARRATOR"] * n)
+
+    flat = spk.tag_paragraphs(paras, "en", LLMPlan(lambda: FakeModel(all_narrator), "fake"))
+    assert flat.warning == spk.WARN_NO_SPEAKERS and "NARRATOR" in flat.raw
+
+    def boom(_prompt):
+        raise RuntimeError("llama died")
+
+    failed = spk.tag_paragraphs(["— Привет, Анна.", "Она молчала."], "ru", LLMPlan(lambda: FakeModel(boom), "fake"))
+    assert failed.warning == spk.WARN_UNPARSED and "RuntimeError" in failed.raw
+    assert all(ln.role == "narrator" for ln in failed)
+
+    book = _book()
+    cast = spk.SpeakerCast(tagger=LLMPlan(lambda: FakeModel(garbage), "fake"), male_id="m", female_id="f",
+                           narrator_id="narr")
+    opts = nr.NarrationOptions(speakers=cast, speak_titles=False, formats={ex.FORMAT_WAV_CHAPTERS})
+    narr = FakeEngine()
+    res, _eng, _ff, _ev = run(
+        tmp_path, engine=narr, book=book, options=opts,
+        extra_engines={"m": (FakeEngine, "m"), "f": (FakeEngine, "f")})
+    assert res.speaker_warning == "unparsed"
+    raw = (res.out_dir / ".debug" / "speakers-raw.txt").read_text(encoding="utf-8")
+    assert "Sure, I can help" in raw
+    assert any("Hello" in call for call in narr.calls)
+    marks = (res.out_dir / ".debug" / "speakers.txt").read_text(encoding="utf-8")
+    assert "mismatch" not in marks and spk.load_marks(marks)

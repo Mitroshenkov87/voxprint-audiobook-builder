@@ -27,6 +27,9 @@ set META=
 for /f "delims=" %%a in ('python tools\make_runtime_lock.py --pyinstaller-metadata-args') do set META=%%a
 if "%META%"=="" (echo [ERROR] shell metadata list. & exit /b 1)
 
+rem  Bake the CI build number into core\build_stamp.py so the frozen code knows it, then restore the git values.
+python tools\embed_build_stamp.py --write-module || (echo [ERROR] build stamp. & exit /b 1)
+
 echo === Build thin shell ===
 pyinstaller --onedir --windowed --noconfirm --clean --name Voxprint --distpath dist\thin --workpath build\thin-work --specpath build\thin-work ^
   --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" --add-data "%CD%\assets\splash.jpg;assets" ^
@@ -41,6 +44,10 @@ pyinstaller --onedir --windowed --noconfirm --clean --name Voxprint --distpath d
   --hidden-import netroute --hidden-import soundfile --collect-all certifi ^
   --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
   %META% %EXCL% main.py
-if errorlevel 1 (echo [ERROR] PyInstaller failed. & exit /b 1)
+set PYI_ERR=%ERRORLEVEL%
+python tools\embed_build_stamp.py --restore-module
+if not "%PYI_ERR%"=="0" (echo [ERROR] PyInstaller failed. & exit /b 1)
+rem  The bootloader ignores a trailer. Swapping only this exe updates the build status reports.
+python tools\embed_build_stamp.py --exe "%CD%\dist\thin\Voxprint\Voxprint.exe" || (echo [ERROR] exe stamp. & exit /b 1)
 echo Thin shell: dist\thin\Voxprint  ^(the packaging step adds _internal\modules.json^)
 endlocal

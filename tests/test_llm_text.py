@@ -187,6 +187,18 @@ def test_narrate_window_options_are_greyed_until_downloaded(app, lib, tmp_path):
     assert n.options().llm_prepare.tag == "fake"
 
 
+def test_chat_request_disables_thinking_and_reads_a_reasoning_field():
+    body = llm_tool.chat_body("mark the speakers", max_tokens=32, temperature=0.2)
+    assert body["chat_template_kwargs"] == {"enable_thinking": False}
+    assert body["stream"] is False and body["max_tokens"] == 32
+    assert llm_tool.reply_text({"choices": [{"message": {"content": "NARRATOR"}}]}) == "NARRATOR"
+    assert llm_tool.reply_text(
+        {"choices": [{"message": {"content": "", "reasoning_content": "MALE: Ann"}}]}) == "MALE: Ann"
+    assert llm_tool.reply_text(
+        {"choices": [{"message": {"content": None, "reasoning": "FEMALE: Ann"}}]}) == "FEMALE: Ann"
+    assert llm_tool.reply_text({"choices": []}) == ""
+
+
 def test_the_nvidia_vulkan_device_is_chosen_on_hybrid_laptops(tmp_path):
     listing = ("Available devices:\n  Vulkan0: AMD Radeon(TM) 780M Graphics (16384 MiB, 15000 MiB free)\n"
                "  Vulkan1: NVIDIA GeForce RTX 4070 Laptop GPU (8188 MiB, 7900 MiB free)\n")
