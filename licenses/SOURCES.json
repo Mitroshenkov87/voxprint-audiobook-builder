@@ -45,7 +45,6 @@
   "sentencepiece": "https://raw.githubusercontent.com/google/sentencepiece/master/LICENSE",
   "soundfile": "https://raw.githubusercontent.com/bastibe/python-soundfile/master/LICENSE",
   "sox": "https://raw.githubusercontent.com/rabitt/pysox/master/LICENSE",
-  "tabler-icons": "https://raw.githubusercontent.com/tabler/tabler-icons/main/LICENSE",
   "torchaudio": "https://raw.githubusercontent.com/pytorch/audio/main/LICENSE",
   "tqdm": "https://raw.githubusercontent.com/tqdm/tqdm/master/LICENCE",
   "transformers": "https://raw.githubusercontent.com/huggingface/transformers/main/LICENSE",

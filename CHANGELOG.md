@@ -5,6 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Changed
+- **Application icon and splash.** New original artwork: `assets/voxprint.png` (one fused mark, a fingerprint whose right ridges become sound-wave bars), the window and installer icons rebuilt from that PNG, and `assets/splash.jpg` (the same logo in a painterly alpine evening). The Linux desktop icon is the same mark. The previous icon was derived from the Tabler Icons fingerprint; that attribution is removed. The already-built 0.1.4 build 668 installer does not contain this artwork.
+
 ## [0.1.4-beta] - 2026-10-08 - build 668 "Kolot"
 
 Codename *Kolot* (Biblical Hebrew *qolot*, plural of *qol*, "voice"; Exodus 19:16 also "thunder"). The next *build-installer* run is build 668: `GITHUB_RUN_NUMBER` 39 plus the offset 629 already in `BUILD.json`. This change does not publish a release.

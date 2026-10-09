@@ -1,49 +1,21 @@
-Voxprint icon assets - third-party icon attribution
-====================================================
+Voxprint icon and splash - original artwork
+===========================================
 
-The fingerprint glyph used in voxprint.svg / voxprint.png / voxprint.ico /
-voxprint-setup.ico / alt1.png / alt2.png is derived from the "fingerprint"
-icon of Tabler Icons (outline set, version 1.6).
+The application icon and the start-up splash are original artwork made for
+this project by Aleksandr Mitroshenkov. They are not third-party material
+and they are not derived from Tabler Icons.
 
-  Source : https://github.com/tabler/tabler-icons
-           https://raw.githubusercontent.com/tabler/tabler-icons/main/icons/outline/fingerprint.svg
-  License: MIT License
-  Copyright (c) 2020-2026 Pawel Kuna
-  Retrieved: 2026-10-03
+Icon
+----
+assets/voxprint.png is the square icon: one fused mark, a fingerprint whose
+right ridges become sound-wave bars, cyan to blue, on a dark navy rounded
+tile. assets/voxprint.ico and assets/voxprint-setup.ico are built from that
+PNG and are what the window, the taskbar, the installer and the uninstall
+entry use. installer/linux/voxprint-256.png is the same mark at 256 px for
+the Linux desktop entry.
 
-Modifications: the five stroke paths were scaled up, recoloured with a
-cyan/teal-to-blue gradient stroke, thickened for small sizes (16/24/32 px
-variants use a subset of the paths / heavier stroke), and combined with
-original sound-wave bars (not part of Tabler Icons) on a dark rounded tile.
-The dark tile, gradient, bars and installer arrow badge are original work.
-
-Splash artwork (splash.jpg)
----------------------------
-splash.jpg (wheat field and mountains with the Voxprint icon) is original artwork
-created and owned by the author, Aleksandr Mitroshenkov, for this project; it is
-not third-party material. The Voxprint icon shown in it is covered by the
-attribution above.
-
---- MIT License text (Tabler Icons) ---------------------------------------
-
- MIT License
-
- Copyright (c) 2020-2026 Paweł Kuna
-
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
-
- The above copyright notice and this permission notice shall be included in all
- copies or substantial portions of the Software.
-
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- SOFTWARE.
+Splash
+------
+assets/splash.jpg is the square splash: the same logo in a painterly alpine
+evening (darkening blue sky, golden rye, pale haze, a soft red glow), with
+no houses, no river and no text. ui/splash.py loads this filename.
