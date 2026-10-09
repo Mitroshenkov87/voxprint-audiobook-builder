@@ -71,7 +71,7 @@ writes number, codename and commit into `credits.json` before PyInstaller runs; 
 `Voxprint-Setup-online-<version>-build<N>.exe` (the plain `Voxprint-Setup-online.exe` stays for stable links), and the components
 manifest records `build`, so the Components window offers a same-version build only when its number is higher. Local builds are build 0.
 To keep the numbering after failed runs, lower `offset` so the next successful build gets the intended number.
-The offset is **628** for 0.1.4: run 39 stamped 668 with offset 629, but that installer was built with an empty release tag (manifest URL `v0.0.0-dev`, setup HTTP 404) and cannot be installed. The next *build-installer* run is 40, and 40 + 628 = 668, codename **Kolot**. Do not lower the offset again for that run.
+The offset is **628** for 0.1.4: run 39 stamped 668 with offset 629, but that installer was built with an empty release tag (manifest URL `v0.0.0-dev`, setup HTTP 404) and cannot be installed. Run 40 + 628 = 668, codename **Kolot**. The next public release is **0.2.0-beta**, build **700**, codename **Kaporet**. Leave the offset at 628 until the release run; changing it then is what makes that run stamp 700.
 
 ### Versions: "verified by Voxprint"
 `infra/verified_manifest.json` pins the package versions and model revisions (HF commit shas) Voxprint was tested with. The updater installs exactly those

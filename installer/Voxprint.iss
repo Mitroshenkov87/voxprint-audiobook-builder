@@ -40,7 +40,7 @@
 #define AppName "Voxprint"
 ; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
 #define AppDisplayName "Voxprint AI Audiobook Builder"
-#define AppVersion "0.1.4"
+#define AppVersion "0.2.0"
 #define AppExe "Voxprint.exe"
 ; CI build number and codename (tools/build_number.py; build_online.ps1 passes /DAppBuild= /DAppCodename=); 0 = local build
 #ifndef AppBuild
@@ -133,9 +133,6 @@ german.VcRedistStatus=Microsoft Visual C++-Komponenten werden installiert...
 english.WinBuildWarning=%1 is designed for Windows 11 (build 26100 and newer). Your build is %2: the program may not work correctly.%n%nContinue the installation?
 russian.WinBuildWarning=%1 рассчитан на Windows 11 (сборка 26100 и новее). У вас сборка %2: программа может работать некорректно.%n%nПродолжить установку?
 german.WinBuildWarning=%1 ist für Windows 11 ausgelegt (Build 26100 und neuer). Ihr Build ist %2: Das Programm läuft eventuell nicht korrekt.%n%nInstallation fortsetzen?
-english.UninstallDataQuestion=Also delete the downloaded models and logs (%1)? They take several gigabytes.
-russian.UninstallDataQuestion=Удалить также скачанные модели и журналы (%1)? Они занимают несколько гигабайт.
-german.UninstallDataQuestion=Auch die heruntergeladenen Modelle und Protokolle (%1) löschen? Sie belegen mehrere Gigabyte.
 english.ModelsPageCaption=Models folder
 russian.ModelsPageCaption=Папка моделей
 german.ModelsPageCaption=Modellordner
@@ -229,7 +226,7 @@ Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 #ifdef ONLINE
 [UninstallDelete]
-; the downloaded program files are not in the uninstall log (the setup did not copy them): remove the folder
+; program files only. {localappdata}\Voxprint (models, voices, state) is not listed.
 Type: filesandordirs; Name: "{app}"
 #endif
 
@@ -874,17 +871,5 @@ begin
   end;
 end;
 
-procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-var
-  DataDir: String;
-begin
-  if CurUninstallStep = usPostUninstall then
-  begin
-    DataDir := ExpandConstant('{localappdata}\Voxprint');
-    if DirExists(DataDir) then
-      { SuppressibleMsgBox: a silent uninstall (/SUPPRESSMSGBOXES) keeps the models and voices (IDNO) instead of waiting }
-      if SuppressibleMsgBox(FmtMessage(CustomMessage('UninstallDataQuestion'), [DataDir]),
-         mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES then
-        DelTree(DataDir, True, True, True);
-  end;
-end;
+{ Uninstall removes {app} only. Models, voices and settings under {localappdata}\Voxprint stay,
+  including models\. Build 668 asked and could delete that folder on Yes; this build does not. }
