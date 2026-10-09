@@ -31,7 +31,7 @@ sha256sum -c Voxprint-Setup-online.exe.sha256                    # with the .sha
 
 **Shortcuts.** The installers create no desktop shortcut (on purpose): Voxprint is in the Start menu (folder *Voxprint AI Audiobook Builder*) and in *Settings -> Apps*, where it is uninstalled. An upgrade over an older install removes a desktop shortcut that an earlier version created.
 
-**The installer is not code-signed.** Windows SmartScreen will show *"Windows protected your PC - Unknown publisher"*: click **More info -> Run anyway** (only after the SHA-256 above matches). The installer asks for administrator rights once (per-machine install). Antivirus programs may warn about large unsigned PyInstaller programs; the source is in this repository and you can build the installer yourself (below).
+**The installer is not code-signed yet**, so a new download has no reputation. Download it only from the GitHub releases page, check the SHA-256 above, and only then keep or run the file. Edge is the strictest: its download bar offers **Delete**, and the file can be removed before you run it. Do not click Delete. Hover the download, then **... -> Keep -> Show more -> Keep anyway**. Chrome and other browsers may show a similar download warning. When you start the installer, SmartScreen may say *"Windows protected your PC"*: **More info -> Run anyway**. That step is usually milder than Edge. An antivirus program may also flag the unsigned file. Code signing is being applied for (SignPath Foundation); the warning will go away later. The installer asks for administrator rights once (per-machine install). The source is in this repository and you can build the installer yourself (below).
 
 ## Hardware requirements
 | | Minimum | Recommended |
