@@ -61,7 +61,6 @@ SOURCES = {
     "uv-apache": ("url", "https://raw.githubusercontent.com/astral-sh/uv/main/LICENSE-APACHE"),
     "pyinstaller": ("repo", "pyinstaller/pyinstaller"),
     "inno-setup": ("url", "https://raw.githubusercontent.com/jrsoftware/issrc/main/license.txt"),
-    "tabler-icons": ("repo", "tabler/tabler-icons"),
     "ctc-forced-aligner": ("repo", "MahmoudAshraf97/ctc-forced-aligner"),
     "gpl-3.0": ("spdx", "GPL-3.0-only"),
     "MPL-2.0": ("spdx", "MPL-2.0"),

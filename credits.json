@@ -916,24 +916,6 @@
    }
   },
   {
-   "id": "tabler-icons",
-   "name": "Tabler Icons",
-   "kind": "asset",
-   "ship": "bundled",
-   "license": "MIT",
-   "license_files": [
-    "tabler-icons"
-   ],
-   "url": "https://tabler.io/icons",
-   "purpose": {
-    "en": "The fingerprint icon of the application (modified)",
-    "de": "Das Fingerabdruck-Symbol der Anwendung (angepasst)",
-    "ru": "Значок-отпечаток приложения (изменён)",
-    "uk": "Значок-відбиток застосунку (змінено)",
-    "lv": "Lietotnes pirksta nospieduma ikona (pārveidota)"
-   }
-  },
-  {
    "id": "ljspeech",
    "name": "LJ Speech 1.1 (public-domain speech; reader Linda Johnson, LibriVox; compiled by Keith Ito)",
    "kind": "asset",

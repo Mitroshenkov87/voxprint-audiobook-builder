@@ -36,7 +36,7 @@ def test_all_required_projects_are_credited():
     names = " ".join(c["name"].lower() for c in DATA["components"])
     for needed in ("qwen3-tts", "forcedaligner", "qwen-tts", "qwen-asr", "pytorch", "transformers", "peft",
                    "accelerate", "bitsandbytes", "pyside6", "numpy", "scipy", "librosa", "soundfile", "pydub",
-                   "imageio-ffmpeg", "ffmpeg", "ru-normalizr", "rutextnorm", "pymorphy3", "num2words", "tabler",
+                   "imageio-ffmpeg", "ffmpeg", "ru-normalizr", "rutextnorm", "pymorphy3", "num2words",
                    "pyinstaller", "inno setup", "ctc-forced-aligner", "mms-300m"):
         assert needed in names, needed
 

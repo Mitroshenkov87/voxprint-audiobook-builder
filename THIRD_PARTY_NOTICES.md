@@ -368,14 +368,6 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 
 ## Assets
 
-### Tabler Icons
-
-* Purpose: The fingerprint icon of the application (modified)
-* Licence: MIT
-* Project: <https://tabler.io/icons>
-* Status: bundled
-* Licence text: [`licenses/tabler-icons.txt`](licenses/tabler-icons.txt)
-
 ### LJ Speech 1.1 (public-domain speech; reader Linda Johnson, LibriVox; compiled by Keith Ito)
 
 * Purpose: Training speech of the optional fully open example voice (not part of the program; the voice is downloaded separately)
