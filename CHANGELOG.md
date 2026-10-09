@@ -5,7 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
-Draft for build 704 (codename to be chosen; `BUILD.json` is unchanged, offset **654**, so build-installer run 50 stamps build 704). Full installer. Upgrade: install over 703; models, voices and settings stay.
+## [0.2.4-beta] - 2026-10-09 - build 704 "Achim"
+
+Codename *Achim* (Biblical Hebrew *achim*, brothers; Genesis 13:8, "for we are brothers"): Voxprint AI Audiobook Builder and Voxprint AI Movie Dubber now live side by side as sibling programs that share models, settings and one Start menu folder. The `BUILD.json` offset stays **654**: build-installer run 50 stamps build 704. Full installer. Upgrade: install over 703; models, voices and settings stay.
 
 ### Added
 - **Shared suite settings** `state/suite.json` (`infra/suite_settings.py`), the format agreed with Voxprint AI Movie Dubber: `{"schema": 1, "ui_language": "ru", "theme": "glass-dark", "models_dir": null, "gpu": "auto"}`. UTF-8, atomic write, unknown keys kept, a missing key is its default (UI language: the OS language if supported, else English; theme `glass-dark`, our only look; `models_dir` null = default folder, `VOXPRINT_MODELS_DIR` always wins; GPU `auto` / `cpu` / `cuda:N`). Read at start, written when the UI language, the models folder or one of these settings changes. Choices made before 704 (`state/language`, `state/models_dir.txt`) are copied into the file at the first start; app-specific settings stay where they were. `voxprint settings` gains `theme`, `gpu`, `gpu.vram_fraction` and `gpu.fast_decode`.
