@@ -870,6 +870,3 @@ begin
     end;
   end;
 end;
-
-{ Uninstall removes {app} only. Models, voices and settings under {localappdata}\Voxprint stay,
-  including models\. Build 668 asked and could delete that folder on Yes; this build does not. }

@@ -26,6 +26,8 @@ def test_script_and_readme_stay_on_the_official_release():
     assert "](install.ps1)" in readme
     assert "\n  install-script:\n" in workflow
     assert "http://127.0.0.1:8765/" in workflow
+    assert "$PSNativeCommandUseErrorActionPreference = $false" in workflow
+    assert "exit 0" in workflow.split("install-script:", 1)[1].split("online-smoke:", 1)[0]
 
 
 def _pwsh():

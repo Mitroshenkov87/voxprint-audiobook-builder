@@ -427,6 +427,10 @@ def test_uninstall_never_deletes_models_voices_or_settings():
     uninstall = iss.split("[UninstallDelete]", 1)[1].split("[Icons]", 1)[0]
     assert 'Name: "{app}"' in uninstall
     assert "filesandordirs" in uninstall and "Voxprint\\models" not in uninstall
+    # A `{ ... }` note after the last procedure is compiled as code. `{app}` inside
+    # it ends the comment at the first `}`, and Inno then reports 'BEGIN' expected.
+    tail = iss.split("[Code]", 1)[1].rsplit("end;", 1)[1]
+    assert "{" not in tail and "Uninstall removes" not in tail
 
 
 def test_the_wizard_language_becomes_the_app_language_once():

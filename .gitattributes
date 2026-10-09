@@ -1,0 +1,9 @@
+# Windows git (core.autocrlf=true) must not rewrite these. yo_safe.txt is pinned
+# by size and SHA-256; a CRLF checkout adds one byte per line and fails that check.
+# The gzip tables are binary. build.bat and installer/Voxprint.iss stay CRLF on purpose.
+core/data/yo_safe.txt text eol=lf
+core/data/yo_not_safe.txt text eol=lf
+core/data/yo_additions.json text eol=lf
+core/data/yo_safe.LICENSE text eol=lf
+core/data/YO_DATASET.md text eol=lf
+core/data/*.gz binary
