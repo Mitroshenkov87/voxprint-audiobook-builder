@@ -192,6 +192,37 @@ def pick_device(exe: Path, run=subprocess.run) -> Optional[str]:
     return chosen
 
 
+def chat_body(prompt: str, max_tokens: int = 2048, temperature: float = 0.2) -> dict:
+    """One chat-completions body. Thinking is off: Gemma 4 would otherwise spend the token budget on a thought channel
+    and return no speaker marks."""
+    return {
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "top_p": 0.9,
+        "max_tokens": max_tokens,
+        "stream": False,
+        "chat_template_kwargs": {"enable_thinking": False},
+    }
+
+
+def reply_text(payload: dict) -> str:
+    """The assistant text. When ``content`` is empty, the reasoning field is the only copy of the answer."""
+    try:
+        message = payload["choices"][0]["message"]
+    except (KeyError, IndexError, TypeError):
+        return ""
+    if not isinstance(message, dict):
+        return ""
+    content = str(message.get("content") or "").strip()
+    if content:
+        return content
+    for key in ("reasoning_content", "reasoning"):
+        alt = message.get(key)
+        if alt:
+            return str(alt).strip()
+    return ""
+
+
 class LlamaServer:
     """``llama-server`` on a free localhost port; :meth:`complete` sends one chat request, :meth:`close` ends the process
     (and frees all of its VRAM)."""
@@ -238,13 +269,12 @@ class LlamaServer:
         raise RuntimeError("llama-server did not become ready in time")
 
     def complete(self, prompt: str, max_tokens: int = 2048, temperature: float = 0.2) -> str:
-        body = json.dumps({"messages": [{"role": "user", "content": prompt}], "temperature": temperature, "top_p": 0.9,
-                           "max_tokens": max_tokens, "stream": False}).encode("utf-8")
+        body = json.dumps(chat_body(prompt, max_tokens, temperature)).encode("utf-8")
         req = urllib.request.Request(f"http://127.0.0.1:{self.port}/v1/chat/completions", data=body,
                                      headers={"Content-Type": "application/json"})
         with self._http.open(req, timeout=900) as r:
             data = json.loads(r.read().decode("utf-8"))
-        return str(data["choices"][0]["message"].get("content") or "")
+        return reply_text(data)
 
     def close(self) -> None:
         p, self.proc = self.proc, None

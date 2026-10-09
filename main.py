@@ -241,6 +241,9 @@ def _cli_printer(name: str):
 
 def main(argv=None) -> int:
     """Start the application (or run one of the CLI maintenance flags); returns the process exit code."""
+    from infra.stdio_guard import guard_stdio
+
+    guard_stdio()
     argv = list(sys.argv if argv is None else argv)
     # updated packages must be on sys.path BEFORE the heavy libraries are imported
     from infra.updater import activate_overlay
@@ -271,7 +274,9 @@ def main(argv=None) -> int:
         is_user_cli = lambda _a: False  # noqa: E731
     if user_cli_main is not None and is_user_cli(argv):
         from infra import diagnostics
+        from infra.stdio_guard import install_cli_excepthook
 
+        install_cli_excepthook()
         diagnostics.log_startup(import_torch=False)       # quick: a headless command must not wait for PyTorch here
         return user_cli_main(argv[1:])
     if "--auto-repair" in argv:          # same job as Settings -> Auto-repair (infra/auto_repair.py)

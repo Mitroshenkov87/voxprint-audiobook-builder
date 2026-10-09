@@ -6,24 +6,41 @@ narrator, narration synthesizes each paragraph with that voice. With only the na
 kept for the preview and every paragraph is spoken by the narrator.
 
 The model is asked for tags, not a rewrite, so a bad answer cannot change the book. A paragraph it fails to mark stays
-with the narrator.
+with the narrator, and the result carries a warning instead of looking like a successful all-narrator pass.
 """
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union
 
 from core.book_parsers import Book
 from core.chunker import Chunk
-from core.llm_text import NAMES, LLMPlan, fill, load_prompt
+from core.llm_text import NAMES, LLMPlan, fill, has_dialogue, load_prompt
 from core.pauses import TITLE
 
 ROLES = ("narrator", "male", "female")
-_TAG = re.compile(r"^(NARRATOR|MALE|FEMALE)(?:\s*:\s*(.*?))?\s*$", re.IGNORECASE)
-_FENCE = re.compile(r"^```\w*\s*|\s*```$")
+_TAG = re.compile(
+    r"^(NARRATOR|MALE|FEMALE|РАССКАЗЧИК|МУЖСКОЙ|ЖЕНСКИЙ|МУЖ|ЖЕН)(?:\s*:\s*(.*?))?\s*$",
+    re.IGNORECASE)
+_ROLE = {
+    "narrator": "narrator", "рассказчик": "narrator",
+    "male": "male", "мужской": "male", "муж": "male",
+    "female": "female", "женский": "female", "жен": "female",
+}
+# Gemma 4 (llama.cpp --jinja) thinks by default. The thought is in the same string as the answer, often as a channel
+# block, and the answer itself is numbered ("1. MALE: Name") with a short preamble. None of that matches a bare tag.
+_THINKING = re.compile(
+    r"<think\b[^>]*>.*?</think>\s*"
+    r"|<\|think\|?>.*?</think>\s*"
+    r"|<\|channel>\s*thought\b.*?(?:<channel\|>|<\|channel\|>)\s*",
+    re.IGNORECASE | re.DOTALL)
+_FENCE = re.compile(r"```+")
+_ENUM = re.compile(r"^(?:\d{1,4}[.)]\s+|[-*•]\s+)")
 MAX_PARAS = 12
 MAX_CHARS = 3500
+WARN_UNPARSED = "unparsed"
+WARN_NO_SPEAKERS = "no_speakers"
 
 
 @dataclass(frozen=True)
@@ -71,21 +88,33 @@ def paragraphs(book: Book) -> List[Tuple[int, str]]:
     return out
 
 
-def parse_tags(answer: str, count: int) -> Optional[List[SpeakerLine]]:
-    """The model's answer as ``count`` lines, or ``None`` when the answer is not usable."""
-    text = _FENCE.sub("", (answer or "").strip())
-    rows = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    if len(rows) != count:
+def _clean_answer(answer: str) -> str:
+    """Drop a thinking channel and code fences so only the model's answer lines remain."""
+    text = _THINKING.sub("", answer or "")
+    return _FENCE.sub("", text)
+
+
+def _line_tag(line: str) -> Optional[SpeakerLine]:
+    """One answer line as a mark, or ``None`` when the line is preamble rather than a tag."""
+    ln = _ENUM.sub("", line.strip())
+    m = _TAG.match(ln)
+    if m is None:
         return None
-    out: List[SpeakerLine] = []
-    for ln in rows:
-        m = _TAG.match(ln)
-        if m is None:
-            return None
-        role = m.group(1).lower()
-        if role != "narrator":
-            role = "male" if role == "male" else "female"
-        out.append(SpeakerLine(role, m.group(2) or ""))
+    role = _ROLE.get(m.group(1).lower(), "narrator")
+    return SpeakerLine(role, m.group(2) or "")
+
+
+def parse_tags(answer: str, count: int) -> Optional[List[SpeakerLine]]:
+    """The model's answer as ``count`` marks, or ``None`` when the answer is not usable.
+
+    A thinking channel, a code fence, a preamble and numbered prefixes (``1. MALE: Name``) are ignored. Lines that are
+    not tags are skipped. The remaining tags must be exactly ``count`` (so ``NARRATOR`` plus a junk line is still
+    rejected).
+    """
+    rows = [ln.strip() for ln in _clean_answer(answer).splitlines() if ln.strip()]
+    out = [tag for tag in (_line_tag(ln) for ln in rows) if tag is not None]
+    if len(out) != count:
+        return None
     return out
 
 
@@ -104,15 +133,45 @@ def _batches(paras: Sequence[str]) -> List[List[int]]:
     return out
 
 
+class TagResult:
+    """Marks plus the raw model reply and a warning code (``""``, ``unparsed``, ``no_speakers``).
+
+    Callers that only need the marks can iterate, index and take ``len`` as they did with a list.
+    """
+
+    def __init__(self, lines: Sequence[SpeakerLine], raw: str = "", warning: str = "") -> None:
+        self.lines = list(lines)
+        self.raw = raw
+        self.warning = warning
+
+    def __iter__(self) -> Iterator[SpeakerLine]:
+        return iter(self.lines)
+
+    def __getitem__(self, item: Union[int, slice]) -> Union[SpeakerLine, List[SpeakerLine]]:
+        return self.lines[item]
+
+    def __len__(self) -> int:
+        return len(self.lines)
+
+    def __bool__(self) -> bool:
+        return bool(self.lines)
+
+
 def tag_paragraphs(paras: Sequence[str], language: str, plan: LLMPlan,
-                   progress: Optional[Callable[[float], None]] = None) -> List[SpeakerLine]:
-    """Mark ``paras``. A block the model fails is narrator. The model is closed before return."""
+                   progress: Optional[Callable[[float], None]] = None) -> TagResult:
+    """Mark ``paras``. A block the model fails stays narrator, with a warning. The model is closed before return.
+
+    ``warning`` is ``unparsed`` when a reply cannot be read (or the model raises), and ``no_speakers`` when every
+    paragraph is the narrator but the text obviously contains dialogue. The raw replies are kept either way.
+    """
     progress = progress or (lambda _f: None)
     lines = [SpeakerLine() for _ in paras]
     if not any(any(c.isalpha() for c in p) for p in paras):
-        return lines
+        return TagResult(lines)
     template = load_prompt("speaker_markup")
     model = None
+    raw_parts: List[str] = []
+    failed = False
     try:
         model = plan.factory()
         batches = _batches(list(paras))
@@ -120,17 +179,27 @@ def tag_paragraphs(paras: Sequence[str], language: str, plan: LLMPlan,
             text = "\n\n".join(paras[i] for i in block)
             prompt = fill(template, language=NAMES.get(language, language or "English"), text=text)
             answer = model.complete(prompt, max_tokens=min(2048, 48 * len(block) + 32))
+            raw_parts.append(answer or "")
             parsed = parse_tags(answer or "", len(block))
-            if parsed is not None:
+            if parsed is None:
+                failed = True
+            else:
                 for i, line in zip(block, parsed):
                     lines[i] = line
             progress((bi + 1) / max(1, len(batches)))
-    except Exception:  # noqa: BLE001 - a failed model leaves every paragraph with the narrator
+    except Exception as exc:  # noqa: BLE001 - a failed model leaves every paragraph with the narrator, and says so
+        failed = True
+        raw_parts.append(f"[error] {type(exc).__name__}: {exc}")
         progress(1.0)
     finally:
         if model is not None:
             model.close()
-    return lines
+    warning = ""
+    if failed:
+        warning = WARN_UNPARSED
+    elif lines and all(ln.role == "narrator" for ln in lines) and any(has_dialogue(p) for p in paras):
+        warning = WARN_NO_SPEAKERS
+    return TagResult(lines, raw="\n\n".join(raw_parts), warning=warning)
 
 
 def _norm(text: str) -> str:

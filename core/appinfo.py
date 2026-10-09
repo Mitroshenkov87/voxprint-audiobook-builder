@@ -7,10 +7,12 @@ is published; while it is a placeholder the link is hidden in the About dialog. 
 from __future__ import annotations
 
 import json
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from core import build_stamp
 from infra.paths import resource_dir
 
 REPO_PLACEHOLDER_MARK = "OWNER"
@@ -43,6 +45,30 @@ APP_COMMIT: str = str(_app().get("commit", ""))
 #: One Biblical Hebrew word (Latin transliteration) naming the build's changes, from BUILD.json (stamped with the number).
 APP_CODENAME: str = str(_app().get("codename", ""))
 APP_CHANNEL: str = str(_app().get("channel", ""))       # "beta" -> shown as 0.1.1-beta
+
+
+def apply_embedded_stamp(executable: Optional[str] = None) -> None:
+    """Prefer the running executable's build stamp, then the constants baked in before PyInstaller.
+
+    ``credits.json`` (often the installed build, left behind when only ``Voxprint.exe`` is replaced) is the fallback
+    already stored in :data:`APP_BUILD`. A developer ``python`` has no trailer and ``build_stamp.BUILD`` is 0, so this
+    leaves the credits values alone.
+    """
+    global APP_BUILD, APP_CODENAME
+    trailer = build_stamp.read_trailer(sys.executable if executable is None else executable)
+    if trailer is not None:
+        build, name = trailer
+        APP_BUILD = build
+        if name:
+            APP_CODENAME = name
+        return
+    if build_stamp.BUILD:
+        APP_BUILD = int(build_stamp.BUILD)
+        if build_stamp.CODENAME:
+            APP_CODENAME = str(build_stamp.CODENAME)
+
+
+apply_embedded_stamp()
 
 
 def version_label() -> str:

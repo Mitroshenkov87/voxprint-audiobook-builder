@@ -25,6 +25,11 @@ def test_cli_prints_one_line_for_the_build_script(capsys):
 def test_build_script_uses_it_and_ships_the_lock_for_the_frozen_check():
     bat = (ROOT / "build_thin.bat").read_text(encoding="utf-8")
     assert "--pyinstaller-metadata-args" in bat and "%META%" in bat and "runtime_lock.json;infra" in bat
+    write_at = bat.index("embed_build_stamp.py --write-module")
+    pack_at = bat.index("\npyinstaller ")
+    restore_at = bat.index("embed_build_stamp.py --restore-module")
+    exe_at = bat.index("embed_build_stamp.py --exe")
+    assert write_at < pack_at < restore_at < exe_at
     main = (ROOT / "main.py").read_text(encoding="utf-8")
     assert "runtime_lock.json" in main and "_md.version(dist)" in main
 

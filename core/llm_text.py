@@ -115,6 +115,11 @@ def keeps_spoken_shape(src: str, out: str) -> bool:
     return True
 
 
+def has_dialogue(text: str) -> bool:
+    """True when ``text`` has quotes or a line that opens with a dash (the same shape the narration prompts keep)."""
+    return _DIALOGUE.search(text or "") is not None
+
+
 def _blocks(idx: Sequence[int], paras: Sequence[str]) -> List[List[int]]:
     out: List[List[int]] = []
     cur: List[int] = []

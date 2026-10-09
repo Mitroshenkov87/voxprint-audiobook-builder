@@ -168,7 +168,7 @@ class NarrationResult:
     resumed_chunks: int = 0                   # chunks that were already in the cache
     seconds: float = 0.0                      # length of the whole book
     chunk_check: Optional[Dict[str, int]] = None   # counts of the per-chunk check (None = not run)
-    speaker_warning: str = ""                 # "mismatch" when the marks do not fit the prepared text
+    speaker_warning: str = ""                 # "mismatch", "unparsed", "no_speakers", joined with ";"
 
 
 ProgressFn = Callable[[NarrationProgress], None]
@@ -764,15 +764,20 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
             cancel=cancel)
     speaker_lines: Optional[List[spk.SpeakerLine]] = None
     speaker_note = ""
+    tag_warning = ""
+    tag_raw: Optional[str] = None
     cast = options.speakers if (options.speakers is not None and extra_engines) else None
     if cast is not None:
         speaker_lines = cast.lines
         if speaker_lines is None and cast.tagger is not None:
             code = tplan.target if tplan is not None else (tl.detect_book_language(book) or "en")
             progress(NarrationProgress(0, 1, None, tr("spk.tagging", pct=0), "prepare"))
-            speaker_lines = spk.tag_paragraphs(
+            tagged = spk.tag_paragraphs(
                 [text for _ci, text in spk.paragraphs(book)], code, cast.tagger,
                 lambda f: progress(NarrationProgress(int(f * 100), 100, None, tr("spk.tagging", pct=int(f * 100)), "prepare")))
+            speaker_lines = list(tagged)
+            tag_warning = tagged.warning
+            tag_raw = tagged.raw
     chunk_list = chunk_book(book, options.max_chars, chapters, options.speak_titles, options.pauses, options.pause_lengths,
                             options.pace)
     shape = options.pause_lengths is not None or options.pace is not None
@@ -781,13 +786,17 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
     if cast is not None and speaker_lines:
         voice_ids = {"male": cast.male_id, "female": cast.female_id}
         chunk_list, speaker_note = spk.assign(chunk_list, book, speaker_lines, voice_ids, cast.narrator_id)
+        codes = [part for part in (tag_warning, speaker_note) if part]
+        speaker_note = ";".join(codes)
         debug = job_dir / ".debug"
         debug.mkdir(parents=True, exist_ok=True)
         note = spk.describe(speaker_lines)
-        if speaker_note:
-            note += "\n" + speaker_note + "\n"
+        if "mismatch" in codes:
+            note += "\nmismatch\n"
             progress(NarrationProgress(0, 1, None, tr("spk.mismatch"), "prepare"))
         (debug / "speakers.txt").write_text(note, encoding="utf-8")
+        if tag_raw is not None:
+            (debug / "speakers-raw.txt").write_text(tag_raw, encoding="utf-8")
     if options.ai_disclosure:              # in the narrated language (the translation target when translating)
         chunk_list = ai_disclosure.prepend(chunk_list, ai_disclosure.phrase(
             language or book.language, narrator, options.disclosure_date))
