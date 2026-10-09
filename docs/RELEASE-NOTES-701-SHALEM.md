@@ -1,6 +1,6 @@
 # Release notes: 0.2.1-beta, build 701 "Shalem"
 
-`BUILD.json` codename is Shalem. The offset stays 655, so build-installer run 46 stamps build 701. The body below is the GitHub release text. Keep the Windows section.
+`BUILD.json` codename is Shalem. Run 46 failed in the Windows unit tests before it published anything, so the offset is 654 and build-installer run 47 stamps build 701. The body below is the GitHub release text. Keep the Windows section.
 
 **Voxprint 0.2.1-beta · build 701 "Shalem"** (Biblical Hebrew *shalem*, שָׁלֵם, whole, complete; Genesis 33:18, Jacob came *shalem* to the city of Shechem). Fixes from the test of build 700 "Kaporet" on a real PC.
 
