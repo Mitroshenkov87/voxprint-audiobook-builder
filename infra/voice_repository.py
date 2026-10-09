@@ -107,6 +107,7 @@ class RepoVoice:
     names: dict = field(default_factory=dict)       # optional localized display names {"ru": "...", "en": "..."}
     descriptions: dict = field(default_factory=dict)   # optional localized descriptions
     bundled: bool = False     # an open voice that comes with Voxprint (infra/bundled_voices.py): installed read-only
+    hidden: bool = False      # retired voice ("hidden"/"retired" in the index): kept for old builds, not offered for download
 
     @property
     def display_name(self) -> str:
@@ -238,8 +239,40 @@ def parse_index(data: Any) -> List[RepoVoice]:
             project_url=voice_info.clean_project_url(str(e.get("project_url", ""))),
             base_model=str(e.get("base_model", "")), size_bytes=size, names=voice_info.clean_names(e.get("names")),
             descriptions=voice_info.clean_names(e.get("descriptions"), voice_info.clean_description),
-            bundled=e.get("bundled") is True))
+            bundled=e.get("bundled") is True, hidden=e.get("hidden") is True or e.get("retired") is True))
     return out
+
+
+def _norm(value: Any) -> str:
+    return str(value or "").strip().casefold()
+
+
+def record_matches(entry: "RepoVoice", record: Any) -> bool:
+    """True if the library ``record`` is the index voice ``entry``.
+
+    A downloaded voice carries the index id as ``repo_id``.  A voice trained or imported locally has no ``repo_id``; it is the
+    same voice when its library id or its name equals the entry's id or name (case-insensitive), e.g. a locally trained
+    *Gideon* (folder ``gideon``) is the catalog's ``gideon``.  A record whose ``repo_id`` names another entry never matches.
+    """
+    info = getattr(record, "info", None) or {}
+    rid = _norm(info.get("repo_id"))
+    if rid:
+        return rid == _norm(entry.id)
+    keys = {_norm(entry.id), _norm(entry.name)} - {""}
+    cand = {_norm(getattr(record, "id", "")), _norm(info.get("id")), _norm(info.get("name"))} - {""}
+    return bool(keys & cand)
+
+
+def installed_entry_ids(entries: List["RepoVoice"], records: List[Any]) -> set:
+    """Ids of the index ``entries`` that are already in the library (see :func:`record_matches`)."""
+    return {e.id for e in entries if any(record_matches(e, r) for r in records)}
+
+
+def installed_record(entry: "RepoVoice", records: List[Any]) -> Any:
+    """The library record of ``entry`` (a downloaded copy first, else a local one with the same id / name), or None."""
+    hits = [r for r in records if record_matches(entry, r)]
+    hits.sort(key=lambda r: 0 if _norm((getattr(r, "info", None) or {}).get("repo_id")) else 1)
+    return hits[0] if hits else None
 
 
 def fetch_index(url: Optional[str] = None, opener: Opener = net.urlopen, timeout: float = 15.0) -> IndexResult:

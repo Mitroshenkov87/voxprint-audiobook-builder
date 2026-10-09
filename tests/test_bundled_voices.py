@@ -211,3 +211,11 @@ def test_asher_and_noa_are_catalog_only():
     assert gideon["bundled"] is True and gideon["size_bytes"] == 53031093
     assert gideon["sha256"] == "6ca0e6824080ee86c21a4b34472bd013bd182ef15bb393c6e494fd554e1c2266"
     assert gideon["url"] == host + "gideon.zip" and gideon["speaker"] == "Kazbek"
+
+
+def test_locally_trained_bundled_voice_is_not_downloaded_again(tmp_path):
+    from tests.test_voice_library import make_adapter
+
+    lib = VoiceLibrary(tmp_path / "lib")
+    lib.add_from_adapter(make_adapter(tmp_path / "g", name="Gideon"))      # trained on the PC: id "gideon", no repo_id
+    assert [e.id for e in bv.missing(lib)] == ["tirzah"]

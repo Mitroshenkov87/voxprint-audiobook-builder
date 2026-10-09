@@ -61,15 +61,13 @@ def is_remote_key(key: str) -> bool:
 def build(library: VoiceLibrary, entries: List[repo.RepoVoice]) -> List[CatalogItem]:
     """Local voices first (as :meth:`VoiceLibrary.list_voices` orders them), then the index voices that are not installed."""
     items: List[CatalogItem] = []
-    installed_ids = set()
-    for rec in library.list_voices():
-        rid = str(rec.info.get("repo_id") or "")
-        if rid:
-            installed_ids.add(rid)
+    records = library.list_voices()
+    installed_ids = repo.installed_entry_ids(entries, records)   # by repo_id, else a local voice with the same id / name
+    for rec in records:
         items.append(CatalogItem(rec.id, rec.name, rec.description, rec.language, rec.license, str(rec.info.get("license_url", "")),
                                  rec.scope, rec.commercial_use, True, record=rec, size_bytes=0, author=str(rec.info.get("author", ""))))
     for e in entries:
-        if e.id in installed_ids:
+        if e.id in installed_ids or e.hidden:   # installed, or a retired voice that is no longer offered
             continue
         items.append(CatalogItem(remote_key(e.id), e.display_name, e.display_description, e.language, e.license, e.license_url,
                                  scope_for_license(e.license), e.commercial_use, False, entry=e, size_bytes=e.size_bytes, author=e.author))
