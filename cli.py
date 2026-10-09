@@ -35,6 +35,8 @@ from core import pauses as pz
 from core import ordinals
 from core import pace as pc
 from core import revoice
+from core import speakers as spk
+from core.translate import detect_book_language
 from core import workspace as ws
 from core.appinfo import APP_BUILD, APP_CHANNEL, APP_CODENAME, APP_VERSION
 from core.asr import make_default_asr
@@ -44,6 +46,7 @@ from core.events import CancelToken, Stage, overall_percent
 from core.narration import NarrationOptions, NarrationProgress, PauseToken
 from core.voice_info import VOICE_TYPES, normalize_voice_type
 from core.voice_library import VoiceLibrary, VoiceRecord
+from infra import auto_repair
 from infra import backup as backup_mod
 from infra import denoise_tool, diagnostics, keep_awake, llm_tool, projects, quality_models, text_models, vc_model
 from infra import model_downloader as md
@@ -96,6 +99,7 @@ FORMAT_ALIASES = {
 
 USER_COMMANDS = frozenset({
     "narrate", "train", "voices", "diag", "status", "capabilities", "models", "revoice", "backup", "restore",
+    "speakers", "check", "repair",
 })
 
 CORE_MODULE_IDS = (
@@ -217,6 +221,19 @@ def version_line(info: Optional[dict] = None) -> str:
     return line
 
 
+def _write_stream(stream, text: str) -> None:
+    """Write one line and flush it.
+
+    A packaged ``Voxprint.exe`` is a windowed program: stdout exists for a caller that redirects it, and
+    ``write`` raises when nothing is attached. The exit code must still be the command's code.
+    """
+    try:
+        stream.write(text if str(text).endswith("\n") else str(text) + "\n")
+        stream.flush()
+    except (OSError, ValueError, AttributeError):
+        pass
+
+
 def _emit_progress(stage: str, percent: float, message: str, **extra) -> None:
     payload = {
         "type": "progress",
@@ -227,7 +244,7 @@ def _emit_progress(stage: str, percent: float, message: str, **extra) -> None:
     for key, value in extra.items():
         if value is not None:
             payload[key] = value
-    print(json.dumps(payload, ensure_ascii=False), flush=True)
+    _write_stream(sys.stdout, json.dumps(payload, ensure_ascii=False))
 
 
 def _emit_result(*, ok: bool, command: str, exit_code: int, outputs, warnings, duration_s: float,
@@ -247,15 +264,15 @@ def _emit_result(*, ok: bool, command: str, exit_code: int, outputs, warnings, d
         payload["details"] = details
     if extra:
         payload.update(extra)
-    print(json.dumps(payload, ensure_ascii=False), flush=True)
+    _write_stream(sys.stdout, json.dumps(payload, ensure_ascii=False))
 
 
 def _error(exc: CliError, *, json_mode: bool, command: str, started: float) -> int:
-    print(f"ERROR: {exc.message}", file=sys.stderr)
+    _write_stream(sys.stderr, f"ERROR: {exc.message}")
     if exc.details:
-        print(f"  details: {exc.details}", file=sys.stderr)
+        _write_stream(sys.stderr, f"  details: {exc.details}")
     if exc.hint:
-        print(f"Fix: {exc.hint}", file=sys.stderr)
+        _write_stream(sys.stderr, f"Fix: {exc.hint}")
     if json_mode:
         _emit_result(
             ok=False, command=command, exit_code=exc.code, outputs=[], warnings=[],
@@ -274,7 +291,7 @@ def _ok(json_mode: bool, command: str, started: float, *, outputs, warnings=None
         )
     else:
         for line in human:
-            print(line, flush=True)
+            _write_stream(sys.stdout, line)
     return EXIT_OK
 
 
@@ -373,6 +390,8 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint narrate book.epub --voice my-voice --out ./audiobooks\n"
             "  voxprint narrate book.fb2 --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json\n"
             "  voxprint narrate book.txt --voice my-voice --out ./audiobooks --pauses --ai-disclosure\n"
+            "  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json\n"
+            "  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks\n"
         ),
     )
     n.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
@@ -405,6 +424,14 @@ def build_parser() -> argparse.ArgumentParser:
     n.set_defaults(ordinals=None)
     n.add_argument("--ai-disclosure", action="store_true",
                    help="Speak a short AI disclosure at the start (opt-in)")
+    n.add_argument("--speakers", action="store_true",
+                   help="Mark each paragraph narrator, male or female with the text model (Gemma), then narrate those voices")
+    n.add_argument("--male-voice", default="", metavar="ID_OR_NAME",
+                   help="Voice for paragraphs marked male (narrator is --voice)")
+    n.add_argument("--female-voice", default="", metavar="ID_OR_NAME",
+                   help="Voice for paragraphs marked female (narrator is --voice)")
+    n.add_argument("--speaker-marks", type=Path, default=None, metavar="FILE",
+                   help="Narrate from this marks file instead of running Gemma (voxprint speakers writes it)")
     n.add_argument("--work-dir", type=Path, default=None, metavar="DIR",
                    help="Remember this folder as the app working folder")
     n.set_defaults(_handler="narrate")
@@ -569,6 +596,39 @@ def build_parser() -> argparse.ArgumentParser:
     rv.add_argument("--title", default="", help="File name for the text book (default: the first clip's title)")
     rv.add_argument("--language", default=None, help="Recognition language hint (default: automatic)")
     rv.set_defaults(_handler="revoice")
+
+    sp = sub.add_parser(
+        "speakers", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
+        help="Mark each paragraph narrator, male or female (no narration)",
+        description=(
+            "Ask the text model (Gemma) who speaks each paragraph and write an editable marks file. "
+            "Narrate that file with narrate --speaker-marks. This command does not synthesize audio."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  voxprint speakers book.txt --out marks.txt --json\n"
+            "  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann "
+            "--speaker-marks marks.txt --out ./audiobooks --json\n"
+        ),
+    )
+    sp.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
+    sp.add_argument("--out", required=True, type=Path, metavar="FILE", help="Marks file to write")
+    sp.set_defaults(_handler="speakers")
+
+    ck = sub.add_parser(
+        "check", aliases=["repair"], parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
+        help="Check models and files and fix what is damaged (alias: repair)",
+        description=(
+            "The same check as Settings -> Check & repair: program, components and models by hash, "
+            "missing or damaged files fetched again, stale model lock files removed."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  voxprint check --json\n"
+            "  voxprint repair --json\n"
+        ),
+    )
+    ck.set_defaults(_handler="check")
     return ap
 
 
@@ -645,7 +705,7 @@ def _narration_progress(json_mode: bool):
         eta = ""
         if p.eta is not None and p.eta >= 0:
             eta = f"  ETA {format_eta(p.eta)}"
-        print(f"[{p.phase}] {p.done}/{p.total}{eta}  {p.message}", flush=True)
+        _write_stream(sys.stdout, f"[{p.phase}] {p.done}/{p.total}{eta}  {p.message}")
 
     return cb
 
@@ -663,14 +723,15 @@ def _train_progress(json_mode: bool):
         if json_mode:
             _emit_progress(name, percent, str(msg))
         else:
-            print(f"[{label}] {float(frac) * 100:5.1f}%  {msg}", flush=True)
+            _write_stream(sys.stdout, f"[{label}] {float(frac) * 100:5.1f}%  {msg}")
 
     return cb
 
 
 def cmd_narrate(args: argparse.Namespace, *,
                 run_fn: Callable[..., object] = run_narration,
-                library: Optional[VoiceLibrary] = None) -> int:
+                library: Optional[VoiceLibrary] = None,
+                plan_fn: Optional[Callable[[], object]] = None) -> int:
     """``narrate BOOK --voice ... --out DIR``: load the book, resolve the voice, call ``run_narration``."""
 
     def body(json_mode: bool, started: float) -> int:
@@ -697,18 +758,94 @@ def cmd_narrate(args: argparse.Namespace, *,
             ai_disclosure=bool(args.ai_disclosure),
             ordinals=ordinals.load_enabled() if getattr(args, "ordinals", None) is None else bool(args.ordinals),
         )
-        job = NarrationJob(book=book, voice=voice, out_dir=out_dir, options=options)
+        cast, extra_voices = _speaker_job(args, voice, lib, plan_fn)
+        if cast is not None:
+            options.speakers = cast
+        job = NarrationJob(book=book, voice=voice, out_dir=out_dir, options=options, extra_voices=extra_voices)
         with keep_awake.keep_awake():
             result = run_fn(job, _narration_progress(json_mode), CancelToken(), PauseToken())
         files = list(getattr(result, "files", None) or [])
-        done = getattr(result, "out_dir", out_dir)
+        done = Path(getattr(result, "out_dir", out_dir))
+        marks = done / ".debug" / "speakers.txt"
+        if marks.is_file():
+            files.append(marks)
+        warnings = []
+        if getattr(result, "speaker_warning", "") == "mismatch":
+            warnings.append(SPEAKER_MISMATCH)
+        human = [f"Done: {done}"] + [f"  {f}" for f in files] + [f"  ! {w}" for w in warnings]
         return _ok(
-            json_mode, "narrate", started, outputs=files,
-            human=[f"Done: {done}"] + [f"  {f}" for f in files],
-            extra={"out_dir": str(done)},
+            json_mode, "narrate", started, outputs=files, warnings=warnings,
+            human=human, extra={"out_dir": str(done)},
         )
 
     return _run("narrate", args, body)
+
+
+SPEAKER_MISMATCH = "Speaker marks do not match the prepared text, so the narrator reads the whole book."
+
+
+def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callable[[], object]]):
+    """Speaker cast and extra voices for ``narrate``, or ``(None, {})`` when multi-voice is off.
+
+    The cast is the same object the Narrate window builds (:class:`core.speakers.SpeakerCast`). Narration applies it.
+    """
+    want = bool(getattr(args, "speakers", False)) or getattr(args, "speaker_marks", None) is not None
+    male_name = (getattr(args, "male_voice", "") or "").strip()
+    female_name = (getattr(args, "female_voice", "") or "").strip()
+    if not want and not male_name and not female_name:
+        return None, {}
+    if not want:
+        raise CliError(
+            EXIT_BAD_ARGS, "--male-voice and --female-voice need --speakers or --speaker-marks",
+            hint="Example: voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann "
+                 "--speakers --out ./audiobooks",
+        )
+    if args.speakers and args.speaker_marks is not None:
+        raise CliError(
+            EXIT_BAD_ARGS, "--speakers and --speaker-marks cannot be used together",
+            hint="Use --speakers to ask Gemma, or --speaker-marks FILE to narrate marks you already edited.",
+        )
+    male = resolve_voice(library, male_name) if male_name else None
+    female = resolve_voice(library, female_name) if female_name else None
+    lines = None
+    tagger = None
+    if args.speaker_marks is not None:
+        path = Path(args.speaker_marks)
+        if not path.is_file():
+            raise CliError(
+                EXIT_INPUT, f"speaker marks not found: {path}",
+                hint="Write them with: voxprint speakers book.txt --out marks.txt",
+            )
+        try:
+            lines = spk.load_marks(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError) as exc:
+            raise CliError(
+                EXIT_INPUT, f"speaker marks cannot be read: {exc}",
+                hint="Each line is 'N. NARRATOR' or 'N. MALE: Name' or 'N. FEMALE: Name'.",
+            ) from exc
+    else:
+        plan = (plan_fn or llm_tool.make_plan)()
+        if plan is None:
+            raise CliError(
+                EXIT_MISSING, "text model is not installed",
+                hint="voxprint models download llm --json",
+            )
+        tagger = plan
+    cast = spk.SpeakerCast(
+        lines=lines, male_id=male.id if male is not None else "", female_id=female.id if female is not None else "",
+        tagger=tagger, narrator_id=narrator.id,
+    )
+    if not cast.uses_several(narrator.id):
+        raise CliError(
+            EXIT_BAD_ARGS, "pick a male or female voice that is not the narrator",
+            hint="Example: voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann "
+                 "--speakers --out ./audiobooks",
+        )
+    extra = {}
+    for rec in (male, female):
+        if rec is not None and rec.id != narrator.id:
+            extra[rec.id] = rec
+    return cast, extra
 
 
 PAUSE_HELP = {"comma": "comma", "mid": "strong mid-sentence break (dash, colon, semicolon, comma + conjunction)",
@@ -842,12 +979,12 @@ def cmd_voices_list(args: argparse.Namespace, *, library: Optional[VoiceLibrary]
         if json_mode:
             return _ok(json_mode, "voices list", started, outputs=[], extra={"voices": rows})
         if not voices:
-            print("No voices installed.")
+            _write_stream(sys.stdout, "No voices installed.")
             return EXIT_OK
         for v in voices:
             vtype = v.info.get("voice_type") or "-"
             gender, age = v.info.get("gender") or "-", v.info.get("age_group") or "-"
-            print(f"{v.id}\t{v.name}\t{vtype}\t{v.language or '-'}\t{v.license}\t{gender}\t{age}")
+            _write_stream(sys.stdout, f"{v.id}\t{v.name}\t{vtype}\t{v.language or '-'}\t{v.license}\t{gender}\t{age}")
         return EXIT_OK
 
     return _run("voices list", args, body)
@@ -964,7 +1101,7 @@ def cmd_version(json_mode: bool) -> int:
             duration_s=0.0, error=None, hint=None, extra=info,
         )
     else:
-        print(version_line(info), flush=True)
+        _write_stream(sys.stdout, version_line(info))
     return EXIT_OK
 
 
@@ -1235,7 +1372,7 @@ def cmd_models_list(args: argparse.Namespace) -> int:
         for row in rows:
             installed = "yes" if row["installed"] else "no"
             optional = "yes" if row["optional"] else "no"
-            print(f"{row['id']}\t{installed}\t{optional}\t{row['kind']}\t{row['title']}")
+            _write_stream(sys.stdout, f"{row['id']}\t{installed}\t{optional}\t{row['kind']}\t{row['title']}")
         return EXIT_OK
 
     return _run("models list", args, body)
@@ -1253,7 +1390,7 @@ def cmd_models_download(args: argparse.Namespace, *,
             if json_mode:
                 _emit_progress("download", float(frac) * 100.0, msg)
             else:
-                print(f"[download] {float(frac) * 100:5.1f}%  {msg}", flush=True)
+                _write_stream(sys.stdout, f"[download] {float(frac) * 100:5.1f}%  {msg}")
 
         if download_fn is not None:
             if installed_fn is not None and installed_fn(key):
@@ -1336,7 +1473,7 @@ def cmd_revoice(args: argparse.Namespace, *,
             if json_mode:
                 _emit_progress("transcribe", float(frac) * 100.0, title)
             else:
-                print(f"[transcribe] {float(frac) * 100:5.1f}%  {title}", flush=True)
+                _write_stream(sys.stdout, f"[transcribe] {float(frac) * 100:5.1f}%  {title}")
 
         fn = transcribe_fn or _default_transcribe
         chapters = list(fn(files, args.language, progress, CancelToken()))
@@ -1361,13 +1498,91 @@ def _flag_present(argv: Sequence[str], *names: str) -> bool:
     return any(a in names for a in argv)
 
 
+def cmd_speakers(args: argparse.Namespace, *,
+                 plan_fn: Optional[Callable[[], object]] = None) -> int:
+    """``speakers BOOK --out FILE``: Gemma marks each paragraph. Does not narrate."""
+
+    def body(json_mode: bool, started: float) -> int:
+        book_path = Path(args.book)
+        if not book_path.is_file():
+            raise CliError(
+                EXIT_INPUT, f"book not found: {book_path}",
+                hint="Example: voxprint speakers book.txt --out marks.txt --json",
+            )
+        book = load_book(book_path)
+        paras = [text for _ci, text in spk.paragraphs(book)]
+        if not paras:
+            raise CliError(EXIT_INPUT, "book has no paragraphs", hint="The file needs at least one paragraph of text.")
+        plan = (plan_fn or llm_tool.make_plan)()
+        if plan is None:
+            raise CliError(EXIT_MISSING, "text model is not installed", hint="voxprint models download llm --json")
+        if json_mode:
+            _emit_progress("prepare", 0.0, "Marking speakers")
+
+        def progress(frac: float) -> None:
+            if json_mode:
+                _emit_progress("prepare", float(frac) * 100.0, "Marking speakers")
+
+        lines = spk.tag_paragraphs(paras, detect_book_language(book) or "en", plan, progress)
+        dest = Path(args.out)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(spk.dump_marks(lines), encoding="utf-8")
+        return _ok(
+            json_mode, "speakers", started, outputs=[dest],
+            human=[f"Marks: {dest}", f"  {len(lines)} paragraphs"],
+            extra={"paragraphs": len(lines)},
+        )
+
+    return _run("speakers", args, body)
+
+
+def cmd_check(args: argparse.Namespace, *,
+              repair_fn: Optional[Callable[..., object]] = None) -> int:
+    """``check`` / ``repair``: Settings -> Check & repair (:func:`infra.auto_repair.run`)."""
+
+    def body(json_mode: bool, started: float) -> int:
+        def progress(frac: float, message: str) -> None:
+            if json_mode:
+                _emit_progress("check", float(frac) * 100.0, message)
+            elif message:
+                _write_stream(sys.stdout, f"[{int(float(frac) * 100):3d}%] {message}")
+
+        report = (repair_fn or auto_repair.run)(progress)
+        items = [{"kind": i.kind, "name": i.name, "status": i.status, "detail": i.detail} for i in report.items]
+        failed = [i for i in items if i["status"] == auto_repair.FAILED]
+        fixed = [i for i in items if i["status"] in (auto_repair.REPAIRED, auto_repair.DOWNLOADED)]
+        warnings = [
+            f"{i['kind']}: {i['name']}" + (f" ({i['detail']})" if i["detail"] else "") for i in failed
+        ]
+        code = EXIT_OK if report.ok else EXIT_INTERNAL
+        extra = {"items": items, "checked": len(items), "fixed": len(fixed), "failed": len(failed)}
+        human = [report.summary()] + [
+            f"{i['status'].upper():10s} {i['kind']}: {i['name']}" + (f" - {i['detail']}" if i["detail"] else "")
+            for i in items
+        ]
+        if json_mode:
+            _emit_result(
+                ok=report.ok, command="check", exit_code=code, outputs=[], warnings=warnings,
+                duration_s=time.perf_counter() - started, error=None if report.ok else report.summary(),
+                hint=None, extra=extra,
+            )
+        else:
+            for line in human:
+                _write_stream(sys.stdout, line)
+        return code
+
+    return _run("check", args, body)
+
+
 def main(argv: Optional[Sequence[str]] = None, *,
          run_narration_fn: Callable[..., object] = run_narration,
          run_task_fn: Callable[..., object] = run_task,
          library: Optional[VoiceLibrary] = None,
          transcribe_fn: Optional[Callable[..., object]] = None,
          download_fn: Optional[Callable[..., object]] = None,
-         installed_fn: Optional[Callable[[str], bool]] = None) -> int:
+         installed_fn: Optional[Callable[[str], bool]] = None,
+         plan_fn: Optional[Callable[[], object]] = None,
+         repair_fn: Optional[Callable[..., object]] = None) -> int:
     """Parse ``argv`` and run the matching subcommand.  Returns the process exit code."""
     raw = list(sys.argv[1:] if argv is None else argv)
     try:
@@ -1393,7 +1608,7 @@ def main(argv: Optional[Sequence[str]] = None, *,
         return int(code)
     handler = getattr(args, "_handler", "")
     if handler == "narrate":
-        return cmd_narrate(args, run_fn=run_narration_fn, library=library)
+        return cmd_narrate(args, run_fn=run_narration_fn, library=library, plan_fn=plan_fn)
     if handler == "train":
         return cmd_train(args, run_fn=run_task_fn)
     if handler == "voices_list":
@@ -1410,6 +1625,10 @@ def main(argv: Optional[Sequence[str]] = None, *,
         return cmd_models_download(args, download_fn=download_fn, installed_fn=installed_fn)
     if handler == "revoice":
         return cmd_revoice(args, transcribe_fn=transcribe_fn)
+    if handler == "speakers":
+        return cmd_speakers(args, plan_fn=plan_fn)
+    if handler == "check":
+        return cmd_check(args, repair_fn=repair_fn)
     if handler == "backup":
         return cmd_backup(args)
     if handler == "restore":

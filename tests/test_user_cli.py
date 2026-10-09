@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -9,11 +10,16 @@ import pytest
 
 import cli as user_cli
 from core import audiobook_export as ex
+from core import narration as nr
 from core import voice_info
 from core.errors import CancelledByUser, DatasetMakerError, ModelDownloadError, OutOfMemoryError_
 from core.events import Stage
+from core.llm_text import LLMPlan
 from core.narration import NarrationOptions, NarrationProgress
 from core.voice_library import VoiceLibrary
+from infra import auto_repair
+from tests.test_llm_text import FakeModel
+from tests.test_narration import FakeEngine, FakeFfmpeg
 from workers.narration_runner import NarrationJob
 from workers.pipeline_runner import KIND_LORA, TaskRequest
 
@@ -576,3 +582,294 @@ def test_revoice_missing_audio(tmp_path, capsys):
     )
     assert code == user_cli.EXIT_INPUT
     assert "Fix:" in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------- speakers, multi-voice narrate, check
+
+
+DIALOGUE = (
+    "He walked along the quiet road for a while.\n\n"
+    '"Hello there," she said softly.\n\n'
+    '"Good day to you," he answered at once.\n'
+)
+
+
+def _add_voice(lib: VoiceLibrary, name: str, voice_id: str, voice_type: str = "male") -> None:
+    src = lib.root.parent / f"_src_{voice_id}"
+    src.mkdir(parents=True, exist_ok=True)
+    (src / "adapter_model.safetensors").write_bytes(b"weights")
+    (src / "adapter_config.json").write_text("{}", encoding="utf-8")
+    (src / "ref_sample.wav").write_bytes(b"RIFFxxxx")
+    (src / "training_meta.json").write_text(json.dumps({"ref_sample_text": "hello"}), encoding="utf-8")
+    voice_info.write_voice_json(src, voice_info.build_voice_info(
+        name, "english", 60, 3, "Qwen/Base", license="CC-BY-4.0", voice_type=voice_type))
+    rec = lib.add_from_adapter(src, name=name)
+    if rec.id != voice_id and not (lib.root / voice_id).exists():
+        rec.path.rename(lib.root / voice_id)
+        info = voice_info.read_voice_json(lib.root / voice_id) or {}
+        info["id"] = voice_id
+        voice_info.write_voice_json(lib.root / voice_id, info)
+
+
+def _cast_library(tmp_path: Path) -> VoiceLibrary:
+    lib = _make_voice(tmp_path, name="Narrator", voice_id="narrator")
+    _add_voice(lib, "Tom", "tom", "male")
+    _add_voice(lib, "Ann", "ann", "female")
+    return VoiceLibrary(lib.root)
+
+
+def _marks_answer(prompt: str) -> str:
+    text = prompt.rsplit("TEXT:\n", 1)[-1]
+    n = len([p for p in text.split("\n\n") if p.strip()])
+    roles = ["NARRATOR", "FEMALE: Ann", "MALE: Tom"]
+    return "\n".join(roles[:n])
+
+
+def _plan():
+    return LLMPlan(lambda: FakeModel(_marks_answer), "fake")
+
+
+def _narrate_with_fakes(engines: dict):
+    """``run_narration`` stand-in: the real ``narrate_book`` with silent engines. No GPU."""
+
+    def run(job, progress, cancel, pause):
+        narr = FakeEngine()
+        narr.tag = "narr"
+        engines["narr"] = narr
+        extra = {}
+        for vid in job.extra_voices:
+            eng = FakeEngine()
+            eng.tag = vid
+            engines[vid] = eng
+            extra[vid] = (lambda e=eng: e, vid)
+        return nr.narrate_book(
+            job.book, lambda: narr, "narr", job.out_dir,
+            language="english", narrator=job.voice.name, options=job.options,
+            progress=progress, cancel=cancel, pause=pause,
+            ffmpeg="ffmpeg", run=FakeFfmpeg(), extra_engines=extra or None,
+        )
+
+    return run
+
+
+def test_parse_speakers_and_check():
+    ap = user_cli.build_parser()
+    args = ap.parse_args([
+        "narrate", "book.txt", "--voice", "narrator", "--out", "out",
+        "--speakers", "--male-voice", "tom", "--female-voice", "ann",
+    ])
+    assert args.speakers and args.male_voice == "tom" and args.female_voice == "ann"
+    assert args.speaker_marks is None
+    marks = ap.parse_args([
+        "narrate", "book.txt", "--voice", "narrator", "--out", "out", "--speaker-marks", "marks.txt",
+    ])
+    assert marks.speaker_marks == Path("marks.txt") and marks.speakers is False
+    plain = ap.parse_args(["narrate", "book.txt", "--voice", "v", "--out", "o"])
+    assert plain.speakers is False and plain.male_voice == "" and plain.female_voice == ""
+    sp = ap.parse_args(["speakers", "book.txt", "--out", "marks.txt", "--json"])
+    assert sp._handler == "speakers" and sp.out == Path("marks.txt") and sp.json_output
+    repair = ap.parse_args(["repair", "--json"])
+    assert repair.command == "repair" and repair._handler == "check" and repair.json_output
+
+
+def test_is_user_cli_speakers_and_check():
+    assert user_cli.is_user_cli(["Voxprint.exe", "speakers", "book.txt", "--out", "marks.txt"])
+    assert user_cli.is_user_cli(["Voxprint.exe", "check"])
+    assert user_cli.is_user_cli(["Voxprint.exe", "--json", "repair"])
+    assert not user_cli.is_user_cli(["Voxprint.exe", "--auto-repair"])
+
+
+def test_speakers_command_writes_marks_the_narrate_flag_reads(tmp_path, capsys):
+    from core import speakers as spk
+
+    book = tmp_path / "book.txt"
+    book.write_text(DIALOGUE, encoding="utf-8")
+    dest = tmp_path / "marks.txt"
+    code = user_cli.main(
+        ["speakers", str(book), "--out", str(dest), "--json"],
+        plan_fn=_plan,
+    )
+    assert code == 0
+    data = _json_lines(capsys.readouterr().out)[-1]
+    assert data["command"] == "speakers" and data["ok"] and data["paragraphs"] == 3
+    assert str(dest) in data["outputs"]
+    lines = spk.load_marks(dest.read_text(encoding="utf-8"))
+    assert [ln.role for ln in lines] == ["narrator", "female", "male"]
+    dest.write_text("1. NARRATOR\n2. MALE: Tom\n3. FEMALE: Ann\n", encoding="utf-8")
+    assert [ln.role for ln in spk.load_marks(dest.read_text(encoding="utf-8"))] == ["narrator", "male", "female"]
+
+
+def test_speakers_missing_model_is_exit_4(tmp_path, capsys):
+    book = tmp_path / "book.txt"
+    book.write_text("Hello there, this is a paragraph.\n", encoding="utf-8")
+    code = user_cli.main(
+        ["speakers", str(book), "--out", str(tmp_path / "marks.txt"), "--json"],
+        plan_fn=lambda: None,
+    )
+    assert code == user_cli.EXIT_MISSING
+    err = capsys.readouterr()
+    data = _json_lines(err.out)[-1]
+    assert data["ok"] is False and data["exit_code"] == 4
+    assert "models download llm" in (data["hint"] or "")
+    assert "Fix:" in err.err
+
+
+def test_narrate_speaker_flags_reject_bad_combinations(tmp_path, capsys):
+    lib = _cast_library(tmp_path)
+    book = tmp_path / "book.txt"
+    book.write_text(DIALOGUE, encoding="utf-8")
+    marks = tmp_path / "marks.txt"
+    marks.write_text("1. NARRATOR\n2. FEMALE: Ann\n3. MALE: Tom\n", encoding="utf-8")
+    out = tmp_path / "audiobooks"
+    base = ["narrate", str(book), "--voice", "narrator", "--out", str(out), "--json"]
+
+    both = user_cli.main(
+        base + ["--speakers", "--speaker-marks", str(marks), "--male-voice", "tom"],
+        library=lib, plan_fn=_plan,
+    )
+    assert both == user_cli.EXIT_BAD_ARGS
+    bare = user_cli.main(base + ["--male-voice", "tom", "--female-voice", "ann"], library=lib)
+    assert bare == user_cli.EXIT_BAD_ARGS
+    same = user_cli.main(base + ["--speakers", "--male-voice", "narrator"], library=lib, plan_fn=_plan)
+    assert same == user_cli.EXIT_BAD_ARGS
+    missing = user_cli.main(
+        base + ["--speaker-marks", str(tmp_path / "no-such.txt"), "--female-voice", "ann"],
+        library=lib,
+    )
+    assert missing == user_cli.EXIT_INPUT
+    bad = tmp_path / "bad.txt"
+    bad.write_text("1. NARRATOR\nhello\n", encoding="utf-8")
+    unreadable = user_cli.main(base + ["--speaker-marks", str(bad), "--female-voice", "ann"], library=lib)
+    assert unreadable == user_cli.EXIT_INPUT
+    err = capsys.readouterr()
+    assert "Fix:" in err.err
+    assert any(row.get("exit_code") == 2 for row in _json_lines(err.out))
+
+
+def test_narrate_from_marks_uses_the_core_path(tmp_path, capsys):
+    lib = _cast_library(tmp_path)
+    book = tmp_path / "book.txt"
+    book.write_text(DIALOGUE, encoding="utf-8")
+    marks = tmp_path / "marks.txt"
+    marks.write_text("1. NARRATOR\n2. FEMALE: Ann\n3. MALE: Tom\n", encoding="utf-8")
+    engines = {}
+    code = user_cli.main(
+        ["narrate", str(book), "--voice", "narrator", "--male-voice", "tom", "--female-voice", "ann",
+         "--speaker-marks", str(marks), "--out", str(tmp_path / "audiobooks"), "--format", "wav", "--json"],
+        run_narration_fn=_narrate_with_fakes(engines), library=lib,
+    )
+    assert code == 0
+    data = _json_lines(capsys.readouterr().out)[-1]
+    assert data["ok"] and data["warnings"] == []
+    speakers = [p for p in data["outputs"] if p.endswith("speakers.txt")]
+    assert len(speakers) == 1 and Path(speakers[0]).is_file()
+    text = Path(speakers[0]).read_text(encoding="utf-8")
+    assert "NARRATOR" in text and "FEMALE" in text and "MALE" in text
+    assert any("walked" in c for c in engines["narr"].calls)
+    assert any("Hello" in c for c in engines["ann"].calls)
+    assert any("Good day" in c for c in engines["tom"].calls)
+
+
+def test_narrate_speakers_flag_asks_the_text_model(tmp_path, capsys):
+    lib = _cast_library(tmp_path)
+    book = tmp_path / "book.txt"
+    book.write_text(DIALOGUE, encoding="utf-8")
+    engines = {}
+    code = user_cli.main(
+        ["narrate", str(book), "--voice", "narrator", "--male-voice", "tom", "--female-voice", "ann",
+         "--speakers", "--out", str(tmp_path / "audiobooks"), "--format", "wav", "--json"],
+        run_narration_fn=_narrate_with_fakes(engines), library=lib, plan_fn=_plan,
+    )
+    assert code == 0, capsys.readouterr().err
+    data = _json_lines(capsys.readouterr().out)[-1]
+    assert data["warnings"] == []
+    assert any("Hello" in c for c in engines["ann"].calls)
+    assert any("Good day" in c for c in engines["tom"].calls)
+    note = next(p for p in data["outputs"] if p.endswith("speakers.txt"))
+    assert Path(note).is_file()
+
+
+def test_narrate_mismatch_warns_and_the_narrator_reads_all(tmp_path, capsys):
+    lib = _cast_library(tmp_path)
+    book = tmp_path / "book.txt"
+    book.write_text(DIALOGUE, encoding="utf-8")
+    marks = tmp_path / "short.txt"
+    marks.write_text("1. FEMALE: Ann\n", encoding="utf-8")
+    engines = {}
+    code = user_cli.main(
+        ["narrate", str(book), "--voice", "narrator", "--female-voice", "ann",
+         "--speaker-marks", str(marks), "--out", str(tmp_path / "audiobooks"), "--format", "wav", "--json"],
+        run_narration_fn=_narrate_with_fakes(engines), library=lib,
+    )
+    assert code == 0
+    data = _json_lines(capsys.readouterr().out)[-1]
+    assert data["warnings"] == [user_cli.SPEAKER_MISMATCH]
+    note = Path(next(p for p in data["outputs"] if p.endswith("speakers.txt")))
+    assert "mismatch" in note.read_text(encoding="utf-8")
+    assert engines["ann"].calls == []
+    heard = " ".join(engines["narr"].calls)
+    assert "Hello" in heard and "Good day" in heard and "walked" in heard
+
+
+def test_check_and_repair_json(tmp_path, capsys):
+    def ok_report(progress):
+        progress(0.4, "checking models")
+        progress(1.0, "done")
+        return auto_repair.Report([
+            auto_repair.Item("model", "gemma", auto_repair.OK),
+            auto_repair.Item("lock", ".gemma.lock", auto_repair.REPAIRED, "removed"),
+        ])
+
+    code = user_cli.main(["check", "--json"], repair_fn=ok_report)
+    assert code == 0
+    lines = _json_lines(capsys.readouterr().out)
+    assert lines[0]["type"] == "progress" and lines[0]["stage"] == "check"
+    data = lines[-1]
+    assert data["command"] == "check" and data["ok"] and data["checked"] == 2 and data["fixed"] == 1
+    assert data["failed"] == 0 and data["items"][1]["status"] == "repaired"
+
+    def bad_report(progress):
+        progress(1.0, "done")
+        return auto_repair.Report([
+            auto_repair.Item("model", "tts", auto_repair.FAILED, "still bad"),
+        ])
+
+    code = user_cli.main(["repair", "--json"], repair_fn=bad_report)
+    assert code == user_cli.EXIT_INTERNAL
+    data = _json_lines(capsys.readouterr().out)[-1]
+    assert data["command"] == "check" and data["ok"] is False and data["exit_code"] == 1
+    assert data["failed"] == 1 and any("tts" in w for w in data["warnings"])
+
+
+def test_json_flushes_and_a_missing_console_keeps_the_exit_code(tmp_path, monkeypatch, capsys):
+    class FlushStream:
+        def __init__(self):
+            self.buf = []
+            self.flushed = 0
+
+        def write(self, text):
+            self.buf.append(text)
+            return len(text)
+
+        def flush(self):
+            self.flushed += 1
+
+    stream = FlushStream()
+    monkeypatch.setattr(sys, "stdout", stream)
+    lib = _make_voice(tmp_path)
+    code = user_cli.main(["voices", "list", "--json"], library=lib)
+    assert code == 0 and stream.flushed >= 1
+    data = json.loads("".join(stream.buf).strip().splitlines()[-1])
+    assert data["ok"] and data["command"] == "voices list"
+
+    class DeadStream:
+        def write(self, _text):
+            raise OSError("no console")
+
+        def flush(self):
+            raise OSError("no console")
+
+    monkeypatch.setattr(sys, "stdout", DeadStream())
+    monkeypatch.setattr(sys, "stderr", DeadStream())
+    assert user_cli.main(["voices", "list", "--json"], library=lib) == 0
+    assert user_cli.main(["check", "--json"], repair_fn=lambda progress: auto_repair.Report([])) == 0

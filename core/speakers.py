@@ -170,6 +170,17 @@ def assign(chunks: Sequence[Chunk], book: Book, lines: Sequence[SpeakerLine], vo
 
 def describe(lines: Sequence[SpeakerLine]) -> str:
     """A short text file of the marks (written next to the job for debugging)."""
+    return dump_marks(lines)
+
+
+_MARK_PREFIX = re.compile(r"^\d+\.\s+")
+
+
+def dump_marks(lines: Sequence[SpeakerLine]) -> str:
+    """Editable marks: one numbered line per paragraph (``1. NARRATOR``, ``2. MALE: Ann``).
+
+    The same text is written to ``.debug/speakers.txt`` and is what ``voxprint speakers`` writes.
+    """
     rows = []
     for i, line in enumerate(lines, start=1):
         if line.role == "narrator":
@@ -177,3 +188,27 @@ def describe(lines: Sequence[SpeakerLine]) -> str:
         else:
             rows.append(f"{i}. {line.role.upper()}" + (f": {line.name}" if line.name else ""))
     return "\n".join(rows) + ("\n" if rows else "")
+
+
+def load_marks(text: str) -> List[SpeakerLine]:
+    """Read :func:`dump_marks` (or the same lines without numbers).
+
+    A trailing ``mismatch`` note, as narration appends when the marks no longer fit the book, is ignored.
+    Raises ``ValueError`` when a line is not a speaker mark or the file has none.
+    """
+    rows: List[SpeakerLine] = []
+    for raw in (text or "").splitlines():
+        ln = raw.strip()
+        if not ln or ln.lower() == "mismatch":
+            continue
+        ln = _MARK_PREFIX.sub("", ln)
+        m = _TAG.match(ln)
+        if m is None:
+            raise ValueError(f"unreadable speaker mark: {raw.strip()}")
+        role = m.group(1).lower()
+        if role != "narrator":
+            role = "male" if role == "male" else "female"
+        rows.append(SpeakerLine(role, m.group(2) or ""))
+    if not rows:
+        raise ValueError("speaker marks file is empty")
+    return rows
