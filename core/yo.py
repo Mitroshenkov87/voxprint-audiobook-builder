@@ -1,20 +1,20 @@
-"""Restore the Russian letter yo before synthesis, and only where a dictionary is sure.
+"""Restore the Russian letter yo where a dictionary is sure.
 
-The narration model is stock ``Qwen/Qwen3-TTS-12Hz-1.7B-Base``. It was not trained on stress
-marks, so a combining acute (U+0301) or a ``+`` before the stressed vowel is not a pronunciation
-hint for it: those characters are extra tokens. This module therefore does not insert them.
-Writing yo (U+0451) is a different letter the tokenizer already knows. Words the safe dictionary
-does not list, including ``текст`` and ambiguous pairs such as ``все`` / ``всё``, are left as
-written. A plain ``е`` the model itself decides to read as yo is outside what the text can force.
+Standalone. Standard library only. Copy this file and ``core/data/yo_runtime.tsv.gz`` (the lookup
+table). The source lists and the dataset card live next to that table; see ``core/data/YO_DATASET.md``.
 
-The word list is ``core/data/yo_safe.txt``, the MIT ``dictionary/safe.txt`` of
-https://github.com/e2yo/eyo-kernel (see ``yo_safe.LICENSE``). The lookup follows that project's
-rules: parentheses expand endings, a leading underscore is lowercase-only, a lowercase entry also
-covers the capitalised form, and a dotted abbreviation such as ``мед. училище`` is not rewritten.
-The TypeScript library is not vendored.
+    from core.yo import restore
+    restore("text with a sure yo word")
+
+The stock Qwen3-TTS base model does not read stress marks, so this module never inserts U+0301 or
+``+``. It writes yo only when the runtime table has a different spelling. Ambiguous words stay as
+written. Licence: Apache-2.0 for this file; the word list is MIT (e2yo/eyo-kernel).
+
+Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
 """
 from __future__ import annotations
 
+import gzip
 import re
 import sys
 import threading
@@ -28,6 +28,10 @@ _UPPER = "".join(chr(c) for c in range(0x0410, 0x0430)) + _YO_UP
 _LOWER = "".join(chr(c) for c in range(0x0430, 0x0450)) + _YO_LO
 _LETTERS = _UPPER + _LOWER
 _UPPER_SET = frozenset(_UPPER)
+_VOWELS = frozenset(chr(c) for c in (
+    0x0430, 0x0435, 0x0451, 0x0438, 0x043E, 0x0443, 0x044B, 0x044D, 0x044E, 0x044F,
+    0x0410, 0x0415, 0x0401, 0x0418, 0x041E, 0x0423, 0x042B, 0x042D, 0x042E, 0x042F,
+))
 # Punctuation the eyo word pattern treats as "not a continuation of an abbreviation".
 _PUNCT = "".join(chr(c) for c in (
     0x5B, 0x7B, 0x7D, 0x28, 0x29, 0x7C, 0x3C, 0x3E, 0x3D, 0x5F, 0x22, 0x27,
@@ -71,23 +75,49 @@ def _word_pattern() -> "re.Pattern[str]":
 _WORD = _word_pattern()
 
 
-def dictionary_path() -> Path:
-    """``yo_safe.txt`` beside this module, or under ``core/data`` in a frozen build."""
-    name = Path("data") / "yo_safe.txt"
-    here = Path(__file__).resolve().parent / name
+def _data_file(name: str) -> Path:
+    """A file in ``core/data``, or the same path inside a frozen build."""
+    here = Path(__file__).resolve().parent / "data" / name
     if here.is_file():
         return here
     base = getattr(sys, "_MEIPASS", None)
     if base:
-        packed = Path(base) / "core" / name
+        packed = Path(base) / "core" / "data" / name
         if packed.is_file():
             return packed
     return here
 
 
+def dictionary_path() -> Path:
+    """The eyo-kernel safe source list (``yo_safe.txt``). The app loads :func:`runtime_path` instead."""
+    return _data_file("yo_safe.txt")
+
+
+def runtime_path() -> Path:
+    """Gzipped ``ye-form<TAB>yo-form`` table built by ``tools/build_yo_dataset.py``."""
+    return _data_file("yo_runtime.tsv.gz")
+
+
 def fold(word: str) -> str:
-    """``word`` with yo folded to ``е``, the dictionary key."""
+    """``word`` with yo folded to ye, the dictionary key."""
     return word.replace(_YO_UP, _YE_UP).replace(_YO_LO, _YE_LO)
+
+
+def stress_index(form: str) -> Optional[int]:
+    """0-based index of yo among the vowels of ``form``, or ``None`` when there is no yo.
+
+    In Russian, yo is always the stressed vowel. This is recorded in the published dataset.
+    Narration does not write the mark into the text.
+    """
+    seen = 0
+    found: Optional[int] = None
+    for ch in form:
+        if ch not in _VOWELS:
+            continue
+        if ch in (_YO_LO, _YO_UP):
+            found = seen
+        seen += 1
+    return found
 
 
 def _capitalise(text: str) -> str:
@@ -127,14 +157,28 @@ def load(text: str) -> Dict[str, str]:
     return table
 
 
+def load_runtime(text: str) -> Dict[str, str]:
+    """``{ye-form: yo-form}`` from the compact runtime table (one pair per line)."""
+    table: Dict[str, str] = {}
+    for line in text.splitlines():
+        if not line or line.startswith("#"):
+            continue
+        key, value = line.split("\t", 1)
+        table[key] = value
+    return table
+
+
 def dictionary() -> Dict[str, str]:
-    """The shipped safe dictionary, loaded once."""
+    """The shipped runtime table, loaded once. Falls back to expanding ``yo_safe.txt`` if the table is absent."""
     global _CACHE
     if _CACHE is None:
         with _LOCK:
             if _CACHE is None:
-                path = dictionary_path()
-                _CACHE = load(path.read_text(encoding="utf-8"))
+                path = runtime_path()
+                if path.is_file():
+                    _CACHE = load_runtime(gzip.decompress(path.read_bytes()).decode("utf-8"))
+                else:
+                    _CACHE = load(dictionary_path().read_text(encoding="utf-8"))
     return _CACHE
 
 

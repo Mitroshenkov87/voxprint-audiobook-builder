@@ -6,9 +6,14 @@ Copyright (c) 2026 Denis Seleznev
 (https://github.com/e2yo/eyo-kernel), file SHA-256
 11fc6d9c3cc6d0fff6a21cd642fa6aecbf3f9eb784f84ccd78141f32e51e0693
 (864903 bytes). It restores the Russian letter yo only where the word
-is unambiguous. Voxprint ships this file and reimplements the lookup in
-`core/yo.py`. It does not ship the TypeScript library, and it does not
-ship `not_safe.txt` (ambiguous homographs such as все / всё).
+is unambiguous.
+
+`yo_not_safe.txt` is `dictionary/not_safe.txt` from the same project
+(242799 bytes). Those rows are ambiguous. They are published in the
+dataset as homographs and are not applied at runtime.
+
+Voxprint ships these files and reimplements the lookup in `core/yo.py`.
+It does not ship the TypeScript library.
 
 The eyo-kernel README says the dictionary was first taken from
 https://github.com/rin-nas/php-yoficator (that repository publishes no

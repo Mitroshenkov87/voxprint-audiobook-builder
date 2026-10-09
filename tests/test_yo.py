@@ -2,7 +2,9 @@
 
 No model is downloaded. The base TTS model is not loaded: a fake engine records the text it would have spoken.
 """
+import gzip
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -23,12 +25,16 @@ def test_shipped_dictionary_is_the_pinned_mit_file():
     assert b"\r" not in raw
     licence = (ROOT / "core" / "data" / "yo_safe.LICENSE").read_text(encoding="utf-8")
     assert "MIT" in licence and "Denis Seleznev" in licence and "e2yo/eyo-kernel" in licence
+    runtime = ROOT / "core" / "data" / "yo_runtime.tsv.gz"
+    dataset = ROOT / "core" / "data" / "yo_dataset.jsonl.gz"
+    assert runtime.stat().st_size == 1323641 and dataset.stat().st_size == 1257057
     assert "core\\data;core\\data" in (ROOT / "build.bat").read_text(encoding="utf-8")
     assert "core\\data;core\\data" in (ROOT / "build_thin.bat").read_text(encoding="utf-8")
     from tools.make_linux_package import app_files
 
     shipped = set(app_files(ROOT))
-    assert "core/data/yo_safe.txt" in shipped and "core/data/yo_safe.LICENSE" in shipped
+    assert "core/data/yo_safe.txt" in shipped and "core/data/yo_runtime.tsv.gz" in shipped
+    assert "core/data/yo_dataset.jsonl.gz" in shipped and "core/data/YO_DATASET.md" in shipped
 
 
 def test_endings_underscore_and_capitals_follow_the_dictionary_rules():
@@ -36,6 +42,24 @@ def test_endings_underscore_and_capitals_follow_the_dictionary_rules():
     assert yo.restore("Елкин, Елкина и ЕЛКИН.", table) == "Ёлкин, Ёлкина и ЕЛКИН."
     assert yo.restore("киев и Киев", table) == "киёв и Киев"
     assert yo.restore("еще Еще ЕЩЕ", table) == "ещё Ещё ЕЩЕ"
+
+
+def test_dataset_records_plain_text_and_rebuilds_the_same_bytes():
+    from tools.build_yo_dataset import build
+
+    before = (ROOT / "core" / "data" / "yo_runtime.tsv.gz").read_bytes()
+    dataset = (ROOT / "core" / "data" / "yo_dataset.jsonl.gz").read_bytes()
+    rows = [json.loads(line) for line in gzip.decompress(dataset).decode("utf-8").splitlines()]
+    plain = next(row for row in rows if row["word"] == "текст")
+    assert plain["yo_form"] == "текст" and plain["type"] == "unambiguous" and plain["stress"] == 0
+    assert plain["source"] == "project"
+    homo = next(row for row in rows if row["word"] == "все")
+    assert homo["type"] == "homograph" and homo["yo_form"] == "всё" and homo["variants"]
+    keys = {line.split("\t", 1)[0] for line in gzip.decompress(before).decode("utf-8").splitlines()}
+    assert "текст" not in keys and "все" not in keys and "берег" not in keys
+    stats = build()
+    assert stats["runtime_bytes"] == 1323641 and stats["dataset_rows"] == 139996
+    assert (ROOT / "core" / "data" / "yo_runtime.tsv.gz").read_bytes() == before
 
 
 def test_real_dictionary_restores_only_sure_words_and_keeps_abbreviations():

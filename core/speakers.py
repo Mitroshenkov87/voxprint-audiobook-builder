@@ -1,5 +1,11 @@
 """Speaker marks for multi-voice narration.
 
+Standalone use is the parser: ``parse_tags`` reads narrator / male / female lines. The tagger also
+needs the text-model plan (``core.llm_text``). Licence: Apache-2.0.
+
+Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
+
+
 One pass of the text model (the same Gemma plan as literary translation) labels each paragraph ``narrator``, ``male``
 or ``female``. The user can edit those labels before Start. When a male or a female voice is selected as well as the
 narrator, narration synthesizes each paragraph with that voice. With only the narrator voice selected, the marks are
