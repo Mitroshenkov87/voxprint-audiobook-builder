@@ -3,3 +3,6 @@
 #   pip install --no-deps ctc-forced-aligner
 # then its light dependencies (per its README): nltk, uroman etc. - TODO-needs-GPU-test.
 ctc-forced-aligner
+# Optional. Fast decode with CUDA Graphs (gpu.fast_decode = graphs). 0.3.x is the last line for qwen-tts 0.1.1 + transformers 4.57;
+# 0.4+ needs qwen-tts-hf + transformers 5 and must NOT be installed. Pure Python; install without dependencies:
+#   pip install --no-deps faster-qwen3-tts==0.3.2      (or: voxprint bench --install-graphs)

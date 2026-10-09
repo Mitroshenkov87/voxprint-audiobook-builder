@@ -72,7 +72,11 @@ AppVerName={#AppDisplayName} {#AppVersion} build {#AppBuild} {#AppCodename}
 #endif
 AppPublisher=Voxprint
 DefaultDirName={autopf}\{#AppName}
-DefaultGroupName={#AppDisplayName}
+; One Start menu folder "Voxprint" for every Voxprint program (Audiobook Builder, Movie Dubber); each program removes only its
+; own shortcut on uninstall, and Windows / Inno remove the folder only when it is empty.  UsePreviousGroup=no moves the entry of
+; builds up to 703 (folder "Voxprint AI Audiobook Builder") into it; [InstallDelete] removes the old one.
+DefaultGroupName=Voxprint
+UsePreviousGroup=no
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExe}
 SetupIconFile=..\assets\voxprint-setup.ico
@@ -190,6 +194,9 @@ english.PortableBadFolder=The folder %1 cannot be used (it cannot be created or 
 russian.PortableBadFolder=Папку %1 нельзя использовать (её нельзя создать или записать в неё). Выберите другую папку.
 german.PortableBadFolder=Der Ordner %1 kann nicht verwendet werden (er kann nicht angelegt oder beschrieben werden). Wählen Sie einen anderen Ordner.
 
+english.ModelsSiblingFound=Voxprint AI Movie Dubber is installed on this PC. Both programs use one models folder, so every model is downloaded only once.
+russian.ModelsSiblingFound=На этом ПК установлен Voxprint AI Movie Dubber. Обе программы используют одну папку моделей, поэтому каждая модель скачивается только один раз.
+german.ModelsSiblingFound=Voxprint AI Movie Dubber ist auf diesem PC installiert. Beide Programme nutzen einen Modellordner, daher wird jedes Modell nur einmal geladen.
 english.UninstallModelsQuestion=No other Voxprint program uses the models in%n%1%n%nDelete these models too (about 15-28 GB)? Choose No to keep them for a later install.
 russian.UninstallModelsQuestion=Модели в папке%n%1%nбольше не использует ни одна программа Voxprint.%n%nУдалить и их (около 15-28 ГБ)? Нажмите «Нет», чтобы оставить их для следующей установки.
 german.UninstallModelsQuestion=Kein anderes Voxprint-Programm verwendet die Modelle in%n%1%n%nDiese Modelle ebenfalls löschen (etwa 15-28 GB)? Wählen Sie Nein, um sie für eine spätere Installation zu behalten.
@@ -204,6 +211,11 @@ Type: files; Name: "{commondesktop}\{#AppDisplayName}.lnk"
 Type: files; Name: "{userdesktop}\{#AppDisplayName}.lnk"
 Type: files; Name: "{commondesktop}\{#AppName}.lnk"
 Type: files; Name: "{userdesktop}\{#AppName}.lnk"
+; builds up to 703 had their own Start menu folder; from 704 on the entry is in the shared "Voxprint" folder
+Type: files; Name: "{commonprograms}\{#AppDisplayName}\{#AppDisplayName}.lnk"
+Type: dirifempty; Name: "{commonprograms}\{#AppDisplayName}"
+Type: files; Name: "{userprograms}\{#AppDisplayName}\{#AppDisplayName}.lnk"
+Type: dirifempty; Name: "{userprograms}\{#AppDisplayName}"
 
 [Files]
 #ifdef ONLINE
@@ -227,11 +239,6 @@ Source: "..\credits.json"; DestDir: "{app}"; Flags: ignoreversion
 Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 #endif
 
-#ifdef ONLINE
-[UninstallDelete]
-; program files only. {localappdata}\Voxprint (models, voices, state) is not listed.
-Type: filesandordirs; Name: "{app}"
-#endif
 
 [Icons]
 Name: "{group}\{#AppDisplayName}"; Filename: "{app}\{#AppExe}"
@@ -283,7 +290,88 @@ begin
   Result := ExpandConstant('{localappdata}\Voxprint\models');
 end;
 
-{ What the page shows first: /ModelsFolder=, else the folder remembered by an earlier install, else the default. }
+{ One string value of the shared settings file %LOCALAPPDATA%\Voxprint\state\suite.json (infra/suite_settings.py; the Movie
+  Dubber reads and writes the same file).  '' when the file, the key or a string value is missing (null = the default folder).
+  Our program writes it as ASCII JSON (\uXXXX escapes); a value with raw non-ASCII bytes is not decoded here and counts as ''. }
+function SuiteJsonString(const Key: String): String;
+var
+  Raw: AnsiString;
+  S, H: String;
+  P, I, N: Integer;
+  C: Char;
+begin
+  Result := '';
+  if not LoadStringFromFile(ExpandConstant('{localappdata}\Voxprint\state\suite.json'), Raw) then Exit;
+  S := String(Raw);
+  P := Pos('"' + Key + '"', S);
+  if P = 0 then Exit;
+  N := Length(S);
+  I := P + Length(Key) + 2;
+  while (I <= N) and ((S[I] = ' ') or (S[I] = #9) or (S[I] = #13) or (S[I] = #10) or (S[I] = ':')) do
+    I := I + 1;
+  if (I > N) or (S[I] <> '"') then Exit;
+  I := I + 1;
+  while I <= N do
+  begin
+    C := S[I];
+    if C = '"' then Exit;
+    if C = '\' then
+    begin
+      I := I + 1;
+      if I > N then Break;
+      C := S[I];
+      if C = 'u' then
+      begin
+        H := Copy(S, I + 1, 4);
+        Result := Result + Chr(StrToIntDef('$' + H, 63));
+        I := I + 4;
+      end
+      else
+        Result := Result + C;
+    end
+    else if Ord(C) > 127 then
+    begin
+      Result := '';
+      Exit;
+    end
+    else
+      Result := Result + C;
+    I := I + 1;
+  end;
+  Result := '';
+end;
+
+{ True when Voxprint AI Movie Dubber is installed: an Apps list entry with "Movie Dubber" in its name, or its key in the models
+  folder's .users.json (infra/models_users.py). }
+function UninstallEntryFound(RootKey: Integer; const Needle: String): Boolean;
+var
+  Names: TArrayOfString;
+  I: Integer;
+  Name: String;
+begin
+  Result := False;
+  if not RegGetSubkeyNames(RootKey, 'Software\Microsoft\Windows\CurrentVersion\Uninstall', Names) then Exit;
+  for I := 0 to GetArrayLength(Names) - 1 do
+    if RegQueryStringValue(RootKey, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + Names[I], 'DisplayName', Name) and
+       (Pos(Needle, Lowercase(Name)) > 0) then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+function MovieDubberInstalled(const ModelsFolder: String): Boolean;
+var
+  Raw: AnsiString;
+begin
+  Result := UninstallEntryFound(HKLM64, 'movie dubber') or UninstallEntryFound(HKLM32, 'movie dubber') or
+            UninstallEntryFound(HKCU, 'movie dubber');
+  if (not Result) and (ModelsFolder <> '') and LoadStringFromFile(AddBackslash(ModelsFolder) + '.users.json', Raw) then
+    Result := Pos('"movie-dubber"', String(Raw)) > 0;
+end;
+
+{ What the page shows first: /ModelsFolder=, else the shared models folder of the Voxprint programs (suite.json), else the folder
+  remembered by an earlier install, else the default.  The same order as infra/paths.py: configured_models_dir. }
 function InitialModelsDir(): String;
 var
   S: String;
@@ -291,6 +379,8 @@ var
 begin
   Result := RemoveBackslash(Trim(ExpandConstant('{param:ModelsFolder|}')));
   if Result <> '' then Exit;
+  Result := RemoveBackslash(Trim(SuiteJsonString('models_dir')));
+  if (Length(Result) >= 3) and ((Copy(Result, 2, 2) = ':\') or (Copy(Result, 1, 2) = '\\')) then Exit;
   S := ExpandConstant('{localappdata}\Voxprint\state\models_dir.txt');
   if FileExists(S) and LoadStringsFromFile(S, Lines) and (GetArrayLength(Lines) > 0) then
   begin
@@ -516,7 +606,7 @@ end;
   A plain custom page, NOT CreateInputDirPage (that one behaved badly in silent installs; found in the final installer test). }
 procedure InitializeWizard();
 var
-  Info, Prompt: TNewStaticText;
+  Info, Prompt, Sibling: TNewStaticText;
   Browse: TNewButton;
 begin
   ModelsPage := CreateCustomPage(wpSelectDir, CustomMessage('ModelsPageCaption'),
@@ -549,6 +639,18 @@ begin
   Browse.Height := ModelsEdit.Height + ScaleY(2);
   Browse.Caption := WizardForm.DirBrowseButton.Caption;
   Browse.OnClick := @ModelsBrowseClick;
+  if MovieDubberInstalled(ModelsEdit.Text) then
+  begin
+    Sibling := TNewStaticText.Create(ModelsPage);
+    Sibling.Parent := ModelsPage.Surface;
+    Sibling.WordWrap := True;
+    Sibling.AutoSize := False;
+    Sibling.Left := 0;
+    Sibling.Top := ScaleY(200);
+    Sibling.Width := ModelsPage.SurfaceWidth;
+    Sibling.Height := ScaleY(34);
+    Sibling.Caption := CustomMessage('ModelsSiblingFound');
+  end;
 #ifdef ONLINE
   if '{#LatestManifestUrl}' <> '' then
   begin
@@ -844,6 +946,19 @@ begin
   SaveStringToFile(F, AnsiString(S), False);
 end;
 
+{ The shared settings file (state\suite.json) gets the models folder chosen above (null = default) and the UI language if it has
+  none yet: Voxprint.exe --sync-suite-settings (infra/suite_settings.py) - run as the user who started the setup, so it is that
+  user's %LOCALAPPDATA%.  A failure is harmless: the app copies the same values at its next start. }
+procedure SyncSuiteSettings();
+var
+  Rc: Integer;
+begin
+  if FileExists(ExpandConstant('{app}\{#AppExe}')) then
+    if not ExecAsOriginalUser(ExpandConstant('{app}\{#AppExe}'), '--sync-suite-settings', ExpandConstant('{app}'), SW_HIDE,
+                              ewWaitUntilTerminated, Rc) then
+      Log('suite settings were not synced; the app does it at its next start');
+end;
+
 { Only paths are remembered (UTF-8 files in state\); no model is copied.  models_dir.txt = the models folder (deleted when it is the
   default, so the app follows its own default); existing_models_dir.txt = an optional folder to import models from (/ModelsDir=).
   A chosen folder with a Voxprint backup is NOT written to models_dir.txt: its root goes to existing_models_dir.txt and the app
@@ -905,6 +1020,7 @@ begin
     if (Backup <> '') or (Dir = '') then
       Dir := DefaultModelsDir();
     RegisterModelsUser(Dir);
+    SyncSuiteSettings();
     Lines[0] := SetupMode();                               { Full / Quick (infra/setup_mode.py); no BOM }
     SaveStringsToUTF8FileWithoutBOM(StateDir + '\install_mode.txt', Lines, False);
     { the wizard language becomes the app's UI language, unless the user already chose one (core/i18n.py reads state\language) }
@@ -946,10 +1062,75 @@ end;
 { The models are deleted only when no other Voxprint program uses them AND the user says yes (default: keep; a silent uninstall
   with /SUPPRESSMSGBOXES keeps them).  Only the default folder is ever offered: a folder the user chose stays untouched. Voices,
   settings and projects in %LOCALAPPDATA%\Voxprint are never deleted here. }
+{ runtime\.users.json: remove our key (bookkeeping only; the runtime is not shared yet, nothing is deleted because of it). }
+procedure UnregisterRuntimeUser;
+var
+  Rc: Integer;
+begin
+  if FileExists(ExpandConstant('{app}\{#AppExe}')) then
+    if not Exec(ExpandConstant('{app}\{#AppExe}'), '--unregister-runtime-user', ExpandConstant('{app}'), SW_HIDE,
+                ewWaitUntilTerminated, Rc) then
+      Log('runtime users file not updated');
+end;
+
+#ifdef ONLINE
+// Online builds: the program files were downloaded after setup (they are not in the uninstall log), so DeleteProgramFolder
+// removes them at usPostUninstall (it replaces the former UninstallDelete entry for the whole program folder) but never
+// touches a sibling Voxprint program installed inside the program folder: a sub-folder with its own uninstaller, or a Movie
+// Dubber folder.  The data folder in LOCALAPPDATA (models, voices, state, suite.json) is never deleted here.
+function IsSiblingFolder(const Path: String): Boolean;
+var
+  F: TFindRec;
+begin
+  Result := Pos('dubber', Lowercase(ExtractFileName(Path))) > 0;
+  if (not Result) and FindFirst(AddBackslash(Path) + 'unins*.exe', F) then
+  begin
+    Result := True;
+    FindClose(F);
+  end;
+end;
+
+procedure DeleteProgramFolder;
+var
+  F: TFindRec;
+  Dir, Path: String;
+begin
+  Dir := ExpandConstant('{app}');
+  if FindFirst(AddBackslash(Dir) + '*', F) then
+  begin
+    try
+      repeat
+        if (F.Name <> '.') and (F.Name <> '..') then
+        begin
+          Path := AddBackslash(Dir) + F.Name;
+          if (F.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
+          begin
+            if not IsSiblingFolder(Path) then
+              DelTree(Path, True, True, True);
+          end
+          else
+            DeleteFile(Path);
+        end;
+      until not FindNext(F);
+    finally
+      FindClose(F);
+    end;
+  end;
+  RemoveDir(Dir);
+end;
+#endif
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then
+  begin
     UnregisterModelsUser;
+    UnregisterRuntimeUser;
+  end;
+#ifdef ONLINE
+  if CurUninstallStep = usPostUninstall then
+    DeleteProgramFolder;
+#endif
   if CurUninstallStep = usPostUninstall then
     if (OtherModelUsers = 0) and (SharedModelsDir <> '') and DirExists(SharedModelsDir) and
        (CompareText(SharedModelsDir, DefaultModelsDir()) = 0) then

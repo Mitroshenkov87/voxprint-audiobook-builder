@@ -424,9 +424,10 @@ def test_the_complete_set_fetches_translators_only_with_their_file_patterns(monk
 def test_uninstall_never_deletes_models_voices_or_settings():
     iss = _iss()
     assert "UninstallDataQuestion" not in iss and "DelTree(DataDir" not in iss
-    uninstall = iss.split("[UninstallDelete]", 1)[1].split("[Icons]", 1)[0]
-    assert 'Name: "{app}"' in uninstall
-    assert "filesandordirs" in uninstall and "Voxprint\\models" not in uninstall
+    # from 704 the online build removes its program folder in [Code] (DeleteProgramFolder), sparing a sibling program inside it
+    assert "[UninstallDelete]" not in iss and 'filesandordirs; Name: "{app}"' not in iss
+    body = iss.split("procedure DeleteProgramFolder", 1)[1].split("\nend;", 1)[0]
+    assert "ExpandConstant('{app}')" in body and "IsSiblingFolder(Path)" in body and "Voxprint\\models" not in body
     # A `{ ... }` note after the last procedure is compiled as code. `{app}` inside
     # it ends the comment at the first `}`, and Inno then reports 'BEGIN' expected.
     tail = iss.split("[Code]", 1)[1].rsplit("end;", 1)[1]

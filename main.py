@@ -6,7 +6,9 @@ Flags: ``--prefetch`` (force-download the models; used by the installer), ``--se
 ``--verify-install`` (install check with reason codes; also written to logs/verify_install.txt),
 ``--repair`` (rebuild only Voxprint's own environment; logs/repair.txt),
 ``--auto-repair`` (check every component and model by hash, fetch missing / broken parts; logs/auto_repair.txt),
-``--register-models-user`` / ``--unregister-models-user --out FILE`` (shared ``models/.users.json``, infra/models_users.py).
+``--register-models-user`` / ``--unregister-models-user --out FILE`` (shared ``models/.users.json``, infra/models_users.py);
+``--register-runtime-user`` / ``--unregister-runtime-user --out FILE`` (``runtime/.users.json``, same format);
+``--sync-suite-settings`` (installer: copy the models folder / UI language into the shared ``state/suite.json``).
 User CLI subcommands (see ``cli.py`` / docs/CLI.md): ``narrate``, ``train``, ``voices``.
 """
 from __future__ import annotations
@@ -265,6 +267,20 @@ def main(argv=None) -> int:
             logging.getLogger("voxprint").info("adopted settings from a previous install: %s", adopted)
     except Exception:  # noqa: BLE001
         pass
+    if "--register-runtime-user" in argv or "--unregister-runtime-user" in argv:
+        # installer / uninstaller helper for runtime\.users.json (bookkeeping only; the runtime is not shared yet)
+        from infra import models_users
+
+        root = models_users.runtime_root()
+        if "--register-runtime-user" in argv:
+            models_users.register_quietly(root)
+            return 0
+        i = argv.index("--out") if "--out" in argv else -1
+        return models_users.unregister_cli(argv[i + 1] if 0 <= i < len(argv) - 1 else None, root=root)
+    if "--sync-suite-settings" in argv:      # installer helper: shared state\suite.json (infra/suite_settings.py)
+        from infra import suite_settings
+
+        return suite_settings.sync_cli()
     if "--register-models-user" in argv or "--unregister-models-user" in argv:
         # installer / uninstaller helper for the shared models\.users.json (infra/models_users.py, agreed with the Movie Dubber)
         from infra import models_users
@@ -329,6 +345,10 @@ def main(argv=None) -> int:
     from infra import models_users
 
     models_users.register_quietly()   # this program uses the shared models folder (models\.users.json)
+    models_users.register_runtime_quietly()
+    from infra import suite_settings
+
+    suite_settings.migrate_quietly()  # earlier choices (models folder, UI language) into the shared state\suite.json
 
     from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication

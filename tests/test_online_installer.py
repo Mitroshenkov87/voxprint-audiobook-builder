@@ -217,7 +217,7 @@ def test_manifest_validation(tmp_path):
 def test_inno_script_has_the_online_variant():
     iss = (ROOT / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
     assert "#ifdef ONLINE" in iss and "voxprint-fetch.exe" in iss and "Voxprint-Setup-online" in iss
-    assert "{param:Manifest|" in iss and "UninstallDelete" in iss
+    assert "{param:Manifest|" in iss and "procedure DeleteProgramFolder" in iss     # uninstall: program files, never a sibling
     assert "PrivilegesRequired=admin" in iss                  # one UAC prompt for the whole install
     assert "PrepareToInstall" in iss and "ExtractTemporaryFile" in iss      # a failure stops the setup (non-zero exit)
     wf = (ROOT / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")

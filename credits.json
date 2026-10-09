@@ -426,6 +426,24 @@
    }
   },
   {
+   "id": "faster-qwen3-tts",
+   "name": "faster-qwen3-tts",
+   "kind": "library",
+   "ship": "optional",
+   "license": "MIT",
+   "license_files": [
+    "faster-qwen3-tts"
+   ],
+   "url": "https://github.com/andimarafioti/faster-qwen3-tts",
+   "purpose": {
+    "en": "Optional fast speech decoding with CUDA Graphs (downloaded only on request)",
+    "de": "Optionale schnelle Sprachdekodierung mit CUDA Graphs (nur auf Anfrage geladen)",
+    "ru": "Необязательное быстрое декодирование речи с CUDA Graphs (скачивается только по запросу)",
+    "uk": "Необов'язкове швидке декодування мовлення з CUDA Graphs (завантажується лише на запит)",
+    "lv": "Neobligāta ātra runas dekodēšana ar CUDA Graphs (lejupielādē tikai pēc pieprasījuma)"
+   }
+  },
+  {
    "id": "pyside6",
    "name": "PySide6 / Qt for Python",
    "kind": "library",
