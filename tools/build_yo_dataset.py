@@ -14,6 +14,7 @@ No network. Standard library plus :mod:`core.yo`. Does not publish the files any
 from __future__ import annotations
 
 import gzip
+import io
 import json
 import sys
 from pathlib import Path
@@ -60,7 +61,7 @@ def _records(table: Dict[str, str], kind: str, source: str) -> Iterable[dict]:
 
 
 def _apply_additions(rows: Dict[str, dict], runtime: Dict[str, str]) -> None:
-    additions: List[dict] = json.loads(ADDITIONS.read_text(encoding="utf-8"))
+    additions: List[dict] = json.loads(_read(ADDITIONS))
     for item in additions:
         word = item["word"]
         form = item["yo_form"]
@@ -79,10 +80,29 @@ def _apply_additions(rows: Dict[str, dict], runtime: Dict[str, str]) -> None:
                 runtime[yo._capitalise(yo.fold(word))] = yo._capitalise(form)
 
 
+def _read(path: Path) -> str:
+    """UTF-8 text with CR stripped, so a CRLF checkout rebuilds the same table."""
+    return path.read_text(encoding="utf-8").replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _gzip_bytes(payload: bytes) -> bytes:
+    """Gzip with mtime 0, an empty name and OS byte 255.
+
+    ``gzip.compress(..., mtime=0)`` on Python 3.12 takes a shortcut through
+    ``zlib`` and writes OS byte 3. Python 3.11 (the Windows CI runner) writes
+    the same deflate stream through ``GzipFile`` with OS byte 255. The files
+    are the same length and differ at byte 9, so a rebuild does not match.
+    """
+    buf = io.BytesIO()
+    with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0, filename="") as handle:
+        handle.write(payload)
+    return buf.getvalue()
+
+
 def build() -> dict:
     """Write the runtime table and the JSONL dataset. Returns byte sizes and record counts."""
-    safe = yo.load(SAFE.read_text(encoding="utf-8"))
-    ambiguous = yo.load(NOT_SAFE.read_text(encoding="utf-8"))
+    safe = yo.load(_read(SAFE))
+    ambiguous = yo.load(_read(NOT_SAFE))
     runtime = {key: safe[key] for key in safe if safe[key] != key}
     by_word: Dict[str, dict] = {}
     for row in _records(safe, "unambiguous", "eyo-kernel"):
@@ -94,9 +114,8 @@ def build() -> dict:
     _apply_additions(by_word, runtime)
     lines = [json.dumps(by_word[key], ensure_ascii=False, sort_keys=True) for key in sorted(by_word)]
     pairs = [f"{key}\t{runtime[key]}" for key in sorted(runtime)]
-    # mtime=0 so a rebuild of the same inputs is byte-identical.
-    DATASET.write_bytes(gzip.compress(("\n".join(lines) + "\n").encode("utf-8"), mtime=0))
-    RUNTIME.write_bytes(gzip.compress(("\n".join(pairs) + "\n").encode("utf-8"), mtime=0))
+    DATASET.write_bytes(_gzip_bytes(("\n".join(lines) + "\n").encode("utf-8")))
+    RUNTIME.write_bytes(_gzip_bytes(("\n".join(pairs) + "\n").encode("utf-8")))
     return {
         "runtime_bytes": RUNTIME.stat().st_size,
         "dataset_bytes": DATASET.stat().st_size,

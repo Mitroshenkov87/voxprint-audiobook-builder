@@ -19,6 +19,20 @@ DICT = ROOT / "core" / "data" / "yo_safe.txt"
 DICT_SHA = "11fc6d9c3cc6d0fff6a21cd642fa6aecbf3f9eb784f84ccd78141f32e51e0693"
 
 
+def test_dictionary_sources_check_out_as_lf():
+    attrs = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+    for name in (
+        "core/data/yo_safe.txt",
+        "core/data/yo_not_safe.txt",
+        "core/data/yo_additions.json",
+        "core/data/yo_safe.LICENSE",
+        "core/data/YO_DATASET.md",
+    ):
+        assert f"{name} text eol=lf" in attrs
+    assert "core/data/*.gz binary" in attrs
+    assert "* text=auto" not in attrs
+
+
 def test_shipped_dictionary_is_the_pinned_mit_file():
     raw = DICT.read_bytes()
     assert len(raw) == 864903 and hashlib.sha256(raw).hexdigest() == DICT_SHA
@@ -59,7 +73,12 @@ def test_dataset_records_plain_text_and_rebuilds_the_same_bytes():
     assert "текст" not in keys and "все" not in keys and "берег" not in keys
     stats = build()
     assert stats["runtime_bytes"] == 1323641 and stats["dataset_rows"] == 139996
-    assert (ROOT / "core" / "data" / "yo_runtime.tsv.gz").read_bytes() == before
+    rebuilt = (ROOT / "core" / "data" / "yo_runtime.tsv.gz").read_bytes()
+    rebuilt_dataset = (ROOT / "core" / "data" / "yo_dataset.jsonl.gz").read_bytes()
+    # Python 3.12 gzip.compress(mtime=0) writes OS byte 3; GzipFile writes 255.
+    # The Windows runner is 3.11, so the shipped header is the GzipFile one.
+    assert before[:10] == bytes.fromhex("1f8b08000000000002ff")
+    assert rebuilt == before and rebuilt_dataset == dataset
 
 
 def test_real_dictionary_restores_only_sure_words_and_keeps_abbreviations():

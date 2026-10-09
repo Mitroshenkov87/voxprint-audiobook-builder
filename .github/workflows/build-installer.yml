@@ -39,28 +39,49 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          # The refusals below are child processes that exit 1 on purpose. A native
+          # non-zero exit must not abort this step, and it must not become the
+          # step's own exit code after the checks have passed.
+          $PSNativeCommandUseErrorActionPreference = $false
           $dir = Join-Path $env:TEMP "voxprint-fake-release"
+          if (Test-Path $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
           New-Item -ItemType Directory -Force $dir | Out-Null
           $bytes = [byte[]](1, 2, 3, 4, 5)
           [IO.File]::WriteAllBytes((Join-Path $dir "Voxprint-Setup-online.exe"), $bytes)
           $hash = (Get-FileHash (Join-Path $dir "Voxprint-Setup-online.exe") -Algorithm SHA256).Hash.ToLower()
           "$hash  Voxprint-Setup-online.exe" | Set-Content -Encoding ascii (Join-Path $dir "Voxprint-Setup-online.exe.sha256")
           $server = Start-Process python -ArgumentList "-m","http.server","8765","--bind","127.0.0.1","--directory",$dir -PassThru -WindowStyle Hidden
-          Start-Sleep -Seconds 2
           $script = (Resolve-Path .\install.ps1).Path
+          function Invoke-Install([string[]]$ArgList) {
+            # The child's transcript must not join the exit code in the return value.
+            & pwsh -NoProfile -File $script @ArgList | Out-Host
+            return $LASTEXITCODE
+          }
           try {
-            & pwsh -NoProfile -File $script -DryRun -SourceUrl "http://127.0.0.1:8765/"
-            if ($LASTEXITCODE -ne 0) { throw "matching dry run failed: $LASTEXITCODE" }
+            # .sha256 is application/octet-stream, so pwsh 7 returns Content as bytes.
+            $ready = $false
+            foreach ($i in 1..50) {
+              try {
+                $probe = Invoke-WebRequest "http://127.0.0.1:8765/Voxprint-Setup-online.exe.sha256" -UseBasicParsing
+                $text = $probe.Content
+                if ($text -is [byte[]]) { $text = [Text.Encoding]::ASCII.GetString($text) }
+                if ($probe.StatusCode -eq 200 -and $text.StartsWith($hash)) { $ready = $true; break }
+              } catch { Start-Sleep -Milliseconds 200 }
+            }
+            if (-not $ready) { throw "local release server did not serve the matching hash" }
+            $code = Invoke-Install @("-DryRun", "-SourceUrl", "http://127.0.0.1:8765/")
+            if ($code -ne 0) { throw "matching dry run failed: $code" }
             "0000000000000000000000000000000000000000000000000000000000000000  Voxprint-Setup-online.exe" | Set-Content -Encoding ascii (Join-Path $dir "Voxprint-Setup-online.exe.sha256")
-            & pwsh -NoProfile -File $script -DryRun -SourceUrl "http://127.0.0.1:8765/"
-            if ($LASTEXITCODE -eq 0) { throw "a bad SHA-256 was accepted" }
-            & pwsh -NoProfile -File $script -DryRun -SourceUrl "https://example.com/Voxprint-Setup-online.exe"
-            if ($LASTEXITCODE -eq 0) { throw "a non-local source was accepted" }
-            & pwsh -NoProfile -File $script -SourceUrl "http://127.0.0.1:8765/"
-            if ($LASTEXITCODE -eq 0) { throw "-SourceUrl was accepted without -DryRun" }
+            $code = Invoke-Install @("-DryRun", "-SourceUrl", "http://127.0.0.1:8765/")
+            if ($code -eq 0) { throw "a bad SHA-256 was accepted" }
+            $code = Invoke-Install @("-DryRun", "-SourceUrl", "https://example.com/Voxprint-Setup-online.exe")
+            if ($code -eq 0) { throw "a non-local source was accepted" }
+            $code = Invoke-Install @("-SourceUrl", "http://127.0.0.1:8765/")
+            if ($code -eq 0) { throw "-SourceUrl was accepted without -DryRun" }
           } finally {
             if ($server -and -not $server.HasExited) { Stop-Process -Id $server.Id -Force }
           }
+          exit 0
   online-smoke:
     runs-on: windows-latest
     timeout-minutes: 15
