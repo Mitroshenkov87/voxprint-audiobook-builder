@@ -5,7 +5,7 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
-Draft for **0.2.0-beta**, build **700** "Kaporet" (Biblical Hebrew *kaporet*, כַּפֹּרֶת, the Ark cover; gematria 700; Numbers 7:89, the Voice spoke from above the kaporet). Not released. `BUILD.json` codename is Kaporet. The offset is still **628** and must stay there until the release run that should stamp 700.
+Draft for **0.2.0-beta**, build **700** "Kaporet" (Biblical Hebrew *kaporet*, כַּפֹּרֶת, the Ark cover; gematria 700; Numbers 7:89, the Voice spoke from above the kaporet). Not released. `BUILD.json` codename is Kaporet. The offset is **655**, so build-installer run 45 stamps build 700.
 
 Upgrading from build 668: uninstall removes only the program folder. On 668, answer **No** to "Also delete the downloaded models and logs?" (that is the default; a silent uninstall already keeps the folder). Clicking Yes on 668 deletes `%LOCALAPPDATA%\Voxprint`, including models, voices and settings. The 700 uninstaller does not ask and does not delete that folder. A clean install of 700 then uses the same models (`models`), voices (`voices`) and settings (`state`). A models folder chosen outside that profile was never deleted by either uninstaller.
 

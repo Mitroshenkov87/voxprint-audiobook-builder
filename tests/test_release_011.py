@@ -133,11 +133,11 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
 
     from tools import build_number as bn
 
-    # run 39 stamped 668 with offset 629, but that installer cannot be installed (empty release tag). Offset 628: run 40 stamps 668 again.
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "40"}) == 668 and bn.build_number({}) == 0
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "39"}) == 667
+    # Runs 41-44 published nothing. Offset 655: run 45 stamps 700 (Kaporet).
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "45"}) == 700 and bn.build_number({}) == 0
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "40"}) == 695
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34"}) == 700
-    assert bn.info()["offset"] == 628
+    assert bn.info()["offset"] == 655
     name = bn.info()["codename"]
     assert name == "Kaporet" and name.isascii() and name.isalpha()
     from pathlib import Path
@@ -146,7 +146,7 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     assert credits["app"]["version"] == "0.2.0" and credits["app"]["channel"] == "beta"
     assert credits["app"]["codename"] == "Kaporet"
     notes = (root / "docs" / "RELEASE-NOTES-700-KAPORET.md").read_text(encoding="utf-8")
-    assert "still 628" in notes and "does not delete" in notes and "Kaporet" in notes
+    assert "655" in notes and "run 45" in notes and "does not delete" in notes and "Kaporet" in notes
     c = tmp_path / "credits.json"
     c.write_text(json.dumps({"app": {"version": "0.1.1"}}), encoding="utf-8")
     bn.stamp(c, 665, "0123456789abcdef", "Tikkun")

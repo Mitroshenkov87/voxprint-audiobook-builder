@@ -1,6 +1,6 @@
 # Release notes draft: 0.2.0-beta, build 700 "Kaporet"
 
-Not released. `BUILD.json` codename is Kaporet. The offset is still 628; change it only for the run that must stamp 700. Paste the body below into the GitHub release when that build exists. Keep the Windows section.
+Not released. `BUILD.json` codename is Kaporet. The offset is 655, so run 45 stamps build 700. Paste the body below into the GitHub release when that build exists. Keep the Windows section.
 
 **Voxprint 0.2.0-beta · build 700 "Kaporet"** (Biblical Hebrew *kaporet*, כַּפֹּרֶת, the Ark cover; gematria 700; Numbers 7:89, the Voice spoke from above the kaporet). Everything since build 668 "Kolot".
 
