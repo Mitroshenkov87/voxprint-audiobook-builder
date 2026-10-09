@@ -1,6 +1,6 @@
 {
  "offset": 628,
- "offset_note": "631 up to build 665 (run 34); 630 from run 36 on, because run 35 failed in CI before it published anything; 629 from run 38 on, because run 37 was cancelled before it published anything (run 38 = build 667). Run 39 stamped 668 with offset 629, but that installer was built with an empty release tag, so its manifest URL is the nonexistent tag v0.0.0-dev and the setup aborts with HTTP 404. 628 from run 40 on, so the next build-installer run is run 40 and 40 + 628 = 668 (codename Kolot).",
- "codename": "Kolot",
- "codename_meaning": "voices (Biblical Hebrew qolot, plural of qol 'voice'; Exodus 19:16 also 'thunder') - one Prepare text switch, speaker marks the user can edit, and narration that speaks narrator, male and female voices"
+ "offset_note": "631 up to build 665 (run 34); 630 from run 36 on, because run 35 failed in CI before it published anything; 629 from run 38 on, because run 37 was cancelled before it published anything (run 38 = build 667). Run 39 stamped 668 with offset 629, but that installer was built with an empty release tag, so its manifest URL is the nonexistent tag v0.0.0-dev and the setup aborts with HTTP 404. 628 from run 40 on, so run 40 + 628 = 668 (codename Kolot). The next public release is 0.2.0-beta build 700, codename Kaporet. Do not change this offset until the release run; that change is what makes that run stamp 700.",
+ "codename": "Kaporet",
+ "codename_meaning": "the Ark cover (Biblical Hebrew kaporet; gematria 700; Numbers 7:89, the Voice spoke from above the kaporet) - yo restoration, the PowerShell install, and the unsigned-installer warnings"
 }

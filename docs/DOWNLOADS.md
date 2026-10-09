@@ -26,6 +26,10 @@ sha256sum Voxprint-Setup-online.exe                              # Linux / macOS
 sha256sum -c Voxprint-Setup-online.exe.sha256                    # with the .sha256 file in the same folder
 ```
 
+## Upgrading from build 668
+
+Uninstall 668, then install 700. On the 668 uninstall question "Also delete the downloaded models and logs?", choose **No** (the default). A silent uninstall of 668 already keeps the folder. Yes deletes `%LOCALAPPDATA%\Voxprint`, including `models`, `voices` and `state`. The 700 uninstaller does not delete that folder. A models folder you chose on another drive was never removed by either uninstaller.
+
 ## Online installer
 `Voxprint-Setup-online.exe` installs only our program shell and then downloads the rest from the developers' own sites, every file verified by a pinned SHA-256 (see the table above and [THIN-INSTALLER.md](THIN-INSTALLER.md)). A broken or interrupted download is resumed, components already on your PC (a compatible PyTorch, ffmpeg, the Visual C++ runtime) are reused after a check, and your data (models, voices, logs) stays in `%LOCALAPPDATA%\Voxprint`. It asks for administrator rights **once** (UAC). Silent install: `Voxprint-Setup-online.exe /VERYSILENT /DIR="C:\Voxprint"`; `/Manifest=<url or file>` uses another manifest (a mirror, a test). The wizard offers two setup types (`/Mode=full` or `/Mode=quick` when silent): **Full** (default) downloads everything on the first start without another click - the components and ALL models including the optional ones, about 28 GB from the pinned sizes, after a free-space check; **Quick** installs only the program and the first start offers the same complete download in the Components window. Both end with the same program. Source: `tools/online_fetch.py`, `tools/make_online_payload.py`, `installer/Voxprint.iss /DONLINE`, `installer/build_online.ps1`.
 

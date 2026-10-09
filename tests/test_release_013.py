@@ -421,11 +421,12 @@ def test_the_complete_set_fetches_translators_only_with_their_file_patterns(monk
 
 
 # ------------------------------------------------------------------------------------------------ 5. / 6. / 8. installer
-def test_silent_uninstall_keeps_the_data_without_a_question():
+def test_uninstall_never_deletes_models_voices_or_settings():
     iss = _iss()
-    assert "MsgBox(FmtMessage(CustomMessage('UninstallDataQuestion')" not in iss.replace("SuppressibleMsgBox", "")
-    m = re.search(r"SuppressibleMsgBox\(FmtMessage\(CustomMessage\('UninstallDataQuestion'\).*?\)\s*=\s*IDYES", iss, re.S)
-    assert m and "MB_DEFBUTTON2, IDNO)" in m.group(0)                        # /SUPPRESSMSGBOXES answers No: models stay
+    assert "UninstallDataQuestion" not in iss and "DelTree(DataDir" not in iss
+    uninstall = iss.split("[UninstallDelete]", 1)[1].split("[Icons]", 1)[0]
+    assert 'Name: "{app}"' in uninstall
+    assert "filesandordirs" in uninstall and "Voxprint\\models" not in uninstall
 
 
 def test_the_wizard_language_becomes_the_app_language_once():

@@ -5,7 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
-Build 669. The codename is not chosen yet. `BUILD.json` is unchanged.
+Draft for **0.2.0-beta**, build **700** "Kaporet" (Biblical Hebrew *kaporet*, כַּפֹּרֶת, the Ark cover; gematria 700; Numbers 7:89, the Voice spoke from above the kaporet). Not released. `BUILD.json` codename is Kaporet. The offset is still **628** and must stay there until the release run that should stamp 700.
+
+Upgrading from build 668: uninstall removes only the program folder. On 668, answer **No** to "Also delete the downloaded models and logs?" (that is the default; a silent uninstall already keeps the folder). Clicking Yes on 668 deletes `%LOCALAPPDATA%\Voxprint`, including models, voices and settings. The 700 uninstaller does not ask and does not delete that folder. A clean install of 700 then uses the same models (`models`), voices (`voices`) and settings (`state`). A models folder chosen outside that profile was never deleted by either uninstaller.
 
 ### Added
 - **PowerShell install.** `install.ps1` downloads `Voxprint-Setup-online.exe` and its `.sha256` only from the official GitHub releases, checks the hash, and starts setup. `-Silent` is `/VERYSILENT`. `-Version` picks a tag; the default is the latest pre-release. The README has the one-line form. Read the script before running it.
@@ -14,6 +16,7 @@ Build 669. The codename is not chosen yet. `BUILD.json` is unchanged.
 - **Command line for speaker marks and Check & repair.** `voxprint narrate` takes `--speakers` (Gemma marks each paragraph), `--male-voice` and `--female-voice` (the narrator is `--voice`), and `--speaker-marks FILE` (narrate an edited marks file and do not run Gemma). This is the same speaker path as the Narrate window. When the marks do not match the prepared text, the narrator reads the whole book and the JSON result carries that warning. The job writes `.debug/speakers.txt` and lists it in `outputs`. `voxprint speakers BOOK --out marks.txt` writes the marks and does not narrate. `voxprint check` (alias `repair`) runs the same check as Settings -> Check & repair and prints what was found and fixed.
 
 ### Fixed
+- **Uninstall keeps user data.** The 700 uninstaller deletes only the program folder. `%LOCALAPPDATA%\Voxprint\models`, `voices` and `state` stay. Build 668 still asks, and Yes deletes the whole profile folder.
 - **Thin shell build.** `build_thin.bat` runs `tools/embed_build_stamp.py` as a file. That script now adds the repo root to its module path, so `core.build_stamp` imports on the build machine.
 - **Speaker marks.** Gemma 4 answers with a thinking channel, a short preamble and numbered lines (`1. MALE: Name`). Those replies are read as marks. If a reply still cannot be read, or a text that has dialogue is marked entirely as the narrator, the command exits 0 with a warning and saves the raw reply (`.debug/speakers-raw.txt` for narration, `<name>.speakers-raw.txt` next to `speakers --out`). The text model is asked not to spend its reply on a thinking pass.
 - **Exe-only patch.** The build number and codename are embedded in `Voxprint.exe` at build time. Status, About and diagnostics prefer that stamp over `_internal/credits.json`, so replacing only the exe reports the new build.
@@ -22,7 +25,7 @@ Build 669. The codename is not chosen yet. `BUILD.json` is unchanged.
 
 ### Changed
 - **Windows install warnings.** The README, the release-notes template, and the download pages say the installer is not code-signed yet. Check the SHA-256 first. Edge's download bar can offer Delete; SmartScreen on launch is the milder step. Code signing is being applied for (SignPath Foundation).
-- **Bundled voices.** Boaz is no longer part of the standard download. Tirzah stays. A new male bundled voice will be trained later. The 0.1.3 sample and the git history of Boaz stay; the voice is not installed.
+- **Bundled voices.** Boaz is no longer part of the standard download. Tirzah stays. Gideon (LibriVox reader Kazbek, *Vekhi*, CC0) is the male voice that replaces Boaz, used as recorded, with no retraining. The Gideon package is not in this repository yet, so this draft does not pin a url or a SHA-256. The 0.1.3 sample and the git history of Boaz stay.
 - **Application icon and splash.** New original artwork: `assets/voxprint.png` (one fused mark, a fingerprint whose right ridges become sound-wave bars), the window and installer icons rebuilt from that PNG, and `assets/splash.jpg` (the same logo in a painterly alpine evening). The Linux desktop icon is the same mark. The previous icon was derived from the Tabler Icons fingerprint; that attribution is removed. The already-built 0.1.4 build 668 installer does not contain this artwork.
 
 ## [0.1.4-beta] - 2026-10-08 - build 668 "Kolot"

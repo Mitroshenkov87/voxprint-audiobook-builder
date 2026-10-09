@@ -137,8 +137,16 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     assert bn.build_number({"GITHUB_RUN_NUMBER": "40"}) == 668 and bn.build_number({}) == 0
     assert bn.build_number({"GITHUB_RUN_NUMBER": "39"}) == 667
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34"}) == 700
+    assert bn.info()["offset"] == 628
     name = bn.info()["codename"]
-    assert name == "Kolot" and name.isascii() and name.isalpha()
+    assert name == "Kaporet" and name.isascii() and name.isalpha()
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    credits = json.loads((root / "credits.json").read_text(encoding="utf-8"))
+    assert credits["app"]["version"] == "0.2.0" and credits["app"]["channel"] == "beta"
+    assert credits["app"]["codename"] == "Kaporet"
+    notes = (root / "docs" / "RELEASE-NOTES-700-KAPORET.md").read_text(encoding="utf-8")
+    assert "still 628" in notes and "does not delete" in notes and "Kaporet" in notes
     c = tmp_path / "credits.json"
     c.write_text(json.dumps({"app": {"version": "0.1.1"}}), encoding="utf-8")
     bn.stamp(c, 665, "0123456789abcdef", "Tikkun")
