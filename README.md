@@ -6,7 +6,7 @@ Part of the Voxprint AI Media Suite (with [Voxprint AI Movie Dubber](https://git
 
 ![status: beta](https://img.shields.io/badge/status-beta%20%2F%20experimental-orange) ![licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue) ![platform: Windows 11 + NVIDIA](https://img.shields.io/badge/platform-Windows%2011%20%2B%20NVIDIA-lightgrey)
 
-> **Beta / experimental (v0.1.3, build 667 "Menuchah").** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs **Windows 11 (24H2+) and an NVIDIA GPU** (16 GB VRAM recommended). Details: [tests and caveats](docs/TESTING.md).
+> **Beta / experimental (v0.2.4, build 704 "Achim").** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs **Windows 11 (24H2+) and an NVIDIA GPU** (16 GB VRAM recommended). Details: [tests and caveats](docs/TESTING.md).
 
 <p align="center"><img src="docs/screenshots/en-667/01-main-window.png" alt="Voxprint Studio" width="420"> <img src="docs/screenshots/en-667/04-voice-library-boaz-tirzah.png" alt="My voices: build 667 screenshot. Tirzah and Gideon are the bundled voices; the picture also shows Boaz, which is retired" width="420"></p>
 <p align="center"><img src="docs/screenshots/en-667/02-narrate-book-top.png" alt="Narrate a book" width="420"> <img src="docs/screenshots/en-667/07-settings-pauses-speed-repair.png" alt="Settings: pauses and reading speed" width="300"></p>
@@ -38,9 +38,9 @@ More: [all features and screenshots](docs/FEATURES.md) · [how it works](docs/HO
 ## Download
 | Build | File | Size |
 |---|---|---|
-| **Online installer (Windows 11 x64, NVIDIA GPU)** | [`Voxprint-Setup-online.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.1.3-beta/Voxprint-Setup-online.exe) | 35,235,971 bytes (about 34 MB, build 667 "Menuchah"; downloads the libraries from PyTorch/PyPI during setup) |
+| **Online installer (Windows 11 x64, NVIDIA GPU)** | [`Voxprint-Setup-online.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.2.4-beta/Voxprint-Setup-online.exe) | 35,409,166 bytes (about 34 MB, build 704 "Achim"; downloads the libraries from PyTorch/PyPI during setup) |
 
-SHA-256: `c145a9fc84c736d655fbbe9bfd5c1cc94794b1be7fb8e9a5eec293e6f1578e42` - release page: [v0.1.3-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.3-beta) (pre-release). Setup type **Full** (default) downloads all models (about 28 GB with the components) on the first start; **Quick** installs only the program and offers the same download in the Components window.
+SHA-256: `c7dd024b4917ba128b064c12d8373182b76f9c10e77fb49f6c06fc8fac0e636d` - release page: [v0.2.4-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.2.4-beta) (pre-release, the latest ready build). Setup type **Full** (default) downloads all models (about 28 GB with the components) on the first start; **Quick** installs only the program and offers the same download in the Components window.
 A full offline installer may return later; the Linux version is temporarily unavailable.
 
 ### Windows security warnings
@@ -58,7 +58,7 @@ Code signing is being applied for (SignPath Foundation). The warning will go awa
 
 **Option 1.** Download `Voxprint-Setup-online.exe` from the table above and run it.
 
-**Option 2: one command in PowerShell (as Administrator).** Read [install.ps1](install.ps1) first. It downloads the installer and its `.sha256` file only from the official GitHub releases, checks the hash, then starts setup. `-Silent` passes `/VERYSILENT`. `-Version v0.1.3-beta` picks that tag; otherwise the latest pre-release is used.
+**Option 2: one command in PowerShell (as Administrator).** Read [install.ps1](install.ps1) first. It downloads the installer and its `.sha256` file only from the official GitHub releases, checks the hash, then starts setup. `-Silent` passes `/VERYSILENT`. `-Version v0.2.4-beta` picks that tag; otherwise the latest pre-release is used.
 
 ```powershell
 irm https://raw.githubusercontent.com/Mitroshenkov87/voxprint-audiobook-builder/main/install.ps1 | iex
