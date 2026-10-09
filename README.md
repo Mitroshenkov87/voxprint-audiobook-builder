@@ -2,6 +2,8 @@
 
 **Train a voice from a short recording, then narrate whole books in it - offline, on your own computer.**
 
+Part of the Voxprint AI Media Suite (with [Voxprint AI Movie Dubber](https://github.com/Mitroshenkov87/voxprint-movie-dubber), coming soon).
+
 ![status: beta](https://img.shields.io/badge/status-beta%20%2F%20experimental-orange) ![licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue) ![platform: Windows 11 + NVIDIA](https://img.shields.io/badge/platform-Windows%2011%20%2B%20NVIDIA-lightgrey)
 
 > **Beta / experimental (v0.1.3, build 667 "Menuchah").** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs **Windows 11 (24H2+) and an NVIDIA GPU** (16 GB VRAM recommended). Details: [tests and caveats](docs/TESTING.md).
@@ -25,7 +27,7 @@
 * **Train your voice** - give it a 5-15 minute recording (yours, or of someone who agreed) and the text you read; everything else is automatic ([Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) LoRA).
 * **Offline translation** before narrating: Russian, English, German ([details](docs/TRANSLATION.md)).
 * **Re-voice** a recording: turn it into editable text, or convert it directly into one of your voices ([details](docs/REVOICE.md)).
-* **Open voices included** - *Levi* (male, the default narrator) and *Miriam* (female), Russian, **CC0-1.0** (free for any use, also commercial), trained only from public-domain LibriVox recordings; part of the standard model download and read-only in the library ([details](voices/BUNDLED.md)). *Natan*, *Shimon*, *Rivka* (`voices-v2`) and *Noa* (`voices-v1`) are optional catalog voices, one click away; multi-voice narration uses Natan and Shimon for men and Miriam for women when they are installed ([voices](voices/README.md)). Up to build 702 the bundled pair was *Tirzah* and *Gideon*; they are retired, and an install that has them keeps them. Older sample: [Genesis 1:1-2:3 with Tirzah](samples/genesis-tirzah.mp3) ([samples](samples/README.md)).
+* **Open voices included** - two bundled voices come with the standard download: *Levi* (male, the default narrator) and *Miriam* (female). More voices are one click away in the online catalog (Voices -> Download voices, or `voxprint voices download <id>`): *Natan* and *Shimon* (male), *Rivka* and *Noa* (female). All are Russian, **CC0-1.0** (free for any use, also commercial) and trained only from public-domain LibriVox recordings; bundled voices are read-only in the library ([bundled voices](voices/BUNDLED.md), [catalog](voices/README.md)). Multi-voice narration starts with Levi as narrator, Natan and Shimon for the men and Miriam for the women. Up to build 702 the bundled pair was *Tirzah* and *Gideon*; they are retired, and an install that has them keeps them. Older sample: [Genesis 1:1-2:3 with Tirzah](samples/genesis-tirzah.mp3) ([samples](samples/README.md)).
 * **Per-voice licences and consent** - every voice carries a licence and a usage scope; the UI shows whether commercial use is allowed ([voices](docs/VOICES.md)).
 * **Resumable and safe** - downloads, narration and backups continue where they stopped; SHA-256 checks everywhere; *Check & repair* verifies every component and model file and re-downloads only the damaged ones.
 * **Local and private** - no account, no telemetry; your recordings never leave the computer ([privacy](docs/PRIVACY.md)).
