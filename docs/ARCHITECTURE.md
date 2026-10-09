@@ -18,7 +18,7 @@ tools/                  maintenance scripts (fetch licence texts, generate notic
 tests/                  pytest suite (runs without GPU, network or models)
 ```
 Dependencies point downwards: `ui -> workers -> core / infra`; `core` never imports `ui` or `workers`.
-Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `train` / `voices`); see [CLI.md](CLI.md).
+Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `train` / `voices` / `speakers` / `check`); see [CLI.md](CLI.md).
 
 ## 2. Module map
 

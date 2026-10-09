@@ -5,6 +5,11 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+Build 669. The codename is not chosen yet. `BUILD.json` is unchanged.
+
+### Added
+- **Command line for speaker marks and Check & repair.** `voxprint narrate` takes `--speakers` (Gemma marks each paragraph), `--male-voice` and `--female-voice` (the narrator is `--voice`), and `--speaker-marks FILE` (narrate an edited marks file and do not run Gemma). This is the same speaker path as the Narrate window. When the marks do not match the prepared text, the narrator reads the whole book and the JSON result carries that warning. The job writes `.debug/speakers.txt` and lists it in `outputs`. `voxprint speakers BOOK --out marks.txt` writes the marks and does not narrate. `voxprint check` (alias `repair`) runs the same check as Settings -> Check & repair and prints what was found and fixed.
+
 ### Changed
 - **Application icon and splash.** New original artwork: `assets/voxprint.png` (one fused mark, a fingerprint whose right ridges become sound-wave bars), the window and installer icons rebuilt from that PNG, and `assets/splash.jpg` (the same logo in a painterly alpine evening). The Linux desktop icon is the same mark. The previous icon was derived from the Tabler Icons fingerprint; that attribution is removed. The already-built 0.1.4 build 668 installer does not contain this artwork.
 

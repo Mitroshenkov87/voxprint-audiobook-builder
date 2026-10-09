@@ -122,9 +122,30 @@ voxprint train ./clips --name Boaz --type male --language ru --consent commercia
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3 --json
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
 voxprint narrate genesis.txt --voice boaz --out ./audiobooks --style scripture --pause-sentence 0.7 --speed 0.95 --json
+voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json
 ```
 
 Pauses and speed: `--pause-comma`, `--pause-mid`, `--pause-sentence`, `--pause-paragraph`, `--pause-chapter` (seconds), `--speed` (0.7-1.3) and `--style auto|scripture|fiction|dialogue`; defaults come from the app's Settings. Details: [CLI.md](CLI.md#narrate-a-book).
+
+Multi-voice: `--voice` is the narrator. `--speakers` asks Gemma to mark each paragraph; `--speaker-marks FILE` narrates a file you already edited (`voxprint speakers` writes it). `--male-voice` and `--female-voice` are the other two voices. The two speaker flags cannot be combined. If the marks do not match the prepared text, the narrator reads the whole book and the JSON `warnings` array says so. `<out>/<book>/.debug/speakers.txt` is listed in `outputs`.
+
+### Speaker marks only
+
+```
+voxprint speakers book.txt --out marks.txt --json
+voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks --json
+```
+
+Does not synthesize. Exit 4 when Gemma is missing (`voxprint models download llm --json`).
+
+### Check and repair
+
+```
+voxprint check --json
+voxprint repair --json
+```
+
+Same job as Settings -> Check & repair. `repair` is an alias; JSON `command` is `check`. Exit 0 when nothing failed, 1 when an item failed. Extra fields: `items`, `checked`, `fixed`, `failed`.
 
 | You pass | File you get |
 |---|---|
@@ -198,7 +219,7 @@ Stdout with `--json` is newline-delimited JSON. Every line is one object. Progre
 |---|---|---|
 | `type` | yes | `"result"` |
 | `ok` | yes | `true` only when `exit_code` is 0 |
-| `command` | yes | `version`, `status`, `capabilities`, `narrate`, `train`, `voices list`, `voices export`, `diag`, `models list`, `models download`, `revoice`, `backup`, `restore` |
+| `command` | yes | `version`, `status`, `capabilities`, `narrate`, `train`, `voices list`, `voices export`, `speakers`, `check`, `diag`, `models list`, `models download`, `revoice`, `backup`, `restore` |
 | `exit_code` | yes | Same number the process returns |
 | `outputs` | yes | Paths written (may be empty) |
 | `warnings` | yes | Strings. Empty array when there are none |
@@ -213,7 +234,9 @@ Extra fields by command:
 |---|---|
 | `version` | `name`, `version`, `build` (integer), `codename` |
 | `status`, `capabilities` | see below. Always JSON, one object, no progress lines |
-| `narrate` | `out_dir` |
+| `narrate` | `out_dir`. `outputs` includes `.debug/speakers.txt` when speaker marks were applied. `warnings` holds the mismatch sentence when the narrator read the whole book |
+| `speakers` | `paragraphs` (integer). The marks file is `outputs[0]` |
+| `check` | `items` (`{kind, name, status, detail}`), `checked`, `fixed`, `failed`. `command` is `check` for `voxprint repair` too |
 | `train` | `voice_id`, `adapter`, `root` |
 | `voices list` | `voices`: array of `{id, name, voice_type, language, license, consent_scope, commercial_use, gender, age_group}` |
 | `diag` | `summary`: array of text lines |

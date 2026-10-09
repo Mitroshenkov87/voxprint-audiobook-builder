@@ -89,5 +89,20 @@ def test_narration_uses_each_voice_and_a_mismatch_stays_with_the_narrator(tmp_pa
         options=nr.NarrationOptions(speakers=bad, speak_titles=False, formats={ex.FORMAT_WAV_CHAPTERS}),
         extra_engines={"m": (unused, "male")})
     assert calls["m"] == 0
-    assert "mismatch" in (res2.out_dir / ".debug" / "speakers.txt").read_text(encoding="utf-8")
+    note = (res2.out_dir / ".debug" / "speakers.txt").read_text(encoding="utf-8")
+    assert "mismatch" in note and res2.speaker_warning == "mismatch"
+    assert spk.load_marks(note) == lines[:1]
     assert narr2.calls
+
+
+def test_marks_file_round_trip():
+    lines = [spk.SpeakerLine("narrator"), spk.SpeakerLine("female", "Ann"), spk.SpeakerLine("male", "Tom")]
+    text = spk.dump_marks(lines)
+    assert spk.load_marks(text) == lines
+    assert spk.load_marks("NARRATOR\nFEMALE: Ann\nMALE: Tom\n") == lines
+    try:
+        spk.load_marks("1. NARRATOR\nhello\n")
+    except ValueError as exc:
+        assert "unreadable" in str(exc)
+    else:
+        raise AssertionError("a bad mark line must be rejected")

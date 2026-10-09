@@ -168,6 +168,7 @@ class NarrationResult:
     resumed_chunks: int = 0                   # chunks that were already in the cache
     seconds: float = 0.0                      # length of the whole book
     chunk_check: Optional[Dict[str, int]] = None   # counts of the per-chunk check (None = not run)
+    speaker_warning: str = ""                 # "mismatch" when the marks do not fit the prepared text
 
 
 ProgressFn = Callable[[NarrationProgress], None]
@@ -852,7 +853,8 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
              {k: round(v, 1) for k, v in stage_s.items()}, checker.stats if checker is not None else "off")
     return NarrationResult(job_dir, result.files, len(chapter_audio), total, counts["cached"],
                            sum(c.duration for c in chapter_audio),
-                           chunk_check=dict(checker.stats) if checker is not None else None)
+                           chunk_check=dict(checker.stats) if checker is not None else None,
+                           speaker_warning=speaker_note)
 
 
 def _cuda_available() -> bool:

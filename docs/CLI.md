@@ -5,8 +5,8 @@ Headless entry points for servers, agents and scripts. Same runners as the Studi
 The file you can hand to an agent is [AGENTS.md](AGENTS.md) (what the program is, where the executable lives, recipes, JSON schemas, exit codes). This page is the command reference.
 
 ```
-python main.py narrate|train|voices|status|models|revoice|diag|backup|restore ...
-Voxprint.exe narrate|train|voices|status|models|revoice|diag|backup|restore ...    # packaged Windows build
+python main.py narrate|train|voices|speakers|check|status|models|revoice|diag|backup|restore ...
+Voxprint.exe narrate|train|voices|speakers|check|status|models|revoice|diag|backup|restore ...    # packaged Windows build
 voxprint ...                                                         # Linux launcher, when installed
 ```
 
@@ -24,6 +24,8 @@ Maintenance flags (`--selftest`, `--auto-repair`, `--modules-status`, `--install
 | `--help`, `-h` | Help for the current command, with examples. `voxprint narrate --help` is the narrate page |
 
 `--json` and `--yes` may sit before the command or after it. `--version` exits before the command runs.
+
+A packaged `Voxprint.exe` is a windowed program. Stdout reaches a caller that redirects it (a pipe or a file). Every line is flushed. When nothing is attached, the write is skipped and the process still exits with the command's code.
 
 `status` and `capabilities` always print one JSON object, even without `--json`.
 
@@ -71,7 +73,8 @@ voxprint capabilities
 voxprint narrate BOOK --voice ID_OR_NAME --out DIR
     [--format NAME] [--no-pauses|--pauses] [--pause-comma SEC] [--pause-mid SEC] [--pause-sentence SEC]
     [--pause-paragraph SEC] [--pause-chapter SEC] [--speed X] [--style auto|scripture|fiction|dialogue]
-    [--ordinals|--no-ordinals] [--ai-disclosure] [--work-dir DIR] [--json]
+    [--ordinals|--no-ordinals] [--ai-disclosure] [--work-dir DIR]
+    [--speakers] [--male-voice ID] [--female-voice ID] [--speaker-marks FILE] [--json]
 ```
 
 | Argument | Meaning |
@@ -92,14 +95,43 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 | `--no-ordinals` / `--ordinals` | Read numbers after words like chapter / day / verse as ordinals by context ("день 1" -> "день первый", "21st", "3. Kapitel"); default: Settings (on). See [ORDINALS.md](ORDINALS.md) |
 | `--ai-disclosure` | Speak a short AI note at the start (opt-in) |
 | `--work-dir DIR` | Remember this folder as the app working folder |
+| `--speakers` | Ask the text model (Gemma) to mark each paragraph narrator, male or female, then narrate those voices. Same path as the Narrate window |
+| `--male-voice ID` | Voice for paragraphs marked male. The narrator is `--voice` |
+| `--female-voice ID` | Voice for paragraphs marked female |
+| `--speaker-marks FILE` | Narrate this marks file and do not run Gemma. `voxprint speakers` writes the file |
 
 ```
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
+voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json
+voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks --json
 ```
+
+`--speakers` and `--speaker-marks` cannot be used together. At least one of `--male-voice` and `--female-voice` must be a voice other than the narrator (exit code 2 otherwise). Voices are loaded one at a time, in book order. When the marks do not match the prepared paragraph count, the narrator reads the whole book, the exit code stays 0, and the JSON `warnings` array contains `Speaker marks do not match the prepared text, so the narrator reads the whole book.` The job writes `<out>/<book>/.debug/speakers.txt` and lists that file in `outputs`.
 
 Every narration cuts the text per sentence and at strong transitions, trims each spoken piece of its own silence and joins the pieces with the pause lengths above; long, comma-rich, descriptive or scripture-like sentences are time-stretched a little slower (pitch kept), dialogue stays at the voice's speed. Defaults come from Settings (*Narration: pauses and speed*); the flags override them for one run.
 
 Running the same narrate command again skips chunks that are already cached (pause, speed and style changes never re-synthesize).
+
+## Speaker marks
+
+```
+voxprint speakers BOOK --out FILE [--json]
+```
+
+Ask Gemma who speaks each paragraph and write an editable text file. This command does not synthesize audio. The file is one numbered line per paragraph:
+
+```
+1. NARRATOR
+2. FEMALE: Ann
+3. MALE: Tom
+```
+
+Blank lines are ignored. A trailing `mismatch` line (written when a previous narration could not apply the marks) is ignored. Edit the file, then pass it to `narrate --speaker-marks`. If Gemma is not installed the exit code is 4 and the fix is `voxprint models download llm --json`.
+
+```
+voxprint speakers book.txt --out marks.txt --json
+voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks --format wav --json
+```
 
 ## Train a voice
 
@@ -204,6 +236,19 @@ voxprint diag [--out ZIP] [--json]
 ```
 
 Writes the log files, `system_info.json` and a settings snapshot (paths cut to names, secrets dropped) into one zip (default: `voxprint-diagnostics-<date>.zip` in the current folder). Same as Settings -> *Save diagnostic report...*.
+
+## Check and repair
+
+```
+voxprint check [--json]
+voxprint repair [--json]
+```
+
+The same check as Settings -> *Check & repair* (`infra.auto_repair.run`): program, components and models by hash, missing or damaged files fetched again, stale model lock files removed. `repair` is an alias; the JSON `command` field is always `check`. Exit code 0 when every item is ok, repaired, downloaded or skipped; exit code 1 when any item failed.
+
+`--json` adds `items` (each `{kind, name, status, detail}`), `checked`, `fixed` and `failed`. `fixed` counts items whose status is `repaired` or `downloaded`. A failed item is also named in `warnings`.
+
+`Voxprint.exe --auto-repair` stays the maintenance flag (it also writes `logs/auto_repair.txt`). `voxprint check` is the user command and prints to stdout.
 
 ## JSON result
 
