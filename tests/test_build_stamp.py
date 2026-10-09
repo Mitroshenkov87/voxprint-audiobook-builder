@@ -1,6 +1,8 @@
 """The frozen exe carries its own build number, ahead of credits.json."""
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -66,3 +68,33 @@ def test_embed_tool_stamps_the_module_and_the_exe_then_restores(tmp_path, monkey
     before = exe.read_bytes()
     assert emb.main(["--exe", str(exe), "--credits", str(credits)]) == 0
     assert exe.read_bytes() == before
+
+
+def test_build_thin_runs_the_stamp_script_as_a_file(tmp_path):
+    """The same command as build_thin.bat: a file path, no PYTHONPATH, cwd not required to be the repo."""
+    bat = (ROOT / "build_thin.bat").read_text(encoding="utf-8")
+    assert "python tools\\embed_build_stamp.py --write-module" in bat
+    src = tmp_path / "build_stamp.py"
+    src.write_text((ROOT / "core" / "build_stamp.py").read_text(encoding="utf-8"), encoding="utf-8")
+    exe = tmp_path / "Voxprint.exe"
+    exe.write_bytes(b"MZ" + b"\x00" * 32)
+    credits = tmp_path / "credits.json"
+    credits.write_text('{"app": {"build": "0"}}', encoding="utf-8")
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+    env["VOXPRINT_BUILD"] = "43"
+    env["VOXPRINT_CODENAME"] = "Kolot"
+    proc = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "embed_build_stamp.py"),
+         "--write-module", str(src), "--exe", str(exe), "--credits", str(credits)],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    text = src.read_text(encoding="utf-8")
+    assert "BUILD = 43" in text and 'CODENAME = "Kolot"' in text
+    assert build_stamp.read_trailer(exe) == (43, "Kolot")
+    assert (ROOT / "core" / "build_stamp.py").read_text(encoding="utf-8").split("BUILD = ", 1)[1].startswith("0")
