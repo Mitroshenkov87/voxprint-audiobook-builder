@@ -458,7 +458,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint train recording.wav --text script.txt --name Anna --type female\n"
             "  voxprint train ./clips --name Anna --type female --out ./voices --json\n"
             "  voxprint train recording.wav --text script.txt --name Anna --force-cpu --yes\n"
-            "  voxprint train ./clips --name Boaz --language ru --consent commercial --speaker \"Reader Name\" --license CC0-1.0\n"
+            "  voxprint train ./clips --name MyVoice --language ru --consent commercial --speaker \"Reader Name\" --license CC0-1.0\n"
         ),
     )
     t.add_argument("audio", type=Path, help="Recording file, or a folder of clips when --text is omitted")

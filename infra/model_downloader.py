@@ -625,7 +625,12 @@ class ModelLock:
     def try_acquire(self) -> bool:
         for _ in range(5):
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            fh = open(self.path, "a+b")
+            try:
+                fh = open(self.path, "a+b")
+            except OSError:
+                # Windows cannot open a lock file another thread of this process already holds (the msvcrt lock is
+                # process-wide, and a second open raises PermissionError). That means the lock is taken: poll again.
+                continue
             try:
                 if os.name == "nt":
                     import msvcrt

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import itertools
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
 import logging
@@ -59,6 +60,8 @@ from core.i18n import tr
 log = logging.getLogger("voxprint.narration")
 
 CHAPTER_TAIL_MS = 1200          # silence appended to every chapter (also separates chapters in single-file exports)
+# Windows monotonic_ns can stay on the same value for two writes in one thread. The counter keeps each part name unique.
+_PART_SEQ = itertools.count()
 
 
 class TTSEngine(Protocol):
@@ -205,7 +208,8 @@ class ChunkCache:
         (the twin chunk won the race) that copy is kept.  Only when the file stays locked does a clear
         :class:`NarrationError` stop the job (the cache keeps every finished chunk, so a new start resumes)."""
         self.dir.mkdir(parents=True, exist_ok=True)
-        tmp = self.dir / f"{key}.{os.getpid()}-{threading.get_ident()}-{time.monotonic_ns()}.part.flac"
+        tmp = self.dir / (
+            f"{key}.{os.getpid()}-{threading.get_ident()}-{time.monotonic_ns()}-{next(_PART_SEQ)}.part.flac")
         dst = self.path(key)
         try:
             sf.write(str(tmp), np.asarray(audio, dtype=np.float32), sr, format="FLAC", subtype="PCM_16")

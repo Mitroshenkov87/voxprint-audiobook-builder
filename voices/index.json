@@ -26,30 +26,6 @@
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
     },
     {
-      "id": "boaz",
-      "name": "Boaz",
-      "language": "ru",
-      "author": "Mark Chulsky (LibriVox) - public domain",
-      "license": "CC0-1.0",
-      "voice_type": "male",
-      "description": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Аграфена (Agrafena)' by Boris Zaytsev, read by Mark Chulsky (https://librivox.org/agrafena-by-boris-zaytsev/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Boaz is Voxprint's own and does not imply the reader's endorsement.",
-      "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-      "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/boaz.zip",
-      "sha256": "138acc6aeeeeb31de5ee31a3adc8320cf60446f17c5178ba83a37e47741638cc",
-      "size_bytes": 53177559,
-      "descriptions": {
-        "en": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Аграфена (Agrafena)' by Boris Zaytsev, read by Mark Chulsky (https://librivox.org/agrafena-by-boris-zaytsev/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Boaz is Voxprint's own and does not imply the reader's endorsement.",
-        "ru": "Встроенный открытый мужской русский голос, обучен только на записи LibriVox из общественного достояния «Аграфена (Agrafena)» (Борис Зайцев), читает Mark Chulsky (https://librivox.org/agrafena-by-boris-zaytsev/). Свободен для любого использования, в том числе коммерческого (CC0-1.0). Атрибуция приветствуется. Имя Boaz дано Voxprint и не означает одобрения чтеца.",
-        "de": "Mitgelieferte offene männliche russische Stimme, nur mit der gemeinfreien LibriVox-Aufnahme 'Аграфена (Agrafena)' von Boris Zaytsev trainiert, gelesen von Mark Chulsky (https://librivox.org/agrafena-by-boris-zaytsev/). Frei für jede Nutzung, auch kommerziell (CC0-1.0). Namensnennung erwünscht. Der Name Boaz stammt von Voxprint und bedeutet keine Billigung durch die Sprecher."
-      },
-      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
-      "gender": "male",
-      "speaker": "Mark Chulsky",
-      "prepared_by": "Voxprint",
-      "project_url": "https://librivox.org/agrafena-by-boris-zaytsev/",
-      "bundled": true
-    },
-    {
       "id": "tirzah",
       "name": "Tirzah",
       "language": "ru",
@@ -72,6 +48,52 @@
       "prepared_by": "Voxprint",
       "project_url": "https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/",
       "bundled": true
+    },
+    {
+      "id": "asher",
+      "name": "Asher",
+      "language": "ru",
+      "author": "Vladimir Anyanov (LibriVox) - public domain",
+      "license": "CC0-1.0",
+      "voice_type": "male",
+      "description": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Teachings of Christ' by Leo Tolstoy, read by Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Asher is Voxprint's own and does not imply the reader's endorsement.",
+      "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "url": "https://PENDING_HOST/asher.zip",
+      "sha256": "PENDING_SHA256",
+      "size_bytes": 0,
+      "descriptions": {
+        "en": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Teachings of Christ' by Leo Tolstoy, read by Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Asher is Voxprint's own and does not imply the reader's endorsement.",
+        "ru": "Необязательный мужской русский голос для каталога в программе, не входит в стандартную загрузку. Обучен только на записи LibriVox из общественного достояния «Teachings of Christ» (Лев Толстой), читает Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Asher дано Voxprint и не означает одобрения чтеца.",
+        "de": "Optionale männliche russische Stimme für den Stimmenkatalog in der App, nicht Teil des Standard-Downloads. Nur mit der gemeinfreien LibriVox-Aufnahme 'Teachings of Christ' von Leo Tolstoy trainiert, gelesen von Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Asher stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+      },
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "gender": "male",
+      "speaker": "Vladimir Anyanov",
+      "prepared_by": "Voxprint",
+      "project_url": "https://archive.org/details/teachingsofchrist_1204_librivox"
+    },
+    {
+      "id": "noa",
+      "name": "Noa",
+      "language": "ru",
+      "author": "Hanna Ponomarenko (LibriVox) - public domain",
+      "license": "CC0-1.0",
+      "voice_type": "female",
+      "description": "Optional female Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Izbrannye' by Sholem Aleichem, read by Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Noa is Voxprint's own and does not imply the reader's endorsement.",
+      "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+      "url": "https://PENDING_HOST/noa.zip",
+      "sha256": "PENDING_SHA256",
+      "size_bytes": 0,
+      "descriptions": {
+        "en": "Optional female Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Izbrannye' by Sholem Aleichem, read by Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Noa is Voxprint's own and does not imply the reader's endorsement.",
+        "ru": "Необязательный женский русский голос для каталога в программе, не входит в стандартную загрузку. Обучен только на записи LibriVox из общественного достояния «Izbrannye» (Шолом-Алейхем), читает Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Noa дано Voxprint и не означает одобрения чтеца.",
+        "de": "Optionale weibliche russische Stimme für den Stimmenkatalog in der App, nicht Teil des Standard-Downloads. Nur mit der gemeinfreien LibriVox-Aufnahme 'Izbrannye' von Sholem Aleichem trainiert, gelesen von Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Noa stammt von Voxprint und bedeutet keine Billigung durch die Sprecherin."
+      },
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "gender": "female",
+      "speaker": "Hanna Ponomarenko",
+      "prepared_by": "Voxprint",
+      "project_url": "https://archive.org/details/izbrannye_2212_librivox"
     }
   ]
 }

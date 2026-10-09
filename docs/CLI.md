@@ -153,7 +153,7 @@ By default the voice is stored with consent method `none` and scope `private_onl
 voxprint train recording.wav --text script.txt --name Anna --type female
 voxprint train ./clips --name Anna --type female --out ./voices --json
 voxprint train recording.wav --text script.txt --name Anna --force-cpu
-voxprint train ./clips --name Boaz --language ru --consent commercial --speaker "Reader Name" --license CC0-1.0
+voxprint train ./clips --name MyVoice --language ru --consent commercial --speaker "Reader Name" --license CC0-1.0
 ```
 
 `--force-cpu` is the retry after exit code 5. A second train creates another voice; it is not a no-op.

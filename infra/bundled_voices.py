@@ -1,10 +1,13 @@
-"""Open voices that come with Voxprint: *Boaz* (male) and *Tirzah* (female), Russian, CC0-1.0.
+"""Open voices that come with Voxprint: *Tirzah* (female), Russian, CC0-1.0.
 
-Trained only from public-domain LibriVox recordings (readers, sources and hashes: ``voices/BUNDLED.md``).  The weights are not
-in git: each voice is one zip on the ``voices-v1`` release, SHA-256 pinned here, and is part of the standard model download
+Trained only from a public-domain LibriVox recording (reader, source and hash: ``voices/BUNDLED.md``).  The weights are not
+in git: the voice is one zip on the ``voices-v1`` release, SHA-256 pinned here, and is part of the standard model download
 (:func:`workers.pipeline_runner.prefetch_models`: the Full setup downloads it upfront, Quick with the first-launch download).
 It is imported into the voices library read-only (``"bundled": true`` in ``voice.json``: no edit, no delete) with its licence
-shown in the Voices window.  The entries mirror ``voices/index.json``; fields left out here come from the zip's ``voice.json``.
+shown in the Voices window.  The entry mirrors ``voices/index.json``; fields left out here come from the zip's ``voice.json``.
+
+*Boaz* shipped with 0.1.3 and is no longer installed. A new male bundled voice will be trained later. Optional catalog
+voices (Asher, Noa) live in ``voices/index.json`` and are not listed here, so they are never part of this download.
 """
 from __future__ import annotations
 
@@ -20,8 +23,6 @@ _URL = "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/do
 _CC0 = ("CC0-1.0", "https://creativecommons.org/publicdomain/zero/1.0/")
 
 VOICES = (
-    {"id": "boaz", "name": "Boaz", "language": "ru", "url": _URL + "boaz.zip", "size_bytes": 53177559,
-     "sha256": "138acc6aeeeeb31de5ee31a3adc8320cf60446f17c5178ba83a37e47741638cc"},
     {"id": "tirzah", "name": "Tirzah", "language": "ru", "url": _URL + "tirzah.zip", "size_bytes": 53274433,
      "sha256": "aef7c849298ec6e3f2aac1114b993ca111b6297bfd9fef0bf1634527be7ab95f"},
 )

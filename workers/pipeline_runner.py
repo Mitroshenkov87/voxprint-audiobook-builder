@@ -699,7 +699,7 @@ def _prefetch_small_optional(progress: ProgressCallback) -> None:
                 ensure(lambda f, m="": progress(Stage.MODEL, float(f), m))
         except Exception as exc:  # noqa: BLE001 - never block the first-run model step
             log.warning("%s download failed: %s", name, exc)
-    try:   # the bundled open voices Boaz and Tirzah (~2 x 53 MB, infra/bundled_voices.py), installed read-only
+    try:   # the bundled open voice Tirzah (~53 MB, infra/bundled_voices.py), installed read-only
         from infra import bundled_voices
 
         bundled_voices.ensure(lambda f, n: progress(Stage.MODEL, float(f), n))

@@ -8,14 +8,17 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 Build 669. The codename is not chosen yet. `BUILD.json` is unchanged.
 
 ### Added
+- **Catalog voices Asher and Noa** (optional, not installed automatically). Asher is the LibriVox reading of Tolstoy's *Teachings of Christ* by Vladimir Anyanov; Noa is Hanna Ponomarenko's reading of Sholem Aleichem's *Izbrannye*. Specs and index entries are in place. The catalog hides them until `url`, `sha256` and `size_bytes` replace the `PENDING_HOST` / `PENDING_SHA256` placeholders.
 - **Command line for speaker marks and Check & repair.** `voxprint narrate` takes `--speakers` (Gemma marks each paragraph), `--male-voice` and `--female-voice` (the narrator is `--voice`), and `--speaker-marks FILE` (narrate an edited marks file and do not run Gemma). This is the same speaker path as the Narrate window. When the marks do not match the prepared text, the narrator reads the whole book and the JSON result carries that warning. The job writes `.debug/speakers.txt` and lists it in `outputs`. `voxprint speakers BOOK --out marks.txt` writes the marks and does not narrate. `voxprint check` (alias `repair`) runs the same check as Settings -> Check & repair and prints what was found and fixed.
 
 ### Fixed
 - **Speaker marks.** Gemma 4 answers with a thinking channel, a short preamble and numbered lines (`1. MALE: Name`). Those replies are read as marks. If a reply still cannot be read, or a text that has dialogue is marked entirely as the narrator, the command exits 0 with a warning and saves the raw reply (`.debug/speakers-raw.txt` for narration, `<name>.speakers-raw.txt` next to `speakers --out`). The text model is asked not to spend its reply on a thinking pass.
 - **Exe-only patch.** The build number and codename are embedded in `Voxprint.exe` at build time. Status, About and diagnostics prefer that stamp over `_internal/credits.json`, so replacing only the exe reports the new build.
 - **Windowed command line.** `Voxprint.exe status --json` when stdout is an invalid handle (Windows error 22) exits with the command's code and does not open a traceback window.
+- **Windows tests (build-installer run 42).** Russian speaker-tag words are built from code points, so `core/speakers.py` has no Cyrillic string literals. Each chunk write adds a counter to its temporary name, so two writes in the same clock tick do not share a `.part.flac`. Opening a model lock file that Windows refuses (another thread already holds it) is treated as "already taken" and retried. A download's first write still counts as progress when it lands before the stall watcher samples the folder.
 
 ### Changed
+- **Bundled voices.** Boaz is no longer part of the standard download. Tirzah stays. A new male bundled voice will be trained later. The 0.1.3 sample and the git history of Boaz stay; the voice is not installed.
 - **Application icon and splash.** New original artwork: `assets/voxprint.png` (one fused mark, a fingerprint whose right ridges become sound-wave bars), the window and installer icons rebuilt from that PNG, and `assets/splash.jpg` (the same logo in a painterly alpine evening). The Linux desktop icon is the same mark. The previous icon was derived from the Tabler Icons fingerprint; that attribution is removed. The already-built 0.1.4 build 668 installer does not contain this artwork.
 
 ## [0.1.4-beta] - 2026-10-08 - build 668 "Kolot"

@@ -276,6 +276,40 @@ def test_a_disk_error_does_not_make_hugging_face_look_slow(manifest, fast_watch)
 
 
 # ------------------------------------------------------------------------------------------------ one download per model
+def test_opening_a_held_lock_file_counts_as_not_acquired(tmp_path, monkeypatch):
+    """Windows raises PermissionError on open() of a lock another thread holds (run 42). That is 'taken', not a crash."""
+    real_open = open
+    opens = []
+
+    def held(path, mode="r", *args, **kwargs):
+        if mode == "a+b" and str(path).endswith(".lock"):
+            opens.append(path)
+            raise PermissionError(13, "The process cannot access the file because it is being used by another process")
+        return real_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", held)
+    assert md.ModelLock(tmp_path / ".m.lock").try_acquire() is False
+    assert len(opens) == 5
+
+
+def test_a_transient_lock_open_error_is_retried(tmp_path, monkeypatch):
+    real_open = open
+    opens = []
+
+    def flaky(path, mode="r", *args, **kwargs):
+        if mode == "a+b" and str(path).endswith(".lock"):
+            opens.append(path)
+            if len(opens) < 3:
+                raise PermissionError(13, "in use")
+        return real_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", flaky)
+    lock = md.ModelLock(tmp_path / ".m.lock")
+    assert lock.try_acquire() is True
+    lock.release(remove=True)
+    assert len(opens) == 3
+
+
 def test_the_model_lock_excludes_a_second_holder_and_is_released(tmp_path):
     a, b = md.ModelLock(tmp_path / ".m.lock"), md.ModelLock(tmp_path / ".m.lock")
     assert a.try_acquire() and not b.try_acquire()

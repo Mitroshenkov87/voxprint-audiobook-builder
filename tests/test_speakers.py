@@ -167,6 +167,10 @@ def test_a_realistic_gemma_reply_marks_the_russian_dialogue():
     assert spk.parse_tags(bare, 2) == [spk.SpeakerLine("narrator"), spk.SpeakerLine("male", "Марк")]
     assert spk.parse_tags("<think>\nMALE: Марк\n</think>\nРАССКАЗЧИК\nЖЕН: Анна\n", 2) == [
         spk.SpeakerLine("narrator"), spk.SpeakerLine("female", "Анна")]
+    assert spk.parse_tags("МУЖСКОЙ: Иван\nЖЕНСКИЙ\nМУЖ: Пётр\n", 3) == [
+        spk.SpeakerLine("male", "Иван"), spk.SpeakerLine("female"), spk.SpeakerLine("male", "Пётр")]
+    assert spk.load_marks("МУЖСКОЙ: Иван\nЖЕНСКИЙ\n") == [
+        spk.SpeakerLine("male", "Иван"), spk.SpeakerLine("female")]
     model = FakeModel(lambda prompt: _gemma_reply(prompt, paras))
     tagged = spk.tag_paragraphs(paras, "ru", LLMPlan(lambda: model, "fake"))
     assert tagged.warning == "" and model.closed
