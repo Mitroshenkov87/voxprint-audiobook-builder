@@ -135,13 +135,11 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
 
     # Runs 41-44 published nothing. Offset 655: run 45 stamped 700 (Kaporet). Run 46 failed before publishing;
     # offset 654: run 47 stamped 701 (Shalem), run 48 stamped 702 (Shelishi), run 49 stamped 703 (Toledot),
-    # run 50 stamps 704 (Achim).
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "47"}) == 701 and bn.build_number({}) == 0
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "48"}) == 702 and bn.build_number({"GITHUB_RUN_NUMBER": "49"}) == 703
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "50"}) == 704
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "40"}) == 694
+    # run 50 failed before publishing; offset 653: run 51 stamps 704 (Achim).
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "51"}) == 704 and bn.build_number({}) == 0
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "40"}) == 693
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34"}) == 700
-    assert bn.info()["offset"] == 654
+    assert bn.info()["offset"] == 653
     name = bn.info()["codename"]
     assert name == "Achim" and name.isascii() and name.isalpha()
     from pathlib import Path
@@ -160,7 +158,7 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     notes = (root / "docs" / "RELEASE-NOTES-703-TOLEDOT.md").read_text(encoding="utf-8")
     assert "654" in notes and "run 49" in notes and "Toledot" in notes and "Levi" in notes and "Miriam" in notes
     notes = (root / "docs" / "RELEASE-NOTES-704-ACHIM.md").read_text(encoding="utf-8")
-    assert "654" in notes and "run 50" in notes and "Achim" in notes and "suite.json" in notes
+    assert "653" in notes and "run 51" in notes and "Achim" in notes and "suite.json" in notes
     c = tmp_path / "credits.json"
     c.write_text(json.dumps({"app": {"version": "0.1.1"}}), encoding="utf-8")
     bn.stamp(c, 665, "0123456789abcdef", "Tikkun")
