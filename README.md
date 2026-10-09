@@ -38,8 +38,21 @@ More: [all features and screenshots](docs/FEATURES.md) · [how it works](docs/HO
 |---|---|---|
 | **Online installer (Windows 11 x64, NVIDIA GPU)** | [`Voxprint-Setup-online.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.1.3-beta/Voxprint-Setup-online.exe) | 35,235,971 bytes (about 34 MB, build 667 "Menuchah"; downloads the libraries from PyTorch/PyPI during setup) |
 
-SHA-256: `c145a9fc84c736d655fbbe9bfd5c1cc94794b1be7fb8e9a5eec293e6f1578e42` - release page: [v0.1.3-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.3-beta) (pre-release). The installer is **not code-signed**: Windows SmartScreen will warn - choose *More info -> Run anyway* only after the SHA-256 matches ([how to check](docs/DOWNLOADS.md)). Setup type **Full** (default) downloads all models (about 28 GB with the components) on the first start; **Quick** installs only the program and offers the same download in the Components window.
+SHA-256: `c145a9fc84c736d655fbbe9bfd5c1cc94794b1be7fb8e9a5eec293e6f1578e42` - release page: [v0.1.3-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.3-beta) (pre-release). Setup type **Full** (default) downloads all models (about 28 GB with the components) on the first start; **Quick** installs only the program and offers the same download in the Components window.
 A full offline installer may return later; the Linux version is temporarily unavailable.
+
+### Windows security warnings
+The installer is not code-signed yet, so a new download has no reputation. Download it only from the [GitHub releases page](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases). Check the SHA-256 against the `.sha256` file next to the installer, and only then keep or run the file ([details](docs/DOWNLOADS.md)):
+
+```powershell
+Get-FileHash .\Voxprint-Setup-online.exe -Algorithm SHA256
+```
+
+Edge is the strictest. Its download bar offers **Delete** for a file that is rarely downloaded, and the file can be removed before you run it. Do not click Delete. Hover the download, then **... -> Keep -> Show more -> Keep anyway**.
+
+Chrome and other browsers may show a similar download warning. When you start the installer, from any browser, Microsoft Defender SmartScreen may say **Windows protected your PC**. Choose **More info -> Run anyway**. That step is usually milder than Edge. An antivirus program may also flag the unsigned file.
+
+Code signing is being applied for (SignPath Foundation). The warning will go away later.
 
 ## Quick start
 1. Install and start Voxprint - the **Studio** opens. Under *Train your voice* choose your recording and the text you read, press **Create voice (LoRA)**.

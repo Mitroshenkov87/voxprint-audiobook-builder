@@ -32,8 +32,8 @@ No telemetry, no account; recordings, text and voices stay on your computer. The
 ## Can I use any voice?
 Only with the voice owner's permission and within the voice's licence (CC0, CC-BY ... or personal-only); every voice carries a licence and a consent record. See [Voices and licences](VOICES.md) and the consent section of the [User guide](USER-GUIDE.md#voice-owners-consent-and-usage-scope).
 
-## Windows SmartScreen warns about the installer. Is it safe?
-The installer is not code-signed, so Windows shows "Unknown publisher". Check the SHA-256 against [DOWNLOADS.md](DOWNLOADS.md) (or the `.sha256` file in the release), then *More info -> Run anyway*. The source is in this repository and the full installer is built by a public GitHub Actions workflow; you can also [build it yourself](BUILDING.md).
+## Windows warns about the installer. Is it safe?
+The installer is not code-signed yet, so a new download has no reputation. Download it only from the GitHub releases page. Check the SHA-256 against [DOWNLOADS.md](DOWNLOADS.md) (or the `.sha256` file) with `Get-FileHash .\Voxprint-Setup-online.exe -Algorithm SHA256`, and only then keep or run it. Edge is the strictest: do not click **Delete** on the download bar. Hover the download, then **... -> Keep -> Show more -> Keep anyway**. The file can be removed before you run it. SmartScreen (*Windows protected your PC* -> *More info -> Run anyway*) is usually milder, and an antivirus program may also flag the file. Code signing is being applied for (SignPath Foundation); the warning will go away later. The source is in this repository and the installer is built by a public GitHub Actions workflow; you can also [build it yourself](BUILDING.md).
 
 ## Does it work on Linux or without an NVIDIA GPU?
 Linux is experimental ([LINUX.md](LINUX.md)). Without an NVIDIA GPU the dataset is still created, but training falls back to the CPU (very slow, with a warning).
