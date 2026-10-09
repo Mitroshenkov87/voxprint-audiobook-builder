@@ -64,7 +64,7 @@ OTHER_FORMATS: Tuple[str, ...] = (ex.FORMAT_M4B_OPUS, ex.FORMAT_OPUS_CHAPTERS, e
 CHARS_PER_SECOND = 14.0         # rough speaking rate used for the "about N hours" estimate
 #: Rule-based preparation steps behind the one "Prepare text" switch (on by default).
 RULE_STEPS: Tuple[str, ...] = (text_prep.STEP_LAYOUT, text_prep.STEP_NOISE, text_prep.STEP_QUOTES, text_prep.STEP_LINKS,
-                               text_prep.STEP_HEADINGS, text_prep.STEP_NUMBERS, text_prep.STEP_ABBREV)
+                               text_prep.STEP_HEADINGS, text_prep.STEP_NUMBERS, text_prep.STEP_ABBREV, text_prep.STEP_YO)
 SPELLFIX_MODEL = "sage-ru"      # registry key of the Russian typo model included in "Prepare text" when it is downloaded
 SAMPLE_CHARS = 420              # length of the prepared-text sample
 
@@ -1224,7 +1224,8 @@ class NarrateWindow(SubWindow):
             translate=self.translate_plan(), ai_disclosure=self.chk_disclosure.isChecked(),
             check_chunks=self.chk_check_chunks.isChecked(), llm_prepare=self.llm_prepare_plan(),
             speakers=self.speaker_cast(),
-            ordinals=ordinals.load_enabled())                    # Settings: ordinal numbers by context
+            ordinals=ordinals.load_enabled(),                    # Settings: ordinal numbers by context
+            yo=self.chk_prepare.isChecked())                     # the Prepare switch; Russian yo is one of its steps
 
     # ------------------------------------------------------------------ state
     @property

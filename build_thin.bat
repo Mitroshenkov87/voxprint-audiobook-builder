@@ -39,6 +39,7 @@ pyinstaller --onedir --windowed --noconfirm --clean --name Voxprint --distpath d
   --hidden-import openvoice.mel_processing --hidden-import openvoice.transforms ^
   --add-data "%CD%\infra\verified_manifest.json;infra" --add-data "%CD%\infra\assets_manifest.json;infra" --add-data "%CD%\infra\model_mirrors.json;infra" --add-data "%CD%\infra\model_release.json;infra" --add-data "%CD%\infra\runtime_lock.json;infra" ^
   --add-data "%CD%\locales;locales" --add-data "%CD%\prompts;prompts" --add-data "%CD%\credits.json;." --add-data "%CD%\licenses;licenses" ^
+  --add-data "%CD%\core\data;core\data" ^
   --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^
   --collect-submodules core --collect-submodules infra --collect-submodules ui --collect-submodules workers --collect-submodules tools ^
   --hidden-import netroute --hidden-import soundfile --collect-all certifi ^

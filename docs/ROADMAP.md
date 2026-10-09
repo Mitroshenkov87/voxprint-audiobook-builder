@@ -2,7 +2,7 @@
 
 Ideas, not promises:
 * **Narrator improvements** - a queue of several books, more book formats (e.g. PDF, DOCX).
-* **Preparation, next steps** - punctuation restoration for Russian (RUPunct), stress marks and `ё`, English / German neural spelling, and tuning of the abbreviation / unit tables on real books (the rule steps themselves are done).
+* **Preparation, next steps** - punctuation restoration for Russian (RUPunct), English / German neural spelling, and tuning of the abbreviation / unit tables on real books (the rule steps themselves are done, including Russian `ё` where a dictionary is sure). Stress marks are not planned for the stock Qwen3-TTS base model: it does not read them.
 * **Translation** - translate a text and speak it in your own voice in another language (a registry entry and a greyed-out placeholder exist, not implemented).
 * **Multi-voice markup** - the Narrate window and the command line can mark each paragraph as narrator, male or female (the text model), the user can edit the marks, and narration speaks those voices one after another. Still open: keeping more than one voice model loaded at once.
 * **Exe patches (build 669)** - the thin build publishes `Voxprint.exe` (~9 MB), its `.sha256` and `patch.json` (`build`, `codename`, `version`, `sha256`, `runtime_lock_sha256` of `infra/runtime_lock.json`). Still to build: the in-app updater applies that patch when only the program changed (the installed lock hash matches `runtime_lock_sha256`, the exe hash matches `sha256`, then the exe is swapped and the program restarts). A full installer runs only when the libraries change.

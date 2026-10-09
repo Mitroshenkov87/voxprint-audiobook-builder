@@ -125,7 +125,7 @@ voxprint narrate genesis.txt --voice tirzah --out ./audiobooks --style scripture
 voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json
 ```
 
-Pauses and speed: `--pause-comma`, `--pause-mid`, `--pause-sentence`, `--pause-paragraph`, `--pause-chapter` (seconds), `--speed` (0.7-1.3) and `--style auto|scripture|fiction|dialogue`; defaults come from the app's Settings. Details: [CLI.md](CLI.md#narrate-a-book).
+Pauses and speed: `--pause-comma`, `--pause-mid`, `--pause-sentence`, `--pause-paragraph`, `--pause-chapter` (seconds), `--speed` (0.7-1.3) and `--style auto|scripture|fiction|dialogue`; defaults come from the app's Settings. For a Russian book, `--yo` (the default) restores the letter yo where a dictionary is sure; `--no-yo` leaves the letter e as written. Details: [CLI.md](CLI.md#narrate-a-book).
 
 Multi-voice: `--voice` is the narrator. `--speakers` asks Gemma to mark each paragraph; `--speaker-marks FILE` narrates a file you already edited (`voxprint speakers` writes it). `--male-voice` and `--female-voice` are the other two voices. The two speaker flags cannot be combined. If the marks do not match the prepared text, the narrator reads the whole book and the JSON `warnings` array says so. `<out>/<book>/.debug/speakers.txt` is listed in `outputs`.
 

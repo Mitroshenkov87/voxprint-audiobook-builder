@@ -48,7 +48,7 @@ def run_narration(job: NarrationJob, progress: Callable[[nr.NarrationProgress], 
 
         checker = chunk_check.make_default_checker(
             language, chunk_check.ChunkCheckOptions(job.options.check_max_cer, job.options.check_retries,
-                                                    ordinals=job.options.ordinals))
+                                                    ordinals=job.options.ordinals, yo=job.options.yo))
     # narrate_book uses its ``language`` for text preparation and the AI disclosure; "" there means "the book's own tag"
     return nr.narrate_book(job.book, factory, tts_engine.engine_tag(job.voice, language), job.out_dir,
                            language="" if language == languages.AUTO else language,

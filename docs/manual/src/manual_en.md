@@ -412,11 +412,11 @@ When the program finds an older component in an environment it does not own (for
 
 Out of the box, everything that can run automatically is **already selected** and marked with a star and the word *{{auto.recommended}}*: if you touch nothing, Voxprint works at maximum quality. The models these options need are part of the first-start download, so there is nothing extra to click. The single check boxes stay in their windows.
 
-* Text preparation (Narrate a book): one switch, *{{prep.one}}*, on by default (layout, footnotes, quotes, links, headings, numbers, abbreviations, and Russian typos when that model is downloaded).
+* Text preparation (Narrate a book): one switch, *{{prep.one}}*, on by default (layout, footnotes, quotes, links, headings, numbers, abbreviations, the Russian letter yo where a dictionary is sure, and Russian typos when that model is downloaded).
 * Translation of the book before narrating (English, Russian, German; Opus-MT models, about 300 MB per direction, downloaded once). Off until you turn it on.
 * Training window: *{{check.checkbox}}* and *{{preview.compare}}* (both need the speech-recognition model, about 1.9 GB, downloaded once).
 * Always on, without a switch: alignment of the text onto the audio and its plausibility check, the audio quality filter, the recognition filters of the audio-only mode.
-* Not included, because they do not exist yet: punctuation model and Russian stress marks. Speaker marks are a separate option on the AI text model card.
+* Not included, because they do not exist yet: a punctuation model. Russian stress marks are not written, because the base speech model does not read them; the letter yo is part of Prepare text. Speaker marks are a separate option on the AI text model card.
 
 The training preset stays at *{{preset.balanced}}* on purpose: in our tests longer training with a higher learning rate made voices babble, so more is not better there. Instead, after **{{preview.compare}}** the better of the two variants is marked **{{auto.recommended}}** (verdict first, then fewer recognition errors, then the smaller pitch shift; with no clear difference variant A, which is cheaper). The choice is still yours: always listen.
 

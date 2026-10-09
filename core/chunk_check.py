@@ -23,6 +23,7 @@ from typing import Callable, Dict, Optional
 
 import numpy as np
 
+from core import yo
 from core.voice_check import cer
 
 log = logging.getLogger("voxprint.narration")
@@ -45,6 +46,8 @@ class ChunkCheckOptions:
     sampling: Dict[str, float] = field(default_factory=lambda: dict(RETRY_SAMPLING))
     #: Read ordinals in the recognised text the way the chunk text was prepared (``NarrationOptions.ordinals``).
     ordinals: bool = True
+    #: Restore Russian yo in the recognised text the way the chunk was spoken (``NarrationOptions.yo``).
+    yo: bool = True
 
 
 def chunk_seed(key: str, attempt: int) -> int:
@@ -166,6 +169,9 @@ def make_default_checker(language: str, options: Optional[ChunkCheckOptions] = N
 
     name = (language or "").strip()
     # the recogniser writes "глава 2" where the chunk text says "глава вторая": prepare its output the same way
-    ordinal = ordinals.ordinal_step(language) if (options is None or options.ordinals) else None
+    opts = options or ChunkCheckOptions()
+    ordinal = ordinals.ordinal_step(language) if opts.ordinals else None
+    letter = yo.as_step(language) if opts.yo else None
+    # same order as narration.text_steps: ordinals, yo, then the number reader
     return ChunkChecker(factory, name if name and name.lower() != "auto" else None, options,
-                        chain_steps(ordinal, default_normalizer(language)))
+                        chain_steps(ordinal, letter, default_normalizer(language)))

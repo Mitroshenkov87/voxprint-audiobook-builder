@@ -49,8 +49,9 @@ def test_options_carry_the_one_switch(app, lib, tmp_path):
     n = s.narrate_window
     plan = n.options().prep
     assert plan.rules.steps == frozenset(text_prep.STEP_KEYS) and plan.neural == frozenset()
+    assert n.options().yo is True and text_prep.STEP_YO in n.selected_rule_steps()
     n.chk_prepare.setChecked(False)
-    assert not n.options().prep.enabled
+    assert not n.options().prep.enabled and n.options().yo is False
     n.chk_prepare.setChecked(True)
     assert n.selected_rule_steps() == set(nw.RULE_STEPS)
     s.shutdown()

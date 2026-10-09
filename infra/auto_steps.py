@@ -8,14 +8,15 @@ these steps need (speech recognition, SAGE clean-up, the aligner) are part of th
 Steps that exist (each one has code and tests):
 
 * text preparation, rule based (:mod:`core.text_prep`): layout, noise, quotes, links, headings, numbers, abbreviations,
+  and, for Russian, the letter yo where a dictionary is sure (:mod:`core.yo`),
 * neural clean-up of typos (:mod:`core.text_cleanup`, Russian books, model downloaded once),
 * quality check of a trained voice (:mod:`core.voice_check`, needs the speech-recognition model),
 * A/B comparison of two quick trainings with a recommendation (:mod:`workers.preview_runner`, same model).
 
 Steps that are always on and have no switch: forced alignment of the text onto the audio with its plausibility check
 (:mod:`core.aligner`), the audio quality gates of the dataset (:mod:`core.quality`) and the speech-recognition gates of
-the audio-only mode (:mod:`core.asr_dataset`).  Not included, because they do not exist yet: punctuation model, stress marks,
-translation, speaker roles (:data:`infra.text_models.REGISTRY`, ``integrated=False``).
+the audio-only mode (:mod:`core.asr_dataset`).  Not included, because it does not exist yet: a punctuation model.
+Russian stress marks are not written: the base speech model does not read them.  Yo restoration is the rule step above.
 """
 from __future__ import annotations
 
