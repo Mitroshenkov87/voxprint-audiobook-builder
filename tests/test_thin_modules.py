@@ -144,6 +144,22 @@ def test_a_full_build_is_untouched(monkeypatch):
     assert mods.activate() is None
 
 
+def test_the_runtime_users_file_does_not_join_sys_path():
+    """Bookkeeping in runtime/.users.json must not look like an installed runtime."""
+    from infra import paths
+
+    rt = paths.app_home() / "runtime"
+    rt.mkdir()
+    (rt / ".users.json").write_text('{"audiobook-builder": true}', encoding="utf-8")
+    (rt / "reuse.json").write_text("{}", encoding="utf-8")
+    try:
+        mods.activate()
+        assert str(rt) not in sys.path
+    finally:
+        while str(rt) in sys.path:
+            sys.path.remove(str(rt))
+
+
 def test_install_downloads_required_modules_and_activates_them(thin):
     assert mods.is_thin() and mods.installed_without_network() is False          # nothing cached yet
     man = mods.load_manifest()
