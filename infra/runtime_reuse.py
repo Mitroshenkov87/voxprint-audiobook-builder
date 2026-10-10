@@ -12,7 +12,8 @@ Compatibility rules (all must hold; every rejection is logged with its reason):
 1. same CPython minor version as the running Voxprint (binary wheels: the ``Tag:`` in the wheel's ``WHEEL`` file, e.g. ``cp311``) and
    64-bit Windows (``win_amd64``);
 2. ``torch`` version inside ``compat.torch`` of ``infra/runtime_lock.json`` (a range around the version we tested);
-3. ``torchaudio`` is installed in the same ``site-packages`` with the same release number as ``torch`` (they are built as a pair);
+3. ``torchaudio`` is installed in the same ``site-packages``. The same release number as ``torch``, or TorchAudio 2.11
+   (the last release, which pairs with torch 2.11 and every later torch) with the same flavor;
 4. flavor: a CPU build is accepted only on a PC without an NVIDIA GPU; a CUDA build must not be newer than the driver supports
    (an older CUDA build than the driver offers is fine); a build without a local tag on Windows is a CPU build;
 5. ``torch/lib`` and the package folders really exist (a half-deleted environment is skipped);
@@ -255,7 +256,7 @@ def assess(ext: ExternalTorch, lock: Dict, wanted_flavor: str, driver_cuda: Opti
         return False, f"unreadable torch version {ext.torch!r}"
     if not ext.torchaudio:
         return False, "torchaudio is not installed next to torch"
-    if ext.torchaudio.split("+")[0] != ext.torch.split("+")[0]:
+    if not _torchaudio_pairs(ext.torch, ext.torchaudio):
         return False, f"torchaudio {ext.torchaudio} does not match torch {ext.torch}"
     have_gpu = driver_cuda is not None and wanted_flavor != "cpu"
     if ext.flavor == "cpu" and have_gpu:
@@ -400,11 +401,24 @@ def extra_paths() -> List[str]:
 
 
 # ------------------------------------------------------------------------------------------------ the decision
+def _torchaudio_pairs(torch_ver: str, audio_ver: str) -> bool:
+    """True when the two wheels are a pair: equal versions, or TorchAudio 2.11 with torch >= 2.11."""
+    torch_base = torch_ver.split("+", 1)[0]
+    audio_base = audio_ver.split("+", 1)[0]
+    if audio_base == torch_base:
+        return True
+    try:
+        return audio_base == "2.11.0" and Version(torch_base) >= Version("2.11.0")
+    except InvalidVersion:
+        return False
+
+
 def choose_flavor(flavors: List[str], driver_cuda: Optional[Tuple[int, int]]) -> str:
     """Best flavor of the lock for this PC: the newest CUDA build the driver supports, else ``cpu``.
-    ``VOXPRINT_TORCH_FLAVOR`` forces one (tests, support)."""
+    ``VOXPRINT_TORCH_FLAVOR`` forces one (tests, support). ``cpu`` is accepted even when the public
+    flavor list is only ``cu130``: CI installs the CPU wheels and does not offer them to users."""
     forced = os.environ.get("VOXPRINT_TORCH_FLAVOR", "").strip()
-    if forced and forced in flavors:
+    if forced == "cpu" or (forced and forced in flavors):
         return forced
     best, best_cu = "cpu", (0, 0)
     for f in flavors:

@@ -10,7 +10,7 @@ is repacked or uploaded by us, so a CI build takes minutes instead of an hour an
 | Part | Source | Pinned by | Fallback |
 |---|---|---|---|
 | Voxprint shell (Qt, numpy, soundfile, our code) | our GitHub release (`Voxprint-shell-01.zip`) | SHA-256 in the manifest | — |
-| PyTorch + torchaudio (2.11.0; `cu128`, `cu126` or `cpu`) | `download.pytorch.org/whl/<flavor>/` | `infra/runtime_lock.json` | optional mirror (`urls`) |
+| PyTorch 2.14.1 `cu130` + torchaudio 2.11.0 (CPU wheels are pinned for CI only) | `download.pytorch.org/whl/<flavor>/` | `infra/runtime_lock.json` | optional mirror (`urls`) |
 | ~70 other libraries (transformers, scipy, librosa, onnxruntime, peft ...) | PyPI (`files.pythonhosted.org`) | `infra/runtime_lock.json` | optional mirror |
 | 3 sdist-only pure-Python packages (`eng-to-ipa`, `sox`, `docopt`) | built from the hash-checked PyPI sdist in CI, shipped as small wheels in our release | SHA-256 in the manifest | — |
 | Visual C++ runtime | Microsoft (`aka.ms/vs/17/release/vc_redist.x64.exe`, fetched by CI and embedded in the setup) — installed only if the PC lacks 14.29 or newer | — | — |
@@ -38,14 +38,14 @@ every file is still at its address with the pinned size). CI only reads the comm
 
 | # | Rule |
 |---|---|
-| 1 | Same CPython minor version as Voxprint (the `Tag:` of the installed wheel, now `cp311`) and `win_amd64` |
-| 2 | `torch` inside `compat.torch` of the lock (now `>=2.8,<2.13`; we tested 2.11.0) |
-| 3 | `torchaudio` in the same `site-packages`, same release number as `torch` |
+| 1 | Same CPython minor version as Voxprint (the `Tag:` of the installed wheel, now `cp314`) and `win_amd64` |
+| 2 | `torch` inside `compat.torch` of the lock (now `>=2.14,<2.15`; we ship 2.14.1) |
+| 3 | `torchaudio` in the same `site-packages`: the same release number as `torch`, or TorchAudio 2.11 (the last release) with torch 2.11 or newer |
 | 4 | Flavor: a CPU build only on a PC without an NVIDIA GPU; a CUDA build must not need a newer driver than installed (older CUDA builds are fine); a build without a local tag on Windows counts as CPU |
 | 5 | `torch/lib`, `torch/__init__.py`, `torchaudio/__init__.py` exist |
 | 6 | The child-process check passes (150 s limit) |
 
-The flavor we download follows the driver (`nvidia-smi`): CUDA ≥ 12.8 → `cu128`, ≥ 12.6 → `cu126`, otherwise `cpu` (`VOXPRINT_TORCH_FLAVOR` forces one).
+The flavor we download is `cu130` when the driver supports CUDA 13 (driver 600 or newer, or a header that says CUDA 13.0+). Otherwise there is no user-facing wheel. `VOXPRINT_TORCH_FLAVOR=cpu` selects the CPU wheels pinned for CI. See [RUNTIME.md](RUNTIME.md).
 
 ## Start-up flow
 
@@ -53,7 +53,7 @@ The flavor we download follows the driver (`nvidia-smi`): CUDA ≥ 12.8 → `cu1
    (manifest address `manifest-thin-<channel>.json`), installs the Visual C++ runtime if needed.
 2. The app starts, activates what is in the runtime folder (`infra/modules.activate()`), and opens the **Components** window (also Settings → Components).
 3. The window reads the manifest (last good copy cached offline), looks for a reusable PyTorch, and downloads the missing modules (`libs`, `text`,
-   `audio`, `torch`) without a click, followed by the SAGE text clean-up model (step 1). One live line names what is downloaded right now
+   `audio`, `cuda12`, `torch`) without a click, followed by the SAGE text clean-up model (step 1). One live line names what is downloaded right now
    (percentage, speed), says when a file is being verified (SHA-256) or shows the error; a bar shows the overall progress. No restart is needed
    afterwards; features that need a module work as soon as it is ready.
 4. Step 2 follows at once: the first-run download of ALL models (TTS, aligner, Qwen3-ASR, SAGE if step 1 could not get it) into the chosen models
@@ -112,7 +112,7 @@ a launcher that installs from the folder without any manifest URL.
 
 ## Decisions to know about
 
-* PyTorch 2.11.0 is the version tested so far; reusing 2.8–2.12 from another program is allowed by the rules above but only the child-process check proves it works.
+* PyTorch 2.14.1 `cu130` is the build we ship. TorchAudio stays at 2.11.0. Reuse is limited to `compat.torch` in the lock; only the child-process check proves a foreign copy works.
 * The mirror fallback (`urls`) is implemented but no mirror is populated yet: the CUDA wheel of PyTorch (2.6 GB) is above GitHub's 2 GiB asset limit, so a mirror
   would have to live on Hugging Face (or be split). If upstream removes an old wheel, the lock must be regenerated (`tools/check_lock_urls.py` warns in CI).
-* Python 3.11 / Windows x64 only (the lock is for `cp311-win_amd64`). Linux keeps its own installer.
+* Python 3.14 / Windows x64 for this lock (`cp314-win_amd64`, plus abi3 wheels that still install on 3.14). Linux uses the same Python. See [RUNTIME.md](RUNTIME.md).

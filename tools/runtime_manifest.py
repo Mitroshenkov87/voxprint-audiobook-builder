@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 #: Order of the modules in the Components window / the install order: small ones first, PyTorch last.
-ORDER = ("libs", "text", "audio", "torch")
+ORDER = ("libs", "text", "audio", "cuda12", "torch")
 
 
 def cid(w: dict) -> str:

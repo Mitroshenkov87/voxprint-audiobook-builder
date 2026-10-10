@@ -9,7 +9,7 @@
 #   ~/.local/share/voxprint/venv   its Python environment (PySide6, PyTorch, transformers ...)
 #   ~/.local/share/voxprint/       models, voices, settings, logs (created by the program)
 #   ~/.local/bin/voxprint          the launcher;  ~/.local/share/applications/voxprint.desktop  the menu entry
-# PyTorch: the CUDA build that fits the NVIDIA driver (uv --torch-backend=auto); without a GPU / on failure the CPU build.
+# PyTorch: torch 2.14.1 cu130 (NVIDIA driver 600+) with TorchAudio 2.11.0. --cpu installs the CPU wheels (CI).
 # Re-running the script updates the program (the environment is reused).  `--uninstall` removes it again.
 set -u
 set -o pipefail
@@ -30,7 +30,7 @@ LAUNCHER="$BIN_DIR/voxprint"
 # system packages (Debian / Ubuntu / AnduinOS / Mint names): Qt xcb platform plugin, OpenGL, ffmpeg, venv
 APT_PACKAGES="python3-venv ffmpeg libegl1 libgl1 libdbus-1-3 libfontconfig1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libpulse0"
 
-MODE=install; ASSUME_YES=0; INSTALL_DEPS=0; TORCH=auto; FROM_DIR=""; NO_DESKTOP=0; PURGE=0; RECREATE=0; SKIP_CHECK=0; NO_SYSCHECK=0
+MODE=install; ASSUME_YES=0; INSTALL_DEPS=0; TORCH=cu130; FROM_DIR=""; NO_DESKTOP=0; PURGE=0; RECREATE=0; SKIP_CHECK=0; NO_SYSCHECK=0
 
 say()  { printf '\033[1m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[33mWARNING: %s\033[0m\n' "$*" >&2; }
@@ -44,8 +44,8 @@ Voxprint for Linux (experimental) - installer
     --check            only report what is missing (system libraries, Python), change nothing
     --install-deps     install the missing system packages with "sudo apt-get install" (Debian/Ubuntu family)
     --yes, -y          answer yes to questions
-    --cpu              install the CPU build of PyTorch (smaller; no GPU acceleration)
-    --torch-backend B  uv torch backend: auto (default), cpu, cu126, cu128, ...
+    --cpu              install the CPU build of PyTorch (CI and machines without an NVIDIA GPU)
+    --torch-backend B  wheel index: cu130 (default), cpu. "auto" means cu130
     --from-dir DIR     take the program from a checkout / unpacked folder (DIR contains main.py) instead of downloading
     --recreate         delete and recreate the Python environment
     --no-desktop       do not create the menu entry
@@ -63,7 +63,7 @@ while [ $# -gt 0 ]; do
     --install-deps) INSTALL_DEPS=1 ;;
     --yes|-y) ASSUME_YES=1 ;;
     --cpu) TORCH=cpu ;;
-    --torch-backend) shift; [ $# -gt 0 ] || die "--torch-backend needs a value"; TORCH="$1" ;;
+    --torch-backend) shift; [ $# -gt 0 ] || die "--torch-backend needs a value"; if [ "$1" = auto ]; then TORCH=cu130; else TORCH="$1"; fi ;;
     --from-dir) shift; [ $# -gt 0 ] || die "--from-dir needs a folder"; FROM_DIR="$1" ;;
     --recreate) RECREATE=1 ;;
     --no-desktop) NO_DESKTOP=1 ;;
@@ -133,8 +133,8 @@ warn_if_old_distro
 say "Voxprint for Linux (EXPERIMENTAL) - checking the system"
 PY="${VOXPRINT_PYTHON:-python3}"
 command -v "$PY" >/dev/null 2>&1 || die "python3 not found. Debian/Ubuntu: sudo apt install python3 python3-venv"
-if ! "$PY" -c 'import sys; sys.exit(0 if (3, 10) <= sys.version_info[:2] <= (3, 13) else 1)'; then
-  die "Python 3.10 - 3.13 is required (found: $("$PY" -c 'import sys; print(sys.version.split()[0])')). Set VOXPRINT_PYTHON=/path/to/python3.12 to use another one."
+if ! "$PY" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 14) else 1)'; then
+  die "Python 3.14 is required (found: $("$PY" -c 'import sys; print(sys.version.split()[0])')). Set VOXPRINT_PYTHON=/path/to/python3.14 to use another one."
 fi
 echo "Python: $("$PY" -c 'import sys; print(sys.version.split()[0])') ($(command -v "$PY"))"
 
@@ -224,11 +224,14 @@ say "Installing the installer tools (pip, uv)"
 UV="$VENV/bin/uv"
 export UV_LINK_MODE=copy UV_CACHE_DIR="${UV_CACHE_DIR:-$CACHE/uv}"
 
-say "Installing PyTorch (backend: $TORCH)"
-if ! "$UV" pip install --python "$VPY" torch torchaudio --torch-backend="$TORCH"; then
+say "Installing PyTorch $TORCH (torch 2.14.1, torchaudio 2.11.0)"
+install_torch() {
+  "$UV" pip install --python "$VPY" "torch==2.14.1" "torchaudio==2.11.0" --index-url "https://download.pytorch.org/whl/$1"
+}
+if ! install_torch "$TORCH"; then
   if [ "$TORCH" != cpu ]; then
     warn "PyTorch ($TORCH) failed - falling back to the CPU build"
-    "$UV" pip install --python "$VPY" torch torchaudio --torch-backend=cpu || die "PyTorch could not be installed"
+    install_torch cpu || die "PyTorch could not be installed"
     TORCH=cpu
   else
     die "PyTorch could not be installed"

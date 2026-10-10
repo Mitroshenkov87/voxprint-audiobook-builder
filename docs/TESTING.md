@@ -1,7 +1,7 @@
 # Tests and verification
 
 ## Tested on Windows
-Real run on **Windows Server 2025 + NVIDIA RTX 4090** (driver 610.88 / CUDA 13.3, Python 3.11.9, torch 2.14.1+cu130), 2026-10-03.
+Real run on **Windows Server 2025 + NVIDIA RTX 4090** (driver 610.88 / CUDA 13.3, Python 3.11.9, torch 2.14.1+cu130), 2026-10-03. The current build is Python 3.14 and torch 2.14.1 `cu130` ([RUNTIME.md](RUNTIME.md)).
 The 4090 has 22.5 GiB; the app was tested against a 16 GiB cap to emulate a 16 GB laptop GPU.
 
 | Area | Result |

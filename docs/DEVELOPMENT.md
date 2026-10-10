@@ -39,7 +39,7 @@ On Windows, never run `uv run` without `--no-sync` (it replaces CUDA torch with 
 * Add a test with every behaviour change or bug fix.
 
 ## Code style
-* Python 3.11+, type hints where they help, `from __future__ import annotations`.
+* Python 3.14, type hints where they help, `from __future__ import annotations`.
 * **Documentation is part of the code.** Every module has a docstring explaining its purpose; every public function/class has a short docstring; add comments for
   *why* something non-obvious is done (not for what the next line does). Code, comments and docstrings are **English**.
 * Keep `core/` free of Qt and of installer logic, and keep `ui/` free of heavy work (it belongs in `workers/` or `core/`).

@@ -94,6 +94,20 @@ def test_flavor_can_be_forced(monkeypatch):
     assert rr.choose_flavor(["cu128", "cpu"], (12, 8)) == "cpu"
 
 
+def test_cpu_is_forced_for_ci_when_it_is_not_a_public_flavor(monkeypatch):
+    monkeypatch.setenv("VOXPRINT_TORCH_FLAVOR", "cpu")
+    assert rr.choose_flavor(["cu130"], (13, 0)) == "cpu"
+    monkeypatch.delenv("VOXPRINT_TORCH_FLAVOR")
+    assert rr.choose_flavor(["cu130"], (13, 0)) == "cu130"
+    assert rr.choose_flavor(["cu130"], (12, 8)) == "cpu"
+
+
+def test_torchaudio_2_11_pairs_with_a_later_torch():
+    assert rr._torchaudio_pairs("2.14.1+cu130", "2.11.0+cu130")
+    assert rr._torchaudio_pairs("2.11.0+cpu", "2.11.0+cpu")
+    assert not rr._torchaudio_pairs("2.14.1+cu130", "2.10.0+cu130")
+
+
 # ------------------------------------------------------------------------------------------------ decision and memory
 def test_the_first_candidate_that_passes_the_check_is_used_and_remembered(tmp_path):
     bad = env_with(tmp_path, "newer", torch="2.12.0+cu128", audio="2.12.0+cu128")

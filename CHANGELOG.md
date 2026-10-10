@@ -5,6 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Changed
+- **Python 3.14 and PyTorch 2.14.1 `cu130`.** Installers, CI, and `infra/runtime_lock.json` use Python 3.14. The only user-facing PyTorch flavor is `cu130` (NVIDIA driver 600 or newer). CPU wheels stay in the lock for CI. TorchAudio stays at 2.11.0, the last release. `audioop-lts` is pinned so pydub can import `audioop`. CTranslate2 is installed with the CUDA 12 cublas and cuDNN wheels; `infra/cuda12_libs.py` registers them before that library is imported. See [docs/RUNTIME.md](docs/RUNTIME.md).
+
 ## [1.0.0-rc] - 2026-10-10 - build 999 "Nachon"
 
 Codename *Nachon* (Biblical Hebrew *nachon*, established, ready; Genesis 41:32). The version is **1.0.0-rc**. The release tag for this build is `v1.0.0-rc`. People see `1.0.0 RC · build 999 "Nachon"`. Build-installer run 52 failed in the Windows tests that need no PyTorch (a bash-only test had lost its skip marker) and published nothing, so the `BUILD.json` offset is **946**: run 53 stamps build 999 (53 + 946 = 999).

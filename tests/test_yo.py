@@ -77,7 +77,7 @@ def test_dataset_records_plain_text_and_rebuilds_the_same_bytes():
     rebuilt = (ROOT / "core" / "data" / "yo_runtime.tsv.gz").read_bytes()
     rebuilt_dataset = (ROOT / "core" / "data" / "yo_dataset.jsonl.gz").read_bytes()
     # Python 3.12 gzip.compress(mtime=0) writes OS byte 3; GzipFile writes 255.
-    # The Windows runner is 3.11, so the shipped header is the GzipFile one.
+    # The shipped header is the GzipFile one.
     assert before[:10] == bytes.fromhex("1f8b08000000000002ff")
     assert rebuilt == before and rebuilt_dataset == dataset
 

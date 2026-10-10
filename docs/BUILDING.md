@@ -10,9 +10,9 @@ Caveat: the installer runs elevated (per-machine); if the administrator account 
 
 ## Run from source (Windows)
 ```bat
-py -3.11 -m venv .venv && .venv\Scripts\activate
+py -3.14 -m venv .venv && .venv\Scripts\activate
 pip install uv
-uv pip install torch torchaudio --torch-backend=auto       :: fallback: pip install -r requirements-torch.txt
+uv pip install torch==2.14.1 torchaudio==2.11.0 --torch-backend=cu130       :: fallback: pip install -r requirements-torch.txt
 uv pip install -r requirements.txt -r requirements-verified.txt
 uv pip install --no-deps -r requirements-nodeps.txt        :: qwen-asr/qwen-tts: their transformers pins conflict
 python -m bitsandbytes                                     :: optional check of the 8-bit optimizer (plain AdamW otherwise - fine)
@@ -28,7 +28,7 @@ build.bat onedir       :: dist\Voxprint\ folder (preferred: faster start, and Qt
 :: verify a frozen build contains every library:  dist\Voxprint\Voxprint.exe --selftest-imports   (result in <app home>\logs\selftest_imports.txt)
 ```
 Experimental thin installer (shell only, modules downloaded by the app): `build_thin.bat`, then `installer\build_online.ps1 -Thin` - see [THIN-INSTALLER.md](THIN-INSTALLER.md).
-Command-line maintenance flags of `main.py`: `--prefetch` (download models now), `--selftest`, `--selftest-imports`, `--selftest-narrate [voice]` (headless: narrates two sentences with the first voice, result in `<app home>\logs\selftest_narrate.txt`, exit code 0 / 1 / 2 = no voice), `--verify-install`, `--repair`.
+Command-line maintenance flags of `main.py`: `--prefetch` (download models now), `--selftest`, `--selftest-imports`, `--selftest-speech` (model-free TTS / ASR smoke), `--selftest-narrate [voice]` (headless: narrates two sentences with the first voice, result in `<app home>\logs\selftest_narrate.txt`, exit code 0 / 1 / 2 = no voice), `--verify-install`, `--repair`.
 App data lives in `%LOCALAPPDATA%\Voxprint` (`models\`, `logs\`, `state\`, ...; override with `VOXPRINT_HOME`).
 Interface language override: `VOXPRINT_LANG=en|de|ru|uk|lv`.
 

@@ -49,7 +49,7 @@ def auto_download(state_dir: Optional[Path] = None) -> bool:
     return mode(state_dir) != QUICK
 
 
-def full_sizes(flavor: str = "cu128", platform: str = "win-x64") -> Dict[str, int]:
+def full_sizes(flavor: str = "cu130", platform: str = "win-x64") -> Dict[str, int]:
     """Bytes of the complete download from the pinned sizes: ``models``, ``runtime`` and ``total``."""
     from infra import bundled_voices, denoise_tool, llm_tool, model_mirrors, quality_models, text_models
 

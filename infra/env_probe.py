@@ -20,9 +20,9 @@ needs huggingface/transformers#44517, which is still an open PR), Qwen3-TTS uses
 Unsloth would pull its own pins (trl, xformers, transformers range incl. 5.x) that conflict with the verified set.
 Voxprint keeps its own LoRA loop (core/lora_trainer.py).  If found it is only reported (reason ``no_qwen3_tts_training``).
 
-NVIDIA driver -> PyTorch wheel flavor follows the CUDA version printed by ``nvidia-smi`` (same mapping Unsloth's
-installer uses: cu118 / cu124 / cu126 / cu128 / cu130, else CPU).  When the header has no ``CUDA Version`` /
-``CUDA UMD Version``, the driver version is used instead: 570+ is treated as CUDA 12.8, 560-569 as 12.6, older as CPU.
+NVIDIA driver -> PyTorch wheel flavor follows the CUDA version printed by ``nvidia-smi``.  The only wheel we ship
+is ``cu130`` (CUDA 13.0).  When the header has no ``CUDA Version`` / ``CUDA UMD Version``, the driver version is
+used instead: 600 and newer count as CUDA 13.0, anything older has no matching wheel.
 """
 from __future__ import annotations
 
@@ -92,9 +92,8 @@ def _run(args: List[str]) -> Tuple[int, str]:
 
 
 # ------------------------------------------------------------------------------------- torch / CUDA flavor
-#: (minimum CUDA version of the driver, wheel tag), checked top-down.
-CUDA_FLAVORS: Tuple[Tuple[Tuple[int, int], str], ...] = (
-    ((13, 0), "cu130"), ((12, 8), "cu128"), ((12, 6), "cu126"), ((12, 4), "cu124"), ((11, 8), "cu118"))
+#: (minimum CUDA version of the driver, wheel tag), checked top-down. Only cu130 is shipped.
+CUDA_FLAVORS: Tuple[Tuple[Tuple[int, int], str], ...] = (((13, 0), "cu130"),)
 
 
 _CUDA_IN_HEADER = re.compile(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)")   # 6xx drivers print "CUDA UMD Version"
@@ -110,7 +109,7 @@ def parse_nvidia_smi_cuda(text: str) -> Optional[Tuple[int, int]]:
 def cuda_from_driver_version(text: str) -> Optional[Tuple[int, int]]:
     """Map ``nvidia-smi --query-gpu=driver_version`` when the header has no CUDA version.
 
-    The first line ``major.minor...`` decides: >= 570 -> CUDA 12.8, >= 560 -> CUDA 12.6, otherwise None (CPU).
+    The first line ``major.minor...`` decides: >= 600 -> CUDA 13.0 (the cu130 wheels need that driver), otherwise None.
     """
     lines = (text or "").splitlines()
     if not lines:
@@ -119,10 +118,8 @@ def cuda_from_driver_version(text: str) -> Optional[Tuple[int, int]]:
     if not m:
         return None
     major = int(m.group(1))
-    if major >= 570:
-        return (12, 8)
-    if major >= 560:
-        return (12, 6)
+    if major >= 600:
+        return (13, 0)
     return None
 
 
