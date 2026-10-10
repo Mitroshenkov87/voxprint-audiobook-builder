@@ -2267,10 +2267,10 @@ def set_setting(key: str, value: str, *, persist: bool = True) -> object:
                 raise CliError(EXIT_BAD_ARGS, f"expected a number such as 0.75, or off, got {value!r}") from exc
             return vram_policy.clamp_fraction(value)
         try:
-            stored = gpu_prefs.set_vram_fraction(value)
+            fraction = gpu_prefs.set_vram_fraction(value)
         except ValueError as exc:
             raise CliError(EXIT_BAD_ARGS, f"expected a number such as 0.75, or off, got {value!r}") from exc
-        return "off" if stored is None else stored
+        return "off" if fraction is None else fraction
     if key == "gpu.fast_decode":
         from infra import gpu_prefs
 

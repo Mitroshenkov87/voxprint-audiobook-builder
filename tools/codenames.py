@@ -105,10 +105,10 @@ def problems(root: Path | None = None) -> list[str]:
     latest_names = by_build.get(latest, set()) if latest is not None else set()
     folded = current.casefold()
     if folded in by_name and folded not in latest_names:
-        builds = sorted(by_name[folded])
-        refs = sources.get((builds[0], folded), [])
+        earlier = sorted(by_name[folded])
+        refs = sources.get((earlier[0], folded), [])
         found.append(
-            f"BUILD.json codename {current} is already used by build {', '.join(str(n) for n in builds)} "
+            f"BUILD.json codename {current} is already used by build {', '.join(str(n) for n in earlier)} "
             f"({'; '.join(refs)})"
         )
     return found
