@@ -168,11 +168,12 @@ def _save_cache(raw: bytes) -> None:
         with _cache_lock:
             fd, name = tempfile.mkstemp(prefix=p.stem + ".", suffix=".tmp", dir=p.parent)
             tmp = Path(name)
+            target = tmp
             with os.fdopen(fd, "wb") as f:
                 f.write(raw)
             for attempt in range(6):
                 try:
-                    os.replace(tmp, p)
+                    os.replace(target, p)
                     tmp = None
                     return
                 except PermissionError:

@@ -64,7 +64,11 @@ def ready(models_dir: Optional[Path] = None, manifest: Optional[Path] = None) ->
     return True
 
 
-def ensure(progress: Callable[[float, str], None] = lambda f, m="": None, models_dir: Optional[Path] = None,
+def _silent_progress(f: float, m: str = "") -> None:
+    pass
+
+
+def ensure(progress: Callable[[float, str], None] = _silent_progress, models_dir: Optional[Path] = None,
            opener=None, timeout: float = 30.0, manifest: Optional[Path] = None) -> Path:
     """Download the converter if it is missing (size + SHA-256, resumable). Only on the user's explicit request.
 

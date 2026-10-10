@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, cast
 
 from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
@@ -521,8 +521,8 @@ class VoicesWindow(SubWindow):
         super().__init__(with_back=True)
         self._fetch, self._download = fetch, download
         self.entries: List[repo.RepoVoice] = repo.load_cache()      # the cached index shows at once, also offline
-        self._index_worker = None
-        self._dl_worker = None
+        self._index_worker: Optional[RepoIndexWorker] = None
+        self._dl_worker: Optional[RepoDownloadWorker] = None
         self._dl_key, self._dl_progress = "", -1.0
         self.library = library or VoiceLibrary()
         self.previewer = previewer or Previewer(self)
@@ -611,7 +611,7 @@ class VoicesWindow(SubWindow):
         items = catalog.build(self.library, self.entries)
         voices = [i for i in items if i.installed]
         for it in voices:
-            rec = it.record
+            rec = cast(VoiceRecord, it.record)
             c = VoiceCard(rec, playing=(self.previewer.current is not None and rec.preview_path == self.previewer.current))
             c.preview.connect(self.toggle_preview)
             c.narrate.connect(self.narrate_with.emit)
@@ -827,7 +827,11 @@ class VoicesWindow(SubWindow):
             dlg = self._repo_dialog_factory(self.library, self)
         else:
             dlg = RepoDialog(self.library, self)
-        dlg.voices_added.connect(lambda ids: (self.refresh(), self.library_changed.emit()))
+        def on_added(_ids) -> None:
+            self.refresh()
+            self.library_changed.emit()
+
+        dlg.voices_added.connect(on_added)
         self.repo_dialog = dlg
         dlg.refresh()
         if os.environ.get("QT_QPA_PLATFORM") == "offscreen":

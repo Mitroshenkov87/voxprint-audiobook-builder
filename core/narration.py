@@ -53,6 +53,7 @@ from core import ai_disclosure
 from core import cpu_budget
 from core import speakers as spk
 from core.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_book
+from core.llm_text import LLMPlan
 from core import ordinals
 from core import yo
 from core.errors import CancelledByUser, DatasetMakerError, NarrationError
@@ -131,7 +132,7 @@ class NarrationOptions:
     #: Machine translation of the book before narration (:mod:`core.translate`); ``None`` = narrate the book as it is.
     translate: Optional[tl.TranslatePlan] = None
     #: "Prepare text for narration" with the AI text model (:mod:`core.llm_text`, a ``LLMPlan``); ``None`` = off.
-    llm_prepare: Optional[object] = None
+    llm_prepare: Optional[LLMPlan] = None
     #: Per-chunk speech-recognition check with regeneration (:mod:`core.chunk_check`); the runner builds the checker.
     check_chunks: bool = False
     check_max_cer: float = 0.15
@@ -324,7 +325,7 @@ def text_steps(language: Optional[str], book_language: Optional[str], options: N
     return chain_steps(ordinal, letter, base)
 
 
-def default_normalizer(language: str) -> Optional[Callable[[str], str]]:
+def default_normalizer(language: Optional[str]) -> Optional[Callable[[str], str]]:
     """Russian numbers/abbreviations are spelled out before synthesis (the same normalizer the dataset builder uses)."""
     if (language or "").strip().lower() in ("russian", "ru"):
         from core.normalizer import normalize_for_tts
@@ -498,10 +499,12 @@ SORT_WINDOW_BATCHES = 3
 
 def _batch_limit(engine: TTSEngine) -> int:
     """How many chunks the engine can take at once (1 = no batching: engine without ``synthesize_batch`` or on CPU)."""
-    if not callable(getattr(engine, "synthesize_batch", None)) or not callable(getattr(engine, "max_batch", None)):
+    batch = getattr(engine, "synthesize_batch", None)
+    limit_of = getattr(engine, "max_batch", None)
+    if not callable(batch) or not callable(limit_of):
         return 1
     try:
-        return max(1, int(engine.max_batch()))
+        return max(1, int(limit_of()))
     except Exception:  # noqa: BLE001
         return 1
 

@@ -24,8 +24,9 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 log = logging.getLogger("voxprint.models")
 
@@ -57,7 +58,7 @@ def reset_verdict() -> None:
     global _verdict
     _verdict = (None, 0.0)
 
-Opener = Callable[[urllib.request.Request, float], "object"]
+Opener = Callable[[urllib.request.Request, float], AbstractContextManager[Any]]
 
 
 class MirrorError(Exception):
@@ -86,7 +87,7 @@ def hf_is_fast(repo_id: str, opener: Opener = _open, timeout: float = HF_PROBE_T
     t0 = clock()
     try:
         req = urllib.request.Request(f"{hf_endpoint()}/api/models/{repo_id}", headers={"User-Agent": "Voxprint"})
-        with opener(req, timeout) as r:  # type: ignore[attr-defined]
+        with opener(req, timeout) as r:
             r.read(1024)
     except (OSError, urllib.error.URLError, ValueError) as exc:
         log.info("huggingface.co not reachable (%s)", exc)
@@ -102,8 +103,8 @@ def list_files(repo_id: str, opener: Opener = _open, timeout: float = 20.0) -> L
     """List ``(path, size)`` of all files of a ModelScope repository (folders, ``.gitattributes`` and README excluded)."""
     url = f"{BASE_URL}/api/v1/models/{repo_id}/repo/files?Recursive=true"
     try:
-        with opener(urllib.request.Request(url, headers={"User-Agent": "Voxprint"}), timeout) as r:  # type: ignore
-            data = json.loads(r.read().decode("utf-8"))  # type: ignore[attr-defined]
+        with opener(urllib.request.Request(url, headers={"User-Agent": "Voxprint"}), timeout) as r:
+            data = json.loads(r.read().decode("utf-8"))
     except (OSError, ValueError) as exc:
         raise MirrorError(f"file list unavailable: {exc}") from exc
     files = (data.get("Data") or {}).get("Files") or []
@@ -175,13 +176,13 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
             if have:
                 headers["Range"] = f"bytes={have}-"
             try:
-                with opener(urllib.request.Request(url, headers=headers), timeout) as r:  # type: ignore[arg-type]
+                with opener(urllib.request.Request(url, headers=headers), timeout) as r:
                     status = getattr(r, "status", 200)
                     if have and status != 206:       # server ignored Range (no 206 Partial Content): start over
                         have = 0
                     with parallel_download.open_retry(part, "ab" if have else "wb") as f:
                         while True:
-                            chunk = r.read(CHUNK)  # type: ignore[attr-defined]
+                            chunk = r.read(CHUNK)
                             if not chunk:
                                 break
                             f.write(chunk)

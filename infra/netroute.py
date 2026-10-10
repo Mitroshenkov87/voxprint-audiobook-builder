@@ -125,7 +125,9 @@ def _from_command(cmd: List[str], pattern: str) -> List[Tuple[str, str]]:
         if m and m.lastindex == 2:
             out.append((m.group(1), m.group(2)))
         elif re.match(r"^(\S+?):\s", line) and not line.startswith(" "):      # ifconfig: "en0: flags=..."
-            cur = re.match(r"^(\S+?):", line).group(1)
+            iface = re.match(r"^(\S+?):", line)
+            if iface is not None:
+                cur = iface.group(1)
         else:
             m2 = re.match(r"^\s+inet6?\s+([0-9a-fA-F:.]+)", line)
             if m2 and cur:
@@ -188,11 +190,13 @@ def _from_windows() -> List[Tuple[str, str]]:
 
 
 def _from_hostname() -> List[Tuple[str, str]]:
-    out = []
+    out: List[Tuple[str, str]] = []
     try:
         for info in socket.getaddrinfo(socket.gethostname(), None):
             if info[0] in (socket.AF_INET, socket.AF_INET6):
-                out.append((info[4][0], info[4][0]))
+                host = info[4][0]
+                if isinstance(host, str):
+                    out.append((host, host))
     except OSError:
         pass
     return out
@@ -358,7 +362,7 @@ def candidates(host: str) -> List[Route]:
 # ----------------------------------------------------------------------------------------------- urllib
 def _bound(base: type, ip: str, connect_timeout: float):
     """An HTTP(S) connection class that binds the source address and uses a short timeout for connecting only."""
-    class Conn(base):       # type: ignore[misc, valid-type]
+    class Conn(base):
         def __init__(self, *a, **kw):
             if ip:
                 kw["source_address"] = (ip, 0)
@@ -528,7 +532,7 @@ def disable_xet() -> None:
     consts = sys.modules.get("huggingface_hub.constants")
     if consts is not None:
         try:
-            consts.HF_HUB_DISABLE_XET = True
+            setattr(consts, "HF_HUB_DISABLE_XET", True)
         except Exception:  # noqa: BLE001
             pass
 
@@ -605,8 +609,8 @@ def set_hub_timeouts() -> None:
     os.environ.setdefault("HF_HUB_ETAG_TIMEOUT", str(int(HUB_CONNECT_TIMEOUT)))
     try:
         constants = importlib.import_module("huggingface_hub.constants")
-        constants.HF_HUB_DOWNLOAD_TIMEOUT = int(os.environ["HF_HUB_DOWNLOAD_TIMEOUT"])
-        constants.HF_HUB_ETAG_TIMEOUT = int(os.environ["HF_HUB_ETAG_TIMEOUT"])
+        setattr(constants, "HF_HUB_DOWNLOAD_TIMEOUT", int(os.environ["HF_HUB_DOWNLOAD_TIMEOUT"]))
+        setattr(constants, "HF_HUB_ETAG_TIMEOUT", int(os.environ["HF_HUB_ETAG_TIMEOUT"]))
     except Exception:  # noqa: BLE001 - no hub (installer helper) or a changed hub: the adapter still bounds every request
         pass
 
@@ -628,7 +632,7 @@ def _install_hf_adapter(ip: str) -> None:
     # loaded by name: voxprint-fetch.exe (PyInstaller) must not pull huggingface_hub / requests / torch into the installer
     configure_http_backend = importlib.import_module("huggingface_hub").configure_http_backend
     requests = importlib.import_module("requests")
-    HTTPAdapter = importlib.import_module("requests.adapters").HTTPAdapter
+    HTTPAdapter: type = importlib.import_module("requests.adapters").HTTPAdapter
     set_hub_timeouts()
 
     class HubAdapter(HTTPAdapter):
@@ -640,7 +644,7 @@ def _install_hf_adapter(ip: str) -> None:
         def send(self, request, stream=False, timeout=None, *args, **kwargs):
             return super().send(request, stream, hub_timeout(timeout), *args, **kwargs)
 
-    def factory() -> "requests.Session":
+    def factory():
         s = requests.Session()
         s.mount("https://", HubAdapter())
         s.mount("http://", HubAdapter())
@@ -652,7 +656,7 @@ def _install_hf_adapter(ip: str) -> None:
         return
     os.environ["HF_HUB_DISABLE_XET"] = "1"
     try:
-        importlib.import_module("huggingface_hub.constants").HF_HUB_DISABLE_XET = True
+        setattr(importlib.import_module("huggingface_hub.constants"), "HF_HUB_DISABLE_XET", True)
     except Exception:  # noqa: BLE001
         pass
 

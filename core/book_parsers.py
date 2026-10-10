@@ -23,7 +23,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, cast
 
 from core.errors import BookParseError
 from core.i18n import tr
@@ -129,7 +129,8 @@ def parse_txt(text: str, title: str = "") -> Book:
     text = text.replace("\r\n", "\n").replace("\r", "\n").strip("\ufeff")
     lines = text.split("\n")
     chapters: List[Chapter] = []
-    cur_title, cur_lines = "", []
+    cur_title = ""
+    cur_lines: List[str] = []
 
     def flush() -> None:
         body = "\n".join(cur_lines).strip()
@@ -141,7 +142,8 @@ def parse_txt(text: str, title: str = "") -> Book:
         next_blank = i + 1 >= len(lines) or not lines[i + 1].strip()
         if _is_heading(line, prev_blank, next_blank):
             flush()
-            cur_title, cur_lines = line.strip().lstrip("#").strip(), []
+            cur_title = line.strip().lstrip("#").strip()
+            cur_lines = []
         else:
             cur_lines.append(line)
     flush()
@@ -360,8 +362,9 @@ def _epub_nav_titles(zf: zipfile.ZipFile, base: str, manifest: Dict[str, Dict[st
                         continue
                     label = next((t.text for t in np_.iter() if _local(t.tag) == "text" and t.text), "")
                     content = next((c for c in np_ if _local(c.tag) == "content"), None)
-                    if content is not None and content.get("src"):
-                        src = content.get("src").split("#")[0]
+                    src_attr = content.get("src") if content is not None else None
+                    if src_attr:
+                        src = src_attr.split("#")[0]
                         titles.setdefault(posixpath.normpath(posixpath.join(posixpath.dirname(path), src)),
                                           _squash(label or ""))
         except (KeyError, BookParseError):
@@ -379,10 +382,11 @@ def parse_epub(path: Path) -> Book:
         try:
             cont = _safe_xml(_read_member(zf, "META-INF/container.xml"))
             rootfile = next(e.get("full-path") for e in cont.iter() if _local(e.tag) == "rootfile")
-            opf = _safe_xml(_read_member(zf, rootfile))
+            opf_path = cast(str, rootfile)
+            opf = _safe_xml(_read_member(zf, opf_path))
         except (KeyError, StopIteration) as exc:
             raise BookParseError(tr("err.book_read"), details=str(exc)) from exc
-        base = posixpath.dirname(rootfile)
+        base = posixpath.dirname(opf_path)
         title = author = lang = cover_id = ""
         manifest: Dict[str, Dict[str, str]] = {}
         spine: List[str] = []
@@ -396,11 +400,15 @@ def parse_epub(path: Path) -> Book:
                 lang = _squash(e.text or "")
             elif n == "meta" and e.get("name") == "cover":
                 cover_id = e.get("content") or ""
-            elif n == "item" and e.get("id") and e.get("href"):
-                manifest[e.get("id")] = {"href": e.get("href"), "type": e.get("media-type", ""),
+            elif n == "item":
+                item_id, href = e.get("id"), e.get("href")
+                if item_id and href:
+                    manifest[item_id] = {"href": href, "type": e.get("media-type", ""),
                                          "properties": e.get("properties", "")}
-            elif n == "itemref" and e.get("idref"):
-                spine.append(e.get("idref"))
+            elif n == "itemref":
+                idref = e.get("idref")
+                if idref:
+                    spine.append(idref)
         nav_titles = _epub_nav_titles(zf, base, manifest)
         chapters: List[Chapter] = []
         for idref in spine:

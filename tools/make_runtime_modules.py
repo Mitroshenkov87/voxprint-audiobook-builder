@@ -108,7 +108,8 @@ def build_modules(site: Path, out: Path, base_url: str, limit_mib: int = 1800) -
         parts: List[dict] = []
         cur: Optional[zipfile.ZipFile] = None
         cur_path: Optional[Path] = None
-        raw, markers = 0, []
+        raw = 0
+        markers: List[str] = []
 
         def close() -> None:
             nonlocal cur, cur_path, raw, markers

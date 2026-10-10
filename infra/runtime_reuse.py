@@ -196,8 +196,8 @@ def candidate_prefixes(environ: Optional[Dict[str, str]] = None, home: Optional[
         for proj in level1:
             venvs(proj)
             try:
-                for sub in sorted(p for p in proj.iterdir() if p.is_dir() and not p.name.startswith("."))[:40]:
-                    venvs(sub)
+                for child in sorted(p for p in proj.iterdir() if p.is_dir() and not p.name.startswith("."))[:40]:
+                    venvs(child)
             except OSError:
                 continue
     return pre

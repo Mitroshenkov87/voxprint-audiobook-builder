@@ -28,7 +28,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Protocol
 
 # --- netroute: the "interface hopper" (infra/netroute.py).  Frozen exe: bundled with --paths infra; the single-file Linux copy
 # --- (voxprint-fetch.py) has the module inlined here by tools/make_linux_package.py; without it plain urllib is used.
@@ -54,6 +54,12 @@ class FetchError(Exception):
 
 
 # --------------------------------------------------------------------------- status file
+class _Progress(Protocol):
+    """Anything :func:`run` reports through (the status file, or a slice of one)."""
+
+    def write(self, state: str, fraction: float, text: str, force: bool = False) -> None: ...
+
+
 class Status:
     """Writes the status file the installer polls (atomic replace).  Line 4 is a heartbeat counter: a background thread
     rewrites the file every ~1.5 s while the job runs, so the installer can tell a busy downloader from a dead one."""
@@ -509,7 +515,7 @@ def _have_size(path: Path, comp: dict) -> bool:
         return False
 
 
-def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Optional[List[str]] = None,
+def run(manifest_source: str, dest: Path, cache: Path, status: _Progress, only: Optional[List[str]] = None,
         sleep: Callable[[float], None] = time.sleep, roles: Optional[List[str]] = None,
         portable: Optional[Path] = None, keep_all: bool = False, offline: bool = False, flavor: str = "auto",
         modules: Optional[List[str]] = None, prune: bool = False) -> int:
@@ -584,7 +590,10 @@ def run(manifest_source: str, dest: Path, cache: Path, status: Status, only: Opt
             fetch.append(c)
     reused = len(comps) - len(todo)
     if offline:
-        lost = [portable_file(portable, c).name for c in todo if not _portable_valid(portable_file(portable, c), c)]
+        setup = portable
+        if setup is None:
+            raise FetchError("The setup folder has no usable manifest.json.")
+        lost = [portable_file(setup, c).name for c in todo if not _portable_valid(portable_file(setup, c), c)]
         if lost:
             raise FetchError("The setup folder is incomplete or damaged (" + ", ".join(lost[:4]) + (" ..." if len(lost) > 4 else "")
                              + "). Run the installer with an internet connection to repair it.")

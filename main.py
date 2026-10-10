@@ -17,6 +17,7 @@ import logging
 import logging.handlers
 import os
 import sys
+from typing import Sequence
 
 
 def _setup_logging() -> None:
@@ -297,7 +298,8 @@ def main(argv=None) -> int:
         from cli import main as user_cli_main
     except ImportError:
         user_cli_main = None  # type: ignore[assignment]
-        is_user_cli = lambda _a: False  # noqa: E731
+        def is_user_cli(argv: Sequence[str]) -> bool:
+            return False
     if user_cli_main is not None and is_user_cli(argv):
         from infra import diagnostics
         from infra.stdio_guard import install_cli_excepthook

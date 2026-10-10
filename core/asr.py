@@ -16,7 +16,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import numpy as np
 
@@ -54,7 +54,8 @@ class Qwen3ASR(BaseASR):
     """Qwen3-ASR through the ``qwen_asr`` package (the same package the aligner uses)."""
 
     def __init__(self, model_path: str = ASR_REPO, device: str = "auto") -> None:
-        self.model_path, self.device, self._m = model_path, device, None
+        self.model_path, self.device = model_path, device
+        self._m: Any = None
 
     def load(self) -> None:
         import torch

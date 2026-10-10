@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
@@ -42,6 +42,9 @@ from ui.revoice_window import RevoiceWindow
 from ui.settings_dialog import SettingsDialog
 from ui.voices_window import VoicesWindow
 from ui.window_base import SubWindow, fit_to_screen
+
+if TYPE_CHECKING:
+    from ui.about_dialog import AboutDialog
 
 PAGES = ("studio", "train", "voices", "narrate", "revoice")
 
@@ -101,7 +104,7 @@ class StudioWindow(SubWindow):
                                           "narrate": self.narrate_window, "revoice": self.revoice_window}
         self.current_page = "studio"
         self._settings: Optional[SettingsDialog] = None
-        self._about = None
+        self._about: Optional[AboutDialog] = None
         self._shutting_down = False
         self._normal_size = None                   # window size before a widened page (Narrate's two columns)
         # Optional "Preload models into memory at startup" (Settings, off by default): ticked by the timer below.
@@ -156,8 +159,8 @@ class StudioWindow(SubWindow):
         for name, w in self.pages.items():
             if name == "studio":
                 continue
-            w.go.connect(self.navigate)           # type: ignore[attr-defined]
-            w.closing.connect(self._on_child_closed)   # type: ignore[attr-defined]
+            w.go.connect(self.navigate)
+            w.closing.connect(self._on_child_closed)
         self.voices_window.narrate_with.connect(self.narrate_with_voice)
         self.voices_window.library_changed.connect(self.refresh)
         self.voices_window.full_model_requested.connect(self._full_model)
@@ -169,7 +172,7 @@ class StudioWindow(SubWindow):
         """Sub-windows share the Studio's look (plain vs. Acrylic is applied per window when it is shown)."""
         for name, w in self.pages.items():
             if name not in ("studio", "train"):
-                w.apply_style_from(self)       # type: ignore[attr-defined]
+                w.apply_style_from(self)
 
     def apply_look_all(self) -> None:
         """Window transparency changed in Settings: restyle the visible pages now (hidden ones on their next show)."""
@@ -195,7 +198,7 @@ class StudioWindow(SubWindow):
         """Language changed: retranslate every window."""
         for name, w in self.pages.items():
             if name != "train":              # the training window retranslates itself before announcing the change
-                w.retranslate()              # type: ignore[attr-defined]
+                w.retranslate()
         if self._settings is not None:
             self._settings.retranslate()
             self._settings.sync_language()

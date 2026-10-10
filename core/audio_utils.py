@@ -56,7 +56,7 @@ def ensure_ffmpeg() -> Optional[str]:
             path = None
     if path is None:
         try:
-            import imageio_ffmpeg  # type: ignore
+            import imageio_ffmpeg
 
             path = imageio_ffmpeg.get_ffmpeg_exe()
         except Exception:  # noqa: BLE001

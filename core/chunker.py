@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import List, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from core import pauses as pz
+from core.pace import Pace
 from core.book_parsers import Book
 from core.text_utils import split_clauses, split_sentences
 
@@ -272,7 +273,7 @@ PAUSE_AFTER_TITLE_MS = 900
 
 def chunk_book(book: Book, max_chars: int = DEFAULT_MAX_CHARS, chapters: Sequence[int] = (),
                speak_titles: bool = False, pauses: "pz.PauseProfile | None" = None,
-               lengths: "pz.PauseLengths | None" = None, pace: "object | None" = None) -> List[Chunk]:
+               lengths: "pz.PauseLengths | None" = None, pace: Optional[Pace] = None) -> List[Chunk]:
     """All chunks of the book in reading order with global indexes (optionally only the given chapter numbers).
 
     With ``speak_titles`` every chapter starts with a chunk that reads its title aloud.  With ``pauses`` the text is cut at

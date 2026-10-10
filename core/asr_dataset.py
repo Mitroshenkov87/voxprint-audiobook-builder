@@ -137,7 +137,8 @@ def build_from_audio(files: Sequence, out_dir, asr: BaseASR, cfg: Optional[AsrCo
         raise AudioReadError(tr("err.asr_no_files"))
     rep, warnings = AsrReport(), []
     clips: List[dict] = []
-    seen_audio, seen_text = set(), {}
+    seen_audio: set[str] = set()
+    seen_text: Dict[str, float] = {}
     progress(Stage.MODEL, 0.0, tr("progress.asr_loading"))
     asr.load()
     progress(Stage.MODEL, 1.0, tr("progress.model_ready"))

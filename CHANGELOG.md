@@ -5,6 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Added
+- **Release audit gate** (`tools/audit.py`, `tools/audit-allowlist.toml`, `.github/workflows/audit.yml`). It runs on every push and pull request to `main`, weekly, and as the first job of the installer workflow. The installer jobs do not start when it fails. It blocks on ruff (Pyflakes and syntax), mypy, bandit high, gitleaks, and a pip-audit high or critical advisory that is not allowlisted. Vulture and radon are report-only. The high advisories in `transformers` 4.57.6 are allowlisted: the published fixes are on the 5.x line, and qwen-tts / qwen-asr pin 4.57.x. Details: [docs/AUDIT.md](docs/AUDIT.md).
+
 ## [0.2.4-beta] - 2026-10-09 - build 704 "Achim"
 
 Codename *Achim* (Biblical Hebrew *achim*, brothers; Genesis 13:8, "for we are brothers"): Voxprint AI Audiobook Builder and Voxprint AI Movie Dubber now live side by side as sibling programs that share models, settings and one Start menu folder. Build-installer run 50 failed in the Windows tests that need no PyTorch (a test used `torch.cuda` from the stand-in module) and published nothing, so the `BUILD.json` offset is **653** and run 51 stamps build 704. Full installer. Upgrade: install over 703; models, voices and settings stay.

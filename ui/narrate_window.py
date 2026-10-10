@@ -118,8 +118,8 @@ class NarrateWindow(SubWindow):
         self._fetch, self._download = fetch, download
         self._player_backend = player_backend
         self.entries: list = repo.load_cache()          # online voices not installed yet (cached index; refreshed in the background)
-        self._index_worker = None
-        self._dl_worker = None
+        self._index_worker: Optional[RepoIndexWorker] = None
+        self._dl_worker: Optional[RepoDownloadWorker] = None
         self._auto_refresh = auto_refresh
         self.runner = runner
         self._pick_book, self._pick_folder = pick_book, pick_folder
@@ -933,7 +933,7 @@ class NarrateWindow(SubWindow):
             plan = self.llm_plan()
             if plan is None:
                 return False
-            lines = spk.tag_paragraphs(paras, self.book_language() or "en", plan)
+            lines = list(spk.tag_paragraphs(paras, self.book_language() or "en", plan))
         dlg = SpeakerDialog(lines, paras, self)
         self._speaker_preview = dlg
         dlg.accepted.connect(lambda: setattr(self, "speaker_lines", dlg.lines()))
@@ -960,10 +960,21 @@ class NarrateWindow(SubWindow):
 
         w = TextModelsDownloadWorker([SimpleNamespace(key=llm_tool.KEY)],
                                      lambda _m, progress: self.llm_ensure(lambda f, msg="": progress(None, f, msg)), parent=self)
-        w.progress.connect(lambda f: (setattr(self, "_llm_msg", tr("prep.model_downloading", pct=int(f * 100))),
-                                      self.lbl_llm_state.setText(self._llm_msg)))
-        w.done.connect(lambda _k: (setattr(self, "_llm_msg", ""), self._refresh_buttons()))
-        w.failed.connect(lambda m: (setattr(self, "_llm_msg", tr("prep.model_failed", error=m)), self._refresh_llm_row()))
+        def on_progress(fraction) -> None:
+            setattr(self, "_llm_msg", tr("prep.model_downloading", pct=int(fraction * 100)))
+            self.lbl_llm_state.setText(self._llm_msg)
+
+        def on_done(_key) -> None:
+            setattr(self, "_llm_msg", "")
+            self._refresh_buttons()
+
+        def on_failed(message) -> None:
+            setattr(self, "_llm_msg", tr("prep.model_failed", error=message))
+            self._refresh_llm_row()
+
+        w.progress.connect(on_progress)
+        w.done.connect(on_done)
+        w.failed.connect(on_failed)
         self.llm_worker = w
         self._llm_msg = tr("prep.model_downloading", pct=0)
         w.start()

@@ -55,9 +55,15 @@ def default_extras(progress: Progress) -> List[str]:
     text_bytes = sum(m.size_mb for m in text_models.missing_component_extras()) * 1024 ** 2
     mos_bytes = quality_models.missing_bytes()
     share = text_bytes / float(text_bytes + mos_bytes) if text_bytes + mos_bytes else 1.0
-    done = text_models.ensure_component_extras(lambda _stage, f, m="": progress(share * float(f), m))
+    def report_text(_stage: object, fraction: float, message: str = "") -> None:
+        progress(share * float(fraction), message)
+
+    done = text_models.ensure_component_extras(report_text)
     if mos_bytes:
-        quality_models.ensure_dnsmos(lambda f, m="": progress(share + (1.0 - share) * float(f), m))
+        def report_mos(fraction: float, message: str = "") -> None:
+            progress(share + (1.0 - share) * float(fraction), message)
+
+        quality_models.ensure_dnsmos(report_mos)
         done.append("dnsmos")
     return done
 
@@ -106,7 +112,10 @@ class ModulesWorker(QThread):
                 # a model download cannot be interrupted half-way: Cancel takes effect when the (small) extra is done
                 base, rest = self.share, 1.0 - self.share
                 try:
-                    self.extras_fn(lambda f, m="": self.progress.emit(base + rest * float(f), m))
+                    def report_extra(fraction: float, message: str = "") -> None:
+                        self.progress.emit(base + rest * float(fraction), message)
+
+                    self.extras_fn(report_extra)
                 except Exception as exc:  # noqa: BLE001 - network / disk errors of any kind
                     log.warning("components: extra text model failed: %s", exc)
                     self.extras_failed.emit(getattr(exc, "user_message", "") or str(exc))

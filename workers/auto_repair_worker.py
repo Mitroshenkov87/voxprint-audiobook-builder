@@ -39,8 +39,12 @@ class AutoRepairWorker(QThread):
             from infra import auto_repair
 
             job = auto_repair.run
+
+        def report(fraction: float, message: str = "") -> None:
+            self.progress.emit(float(fraction), str(message))
+
         try:
-            rep = job(lambda f, m="": self.progress.emit(float(f), str(m)), self.cancel_token)
+            rep = job(report, self.cancel_token)
         except CancelledByUser:
             self.cancelled.emit()
             return

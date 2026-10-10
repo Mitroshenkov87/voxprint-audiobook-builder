@@ -137,7 +137,11 @@ def _same_drive(a: Path, b: Path) -> bool:
         return False
 
 
-def import_model(found, progress: Callable[[float, str], None] = lambda f, m="": None,
+def _silent_progress(f: float, m: str = "") -> None:
+    pass
+
+
+def import_model(found, progress: Callable[[float, str], None] = _silent_progress,
                  cancel: Optional[CancelToken] = None, usage: Optional[Callable[[Path], object]] = None,
                  allow_link: bool = True, dest_root: Optional[Path] = None) -> Path:
     """Bring the model of ``found`` into Voxprint's models folder (link or copy, hash-verified); returns its folder."""
@@ -279,7 +283,7 @@ def restore_pending() -> bool:
     return stamp != _read_state(RESTORED_NAME)
 
 
-def restore_backup(progress: Callable[[float, str], None] = lambda f, m="": None,
+def restore_backup(progress: Callable[[float, str], None] = _silent_progress,
                    cancel: Optional[CancelToken] = None, include_voices: bool = True, **kw) -> Optional["backup.Report"]:
     """Restore the backup source (:func:`backup_source`) INTO the live folders: models -> :func:`infra.paths.models_dir`
     (the default unless a normal models folder was chosen), voices -> the voice library, ffmpeg -> the tools folder.
@@ -341,7 +345,7 @@ def pending(repos: Iterable[str]) -> bool:
     return False
 
 
-def import_available(repos: Iterable[str], progress: Callable[[float, str], None] = lambda f, m="": None,
+def import_available(repos: Iterable[str], progress: Callable[[float, str], None] = _silent_progress,
                      cancel: Optional[CancelToken] = None, **kw) -> "backup.Report":
     """Import every listed model that is missing in Voxprint's folder and present in the configured folder."""
     from infra import model_downloader as md
@@ -354,7 +358,10 @@ def import_available(repos: Iterable[str], progress: Callable[[float, str], None
         found = find(repo, md.pinned_revision(repo))
         if found is None:
             continue
-        path = import_model(found, lambda f, m="", i=i: progress((i + f) / max(1, len(todo)), m), cancel, **kw)
+        def _step(f: float, m: str = "", step: int = i) -> None:
+            progress((step + f) / max(1, len(todo)), m)
+
+        path = import_model(found, _step, cancel, **kw)
         files = backup.list_files(path)
         report.items += 1
         report.copied_files += len(files)

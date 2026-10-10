@@ -57,8 +57,13 @@ def transcribe_files(files: Sequence[Path], asr: asr_mod.BaseASR, language: Opti
     n = max(1, len(files))
     for k, f in enumerate(files):
         title = chapter_title(Path(f))
-        text = transcribe_file(Path(f), asr, language,
-                               (lambda fr, k=k, title=title: progress((k + fr) / n, title)) if progress else None, cancel)
+        if progress is None:
+            on_piece = None
+        else:
+            def on_piece(fr: float, done: int = k, name: str = title,
+                         cb: Callable[[float, str], None] = progress) -> None:
+                cb((done + fr) / n, name)
+        text = transcribe_file(Path(f), asr, language, on_piece, cancel)
         log.info("re-voice: %s -> %d characters", Path(f).name, len(text))
         out.append((title, text))
     return out

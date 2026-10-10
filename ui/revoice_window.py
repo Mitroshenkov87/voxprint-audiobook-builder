@@ -467,9 +467,13 @@ class RevoiceWindow(SubWindow):
             return
         self.previewer.stop()
         self.out_dir.mkdir(parents=True, exist_ok=True)
-        self._session, self._input, rec = QMediaCaptureSession(), QAudioInput(), QMediaRecorder()
-        self._session.setAudioInput(self._input)
-        self._session.setRecorder(rec)
+        session, audio_in, rec = QMediaCaptureSession(), QAudioInput(), QMediaRecorder()
+        self._session, self._input = session, audio_in
+        # PySide6 stubs type these constructors as None.
+        if session is None or audio_in is None or rec is None:
+            return
+        session.setAudioInput(audio_in)
+        session.setRecorder(rec)
         rec.setMediaFormat(record_format())
         rec.setQuality(QMediaRecorder.Quality.HighQuality)
         stamp = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
@@ -505,7 +509,11 @@ class RevoiceWindow(SubWindow):
         w.progress.connect(lambda f, t: (self.progress.setValue(int(f * 100)),
                                          self.lbl_state.setText(tr("revoice.transcribing", name=t))))
         w.done.connect(self._on_done)
-        w.failed.connect(lambda m: (self.lbl_state.setText(tr("revoice.failed", error=m)), self._refresh()))
+        def on_failed(message) -> None:
+            self.lbl_state.setText(tr("revoice.failed", error=message))
+            self._refresh()
+
+        w.failed.connect(on_failed)
         w.finished.connect(self._refresh)
         self.worker = w
         self.progress.setValue(0)
@@ -529,7 +537,11 @@ class RevoiceWindow(SubWindow):
         w = ConvertWorker(src, rec.preview_path, self.out_dir, self.vc_factory, self)
         w.progress.connect(lambda f: self.progress.setValue(int(f * 100)))
         w.done.connect(self._on_converted)
-        w.failed.connect(lambda m: (self.lbl_state.setText(tr("revoice.vc_failed", error=m)), self._refresh()))
+        def on_failed(message) -> None:
+            self.lbl_state.setText(tr("revoice.vc_failed", error=message))
+            self._refresh()
+
+        w.failed.connect(on_failed)
         w.finished.connect(self._refresh)
         self.converter = w
         self.progress.setValue(0)
