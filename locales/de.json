@@ -113,7 +113,7 @@
  "err.book_empty": "Das Buch enthält keinen Text.",
  "err.book_read": "Die Buchdatei kann nicht gelesen werden.",
  "err.book_unsafe": "Die Buchdatei wirkt unsicher oder ist zu groß und wurde nicht geöffnet.",
- "err.book_unsupported": "Nicht unterstütztes Buchformat. Verwenden Sie TXT, FB2 (oder FB2.ZIP) oder EPUB.",
+ "err.book_unsupported": "Nicht unterstütztes Buchformat. Verwenden Sie TXT, Markdown, FB2 (oder FB2.ZIP) oder EPUB.",
  "err.cancelled": "Der Vorgang wurde abgebrochen.",
  "err.dataset_empty": "Der Datensatz ist leer.",
  "err.dataset_file_missing": "Datensatzdatei nicht gefunden: {file}",

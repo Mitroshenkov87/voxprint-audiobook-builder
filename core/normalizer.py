@@ -236,9 +236,104 @@ def _map_sentence(raw: str, spoken: str, raw_off: int, spoken_off: int) -> List[
     return out
 
 
+def _skeleton(token: str) -> str:
+    """Comparison form of a token: case-folded, yo folded to ye, stress marks removed."""
+    return "".join(ch.casefold().replace("ё", "е") for ch in token if ch != "\u0301")
+
+
+def _author_marks(token: str):
+    """``(yo flags, stress flags)`` for each character of ``token`` except U+0301."""
+    yos = []
+    stresses = []
+    for ch in token:
+        if ch == "\u0301":
+            if stresses:
+                stresses[-1] = True
+            continue
+        yos.append(ch in ("ё", "Ё"))
+        stresses.append(False)
+    return yos, stresses
+
+
+def _paint_author_marks(word: str, yos, stresses) -> str:
+    """Copy author yo and U+0301 onto ``word`` when it has the same letters aside from those marks."""
+    out = []
+    i = 0
+    for ch in word:
+        if ch == "\u0301":
+            continue
+        if i >= len(yos):
+            return word
+        if yos[i] and ch in ("е", "Е"):
+            ch = "ё" if ch == "е" else "Ё"
+        out.append(ch)
+        if stresses[i]:
+            out.append("\u0301")
+        i += 1
+    if i != len(yos):
+        return word
+    return "".join(out)
+
+
+def _later_has_skeleton(matches, start: int, skeleton: str, limit: int = 8) -> bool:
+    """True when a spoken token within ``limit`` of ``start`` has ``skeleton``."""
+    for match in matches[start:start + limit]:
+        if _skeleton(match.group()) == skeleton:
+            return True
+    return False
+
+
+def _keep_author_yo_and_stress(raw: str, norm: str) -> str:
+    """Put author yo and U+0301 back onto the words the engine kept.
+
+    The Russian engines may fold yo to ye and drop combining stress. A word the author already
+    wrote with yo, and a stress mark the author wrote, are copied onto the spoken token with the
+    same letters. Nothing is inserted when the author did not write it. Tokens the engine expanded
+    (a number read as words) are left as the engine wrote them.
+    """
+    if "ё" not in raw and "Ё" not in raw and "\u0301" not in raw:
+        return norm
+    raw_toks = [match.group() for match in _TOKEN_RE.finditer(raw)]
+    matches = list(_TOKEN_RE.finditer(norm))
+    pieces = []
+    cursor = 0
+    i = 0
+    j = 0
+    while i < len(matches):
+        match = matches[i]
+        word = match.group()
+        skeleton = _skeleton(word)
+        if j < len(raw_toks) and _skeleton(raw_toks[j]) == skeleton:
+            yos, stresses = _author_marks(raw_toks[j])
+            painted = _paint_author_marks(word, yos, stresses) if any(yos) or any(stresses) else word
+            pieces.append(norm[cursor:match.start()])
+            pieces.append(painted)
+            cursor = match.end()
+            i += 1
+            j += 1
+        elif j < len(raw_toks) and _later_has_skeleton(matches, i + 1, _skeleton(raw_toks[j])):
+            pieces.append(norm[cursor:match.start()])
+            pieces.append(word)
+            cursor = match.end()
+            i += 1
+        elif j < len(raw_toks):
+            j += 1
+        else:
+            pieces.append(norm[cursor:match.start()])
+            pieces.append(word)
+            cursor = match.end()
+            i += 1
+    pieces.append(norm[cursor:])
+    return "".join(pieces)
+
+
 def _fix_sentence(raw_sent: str, norm: str) -> str:
-    """Tidy an engine's output and restore the sentence terminator the engine removed."""
-    norm = collapse_ws(norm.replace("\u0301", ""))
+    """Tidy an engine's output and restore the sentence terminator the engine removed.
+
+    Author yo and U+0301 are copied back onto words the engine folded. This function does not
+    invent either mark.
+    """
+    norm = _keep_author_yo_and_stress(raw_sent, collapse_ws(norm))
     # the engines drop the period after an abbreviation - restore the sentence terminator
     tail = raw_sent.rstrip("\"'»”’)]} ")[-1:]
     if tail and tail in _TERMINATORS and (not norm or norm[-1] not in _TERMINATORS + "\"'»”’)"):

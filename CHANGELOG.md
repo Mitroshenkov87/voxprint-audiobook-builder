@@ -5,6 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Added
+- **Plotweaver books on the command line.** `python cli.py narrate book.md --speaker-marks marks.txt` reads UTF-8 Markdown or TXT (`#` / `##` chapter headings, blank-line paragraphs). The marks file is one line per paragraph (`NARRATOR`, `MALE: Name`, `FEMALE: Name`). An author-written yo is not replaced by the dictionary, and a U+0301 stress mark is kept through the Russian normalizer. See [docs/CLI.md](docs/CLI.md#narrate-a-book).
+
 ### Changed
 - **Python 3.14 and PyTorch 2.14.1 `cu130`.** Installers, CI, and `infra/runtime_lock.json` use Python 3.14. The only user-facing PyTorch flavor is `cu130` (NVIDIA driver 600 or newer). CPU wheels stay in the lock for CI. TorchAudio stays at 2.11.0, the last release. `audioop-lts` is pinned so pydub can import `audioop`. CTranslate2 is installed with the CUDA 12 cublas and cuDNN wheels; `infra/cuda12_libs.py` registers them before that library is imported. See [docs/RUNTIME.md](docs/RUNTIME.md).
 

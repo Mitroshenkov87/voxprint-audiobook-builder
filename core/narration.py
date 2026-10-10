@@ -319,7 +319,8 @@ def text_steps(language: Optional[str], book_language: Optional[str], options: N
     Ordinals by context come first (they need the digits and the noun next to them).  Russian yo restoration comes
     next, while a dotted abbreviation still has the following word in the case the book used (``мед. училище``).
     The language normalizer runs last: it may capitalise after a full stop, and a second yo pass would then miss
-    the abbreviation.  The normalizer keeps a yo the dictionary already wrote.
+    the abbreviation.  The normalizer keeps a yo the dictionary or the author already wrote, and a U+0301
+    stress mark the author wrote.
     """
     spoken = language if (language or "").strip().lower() not in ("", "auto") else book_language
     ordinal = ordinals.ordinal_step(spoken) if options.ordinals else None

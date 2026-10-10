@@ -41,6 +41,26 @@ def test_unchanged_text_and_other_languages_are_identity():
     assert e.spoken == "There are 5 apples." and not e.changed
 
 
+def test_author_yo_and_stress_survive_an_engine_that_strips_them():
+    raw = "В тексте ёще и ещё\u0301. На поле све\u0301т. В зале 2 человека."
+
+    def strip(text: str) -> str:
+        return text.replace("ё", "е").replace("Ё", "Е").replace("\u0301", "")
+
+    spoken = nz.normalize_for_tts(raw, "Russian", ("strip", strip)).spoken
+    assert "ёще" in spoken and "ещё\u0301" in spoken and "све\u0301т" in spoken
+    assert "два" in spoken and "2" not in spoken
+    kept = nz.normalize_for_tts(raw, "Russian", ("builtin", lambda s: s)).spoken
+    assert "ёще" in kept and "ещё\u0301" in kept and "све\u0301т" in kept
+
+
+def test_real_engine_keeps_author_yo_and_stress_when_installed():
+    pytest.importorskip("ru_normalizr")
+    raw = "В тексте ёще и ещё\u0301. На поле све\u0301т."
+    spoken = nz.normalize_for_tts(raw, "Russian").spoken
+    assert "ёще" in spoken and "ещё\u0301" in spoken and "све\u0301т" in spoken
+
+
 def test_real_engine_if_installed():
     pytest.importorskip("ru_normalizr")
     r = nz.normalize_for_tts("Цена 3,5 рубля. Это в 2024 году.", "Russian")

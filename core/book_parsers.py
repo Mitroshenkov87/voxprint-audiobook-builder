@@ -1,4 +1,4 @@
-"""Book input for the narrator: plain text, FictionBook (FB2, also ``.fb2.zip``) and EPUB -> :class:`Book`.
+"""Book input for the narrator: plain text, Markdown, FictionBook (FB2, also ``.fb2.zip``) and EPUB -> :class:`Book`.
 
 Only the standard library is used (``zipfile``, ``xml.etree``, ``html.parser``).  XML from files is parsed only after a
 guard that rejects documents declaring entities (the "billion laughs" family) - ``xml.etree`` does not resolve external
@@ -29,7 +29,7 @@ from core.errors import BookParseError
 from core.i18n import tr
 from core.text_utils import decode_bytes
 
-SUPPORTED_EXTENSIONS = (".txt", ".fb2", ".epub", ".zip")
+SUPPORTED_EXTENSIONS = (".txt", ".md", ".fb2", ".epub", ".zip")
 MAX_MEMBER_BYTES = 80 * 1024 * 1024
 MIN_CHAPTER_CHARS = 40          # EPUB documents with less text (title pages, blank pages) are dropped
 
@@ -448,7 +448,11 @@ def parse_epub(path: Path) -> Book:
 # --------------------------------------------------------------------------- entry point
 
 def load_book(path) -> Book:
-    """Load a TXT / FB2 / FB2.ZIP / EPUB file.  Raises :class:`BookParseError` with a user-readable message."""
+    """Load a TXT / Markdown / FB2 / FB2.ZIP / EPUB file.  Raises :class:`BookParseError` with a user-readable message.
+
+    ``.md`` is read as UTF-8 (or the same encodings as TXT) and split like plain text: ``#`` / ``##`` / ``###``
+    headings are chapter titles, and a blank line separates paragraphs.
+    """
     p = Path(path)
     ext = p.suffix.lower()
     if not p.is_file():
@@ -466,7 +470,7 @@ def load_book(path) -> Book:
                 book = parse_fb2(_read_member(zf, name))
         except zipfile.BadZipFile as exc:
             raise BookParseError(tr("err.book_read"), details=str(exc)) from exc
-    elif ext == ".txt":
+    elif ext in (".txt", ".md"):
         data = p.read_bytes()
         if not data.strip():
             raise BookParseError(tr("err.book_empty"))

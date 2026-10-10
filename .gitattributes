@@ -8,4 +8,5 @@ core/data/yo_safe.LICENSE text eol=lf
 core/data/YO_DATASET.md text eol=lf
 core/data/yo_context.json text eol=lf
 tests/fixtures/yo/*.txt text eol=lf
+tests/fixtures/plotweaver/* text eol=lf
 core/data/*.gz binary

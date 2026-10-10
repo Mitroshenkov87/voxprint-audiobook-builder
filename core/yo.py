@@ -7,12 +7,14 @@ table). The source lists and the dataset card live next to that table; see ``cor
     restore("text with a sure yo word")
 
 The stock Qwen3-TTS base model does not read stress marks, so this module never inserts U+0301 or
-``+``. It writes yo only when the runtime table has a different spelling. Ambiguous words stay as
-written, except two context rules in ``core/data/yo_context.json`` (copy it too; without it those
-words are left alone). "vse" (all, plural) versus "vsyo" (everything, still) is decided from the
-neighbouring words. "chem", "nem" and "vsem" are written with yo after the prepositions o, ob, obo,
-v, vo, na and pri (prepositional case). "na" is in that list because with these three pronouns it is
-always prepositional. "vsem" after any other word, including a dative plural, stays.
+``+``. It writes yo only when the runtime table has a different spelling. A word that already
+contains yo is left as the author wrote it, and a U+0301 the author wrote stays on the same letter.
+Ambiguous words stay as written, except two context rules in ``core/data/yo_context.json`` (copy it
+too; without it those words are left alone). "vse" (all, plural) versus "vsyo" (everything, still)
+is decided from the neighbouring words. "chem", "nem" and "vsem" are written with yo after the
+prepositions o, ob, obo, v, vo, na and pri (prepositional case). "na" is in that list because with
+these three pronouns it is always prepositional. "vsem" after any other word, including a dative
+plural, stays.
 Licence: Apache-2.0 for this file and the rule table; the word list is MIT (e2yo/eyo-kernel).
 
 Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
@@ -46,6 +48,7 @@ _PUNCT = "".join(chr(c) for c in (
 ))
 
 _HAS_EYO = re.compile("[" + _YE_UP + _YO_UP + _YE_LO + _YO_LO + "]")
+_STRESS = "\u0301"
 _SPLIT = re.compile("[(|)]")
 _LOCK = threading.Lock()
 _CACHE: Optional[Dict[str, str]] = None
@@ -197,27 +200,72 @@ def restore(text: str, table: Optional[Dict[str, str]] = None, context: bool = T
     return restore_counted(text, table, context)[0]
 
 
+def _peel_stress(text: str) -> tuple:
+    """``(text without U+0301, indexes of the letters the author stressed)``.
+
+    Yo forms are the same length as the ye forms, so those indexes still point at the same letters
+    after :func:`restore_counted` writes yo.
+    """
+    bare = []
+    marks = []
+    for ch in text:
+        if ch == _STRESS:
+            if bare:
+                marks.append(len(bare) - 1)
+            continue
+        bare.append(ch)
+    return "".join(bare), marks
+
+
+def _apply_stress(text: str, marks) -> str:
+    """Put U+0301 back after the letters listed in ``marks``."""
+    want = set(marks)
+    out = []
+    for i, ch in enumerate(text):
+        out.append(ch)
+        if i in want:
+            out.append(_STRESS)
+    return "".join(out)
+
+
+def _has_yo(word: str) -> bool:
+    """True when ``word`` already contains the letter yo."""
+    return _YO_LO in word or _YO_UP in word
+
+
 def restore_counted(text: str, table: Optional[Dict[str, str]] = None, context: bool = True) -> tuple:
-    """``(restored text, how many words changed)``."""
-    if not text or _HAS_EYO.search(text) is None:
-        return text or "", 0
+    """``(restored text, how many words changed)``.
+
+    A word that already contains yo is not looked up: the author's letter wins over the dictionary,
+    including a yo standing on a different vowel. U+0301 marks the author wrote are kept. This
+    function still never inserts a stress mark of its own.
+    """
+    if not text:
+        return "", 0
+    bare, marks = _peel_stress(text) if _STRESS in text else (text, ())
+    if _HAS_EYO.search(bare) is None:
+        return text, 0
     words = table if table is not None else dictionary()
     changed = 0
 
     def repl(match: "re.Match[str]") -> str:
         nonlocal changed
         word = match.group(0)
+        if _has_yo(word):
+            return word
         out = words.get(fold(word), word)
         if out != word:
             changed += 1
         return out
 
-    out = _WORD.sub(repl, text)
+    out = _WORD.sub(repl, bare)
     if context:
         out, more = restore_vse_counted(out)
         changed += more
         out, more = restore_prep_counted(out)
         changed += more
+    if marks and len(out) == len(bare):
+        out = _apply_stress(out, marks)
     return out, changed
 
 

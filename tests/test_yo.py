@@ -288,6 +288,18 @@ def test_prepositional_chem_nem_vsem_take_yo_only_after_a_preposition(src, want)
     assert yo.restore(want) == want
 
 
+def test_explicit_yo_and_author_stress_are_not_rewritten():
+    """A yo the author already wrote wins over the dictionary. U+0301 stays on the same letter."""
+    table = yo.load("ещё\nчёрный\n")
+    assert yo.restore("ёще и еще", table) == "ёще и ещё"
+    assert yo.restore("еще\u0301", table) == "ещё\u0301"
+    assert yo.restore("ёще\u0301 еще\u0301", table) == "ёще\u0301 ещё\u0301"
+    assert yo.restore("Вот и все\u0301.") == "Вот и всё\u0301."
+    out = yo.restore("В тексте ёще и еще. На поле све\u0301т.")
+    assert out.count("ёще") == 1 and "ещё" in out and "све\u0301т" in out
+    assert yo.restore(out) == out
+
+
 def test_prepositional_yo_is_context_and_is_counted():
     assert yo.restore("о чем и в нем.", context=False) == "о чем и в нем."
     out, n = yo.restore_counted("Речь о чем и о нем.")
