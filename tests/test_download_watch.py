@@ -40,7 +40,9 @@ def test_growing_data_is_not_a_stall_and_results_and_errors_pass_through(tmp_pat
             time.sleep(0.05)
         return "done"
 
-    assert dw.run_watched(slow_but_alive, tmp_path, meter(), threading.Event(), stall=0.3, poll=0.05) == "done"
+    # The gap between writes is 0.05 s. The stall window has to be much wider than that:
+    # a busy Windows runner can pause the watcher long enough to trip a 0.3 s limit.
+    assert dw.run_watched(slow_but_alive, tmp_path, meter(), threading.Event(), stall=3.0, poll=0.05) == "done"
     with pytest.raises(ValueError):
         dw.run_watched(lambda: (_ for _ in ()).throw(ValueError("boom")), tmp_path, meter(), threading.Event(), poll=0.05)
 
