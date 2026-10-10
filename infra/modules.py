@@ -314,8 +314,17 @@ def versions(manifest: Dict[str, Any]) -> tuple:
 
 
 def pending(mods: List[Module]) -> List[Module]:
-    """What the Components window downloads: the missing required modules and every module with an update."""
+    """What the Components window downloads: the missing required modules and every module with an update.
+
+    The soundscape model is not a runtime wheel. ``infra.soundscape_model`` downloads it only when the user
+    turns the setting on, and :func:`pending` never includes it.
+    """
     return [m for m in mods if (m.required and not m.installed) or m.update]
+
+
+def not_a_runtime_module(name: str) -> bool:
+    """True for an optional piece the thin installer must not fetch. ``soundscape`` is ACE-Step."""
+    return name == "soundscape"
 
 
 def installed_without_network() -> bool:

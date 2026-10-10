@@ -119,6 +119,7 @@ voxprint train ./clips --name MyVoice --type male --language ru --consent commer
 ### Narrate
 
 ```
+voxprint narrate book.vxbook --voice my-voice --out ./audiobooks --format mp3 --json
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3 --json
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
 voxprint narrate genesis.txt --voice levi --out ./audiobooks --style scripture --pause-sentence 0.7 --speed 0.95 --json
@@ -126,7 +127,7 @@ voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann -
 python cli.py narrate book.md --voice narrator --male-voice tom --female-voice ann --character Ivan=tom --character Anna=ann --speaker-marks marks.txt --out ./audiobooks --format wav --json
 ```
 
-Pauses and speed: `--pause-comma`, `--pause-mid`, `--pause-sentence`, `--pause-paragraph`, `--pause-chapter` (seconds), `--speed` (0.7-1.3) and `--style auto|scripture|fiction|dialogue`; defaults come from the app's Settings. For a Russian book, `--yo` (the default) restores the letter yo where a dictionary is sure; `--no-yo` leaves the letter e as written. A word that already contains yo, and a U+0301 stress mark the author wrote, are kept. `.md` is read like TXT: `#` / `##` headings are chapters, a blank line is a paragraph. Details: [CLI.md](CLI.md#narrate-a-book).
+Pauses and speed: `--pause-comma`, `--pause-mid`, `--pause-sentence`, `--pause-paragraph`, `--pause-chapter` (seconds), `--speed` (0.7-1.3) and `--style auto|scripture|fiction|dialogue`; defaults come from the app's Settings. For a Russian book, `--yo` (the default) restores the letter yo where a dictionary is sure; `--no-yo` leaves the letter e as written. A word that already contains yo, and a U+0301 stress mark the author wrote, are kept. `.md` is read like TXT: `#` / `##` headings are chapters, a blank line is a paragraph. A `.vxbook` narrates its own cast (`--voice` is the narrator) and skips dictionary yo. `--no-soundscape` skips an optional mix and does not download anything; the mix runs only when the file declares `sound/1` and `narration.soundscape` is on. Details: [CLI.md](CLI.md#narrate-a-book), [SOUNDSCAPE.md](SOUNDSCAPE.md).
 
 Multi-voice: `--voice` is the narrator. `--speakers` asks Gemma to mark each paragraph; `--speaker-marks FILE` narrates a file you already edited (`voxprint speakers` writes it). `--male-voice` and `--female-voice` are the role voices. `--male2-voice` / `--female2-voice` add a second voice per role: different characters (by the name in the marks) alternate between the two in order of first appearance. `--character NAME=VOICE` (repeatable) pins one character to a voice. Without those three flags every man and every woman share one voice, as before. The two speaker flags cannot be combined. If the marks do not match the prepared text, the narrator reads the whole book and the JSON `warnings` array says so. `<out>/<book>/.debug/speakers.txt` is listed in `outputs`.
 
@@ -280,7 +281,7 @@ Extra fields by command:
 | 0 | ok | Read `outputs`. A download that was already installed is also 0, with `downloaded: false` |
 | 1 | internal | `voxprint diag --out voxprint-diagnostics.zip --json` and read `error` |
 | 2 | bad args | `voxprint <command> --help`. Unknown module: `voxprint models list --json` |
-| 3 | input | The path or voice id is wrong. `voxprint voices list --json` for voices. Books are TXT, Markdown, FB2, `.fb2.zip`, EPUB |
+| 3 | input | The path or voice id is wrong. `voxprint voices list --json` for voices. Books are TXT, Markdown, FB2, `.fb2.zip`, EPUB, `.vxbook`. A `.vxbook` cast voice that is not installed is also 3 |
 | 4 | missing | `voxprint models download <id> --json`. The `hint` names the id when it can |
 | 5 | gpu | Free video memory, or `voxprint train ... --force-cpu`. Check `voxprint status --json` |
 | 6 | cancelled | Run the same `narrate` again. Finished chunks are kept |

@@ -6,6 +6,7 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 ## [Unreleased]
 
 ### Added
+- **`.vxbook` books and an optional soundscape.** `narrate book.vxbook --voice ID` reads a Voxprint book (ZIP, manifest, `book.md`, `speakers.json`, optional `cast.json`) and narrates its cast. `--voice` is the narrator and overrides the cast narrator; `--character` overrides a character. The letter yo in the file is left as written, and a U+0301 stress mark is kept. A soundscape mixes only when the manifest lists `sound/1` and `sound.json` is present, and only after the user turns it on (`narration.soundscape`, or the Settings checkbox). It is off by default, is not part of the full download, and `--no-soundscape` skips one run without downloading. See [docs/SOUNDSCAPE.md](docs/SOUNDSCAPE.md).
 - **Plotweaver books on the command line.** `python cli.py narrate book.md --speaker-marks marks.txt` reads UTF-8 Markdown or TXT (`#` / `##` chapter headings, blank-line paragraphs). The marks file is one line per paragraph (`NARRATOR`, `MALE: Name`, `FEMALE: Name`). An author-written yo is not replaced by the dictionary, and a U+0301 stress mark is kept through the Russian normalizer, including when ru-normalizr rewrites that mark as a plus immediately before the vowel. See [docs/CLI.md](docs/CLI.md#narrate-a-book).
 
 ### Changed

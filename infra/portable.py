@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
-from infra import download_watch, env_probe, model_mirrors, model_release, modelscope_mirror, vc_model
+from infra import download_watch, env_probe, model_mirrors, model_release, modelscope_mirror, soundscape_model, vc_model
 
 log = logging.getLogger("voxprint.portable")
 
@@ -317,7 +317,7 @@ def models_for(mode: str, vram_mb: int, entries: Optional[Dict[str, Any]] = None
         # The voice converter is optional and lives in models/openvoice-v2 (the Re-voice window downloads it).
         # The generic Owner--Name folder would not be the copy the app loads.
         names = sorted(entries if entries is not None else model_mirrors.load())
-        return [r for r in names if r != vc_model.REPO]
+        return [r for r in names if r not in (vc_model.REPO, soundscape_model.REPO)]
     return [ALIGNER, TTS_LARGE if vram_mb >= LARGE_MIN_VRAM_MB else TTS_SMALL,
             ASR_LARGE if vram_mb >= ASR_LARGE_MIN_VRAM_MB else ASR, SAGE]
 

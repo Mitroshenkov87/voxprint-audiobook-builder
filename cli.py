@@ -48,11 +48,12 @@ from core.text_prep import STEP_KEYS, STEP_YO, PrepOptions
 from core.errors import BackupError, CancelledByUser, DatasetMakerError, OutOfMemoryError_
 from core.events import CancelToken, Stage, overall_percent
 from core.narration import NarrationOptions, NarrationProgress, PauseToken
+from core import soundscape as soundscape_mod
 from core.voice_info import VOICE_TYPES, normalize_voice_type
 from core.voice_library import VoiceLibrary, VoiceRecord
 from infra import auto_repair
 from infra import backup as backup_mod
-from infra import denoise_tool, diagnostics, keep_awake, llm_tool, projects, quality_models, text_models, vc_model
+from infra import denoise_tool, diagnostics, keep_awake, llm_tool, projects, quality_models, soundscape_model, text_models, vc_model
 from infra import model_downloader as md
 from infra import modules as runtime_modules
 from infra import paths as app_paths
@@ -402,7 +403,7 @@ def build_parser() -> argparse.ArgumentParser:
     n = sub.add_parser(
         "narrate", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
         help="Narrate a book with a trained voice",
-        description="Narrate a TXT, Markdown, FB2, FB2.ZIP or EPUB book with a voice from the library.",
+        description="Narrate a TXT, Markdown, FB2, FB2.ZIP, EPUB or .vxbook file with a voice from the library.",
         epilog=(
             "Examples:\n"
             "  voxprint narrate book.epub --voice my-voice --out ./audiobooks\n"
@@ -416,7 +417,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint narrate book.txt --voice levi --male-voice natan --character David=shimon --speakers --out ./out\n"
         ),
     )
-    n.add_argument("book", help="Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file")
+    n.add_argument("book", help="Path to a TXT, Markdown, FB2, FB2.ZIP, EPUB or .vxbook file")
     n.add_argument("--voice", required=True, metavar="ID_OR_NAME",
                    help="Voice library id or display name")
     n.add_argument("--out", required=True, type=Path, metavar="DIR",
@@ -473,6 +474,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Narrate from this marks file instead of running Gemma (voxprint speakers writes it). "
                         "One line per paragraph: 'N. NARRATOR', 'N. MALE: Name', 'N. FEMALE: Name', "
                         "or the same lines without the numbers")
+    n.add_argument("--no-soundscape", action="store_true",
+                   help="Do not mix a soundscape on this run. Does not change the saved setting and does not download the model. "
+                        "A soundscape plays only for a .vxbook that declares extension sound/1, and only when the setting is on")
     n.add_argument("--work-dir", type=Path, default=None, metavar="DIR",
                    help="Remember this folder as the app working folder")
     n.set_defaults(_handler="narrate")
@@ -907,7 +911,7 @@ def cmd_narrate(args: argparse.Namespace, *,
         if not book_path.is_file():
             raise CliError(
                 EXIT_INPUT, f"book not found: {book_path}",
-                hint="Pass a TXT, Markdown, FB2, FB2.ZIP or EPUB file that exists. "
+                hint="Pass a TXT, Markdown, FB2, FB2.ZIP, EPUB or .vxbook file that exists. "
                      "Example: voxprint narrate book.epub --voice my-voice --out ./audiobooks",
             )
         book = load_book(book_path)
@@ -918,6 +922,8 @@ def cmd_narrate(args: argparse.Namespace, *,
         formats = parse_formats(args.formats)
         lengths, pace = narration_shaping(args)
         yo_on = True if getattr(args, "yo", None) is None else bool(args.yo)
+        if book.explicit_yo:
+            yo_on = False
         options = NarrationOptions(
             formats=formats,
             pauses=pz.PauseProfile(lengths=lengths) if args.pauses else None,
@@ -927,8 +933,11 @@ def cmd_narrate(args: argparse.Namespace, *,
             yo=yo_on,
             # Yo only. The rest of Prepare text stays a window switch; this plan writes the restored book to .debug.
             prep=PrepPlan(rules=PrepOptions(frozenset({STEP_YO}))) if yo_on else None,
+            sound=(soundscape_mod.SoundRequest()
+                   if soundscape_model.enabled() and not getattr(args, "no_soundscape", False)
+                   and soundscape_mod.requested(book) else None),
         )
-        cast, extra_voices = _speaker_job(args, voice, lib, plan_fn)
+        cast, extra_voices = _speaker_job(args, voice, lib, plan_fn, book)
         if cast is not None:
             options.speakers = cast
         job = NarrationJob(book=book, voice=voice, out_dir=out_dir, options=options, extra_voices=extra_voices)
@@ -973,12 +982,16 @@ def speaker_warning_lines(code: str) -> list:
     return out
 
 
-def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callable[[], object]]):
+def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callable[[], object]], book=None):
     """Speaker cast and extra voices for ``narrate``, or ``(None, {})`` when multi-voice is off.
 
     The cast is the same object the Narrate window builds (:class:`core.speakers.SpeakerCast`). Narration applies it.
+    A ``.vxbook`` already carries marks and a cast. ``--voice`` is the narrator. ``--character`` wins over ``cast.json``.
+    ``--speakers`` does not call the text model for a book that already has marks.
     """
-    want = bool(getattr(args, "speakers", False)) or getattr(args, "speaker_marks", None) is not None
+    vx_marks = tuple(getattr(book, "speaker_marks", ()) or ())
+    vx = bool(vx_marks) and getattr(args, "speaker_marks", None) is None
+    want = bool(getattr(args, "speakers", False)) or getattr(args, "speaker_marks", None) is not None or vx
     names = {flag: (getattr(args, attr, "") or "").strip() for flag, attr in (
         ("--male-voice", "male_voice"), ("--female-voice", "female_voice"),
         ("--male2-voice", "male2_voice"), ("--female2-voice", "female2_voice"))}
@@ -1009,7 +1022,7 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
     except ValueError as exc:
         raise CliError(EXIT_BAD_ARGS, f"--character: {exc}",
                        hint="Example: --character David=asher --character Hannah=noa") from exc
-    if not any(names.values()) and not raw_characters:
+    if not any(names.values()) and not raw_characters and not getattr(book, "voice_cast", None):
         # --speakers alone: the shipped cast (Natan, Shimon, Miriam) when installed, else the first voices by gender
         from infra import bundled_voices
 
@@ -1020,8 +1033,31 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
             names["--male-voice"], names["--male2-voice"] = names["--male2-voice"], ""
     recs = {flag: (resolve_voice(library, name) if name else None) for flag, name in names.items()}
     characters = {who: resolve_voice(library, vname) for who, vname in character_names.items()}
+    pinned: dict = {}
+    if vx and book is not None:
+        pinned = dict(book.voice_cast)
+        for who, rec in characters.items():
+            canon = book.alias_to_name.get(who, who)
+            pinned[canon] = rec.id
+            pinned[who] = rec.id
+            for key in list(pinned):
+                if key.casefold() == who.casefold() or key.casefold() == canon.casefold():
+                    pinned[key] = rec.id
+        for vid in set(pinned.values()):
+            try:
+                resolve_voice(library, vid)
+            except CliError as exc:
+                raise CliError(
+                    EXIT_INPUT, f"cast voice not found: {vid}",
+                    hint="Install that voice, or override it with --character Name=voice. "
+                         "voxprint voices list --json",
+                ) from exc
+    elif characters:
+        pinned = {who: rec.id for who, rec in characters.items()}
     lines = None
     tagger = None
+    if vx and args.speakers:
+        log.warning("speaker marks are already in the .vxbook; --speakers will not call the text model")
     if args.speaker_marks is not None:
         path = Path(args.speaker_marks)
         if not path.is_file():
@@ -1036,6 +1072,8 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
                 EXIT_INPUT, f"speaker marks cannot be read: {exc}",
                 hint="Each line is 'NARRATOR', 'MALE: Name' or 'FEMALE: Name'. A leading 'N. ' is optional.",
             ) from exc
+    elif vx:
+        lines = [spk.SpeakerLine(role, name) for role, name in vx_marks]
     else:
         plan = (plan_fn or llm_tool.make_plan)()
         if plan is None:
@@ -1053,9 +1091,11 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
         lines=lines, male_id=vid("--male-voice"), female_id=vid("--female-voice"),
         tagger=cast(Any, tagger), narrator_id=narrator.id,
         male2_id=vid("--male2-voice"), female2_id=vid("--female2-voice"),
-        characters={who: rec.id for who, rec in characters.items()},
+        characters=pinned,
     )
     if not speaker_cast.uses_several(narrator.id):
+        if vx:
+            return None, {}
         raise CliError(
             EXIT_BAD_ARGS, "pick a male or female voice that is not the narrator",
             hint="Example: voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann "
@@ -1065,6 +1105,9 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
     for rec in [*recs.values(), *characters.values()]:
         if rec is not None and rec.id != narrator.id:
             extra[rec.id] = rec
+    for vid in pinned.values():
+        if vid and vid != narrator.id and vid not in extra:
+            extra[vid] = resolve_voice(library, vid)
     return speaker_cast, extra
 
 
@@ -2111,6 +2154,8 @@ SETTINGS_HELP = {
     "narration.style": "Reading style: auto, scripture, fiction, dialogue",
     "narration.pauses": "Explicit pauses between phrases (on/off)",
     "narration.ordinals": "Read ordinal numbers by context (on/off)",
+    "narration.soundscape": "Soundscape under narration for a .vxbook that declares it (on/off, off by default; "
+                            "turning it on downloads ACE-Step)",
     "narration.ai_disclosure": "Speak the AI disclosure at the start (on/off)",
     "theme": "Look shared by the Voxprint programs (glass-dark)",
     "gpu": "GPU shared by the Voxprint programs: auto, cpu or cuda:N",
@@ -2144,6 +2189,7 @@ def settings_values() -> dict:
         "narration.style": pace.style,
         "narration.pauses": bool(pz.load_enabled()),
         "narration.ordinals": bool(ordinals.load_enabled()),
+        "narration.soundscape": bool(soundscape_model.enabled()),
         "narration.ai_disclosure": bool(ai_disclosure.load_enabled()),
         "theme": suite_settings.theme(),
         "gpu": suite_settings.gpu(),
@@ -2226,6 +2272,13 @@ def set_setting(key: str, value: str) -> object:
         on = _parse_bool(value)
         ai_disclosure.save_enabled(on)
         return on
+    if key == "narration.soundscape":
+        on = _parse_bool(value)
+        if on:
+            soundscape_model.enable()
+        else:
+            soundscape_model.disable()
+        return soundscape_model.enabled()
     kind = key.rsplit(".", 1)[1]
     try:
         sec = float(value)

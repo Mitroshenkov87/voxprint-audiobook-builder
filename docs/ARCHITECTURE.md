@@ -38,7 +38,9 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `model_locator.py` | finds models downloaded by other apps (Hugging Face cache, Pinokio/Alexandria, ModelScope) - read-only |
 | `voice_info.py` | `voice.json` (schema 3): fields, gender / age group (derived voice type), **licences** (`LICENSES`, `license_allows_commercial`, derived `commercial_use`), migration of schema 1, read/write |
 | `voice_library.py` | the voice library under `voices/<id>/`: `VoiceLibrary`, `VoiceRecord`, register / import (folder, hardened zip) / update / delete / list |
-| `book_parsers.py` | TXT (heading detection), FB2 (+ `.fb2.zip`, entity guard, cover), EPUB (nav / NCX / spine) -> `Book` / `Chapter`; stdlib only |
+| `book_parsers.py` | TXT (heading detection), FB2 (+ `.fb2.zip`, entity guard, cover), EPUB (nav / NCX / spine), `.vxbook` -> `Book` / `Chapter`; stdlib only. The `.vxbook` reader is `vxbook.py` |
+| `vxbook.py` | Open a `.vxbook` ZIP (mimetype, hashes, size limits), map `book.md` / `speakers.json` / `cast.json` onto a `Book`, and keep an optional `sound.json` when extension `sound/1` is declared |
+| `soundscape.py` | Plan and mix that soundscape under a finished chapter. Beds are one 45 s clip looped with a crossfade. Plain books and a `.vxbook` without `sound/1` are left alone |
 | `num_words.py` | own number-to-words for Russian (cardinals, ordinals with case / gender / number, decimals) and English (cardinals, ordinals, years); no `num2words` (LGPL-2.1, no declension by suffix). Cyrillic *data* |
 | `text_prep.py` | rule-based book preparation: steps `layout, noise, quotes, links, headings, numbers, abbrev, yo` (`STEP_KEYS`), `PrepOptions`, `prepare_text_block`, `prepare_book` -> `(Book, PrepReport)`, `resolve_language`; ru + en for the shared steps, `yo` for Russian only, other languages only the neutral steps |
 | `yo.py` | Russian letter yo from the MIT eyo-kernel safe dictionary (`core/data/yo_safe.txt`, no download). Does not insert stress marks (the base TTS model does not read them); a yo or U+0301 the author wrote is kept |
@@ -124,6 +126,7 @@ book file --book_parsers.load_book--> Book(chapters) --chunker.chunk_book--> chu
    narration.synthesize_chunks: for each chunk  cache hit?  yes -> reuse   no -> TTSEngine.synthesize_batch (or synthesize) (Qwen3AdapterEngine: base model + voice adapter + reference clip) -> ChunkCache (atomic FLAC)
    narration.assemble_chapters: stream chunks into one WAV per chapter, pauses between sentences / paragraphs, a tail after each chapter
    (chapters are joined and their per-chapter files encoded on a CPU pool while the GPU synthesizes the next ones)
+   soundscape.mix_chapter_file (only when NarrationOptions.sound is set and plan_for returns a plan): cue audio, duck under speech, scale speech back to its own RMS, then encode
    audiobook_export.export_formats: ffmpeg  ->  .opus (chapters in ffmetadata)  /  per-chapter .mp3 + .m3u8  /  .m4b (AAC, only if allowed)  / ...
 ```
 The job folder is `<output>/<book>/` with `.cache/` (chunks) and `.work/` (temporary WAVs); both are removed after success unless `keep_cache` is set. Start after a cancel / crash simply finds the cached chunks again.

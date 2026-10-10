@@ -292,7 +292,7 @@ def cleanup_book(book: Book, engine: CleanupEngine, cache_path: Optional[Path] =
             out_paras.append(" ".join(fixed) if len(blocks) > 1 or "\n" not in (blocks[0] if blocks else "") else blocks[0])
         chapters.append(Chapter(ch.title, "\n\n".join(out_paras)))
     cache.save()
-    return Book(book.title, book.author, book.language, chapters, book.cover, book.cover_ext), stats
+    return book.carry(chapters=chapters), stats
 
 
 # --------------------------------------------------------------------------- the real model

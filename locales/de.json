@@ -113,7 +113,7 @@
  "err.book_empty": "Das Buch enthält keinen Text.",
  "err.book_read": "Die Buchdatei kann nicht gelesen werden.",
  "err.book_unsafe": "Die Buchdatei wirkt unsicher oder ist zu groß und wurde nicht geöffnet.",
- "err.book_unsupported": "Nicht unterstütztes Buchformat. Verwenden Sie TXT, Markdown, FB2 (oder FB2.ZIP) oder EPUB.",
+ "err.book_unsupported": "Nicht unterstütztes Buchformat. Verwenden Sie TXT, Markdown, FB2 (oder FB2.ZIP), EPUB oder ein Voxprint-Buch (.vxbook).",
  "err.cancelled": "Der Vorgang wurde abgebrochen.",
  "err.dataset_empty": "Der Datensatz ist leer.",
  "err.dataset_file_missing": "Datensatzdatei nicht gefunden: {file}",
@@ -872,5 +872,8 @@
  "spk.note": "Jeder Absatz ist der Erzähler oder eine Figur. Bearbeiten Sie eine Zeile, bevor die Erzählung beginnt.",
  "spk.title": "Sprechermarken",
  "spk.tagging": "Sprecher werden markiert… {pct}%",
- "spk.mismatch": "Die Sprechermarken passen nicht zum vorbereiteten Text, daher liest der Erzähler das ganze Buch."
+ "spk.mismatch": "Die Sprechermarken passen nicht zum vorbereiteten Text, daher liest der Erzähler das ganze Buch.",
+ "err.vxbook": "Dieses Voxprint-Buch konnte nicht gelesen werden ({detail}).",
+ "narrset.soundscape": "Klangkulisse unter die Vertonung mischen, wenn das Buch sie verlangt",
+ "narrset.soundscape_tip": "Standardmäßig aus. Beim Einschalten wird das ACE-Step-Modell einmal geladen (etwa 10 GB). Musik und Effekte laufen nur bei einem .vxbook mit Sound-Erweiterung. Normale Bücher bleiben still. Die Mischung behält die Lautstärke der Sprache. Gilt ab der nächsten Vertonung."
 }

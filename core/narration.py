@@ -37,7 +37,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Protocol, Sequence, Set
+from typing import Any, Callable, Dict, List, Optional, Protocol, Sequence, Set
 
 import numpy as np
 import soundfile as sf
@@ -53,6 +53,7 @@ from core import ai_disclosure
 from core import cpu_budget
 from core import gpu_lock
 from core import gpu_thermal
+from core import soundscape as soundscape_mod
 from core import speakers as spk
 from core import sysmem_spill
 from core.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_book
@@ -151,6 +152,8 @@ class NarrationOptions:
     yo: bool = True
     #: Speaker marks and the male / female voice ids (:mod:`core.speakers`).  ``None`` = the narrator voice only.
     speakers: Optional[spk.SpeakerCast] = None
+    #: Optional soundscape (:class:`core.soundscape.SoundRequest`). ``None`` mixes nothing, including on a plain book.
+    sound: Optional[Any] = None
 
 
 @dataclass
@@ -685,7 +688,8 @@ def _synth_with_retry(engine: TTSEngine, text: str, index: int, attempts: int = 
 def assemble_chapter(book: Book, position: int, chapter: int, chunks: Sequence[Chunk], engine_tag: str,
                      cache: ChunkCache, texts: Dict[int, str], work_dir: Path,
                      pauses: Optional[pz.PauseProfile] = None, lengths: Optional[pz.PauseLengths] = None,
-                     shape: bool = False, tags: Optional[Dict[int, str]] = None) -> ex.ChapterAudio:
+                     shape: bool = False, tags: Optional[Dict[int, str]] = None,
+                     spans: Optional[List[tuple]] = None) -> ex.ChapterAudio:
     """Join the cached chunks of one chapter (``chunks``, in order) with their pauses into ``chapter_<position+1>.wav``.
 
     With ``shape`` every piece first loses its own leading / trailing silence (so the inserted pauses are what is heard)
@@ -708,13 +712,17 @@ def assemble_chapter(book: Book, position: int, chapter: int, chunks: Sequence[C
                 data = resample(data, sr, sr_out)
             if shape:
                 data = time_stretch(trim_silence(data, sr_out), sr_out, c.tempo)
+            start = frames
             sf_out.write(data)
             frames += len(data)
+            speech_end = frames
             is_last = c is chunks[-1]
             tail_ms = pauses.ms(pz.CHAPTER) if pauses is not None else (lengths.ms(pz.CHAPTER) if lengths else CHAPTER_TAIL_MS)
             gap = int(sr_out * (tail_ms if is_last else c.pause_ms) / 1000)
             sf_out.write(np.zeros(gap, dtype=np.float32))
             frames += gap
+            if spans is not None:
+                spans.append((c.paragraph, texts.get(c.index, c.text), start, speech_end, frames))
     finally:
         if sf_out is not None:
             sf_out.close()
@@ -747,10 +755,13 @@ class _ChapterPipeline:
     def __init__(self, book: Book, chunks: Sequence[Chunk], engine_tag: str, cache: ChunkCache, texts: Dict[int, str],
                  work: Path, pauses: Optional[pz.PauseProfile], exporter: ex.Exporter, pool: ThreadPoolExecutor,
                  cancel: CancelToken, pause: PauseToken, lengths: Optional[pz.PauseLengths] = None,
-                 shape: bool = False, tags: Optional[Dict[int, str]] = None) -> None:
+                 shape: bool = False, tags: Optional[Dict[int, str]] = None,
+                 mix: Optional[Callable[[ex.ChapterAudio, int, List[tuple]], ex.ChapterAudio]] = None) -> None:
         self.book, self.engine_tag, self.cache, self.texts, self.work, self.pauses = book, engine_tag, cache, texts, work, pauses
         self.lengths, self.shape, self.tags = lengths, shape, tags or {}
         self.exporter, self.pool, self.cancel, self.pause = exporter, pool, cancel, pause
+        self.mix = mix
+        self.spans: Dict[int, List[tuple]] = {}
         self.groups = _by_chapter(chunks)
         self.position = {ci: pos for pos, ci in enumerate(self.groups)}
         self.left = {ci: sum(1 for c in g if not cache.has(cache.key(self.tags.get(c.index, engine_tag), texts[c.index])))
@@ -781,9 +792,12 @@ class _ChapterPipeline:
     def _assemble(self, ci: int) -> ex.ChapterAudio:
         self.pause.wait(self.cancel)               # paused: background work holds too (the user wants the machine back)
         self.cancel.check()
+        spans: List[tuple] = []
         ch = assemble_chapter(self.book, self.position[ci], ci, self.groups[ci], self.engine_tag, self.cache, self.texts,
-                              self.work, self.pauses, self.lengths, self.shape, self.tags)
-        self.exporter.add_chapter(ch)
+                              self.work, self.pauses, self.lengths, self.shape, self.tags, spans)
+        self.spans[ci] = spans
+        if self.mix is None:
+            self.exporter.add_chapter(ch)
         return ch
 
     def check(self) -> None:
@@ -796,7 +810,13 @@ class _ChapterPipeline:
         """All chapters in book order (any chapter not started yet is started now)."""
         for ci in self.groups:
             self._submit(ci)
-        return [self.futures[ci].result() for ci in self.groups]
+        ordered = [self.futures[ci].result() for ci in self.groups]
+        if self.mix is None:
+            return ordered
+        mixed = [self.mix(ch, ci, self.spans.get(ci, [])) for ch, ci in zip(ordered, self.groups)]
+        for ch in mixed:
+            self.exporter.add_chapter(ch)
+        return mixed
 
 
 def _effective_translation(book: Book, options: NarrationOptions) -> Optional[tl.TranslatePlan]:
@@ -973,8 +993,19 @@ def _narrate_book_work(book: Book, engine_factory: Callable[[], TTSEngine], engi
         meta = ex.BookMeta(source_book.title, source_book.author, narrator, source_book.language, cover_path)
         n_chapters = len({c.chapter for c in chunk_list})
         exporter = ex.Exporter(ffmpeg, formats, meta, job_dir, n_chapters, options.bitrates, run, work, pool.submit)
+        sound_plan = soundscape_mod.plan_for(book) if options.sound is not None else None
+        mix = None
+        if sound_plan is not None and options.sound is not None:
+            sound_cache = job_dir / ".cache" / "sound"
+            request = options.sound
+
+            def mix(ch: ex.ChapterAudio, ci: int, spans: List[tuple],
+                    _plan: soundscape_mod.SoundPlan = sound_plan, _request: Any = request) -> ex.ChapterAudio:
+                return soundscape_mod.mix_chapter_file(
+                    ch, spans, _plan, ci, _request, sound_cache, thermal, cancel, pause)
+
         chapters_pipe = _ChapterPipeline(source_book, chunk_list, engine_tag, cache, texts, work, options.pauses, exporter,
-                                         pool, cancel, pause, options.pause_lengths, shape, tags)
+                                         pool, cancel, pause, options.pause_lengths, shape, tags, mix)
         chapters_pipe.start()
         handed_over, engine_future = engine_future, None          # from here on synthesize_chunks owns (and closes) it
         counts = synthesize_chunks(chunk_list, engine_factory, engine_tag, cache, texts, progress, cancel, pause,
