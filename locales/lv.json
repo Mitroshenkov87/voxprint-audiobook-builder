@@ -726,6 +726,8 @@
  "narr.check_chunks": "Pārbaudīt katru fragmentu ar runas atpazīšanu un ģenerēt no jauna tos, kas nesaka savu tekstu (lēnāk)",
  "narr.check_chunks_tip": "Pēc sintēzes katrs fragments tiek nolasīts no jauna ar runas atpazīšanu. Ja vairāk nekā 15 % rakstzīmju atšķiras no teksta (izlaisti vai atkārtoti vārdi, murmināšana), tas tiek ģenerēts vēlreiz līdz divām reizēm un tiek paturēts labākais mēģinājums. Ierunāšana aizņem ilgāk. Ieslēgts ar sagatavi Augsta; jau gatavie fragmenti netiek pārbaudīti vēlreiz.",
  "narr.checking": "Pārbauda fragmentus {first}–{last} no {total} ar runas atpazīšanu…",
+ "narr.cooling": "GPU dzesēšana",
+ "narr.gpu_busy": "GPU aizņemts: {owner} {job}",
  "narr.check_summary": "Runas pārbaude: {n} no {total} fragmentiem ģenerēti no jauna, {bad} joprojām apšaubāmi.",
  "clipmax.label": "Garākais apmācības klips:",
  "clipmax.tip": "Lielākā daļa klipu paliek ap 8 sekundēm; virs 12 s gari teikumi ar komatiem tiek paturēti veseli līdz šim garumam, kas palīdz balsij palikt stabilai garās vietās. 12 s ir klasiskais griezums. Videokartes ar mazāk nekā 10 GB videatmiņas un procesors ir ierobežoti līdz 15 s.",

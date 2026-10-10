@@ -726,6 +726,8 @@
  "narr.check_chunks": "Check every fragment by speech recognition and regenerate the ones that do not say their text (slower)",
  "narr.check_chunks_tip": "After synthesis each fragment is re-read by speech recognition. If more than 15 % of the characters differ from the text (skipped or repeated words, babbling), it is generated again up to two times and the best attempt is kept. Narration takes longer. Switched on with the High preset; fragments already finished are not checked again.",
  "narr.checking": "Checking fragments {first}–{last} of {total} by speech recognition…",
+ "narr.cooling": "Cooling GPU",
+ "narr.gpu_busy": "GPU busy: {owner} {job}",
  "narr.check_summary": "Speech check: {n} of {total} fragments generated again, {bad} still doubtful.",
  "clipmax.label": "Longest training clip:",
  "clipmax.tip": "Most clips stay around 8 seconds; with more than 12 s, long sentences with commas are kept whole up to this length, which helps the voice stay stable in long passages. 12 s is the classic cut. GPUs with less than 10 GB of video memory and the CPU are limited to 15 s.",
