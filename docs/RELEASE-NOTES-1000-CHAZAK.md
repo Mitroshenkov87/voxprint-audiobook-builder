@@ -1,6 +1,6 @@
 # Release notes: 1.0.0-rc.2, build 1000 "Chazak"
 
-`BUILD.json` codename is Chazak. Build-installer run 53 published 999 Nachon, so the offset stays 946 and build-installer run 54 stamps build 1000 (54 + 946 = 1000). The release tag is `v1.0.0-rc.2`, published as a pre-release (not latest). The Windows file version is `1.0.0.1000`. The body below is the GitHub release text. Keep the Windows section.
+`BUILD.json` codename is Chazak. Build-installer run 53 published 999 Nachon. Run 54 failed in the Windows tests that need no PyTorch (all tests passed, then the process crashed on exit) and published nothing, so the offset is 945 and build-installer run 55 stamps build 1000 (55 + 945 = 1000). The release tag is `v1.0.0-rc.2`, published as a pre-release (not latest). The Windows file version is `1.0.0.1000`. The body below is the GitHub release text. Keep the Windows section.
 
 **Voxprint 1.0.0 RC2 · build 1000 "Chazak"** (Biblical Hebrew *chazak*, חֲזַק, be strong; Deuteronomy 31:6, *chazak ve'ematz*, "be strong and of good courage"): a build that holds under load. The runtime moves to Python 3.14 and PyTorch 2.11 for CUDA 13, an RTX 40-series GPU is now required, and the app reads Voxprint books (`.vxbook`) with an optional soundscape.
 
