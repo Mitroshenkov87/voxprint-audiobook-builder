@@ -48,7 +48,15 @@ UI_ENTRY = (
     "ui/revoice_window.py",
 )
 
-DOC_GATE_PATHS = ("core", "infra", "cli.py", "main.py", *UI_ENTRY)
+#: Outside ``core/`` and the windows, but part of the same public surface:
+#: the dry-run helper lives in ``core/``, the codename check and the suite icons do not.
+ALSO_DOCUMENTED = (
+    "tools/codenames.py",
+    "ui/suite_icons.py",
+)
+
+DOC_GATE_PATHS = ("core", "infra", "cli.py", "main.py", *UI_ENTRY, *ALSO_DOCUMENTED)
+API_GROUPS = ("core", "infra", "cli", "main", "ui", "tools")
 
 
 def module_files() -> List[Path]:
@@ -59,6 +67,7 @@ def module_files() -> List[Path]:
     files.append(ROOT / "cli.py")
     files.append(ROOT / "main.py")
     files.extend(ROOT / rel for rel in UI_ENTRY)
+    files.extend(ROOT / rel for rel in ALSO_DOCUMENTED)
     return files
 
 
@@ -83,11 +92,12 @@ def api_index(names: Sequence[str]) -> str:
     lines = [
         "# API reference",
         "",
-        "Generated from the docstrings in `core/`, `infra/`, `cli.py`, `main.py`",
-        "and the main windows. Do not edit the module pages by hand.",
+        "Generated from the docstrings in `core/`, `infra/`, `cli.py`, `main.py`,",
+        "the main windows, the suite icons and the codename check.",
+        "Do not edit the module pages by hand.",
         "",
     ]
-    for group in ("core", "infra", "cli", "main", "ui"):
+    for group in API_GROUPS:
         members = groups.get(group, [])
         if not members:
             continue
@@ -105,7 +115,7 @@ def api_nav(names: Sequence[str]) -> str:
     for name in names:
         groups.setdefault(name.split(".", 1)[0], []).append(name)
     lines = [f"  {NAV_START}", "  - API reference:", "      - Overview: api/index.md"]
-    for group in ("core", "infra", "cli", "main", "ui"):
+    for group in API_GROUPS:
         members = groups.get(group, [])
         if not members:
             continue

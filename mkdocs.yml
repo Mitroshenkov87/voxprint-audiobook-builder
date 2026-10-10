@@ -265,4 +265,7 @@ nav:
           - voices_window: api/ui.voices_window.md
           - settings_dialog: api/ui.settings_dialog.md
           - revoice_window: api/ui.revoice_window.md
+          - suite_icons: api/ui.suite_icons.md
+      - tools:
+          - codenames: api/tools.codenames.md
   # END GENERATED API NAV

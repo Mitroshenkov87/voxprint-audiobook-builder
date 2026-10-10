@@ -1,7 +1,8 @@
 # API reference
 
-Generated from the docstrings in `core/`, `infra/`, `cli.py`, `main.py`
-and the main windows. Do not edit the module pages by hand.
+Generated from the docstrings in `core/`, `infra/`, `cli.py`, `main.py`,
+the main windows, the suite icons and the codename check.
+Do not edit the module pages by hand.
 
 ## core
 
@@ -148,3 +149,8 @@ and the main windows. Do not edit the module pages by hand.
 - [`ui.voices_window`](ui.voices_window.md)
 - [`ui.settings_dialog`](ui.settings_dialog.md)
 - [`ui.revoice_window`](ui.revoice_window.md)
+- [`ui.suite_icons`](ui.suite_icons.md)
+
+## tools
+
+- [`tools.codenames`](tools.codenames.md)
