@@ -45,7 +45,7 @@ APP_BUILD: int = int(str(_app().get("build", 0) or 0)) if str(_app().get("build"
 APP_COMMIT: str = str(_app().get("commit", ""))
 #: One Biblical Hebrew word (Latin transliteration) naming the build's changes, from BUILD.json (stamped with the number).
 APP_CODENAME: str = str(_app().get("codename", ""))
-APP_CHANNEL: str = str(_app().get("channel", ""))       # "beta" -> 0.2.4-beta; "rc" on 1.0.0-rc.2 is shown as 1.0.0 RC2
+APP_CHANNEL: str = str(_app().get("channel", ""))       # "beta" -> 0.2.4-beta; "rc" on 1.0.0-rc.3 is shown as 1.0.0 RC3
 
 
 def apply_embedded_stamp(executable: Optional[str] = None) -> None:
@@ -73,12 +73,12 @@ apply_embedded_stamp()
 
 
 def _has_channel(version: str, channel: str) -> bool:
-    """True when ``version`` already ends in ``-<channel>`` or ``-<channel>.<n>`` (``1.0.0-rc``, ``1.0.0-rc.2``)."""
+    """True when ``version`` already ends in ``-<channel>`` or ``-<channel>.<n>`` (``1.0.0-rc``, ``1.0.0-rc.3``)."""
     return bool(channel) and re.search(rf"-{re.escape(channel)}(\.\d+)?$", str(version)) is not None
 
 
 def release_version(version: Optional[str] = None, channel: Optional[str] = None) -> str:
-    """``1.0.0-rc.2``, ``1.0.0-rc`` or ``0.2.4-beta``. A channel already present as a suffix is not repeated."""
+    """``1.0.0-rc.3``, ``1.0.0-rc`` or ``0.2.4-beta``. A channel already present as a suffix is not repeated."""
     version = APP_VERSION if version is None else version
     channel = APP_CHANNEL if channel is None else channel
     if channel and not _has_channel(str(version), channel):
@@ -89,7 +89,7 @@ def release_version(version: Optional[str] = None, channel: Optional[str] = None
 def shown_version(version: Optional[str] = None, channel: Optional[str] = None) -> str:
     """Version as shown to people.
 
-    ``1.0.0-rc`` is ``1.0.0 RC`` and ``1.0.0-rc.2`` is ``1.0.0 RC2``. A channel that is not already inside the
+    ``1.0.0-rc`` is ``1.0.0 RC`` and ``1.0.0-rc.3`` is ``1.0.0 RC3``. A channel that is not already inside the
     version stays hyphenated, as in ``0.2.4-beta``.
     """
     version = APP_VERSION if version is None else version
@@ -104,7 +104,7 @@ def shown_version(version: Optional[str] = None, channel: Optional[str] = None) 
 
 
 def version_label() -> str:
-    """``1.0.0 RC2 · build 1000 "Chazak"`` (an older beta: ``0.1.1-beta · build 665 "Tikkun"``).
+    """``1.0.0 RC3 · build 1001 "Tamim"`` (an older beta: ``0.1.1-beta · build 665 "Tikkun"``).
 
     A local build with no CI number shows the version without ``build 0``.
     """
