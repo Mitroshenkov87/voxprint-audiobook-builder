@@ -6,859 +6,379 @@ The longer guide, with JSON fields and exit codes, is [CLI.md](../CLI.md).
 
 ## `voxprint`
 
-```text
-usage: voxprint [-h] [--json] [--yes] [--dry-run] [--version]
-                {narrate,train,voices,diag,status,capabilities,backup,restore,models,revoice,speakers,check,repair,prepare,translate,settings,bench} ...
-
 Voxprint AI Audiobook Builder - headless CLI for scripts and agents. Every command is non-interactive. Guide: docs/AGENTS.md.
 
-positional arguments:
-  {narrate,train,voices,diag,status,capabilities,backup,restore,models,revoice,speakers,check,repair,prepare,translate,settings,bench}
-    narrate             Narrate a book with a trained voice
-    train               Train a voice (LoRA) from a recording or a folder of clips
-    voices              List, export or download voices
-    diag                Save a diagnostic report (logs + system information) as a zip
-    status (capabilities)
-                        List models, GPU, voices and formats as JSON (alias:
-                        capabilities)
-    backup              Copy models and voices to a folder (resumable, with a
-                        manifest)
-    restore             Restore a backup into the normal folders, or use its models in
-                        place
-    models              List or download speech, translation and optional tool modules
-    revoice             Transcribe speech to a text book you can narrate
-    speakers            Mark each paragraph narrator, male or female (no narration)
-    check (repair)      Check models and files and fix what is damaged (alias: repair)
-    prepare             Prepare a book's text for narration (rules, letter yo, typo
-                        fix; optional text-model rewrite)
-    translate           Translate a book offline (Opus-MT; --literary uses the text
-                        model)
-    settings            Show or change the saved settings
-    bench               Speed test: batched generation vs CUDA Graphs (realtime
-                        factor, peak VRAM)
+### Arguments
 
-options:
-  -h, --help            show this help message and exit
-  --json                Print progress as JSON lines and a final JSON result (paths,
-                        duration, warnings)
-  --yes, -y             Accept confirmations. Every command is already non-
-                        interactive; this flag is always safe
-  --dry-run             Check arguments, input files and the output path, then print
-                        the result and exit. Does not load models, use the GPU, or
-                        download anything. Works without an RTX GPU
-  --version, -V         Print version, build number and codename from BUILD.json
-                        (example: 0.1.1-beta build 665 "Tikkun")
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
 
-Examples:
-  voxprint --version
-  voxprint status --json
-  voxprint voices list
-  voxprint narrate --help
-  voxprint train --help
-  voxprint models list --json
-  voxprint prepare book.txt --out book.prepared.txt --json
-  voxprint translate book.txt --to ru --out book.ru.txt --json
-  voxprint settings list --json
-  voxprint status --dry-run --json
-  voxprint diag --out report.zip
-  voxprint backup --out E:\ --json
-  voxprint restore --from E:\ --json
-```
+### Commands
+
+- `narrate` — Narrate a book with a trained voice
+- `train` — Train a voice (LoRA) from a recording or a folder of clips
+- `voices` — List, export or download voices
+- `diag` — Save a diagnostic report (logs + system information) as a zip
+- `status (capabilities)` — List models, GPU, voices and formats as JSON (alias: capabilities)
+- `backup` — Copy models and voices to a folder (resumable, with a manifest)
+- `restore` — Restore a backup into the normal folders, or use its models in place
+- `models` — List or download speech, translation and optional tool modules
+- `revoice` — Transcribe speech to a text book you can narrate
+- `speakers` — Mark each paragraph narrator, male or female (no narration)
+- `check (repair)` — Check models and files and fix what is damaged (alias: repair)
+- `prepare` — Prepare a book's text for narration (rules, letter yo, typo fix; optional text-model rewrite)
+- `translate` — Translate a book offline (Opus-MT; --literary uses the text model)
+- `settings` — Show or change the saved settings
+- `bench` — Speed test: batched generation vs CUDA Graphs (realtime factor, peak VRAM)
 
 ## `voxprint narrate`
 
-```text
-usage: voxprint narrate [-h] [--json] [--yes] [--dry-run] [--version] --voice
-                        ID_OR_NAME --out DIR [--format NAME] [--pauses | --no-pauses]
-                        [--pause-comma SEC] [--pause-mid SEC] [--pause-sentence SEC]
-                        [--pause-paragraph SEC] [--pause-chapter SEC] [--speed X]
-                        [--style {auto,scripture,fiction,dialogue}]
-                        [--ordinals | --no-ordinals] [--yo | --no-yo]
-                        [--ai-disclosure] [--speakers] [--male-voice ID_OR_NAME]
-                        [--female-voice ID_OR_NAME] [--male2-voice ID_OR_NAME]
-                        [--female2-voice ID_OR_NAME] [--character NAME=VOICE]
-                        [--speaker-marks FILE] [--no-soundscape] [--work-dir DIR]
-                        book
-
 Narrate a TXT, Markdown, FB2, FB2.ZIP, EPUB or .vxbook file with a voice from the library.
 
-positional arguments:
-  book                  Path to a TXT, Markdown, FB2, FB2.ZIP, EPUB or .vxbook file
+### Arguments
 
-options:
-  -h, --help            show this help message and exit
-  --json                Print progress as JSON lines and a final JSON result (paths,
-                        duration, warnings)
-  --yes, -y             Accept confirmations. Every command is already non-
-                        interactive; this flag is always safe
-  --dry-run             Check arguments, input files and the output path, then print
-                        the result and exit. Does not load models, use the GPU, or
-                        download anything. Works without an RTX GPU
-  --version, -V         Print version, build number and codename from BUILD.json
-                        (example: 0.1.1-beta build 665 "Tikkun")
-  --voice ID_OR_NAME    Voice library id or display name
-  --out DIR             Working / output folder (job lands in <DIR>/<book title>/)
-  --format NAME         Output format (repeatable or comma-separated). Default:
-                        opus_single. Aliases: flac, flac_chapters, m4b, m4b_opus, mp3,
-                        mp3_chapters, mp3_single, opus, opus_chapters, opus_single,
-                        wav, wav_chapters
-  --pauses              Enable explicit pauses between phrases
-  --no-pauses           Disable explicit pauses (default)
-  --pause-comma SEC     Silence after a comma in seconds (default: Settings, else
-                        0.25)
-  --pause-mid SEC       Silence after a strong mid-sentence break (dash, colon,
-                        semicolon, comma + conjunction) in seconds (default: Settings,
-                        else 0.4)
-  --pause-sentence SEC  Silence after a sentence end (. ! ?) in seconds (default:
-                        Settings, else 0.6)
-  --pause-paragraph SEC
-                        Silence after a paragraph or numbered / verse line in seconds
-                        (default: Settings, else 1)
-  --pause-chapter SEC   Silence after a chapter title, chapter end or scene break in
-                        seconds (default: Settings, else 2)
-  --speed X             Global reading speed 0.7-1.3 (1 = the voice's own; default:
-                        Settings)
-  --style {auto,scripture,fiction,dialogue}
-                        Reading style: auto (detected) | scripture (solemn, slower) |
-                        fiction | dialogue (default: Settings)
-  --ordinals            Read ordinal numbers by context (Russian 'глава 2' -> 'глава
-                        вторая', '21st', German '3. Kapitel'); default: Settings (on)
-  --no-ordinals         Read every number as written (cardinal)
-  --yo                  Restore the Russian letter yo where a dictionary is sure
-                        (default: on). A word that already contains yo, and a U+0301
-                        stress mark the author wrote, stay
-  --no-yo               Leave the letter e as written; do not restore yo
-  --ai-disclosure       Speak a short AI disclosure at the start (opt-in)
-  --speakers            Mark each paragraph narrator, male or female with the text
-                        model (Gemma), then narrate those voices. Without --male-voice
-                        / --female-voice / --character the shipped cast is used when
-                        installed (men Natan and Shimon, woman Miriam), else the first
-                        library voices of each gender
-  --male-voice ID_OR_NAME
-                        Voice for paragraphs marked male (narrator is --voice)
-  --female-voice ID_OR_NAME
-                        Voice for paragraphs marked female (narrator is --voice)
-  --male2-voice ID_OR_NAME
-                        Second male voice: different male characters alternate between
-                        --male-voice and this one in order of first appearance
-  --female2-voice ID_OR_NAME
-                        Second female voice, alternating with --female-voice the same
-                        way
-  --character NAME=VOICE
-                        Pin one character (the name as written in the marks) to a
-                        voice. Repeatable; wins over the male / female voices
-  --speaker-marks FILE  Narrate from this marks file instead of running Gemma
-                        (voxprint speakers writes it). One line per paragraph: 'N.
-                        NARRATOR', 'N. MALE: Name', 'N. FEMALE: Name', or the same
-                        lines without the numbers
-  --no-soundscape       Do not mix a soundscape on this run. Does not change the saved
-                        setting and does not download the model. A soundscape plays
-                        only for a .vxbook that declares extension sound/1, and only
-                        when the setting is on
-  --work-dir DIR        Remember this folder as the app working folder
-
-Examples:
-  voxprint narrate book.epub --voice my-voice --out ./audiobooks
-  voxprint narrate book.vxbook --voice narrator --out ./audiobooks --dry-run --json
-  voxprint narrate book.fb2 --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
-  voxprint narrate book.txt --voice my-voice --out ./audiobooks --pauses --ai-disclosure
-  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json
-  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks
-  python cli.py narrate book.md --voice narrator --male-voice tom --female-voice ann --character Ivan=tom --character Anna=ann --speaker-marks marks.txt --out ./audiobooks --format wav --json
-  voxprint narrate book.txt --voice levi --speakers --out ./out
-  voxprint narrate book.txt --voice levi --male-voice natan --male2-voice shimon --female-voice noa --speakers --out ./out
-  voxprint narrate book.txt --voice levi --male-voice natan --character David=shimon --speakers --out ./out
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `book` — Path to a TXT, Markdown, FB2, FB2.ZIP, EPUB or .vxbook file
+- `--voice` — Voice library id or display name
+- `--out` — Working / output folder (job lands in <DIR>/<book title>/)
+- `--format` — Output format (repeatable or comma-separated). Default: opus_single. Aliases: flac, flac_chapters, m4b, m4b_opus, mp3, mp3_chapters, mp3_single, opus, opus_chapters, opus_single, wav, wav_chapters
+- `--pauses` — Enable explicit pauses between phrases
+- `--no-pauses` — Disable explicit pauses (default)
+- `--pause-comma` — Silence after a comma in seconds (default: Settings, else 0.25)
+- `--pause-mid` — Silence after a strong mid-sentence break (dash, colon, semicolon, comma + conjunction) in seconds (default: Settings, else 0.4)
+- `--pause-sentence` — Silence after a sentence end (. ! ?) in seconds (default: Settings, else 0.6)
+- `--pause-paragraph` — Silence after a paragraph or numbered / verse line in seconds (default: Settings, else 1)
+- `--pause-chapter` — Silence after a chapter title, chapter end or scene break in seconds (default: Settings, else 2)
+- `--speed` — Global reading speed 0.7-1.3 (1 = the voice's own; default: Settings)
+- `--style` — Reading style: auto (detected) | scripture (solemn, slower) | fiction | dialogue (default: Settings) (choices: auto, scripture, fiction, dialogue)
+- `--ordinals` — Read ordinal numbers by context (Russian 'глава 2' -> 'глава вторая', '21st', German '3. Kapitel'); default: Settings (on)
+- `--no-ordinals` — Read every number as written (cardinal)
+- `--yo` — Restore the Russian letter yo where a dictionary is sure (default: on). A word that already contains yo, and a U+0301 stress mark the author wrote, stay
+- `--no-yo` — Leave the letter e as written; do not restore yo
+- `--ai-disclosure` — Speak a short AI disclosure at the start (opt-in)
+- `--speakers` — Mark each paragraph narrator, male or female with the text model (Gemma), then narrate those voices. Without --male-voice / --female-voice / --character the shipped cast is used when installed (men Natan and Shimon, woman Miriam), else the first library voices of each gender
+- `--male-voice` — Voice for paragraphs marked male (narrator is --voice)
+- `--female-voice` — Voice for paragraphs marked female (narrator is --voice)
+- `--male2-voice` — Second male voice: different male characters alternate between --male-voice and this one in order of first appearance
+- `--female2-voice` — Second female voice, alternating with --female-voice the same way
+- `--character` — Pin one character (the name as written in the marks) to a voice. Repeatable; wins over the male / female voices
+- `--speaker-marks` — Narrate from this marks file instead of running Gemma (voxprint speakers writes it). One line per paragraph: 'N. NARRATOR', 'N. MALE: Name', 'N. FEMALE: Name', or the same lines without the numbers
+- `--no-soundscape` — Do not mix a soundscape on this run. Does not change the saved setting and does not download the model. A soundscape plays only for a .vxbook that declares extension sound/1, and only when the setting is on
+- `--work-dir` — Remember this folder as the app working folder
 
 ## `voxprint train`
 
-```text
-usage: voxprint train [-h] [--json] [--yes] [--dry-run] [--version] [--text SCRIPT]
-                      [--name NAME] [--type {,male,female,child,other}] [--out DIR]
-                      [--license ID]
-                      [--consent {none,auto,commercial,public_noncommercial,private_only}]
-                      [--speaker NAME] [--language LANG]
-                      audio
-
 Train a LoRA voice. Omit --text for a folder of clips or for no-transcript mode.
 
-positional arguments:
-  audio                 Recording file, or a folder of clips when --text is omitted
+### Arguments
 
-options:
-  -h, --help            show this help message and exit
-  --json                Print progress as JSON lines and a final JSON result (paths,
-                        duration, warnings)
-  --yes, -y             Accept confirmations. Every command is already non-
-                        interactive; this flag is always safe
-  --dry-run             Check arguments, input files and the output path, then print
-                        the result and exit. Does not load models, use the GPU, or
-                        download anything. Works without an RTX GPU
-  --version, -V         Print version, build number and codename from BUILD.json
-                        (example: 0.1.1-beta build 665 "Tikkun")
-  --text SCRIPT         Transcript of the recording; omit to use no-transcript (ASR)
-                        mode
-  --name NAME           Display name for the new voice
-  --type {,male,female,child,other}
-                        Voice type stored in voice.json: male | female | child | other
-  --out DIR             Parent folder of the work folder <voice name>_Voxprint
-                        (default: next to the recording); two voices never share a
-                        work folder
-  --license ID          Licence stored in voice.json, e.g. CC0-1.0, CC-BY-4.0, CC-BY-
-                        NC-4.0 (default: from --consent)
-  --consent {none,auto,commercial,public_noncommercial,private_only}
-                        Voice owner's consent: none (private only, default) | auto
-                        (read the spoken statement at the end) | commercial |
-                        public_noncommercial | private_only (confirmed manually)
-  --speaker NAME        Name of the person whose voice it is (consent and voice.json)
-  --language LANG       Language of the recording, e.g. ru, en, de (default: detected)
-
-Examples:
-  voxprint train recording.wav --text script.txt --name Anna --type female
-  voxprint train ./clips --name Anna --type female --out ./voices --json
-  voxprint train ./clips --name MyVoice --language ru --consent commercial --speaker "Reader Name" --license CC0-1.0
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `audio` — Recording file, or a folder of clips when --text is omitted
+- `--text` — Transcript of the recording; omit to use no-transcript (ASR) mode
+- `--name` — Display name for the new voice
+- `--type` — Voice type stored in voice.json: male | female | child | other (choices: , male, female, child, other)
+- `--out` — Parent folder of the work folder <voice name>_Voxprint (default: next to the recording); two voices never share a work folder
+- `--license` — Licence stored in voice.json, e.g. CC0-1.0, CC-BY-4.0, CC-BY-NC-4.0 (default: from --consent)
+- `--consent` — Voice owner's consent: none (private only, default) | auto (read the spoken statement at the end) | commercial | public_noncommercial | private_only (confirmed manually) (choices: none, auto, commercial, public_noncommercial, private_only; default: none)
+- `--speaker` — Name of the person whose voice it is (consent and voice.json)
+- `--language` — Language of the recording, e.g. ru, en, de (default: detected)
 
 ## `voxprint voices`
 
-```text
-usage: voxprint voices [-h] [--json] [--yes] [--dry-run] [--version]
-                       {list,export,catalog,download} ...
-
 List installed voices, export one as a zip, or list and download the voices of the online catalog.
 
-positional arguments:
-  {list,export,catalog,download}
-    list                List installed voices
-    export              Export a voice as a small zip (adapter + voice.json)
-    catalog             List the voices of the online voice catalog (installed or not)
-    download            Download a catalog voice into the library (hash-checked,
-                        resumable)
+### Arguments
 
-options:
-  -h, --help            show this help message and exit
-  --json                Print progress as JSON lines and a final JSON result (paths,
-                        duration, warnings)
-  --yes, -y             Accept confirmations. Every command is already non-
-                        interactive; this flag is always safe
-  --dry-run             Check arguments, input files and the output path, then print
-                        the result and exit. Does not load models, use the GPU, or
-                        download anything. Works without an RTX GPU
-  --version, -V         Print version, build number and codename from BUILD.json
-                        (example: 0.1.1-beta build 665 "Tikkun")
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
 
-Examples:
-  voxprint voices list
-  voxprint voices list --json
-  voxprint voices export my-voice --out my-voice.zip
-  voxprint voices catalog
-  voxprint voices download eitan --json
-```
+### Commands
+
+- `list` — List installed voices
+- `export` — Export a voice as a small zip (adapter + voice.json)
+- `catalog` — List the voices of the online voice catalog (installed or not)
+- `download` — Download a catalog voice into the library (hash-checked, resumable)
 
 ## `voxprint voices list`
 
-```text
-usage: voxprint voices list [-h] [--json] [--yes] [--dry-run] [--version]
-
 List installed voices. Without --json the columns are tab-separated.
 
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
+### Arguments
 
-Examples:
-  voxprint voices list
-  voxprint voices list --json
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
 
 ## `voxprint voices export`
 
-```text
-usage: voxprint voices export [-h] [--json] [--yes] [--dry-run] [--version] --out ZIP
-                              VOICE
+### Arguments
 
-positional arguments:
-  VOICE          Voice id or display name
-
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
-  --out ZIP      Destination .zip path
-
-Examples:
-  voxprint voices export my-voice --out my-voice.zip --json
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `VOICE` — Voice id or display name
+- `--out` — Destination .zip path
 
 ## `voxprint voices catalog`
 
-```text
-usage: voxprint voices catalog [-h] [--json] [--yes] [--dry-run] [--version]
-
 Fetch the voice catalog (voices/index.json; the cached copy when offline) and list its voices.
 
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
+### Arguments
 
-Examples:
-  voxprint voices catalog
-  voxprint voices catalog --json
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
 
 ## `voxprint voices download`
 
-```text
-usage: voxprint voices download [-h] [--json] [--yes] [--dry-run] [--version] VOICE
-
 Download one voice of the catalog by its id or name, check its SHA-256 and import it. A voice already in the library is skipped.
 
-positional arguments:
-  VOICE          Catalog id or name (see: voxprint voices catalog)
+### Arguments
 
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
-
-Examples:
-  voxprint voices download eitan --json
-  voxprint voices download Noa
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `VOICE` — Catalog id or name (see: voxprint voices catalog)
 
 ## `voxprint diag`
 
-```text
-usage: voxprint diag [-h] [--json] [--yes] [--dry-run] [--version] [--out ZIP]
-
 Zip logs, system_info.json and a settings snapshot (paths cut to names, secrets dropped).
 
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
-  --out ZIP      Destination .zip (default: voxprint-diagnostics-<date>.zip in the
-                 current folder)
+### Arguments
 
-Examples:
-  voxprint diag
-  voxprint diag --out report.zip --json
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `--out` — Destination .zip (default: voxprint-diagnostics-<date>.zip in the current folder)
 
 ## `voxprint status`
 
-
 Alias: `capabilities`.
-
-```text
-usage: voxprint status [-h] [--json] [--yes] [--dry-run] [--version]
 
 One JSON object an agent can use to plan. Printed even without --json.
 
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
+### Arguments
 
-Examples:
-  voxprint status --json
-  voxprint capabilities --json
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
 
 ## `voxprint backup`
 
-```text
-usage: voxprint backup [-h] [--json] [--yes] [--dry-run] [--version] --out DIR
-                       [--no-models] [--no-voices]
-
 Copy the models and the voice library into <DIR>/Voxprint-backup/ with a SHA-256 manifest. Files already there with the same size and hash are skipped, so a second run continues.
 
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
-  --out DIR      Folder the backup is written into
-  --no-models    Leave models out
-  --no-voices    Leave the voice library out
+### Arguments
 
-Examples:
-  voxprint backup --out E:\
-  voxprint backup --out /mnt/usb --no-voices --json
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `--out` — Folder the backup is written into
+- `--no-models` — Leave models out
+- `--no-voices` — Leave the voice library out
 
 ## `voxprint restore`
 
-```text
-usage: voxprint restore [-h] [--json] [--yes] [--dry-run] [--version] --from DIR
-                        [--link]
-
 Copy a backup back and check every file against the manifest and the pinned hashes. A damaged or missing file is reported and left for the normal download.
 
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
-  --from DIR     Folder that contains the backup (or the Voxprint-backup folder
-                 itself)
-  --link         Use models from this folder (don't copy). The drive must stay
-                 connected.
+### Arguments
 
-Examples:
-  voxprint restore --from E:\
-  voxprint restore --from E:\ --link --json
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `--from` — Folder that contains the backup (or the Voxprint-backup folder itself)
+- `--link` — Use models from this folder (don't copy). The drive must stay connected.
 
 ## `voxprint models`
 
-```text
-usage: voxprint models [-h] [--json] [--yes] [--dry-run] [--version]
-                       {list,download} ...
-
 Optional and required model modules. Already-installed modules are left in place.
 
-positional arguments:
-  {list,download}
-    list           List module ids and whether each one is installed
-    download       Download one module if it is not installed yet
+### Arguments
 
-options:
-  -h, --help       show this help message and exit
-  --json           Print progress as JSON lines and a final JSON result (paths,
-                   duration, warnings)
-  --yes, -y        Accept confirmations. Every command is already non-interactive;
-                   this flag is always safe
-  --dry-run        Check arguments, input files and the output path, then print the
-                   result and exit. Does not load models, use the GPU, or download
-                   anything. Works without an RTX GPU
-  --version, -V    Print version, build number and codename from BUILD.json (example:
-                   0.1.1-beta build 665 "Tikkun")
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
 
-Module ids:
-  aligner, asr, asr-0.6b, asr-1.7b, denoise, dnsmos, llm, openvoice, opus-big-de-ru, opus-big-en-ru, opus-big-ru-de, opus-big-ru-en, opus-de-en, opus-en-de, opus-en-ru, opus-ru-en, required, sage-ru, translate, tts, tts-0.6b, tts-1.7b
-Aliases:
-  deepfilter -> denoise, deepfilternet -> denoise, gemma -> llm, llm-gemma4-12b -> llm, mos -> dnsmos, openvoice-v2 -> openvoice, translation -> translate, vc -> openvoice
+### Commands
 
-Examples:
-  voxprint models list --json
-  voxprint models download denoise --json
-  voxprint models download asr
-  voxprint models download opus-big-en-ru --yes
-  voxprint models download llm
-  voxprint models download translate
-```
+- `list` — List module ids and whether each one is installed
+- `download` — Download one module if it is not installed yet
 
 ## `voxprint models list`
 
-```text
-usage: voxprint models list [-h] [--json] [--yes] [--dry-run] [--version]
+### Arguments
 
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
-
-Examples:
-  voxprint models list --json
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
 
 ## `voxprint models download`
 
-```text
-usage: voxprint models download [-h] [--json] [--yes] [--dry-run] [--version] module
-
 Download a module by id. Safe to repeat: an installed module is not fetched again.
 
-positional arguments:
-  module         Module id (voxprint models list --json)
+### Arguments
 
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
-
-Module ids:
-  aligner, asr, asr-0.6b, asr-1.7b, denoise, dnsmos, llm, openvoice, opus-big-de-ru, opus-big-en-ru, opus-big-ru-de, opus-big-ru-en, opus-de-en, opus-en-de, opus-en-ru, opus-ru-en, required, sage-ru, translate, tts, tts-0.6b, tts-1.7b
-Aliases:
-  deepfilter -> denoise, deepfilternet -> denoise, gemma -> llm, llm-gemma4-12b -> llm, mos -> dnsmos, openvoice-v2 -> openvoice, translation -> translate, vc -> openvoice
-
-Examples:
-  voxprint models list --json
-  voxprint models download denoise --json
-  voxprint models download asr
-  voxprint models download opus-big-en-ru --yes
-  voxprint models download llm
-  voxprint models download translate
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `module` — Module id (voxprint models list --json)
 
 ## `voxprint revoice`
 
-```text
-usage: voxprint revoice [-h] [--json] [--yes] [--dry-run] [--version] [--out DIR]
-                        [--title TITLE] [--language LANGUAGE]
-                        audio [audio ...]
-
 Recognise one or more audio files (or a folder) with the installed speech model and write a TXT book. Narrate that file with the narrate command.
 
-positional arguments:
-  audio                Audio file(s) or a folder of clips
+### Arguments
 
-options:
-  -h, --help           show this help message and exit
-  --json               Print progress as JSON lines and a final JSON result (paths,
-                       duration, warnings)
-  --yes, -y            Accept confirmations. Every command is already non-interactive;
-                       this flag is always safe
-  --dry-run            Check arguments, input files and the output path, then print
-                       the result and exit. Does not load models, use the GPU, or
-                       download anything. Works without an RTX GPU
-  --version, -V        Print version, build number and codename from BUILD.json
-                       (example: 0.1.1-beta build 665 "Tikkun")
-  --out DIR            Folder for the text book (default: the Re-voice projects
-                       folder)
-  --title TITLE        File name for the text book (default: the first clip's title)
-  --language LANGUAGE  Recognition language hint: ISO code or name, any case (ru, en,
-                       de, Russian ...; default: automatic)
-
-Examples:
-  voxprint revoice recording.wav --out ./revoice --json
-  voxprint revoice ./chapters --title "My talk" --out ./revoice --language en
-  voxprint narrate ./revoice/My-talk.txt --voice my-voice --out ./audiobooks --format mp3
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `audio` — Audio file(s) or a folder of clips
+- `--out` — Folder for the text book (default: the Re-voice projects folder)
+- `--title` — File name for the text book (default: the first clip's title)
+- `--language` — Recognition language hint: ISO code or name, any case (ru, en, de, Russian ...; default: automatic)
 
 ## `voxprint speakers`
 
-```text
-usage: voxprint speakers [-h] [--json] [--yes] [--dry-run] [--version] --out FILE book
-
 Ask the text model (Gemma) who speaks each paragraph and write an editable marks file. Narrate that file with narrate --speaker-marks. This command does not synthesize audio.
 
-positional arguments:
-  book           Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file
+### Arguments
 
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
-  --out FILE     Marks file to write
-
-Examples:
-  voxprint speakers book.txt --out marks.txt --json
-  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks --json
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `book` — Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file
+- `--out` — Marks file to write
 
 ## `voxprint check`
 
-
 Alias: `repair`.
-
-```text
-usage: voxprint check [-h] [--json] [--yes] [--dry-run] [--version]
 
 The same check as Settings -> Check & repair: program, components and models by hash, missing or damaged files fetched again, stale model lock files removed.
 
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
+### Arguments
 
-Examples:
-  voxprint check --json
-  voxprint repair --json
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
 
 ## `voxprint prepare`
 
-```text
-usage: voxprint prepare [-h] [--json] [--yes] [--dry-run] [--version] --out FILE
-                        [--report FILE] [--language CODE] [--steps NAME] [--no-rules]
-                        [--yo | --no-yo] [--typos | --no-typos] [--llm]
-                        [--work-dir DIR]
-                        book
-
 The Narrate window's Prepare text step without narration: layout, footnotes, quotes, links, headings, numbers, abbreviations and (Russian) the letter yo, then the Russian typo model when it is downloaded. --llm adds the text model's narration rewrite. Writes plain text and a JSON report.
 
-positional arguments:
-  book             Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file
+### Arguments
 
-options:
-  -h, --help       show this help message and exit
-  --json           Print progress as JSON lines and a final JSON result (paths,
-                   duration, warnings)
-  --yes, -y        Accept confirmations. Every command is already non-interactive;
-                   this flag is always safe
-  --dry-run        Check arguments, input files and the output path, then print the
-                   result and exit. Does not load models, use the GPU, or download
-                   anything. Works without an RTX GPU
-  --version, -V    Print version, build number and codename from BUILD.json (example:
-                   0.1.1-beta build 665 "Tikkun")
-  --out FILE       Prepared text file to write (UTF-8)
-  --report FILE    JSON report to write (default: <out stem>.prep_report.json next to
-                   --out)
-  --language CODE  Book language hint: ru, en, de (default: detected)
-  --steps NAME     Only these rule steps (repeatable or comma-separated; default: all)
-  --no-rules       Skip every rule step
-  --yo             Restore the Russian letter yo (default: on)
-  --no-yo          Leave the letter e as written
-  --typos          Require the Russian typo model (exit 4 when it is not downloaded)
-  --no-typos       Skip the typo model (default: used when downloaded, unless --steps
-                   is given)
-  --llm, --markup  Also run the text model's narration rewrite (Gemma; off by default)
-  --work-dir DIR   Keep the text model's cache here (default: a temporary folder)
-
-Steps: layout, noise, quotes, links, headings, numbers, abbrev, yo
-Examples:
-  voxprint prepare book.txt --out book.prepared.txt --json
-  voxprint prepare book.fb2 --out prepared.txt --report report.json --no-typos
-  voxprint prepare book.txt --out yo-only.txt --steps yo
-  voxprint prepare book.txt --out prepared.txt --llm --json
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `book` — Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file
+- `--out` — Prepared text file to write (UTF-8)
+- `--report` — JSON report to write (default: <out stem>.prep_report.json next to --out)
+- `--language` — Book language hint: ru, en, de (default: detected)
+- `--steps` — Only these rule steps (repeatable or comma-separated; default: all)
+- `--no-rules` — Skip every rule step
+- `--yo` — Restore the Russian letter yo (default: on)
+- `--no-yo` — Leave the letter e as written
+- `--typos` — Require the Russian typo model (exit 4 when it is not downloaded)
+- `--no-typos` — Skip the typo model (default: used when downloaded, unless --steps is given)
+- `--llm, --markup` — Also run the text model's narration rewrite (Gemma; off by default)
+- `--work-dir` — Keep the text model's cache here (default: a temporary folder)
 
 ## `voxprint translate`
 
-```text
-usage: voxprint translate [-h] [--json] [--yes] [--dry-run] [--version] --to
-                          {en,ru,de} [--from {,en,ru,de,uk}] --out FILE [--literary]
-                          [--work-dir DIR]
-                          book
-
 Translate a book with the offline models the Narrate window uses and write plain text. Does not narrate.
 
-positional arguments:
-  book                  Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file
+### Arguments
 
-options:
-  -h, --help            show this help message and exit
-  --json                Print progress as JSON lines and a final JSON result (paths,
-                        duration, warnings)
-  --yes, -y             Accept confirmations. Every command is already non-
-                        interactive; this flag is always safe
-  --dry-run             Check arguments, input files and the output path, then print
-                        the result and exit. Does not load models, use the GPU, or
-                        download anything. Works without an RTX GPU
-  --version, -V         Print version, build number and codename from BUILD.json
-                        (example: 0.1.1-beta build 665 "Tikkun")
-  --to {en,ru,de}       Target language
-  --from {,en,ru,de,uk}
-                        Source language (default: detected)
-  --out FILE            Translated text file to write (UTF-8)
-  --literary            Literary translation by the text model (Gemma), Opus-MT as the
-                        fallback
-  --work-dir DIR        Keep the sentence cache here, so a second run is quick
-                        (default: a temporary folder)
-
-Examples:
-  voxprint translate book.epub --to ru --out book.ru.txt --json
-  voxprint translate book.txt --from de --to en --out book.en.txt
-  voxprint translate book.txt --to ru --out book.ru.txt --literary
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `book` — Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file
+- `--to` — Target language (choices: en, ru, de)
+- `--from` — Source language (default: detected) (choices: , en, ru, de, uk)
+- `--out` — Translated text file to write (UTF-8)
+- `--literary` — Literary translation by the text model (Gemma), Opus-MT as the fallback
+- `--work-dir` — Keep the sentence cache here, so a second run is quick (default: a temporary folder)
 
 ## `voxprint settings`
 
-```text
-usage: voxprint settings [-h] [--json] [--yes] [--dry-run] [--version]
-                         {list,get,set} ...
-
 The values Settings shows: language, projects folder, reading speed and style, pauses, ordinals.
 
-positional arguments:
-  {list,get,set}
-    list          Every setting and its value
-    get           One setting
-    set           Change one setting
+### Arguments
 
-options:
-  -h, --help      show this help message and exit
-  --json          Print progress as JSON lines and a final JSON result (paths,
-                  duration, warnings)
-  --yes, -y       Accept confirmations. Every command is already non-interactive; this
-                  flag is always safe
-  --dry-run       Check arguments, input files and the output path, then print the
-                  result and exit. Does not load models, use the GPU, or download
-                  anything. Works without an RTX GPU
-  --version, -V   Print version, build number and codename from BUILD.json (example:
-                  0.1.1-beta build 665 "Tikkun")
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
 
-Examples:
-  voxprint settings list --json
-  voxprint settings get narration.speed
-  voxprint settings set narration.ordinals off
-  voxprint settings set narration.pause.sentence 0.8
-```
+### Commands
+
+- `list` — Every setting and its value
+- `get` — One setting
+- `set` — Change one setting
 
 ## `voxprint settings list`
 
-```text
-usage: voxprint settings list [-h] [--json] [--yes] [--dry-run] [--version]
+### Arguments
 
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
 
 ## `voxprint settings get`
 
-```text
-usage: voxprint settings get [-h] [--json] [--yes] [--dry-run] [--version] KEY
+### Arguments
 
-positional arguments:
-  KEY
-
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
 
 ## `voxprint settings set`
 
-```text
-usage: voxprint settings set [-h] [--json] [--yes] [--dry-run] [--version] KEY VALUE
+### Arguments
 
-positional arguments:
-  KEY
-  VALUE
-
-options:
-  -h, --help     show this help message and exit
-  --json         Print progress as JSON lines and a final JSON result (paths,
-                 duration, warnings)
-  --yes, -y      Accept confirmations. Every command is already non-interactive; this
-                 flag is always safe
-  --dry-run      Check arguments, input files and the output path, then print the
-                 result and exit. Does not load models, use the GPU, or download
-                 anything. Works without an RTX GPU
-  --version, -V  Print version, build number and codename from BUILD.json (example:
-                 0.1.1-beta build 665 "Tikkun")
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
 
 ## `voxprint bench`
 
-```text
-usage: voxprint bench [-h] [--json] [--yes] [--dry-run] [--version] [--voice VOICE]
-                      [--modes LIST] [--out DIR] [--install-graphs]
-
 Narrate a fixed Russian text (12 phrases) once per mode with the same voice and print the realtime factor and the peak video memory. 'batched' = several phrases per generate call (the default path); 'graphs' = one phrase at a time through faster-qwen3-tts with CUDA Graphs (optional module). Each mode loads the model itself; nothing is saved unless --out is given.
 
-options:
-  -h, --help        show this help message and exit
-  --json            Print progress as JSON lines and a final JSON result (paths,
-                    duration, warnings)
-  --yes, -y         Accept confirmations. Every command is already non-interactive;
-                    this flag is always safe
-  --dry-run         Check arguments, input files and the output path, then print the
-                    result and exit. Does not load models, use the GPU, or download
-                    anything. Works without an RTX GPU
-  --version, -V     Print version, build number and codename from BUILD.json (example:
-                    0.1.1-beta build 665 "Tikkun")
-  --voice VOICE     Voice id or name (default: Levi)
-  --modes LIST      Comma-separated: batched, graphs
-  --out DIR         Also save bench-<mode>.wav here to listen
-  --install-graphs  First download faster-qwen3-tts 0.3.2 (MIT, 43 KB, SHA-256
-                    checked) into the packages folder
+### Arguments
 
-Examples:
-  voxprint bench
-  voxprint bench --voice Levi --modes batched,graphs --out ./bench --json
-  voxprint bench --install-graphs
-```
+- `--json` — Print progress as JSON lines and a final JSON result (paths, duration, warnings)
+- `--yes, -y` — Accept confirmations. Every command is already non-interactive; this flag is always safe
+- `--dry-run` — Check arguments, input files and the output path, then print the result and exit. Does not load models, use the GPU, or download anything. Works without an RTX GPU
+- `--version, -V` — Print version, build number and codename from BUILD.json (example: 0.1.1-beta build 665 "Tikkun")
+- `--voice` — Voice id or name (default: Levi) (default: Levi)
+- `--modes` — Comma-separated: batched, graphs (default: batched,graphs)
+- `--out` — Also save bench-<mode>.wav here to listen
+- `--install-graphs` — First download faster-qwen3-tts 0.3.2 (MIT, 43 KB, SHA-256 checked) into the packages folder

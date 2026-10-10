@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
@@ -147,23 +146,94 @@ def _subparsers(parser: argparse.ArgumentParser) -> List[Tuple[List[str], argpar
     return found
 
 
-def _stabilize_help(text: str) -> str:
-    """Join a usage ellipsis onto the choice list.
+def _action_label(action: argparse.Action) -> str:
+    """The flag or positional name, as the reference should print it."""
+    if action.option_strings:
+        return ", ".join(action.option_strings)
+    metavar = action.metavar
+    if isinstance(metavar, tuple):
+        return " ".join(str(part) for part in metavar)
+    if metavar:
+        return str(metavar)
+    return action.dest
 
-    Python 3.12 wraps the ``...`` of a subparser onto its own line. Python 3.14
-    keeps ``{choices} ...`` together when the line is wide enough. The page is
-    committed, so both interpreters have to emit the same text.
-    """
-    return re.sub(r"\}\n[ ]+\.\.\.(?=\n)", "} ...", text)
+
+def _plain(text: str) -> str:
+    """Help text as one line. Argparse stores the author's line breaks."""
+    return " ".join(text.split())
+
+
+def _action_line(action: argparse.Action) -> str:
+    """One bullet for an argument. Empty when the argument is hidden."""
+    if isinstance(action, (argparse._HelpAction, argparse._SubParsersAction)):
+        return ""
+    help_text = action.help
+    if not isinstance(help_text, str) or help_text == argparse.SUPPRESS:
+        return ""
+    details: List[str] = []
+    if action.choices is not None:
+        details.append("choices: " + ", ".join(str(choice) for choice in action.choices))
+    default = action.default
+    # bool is a subclass of int. ``==SUPPRESS==`` is how a parent parser's
+    # suppressed default shows up on the child.
+    if isinstance(default, bool) or default in (None, argparse.SUPPRESS, "", "==SUPPRESS=="):
+        default = None
+    if isinstance(default, (str, int, float)):
+        details.append(f"default: {default}")
+    line = f"- `{_action_label(action)}` — {_plain(help_text)}"
+    if details:
+        line += " (" + "; ".join(details) + ")"
+    return line
+
+
+def _command_summaries(parser: argparse.ArgumentParser) -> Dict[str, str]:
+    """Short help of each direct subcommand, keyed by its name."""
+    found: Dict[str, str] = {}
+    for action in parser._actions:
+        if not isinstance(action, argparse._SubParsersAction):
+            continue
+        for choice in getattr(action, "_choices_actions", []):
+            found[str(choice.dest)] = _plain(choice.help) if isinstance(choice.help, str) else ""
+    return found
 
 
 def _help_block(title: str, parser: argparse.ArgumentParser, aliases: Sequence[str]) -> str:
-    text = _stabilize_help(parser.format_help()).replace("```", "'''").rstrip()
-    alias = ""
+    """One command, from the parser's description and arguments.
+
+    This is not ``format_help()``. That text wraps differently on Python 3.12
+    and 3.14, and the page is committed, so the two interpreters have to agree.
+    """
+    lines = [f"## `{title}`", ""]
     if aliases:
         joined = ", ".join(f"`{name}`" for name in aliases)
-        alias = f"\n\nAlias: {joined}.\n"
-    return f"## `{title}`\n{alias}\n```text\n{text}\n```\n"
+        lines.extend([f"Alias: {joined}.", ""])
+    description = _plain(parser.description or "")
+    if description:
+        lines.extend([description, ""])
+    arguments: List[str] = []
+    for action in parser._actions:
+        line = _action_line(action)
+        if line:
+            arguments.append(line)
+    if arguments:
+        lines.extend(["### Arguments", ""])
+        lines.extend(arguments)
+        lines.append("")
+    commands = _subparsers(parser)
+    if commands:
+        summaries = _command_summaries(parser)
+        lines.extend(["### Commands", ""])
+        for names, _sub in commands:
+            label = names[0]
+            if len(names) > 1:
+                label += " (" + ", ".join(names[1:]) + ")"
+            summary = summaries.get(names[0], "")
+            if summary:
+                lines.append(f"- `{label}` — {summary}")
+            else:
+                lines.append(f"- `{label}`")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _walk(prefix: Sequence[str], parser: argparse.ArgumentParser) -> List[str]:
@@ -176,8 +246,7 @@ def _walk(prefix: Sequence[str], parser: argparse.ArgumentParser) -> List[str]:
 
 
 def render_cli() -> str:
-    """The command reference, rendered from the live parser at a fixed width."""
-    os.environ["COLUMNS"] = "88"
+    """The command reference, rendered from the live parser's arguments."""
     parser = user_cli.build_parser()
     parts = [
         "# Command reference",
