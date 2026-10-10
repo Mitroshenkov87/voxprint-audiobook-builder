@@ -1,4 +1,5 @@
 """Shared pytest setup: every test gets an isolated app-data folder, a fixed language and no network/model-cache access."""
+import ctypes
 import os
 import sys
 from pathlib import Path
@@ -52,6 +53,13 @@ def remember_exit_status(exitstatus: int) -> None:
     _ci_exit = int(exitstatus)
 
 
+def _terminate_windows(code: int) -> bool:
+    """End this process without ``DLL_PROCESS_DETACH``. ``ExitProcess`` (what ``os._exit`` calls) still runs it,
+    and on Python 3.14 that detach access-violates once Qt is loaded."""
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    return bool(kernel.TerminateProcess(kernel.GetCurrentProcess(), code & 0xFFFFFFFF))
+
+
 def leave_before_native_shutdown() -> bool:
     """On GitHub Actions, exit with the session result and skip interpreter shutdown.
 
@@ -61,7 +69,10 @@ def leave_before_native_shutdown() -> bool:
     """
     if os.environ.get("GITHUB_ACTIONS") != "true" or _ci_exit is None:
         return False
-    os._exit(_ci_exit)
+    code = int(_ci_exit)
+    if sys.platform == "win32" and _terminate_windows(code):
+        return True
+    os._exit(code)
 
 
 def pytest_sessionfinish(session, exitstatus):
