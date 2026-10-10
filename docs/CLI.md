@@ -206,7 +206,7 @@ voxprint settings set KEY VALUE [--json]
 | `narration.pause.comma`, `.mid`, `.sentence`, `.paragraph`, `.chapter` | Seconds, 0-6 |
 | `theme` | Shared by the Voxprint programs (`state/suite.json`). This program has one look, `glass-dark`; another program's theme id is kept and read as `glass-dark` |
 | `gpu` | Shared by the Voxprint programs: `auto`, `cpu` or `cuda:N`. Narration uses it; a GPU that is not there falls back to `cuda:0` |
-| `gpu.vram_fraction` | 0.70-0.80 (default 0.75): the most of the card's total video memory narration plans for, counting what other programs hold. Environment: `VOXPRINT_VRAM_FRACTION` |
+| `gpu.vram_fraction` | Optional extra cap, 0.70-0.80 of the card (default `off`). Narration already leaves `max(2 GB, 8 % of the card)` free and re-reads free memory before every batch. Set a fraction to also stay under that share of the total. `off` clears it. Environment: `VOXPRINT_VRAM_FRACTION` (`0.75`, `75` or `off`) |
 | `gpu.fast_decode` | `off` (default) or `graphs`: one chunk at a time with CUDA Graphs (needs faster-qwen3-tts, see [Bench](#bench)). Environment: `VOXPRINT_FAST_DECODE` |
 
 These are the files Settings writes, so the window and `narrate` use them. An unknown key or a bad value is exit 2. `--json` adds `settings` (for `list`) or `key` and `value`.

@@ -5,6 +5,14 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Added
+- **GPU lock** (`core/gpu_lock.py`). Narration holds `voxprint-gpu.lock` in the temp folder (`%TEMP%` on Windows) for the whole job and deletes it when the job ends, including when the job fails. The file is the JSON protocol shared with Voxprint AI Movie Dubber: `owner` (`audiobook-builder`), `pid`, `job`, `started` and `eta` (ISO 8601, UTC), written atomically. The same process may enter again. If another live program holds the lock, narration waits and shows "GPU busy: <owner> <job>". A lock is stale when its process is gone, or when its eta is more than 2 hours in the past.
+- **Automatic GPU cooling** (`core/gpu_thermal.py`). There is no setting. The first 2.5 hours of a job run at full speed. After that, if `nvidia-smi` `temperature.gpu` stays at or above 83 °C (median of the samples from the last 5 minutes), narration pauses 2.5 minutes between batches, logs it, shows "Cooling GPU", and then continues at full speed.
+- **Windows shared-memory spill guard** (`core/sysmem_spill.py`). After the voice model loads, a background sampler reads `\GPU Process Memory(pid_<pid>*)\Shared Usage` (PDH, or `typeperf` when PDH cannot). Growth of more than 256 MB over that baseline is treated as out of memory: the CUDA cache is emptied and the batch is halved. The diagnostic report tells you to set NVIDIA Control Panel → Manage 3D settings → CUDA - Sysmem Fallback Policy = Prefer No Sysmem Fallback.
+
+### Changed
+- **Video memory rule** (`core/vram_policy.py`). The 75 % cap is no longer the default. Before every batch, free memory is read again with `torch.cuda.mem_get_info`. The reserve is `max(2 GB, 8 % of the card)`, the budget is what is free beyond that reserve, and the batch is `budget // 0.9 GB` clamped to 1–12. `gpu.vram_fraction` / `VOXPRINT_VRAM_FRACTION` stays as an optional extra cap (0.70–0.80) and is off unless you set it (`off` clears it). On a 16 GB card with about 11 GB free the batch is 10 (it was 7 under the 75 % cap).
+
 ## [0.2.4-beta] - 2026-10-09 - build 704 "Achim"
 
 Codename *Achim* (Biblical Hebrew *achim*, brothers; Genesis 13:8, "for we are brothers"): Voxprint AI Audiobook Builder and Voxprint AI Movie Dubber now live side by side as sibling programs that share models, settings and one Start menu folder. Build-installer run 50 failed in the Windows tests that need no PyTorch (a test used `torch.cuda` from the stand-in module) and published nothing, so the `BUILD.json` offset is **653** and run 51 stamps build 704. Full installer. Upgrade: install over 703; models, voices and settings stay.
