@@ -344,8 +344,8 @@ class ModulesDialog(GlassDialog):
         if isinstance(res, str):
             self.modules = []
             self._list_failed = True
-            self._set_line(tr("modules.offline", error=res), error=True)
             self._render()
+            self._set_line(tr("modules.offline", error=res), error=True)
             return
         self._list_failed = False
         self.modules = list(res)
@@ -355,6 +355,9 @@ class ModulesDialog(GlassDialog):
             self._auto_tried = True
             self.start_install(updates=False)
             return
+        # Enable Download before the status text. Setting the label can re-enter the event loop, and a test
+        # (or a paint) would otherwise see "press Download" while the button is still off.
+        self._render()
         if self._note:
             self._set_line(self._note, error=self._note_error)
         elif self._offer_pending():
@@ -363,7 +366,6 @@ class ModulesDialog(GlassDialog):
             self._set_line(tr("modules.all_ready"))
         else:
             self._set_line(self._summary())
-        self._render()
         if self.modules and not any(m.required and not (m.installed or m.update) for m in self.modules):
             self.ready.emit()
             if self._go:

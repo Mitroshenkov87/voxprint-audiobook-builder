@@ -66,6 +66,11 @@ def _terminate_windows(code: int) -> bool:
     return bool(kernel.TerminateProcess(kernel.GetCurrentProcess(), code & 0xFFFFFFFF))
 
 
+def _qt_loaded() -> bool:
+    """True once this process has imported PySide6 (the Windows hard-exit then crashes the session)."""
+    return any(name == "PySide6" or name.startswith("PySide6.") for name in sys.modules)
+
+
 def leave_before_native_shutdown() -> bool:
     """On GitHub Actions, exit with the session result and skip interpreter shutdown.
 
@@ -73,12 +78,18 @@ def leave_before_native_shutdown() -> bool:
     the process dies with a bus error after a green session. The result is already decided.
     A crash during a test never reaches this function. Off CI the process exits normally.
     Streams are flushed first: ``os._exit`` does not, and the failure text would never reach the log.
+
+    Windows with Qt loaded exits normally. ``TerminateProcess`` and ``ExitProcess`` both come back as a
+    non-zero status for those sessions (``test_auto_quality`` and ``test_screen_fit``). A Windows session
+    that never imported Qt still uses ``TerminateProcess``, which skips the DLL detach crash.
     """
     if os.environ.get("GITHUB_ACTIONS") != "true" or _ci_exit is None:
         return False
     code = int(_ci_exit)
     sys.stdout.flush()
     sys.stderr.flush()
+    if sys.platform == "win32" and _qt_loaded():
+        return False
     if sys.platform == "win32" and _terminate_windows(code):
         return True
     os._exit(code)

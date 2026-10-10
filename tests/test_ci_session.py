@@ -26,6 +26,7 @@ def test_ci_exits_with_the_session_status_after_the_summary(monkeypatch):
 def test_windows_ci_terminates_without_dll_detach(monkeypatch):
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     monkeypatch.setattr(conftest.sys, "platform", "win32")
+    monkeypatch.setattr(conftest, "_qt_loaded", lambda: False)
     terminated, exited = [], []
     monkeypatch.setattr(conftest, "_terminate_windows", lambda code: terminated.append(code) or True)
     monkeypatch.setattr(conftest.os, "_exit", exited.append)
@@ -34,6 +35,18 @@ def test_windows_ci_terminates_without_dll_detach(monkeypatch):
     conftest.remember_exit_status(1)
     conftest.leave_before_native_shutdown()
     assert terminated == [0, 1] and exited == []
+
+
+def test_windows_qt_session_exits_normally(monkeypatch):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setattr(conftest.sys, "platform", "win32")
+    monkeypatch.setattr(conftest, "_qt_loaded", lambda: True)
+    terminated, exited = [], []
+    monkeypatch.setattr(conftest, "_terminate_windows", lambda code: terminated.append(code) or True)
+    monkeypatch.setattr(conftest.os, "_exit", exited.append)
+    conftest.remember_exit_status(0)
+    assert conftest.leave_before_native_shutdown() is False
+    assert terminated == [] and exited == []
 
 
 def test_windows_terminate_silences_faulthandler_before_the_kill(monkeypatch):
