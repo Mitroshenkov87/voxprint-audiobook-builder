@@ -18,7 +18,7 @@ jobs:
       # internal: CI runners have no RTX 40-series GPU (infra/gpu_requirement.py); never a user option
       VOXPRINT_ALLOW_NO_GPU: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
@@ -76,7 +76,7 @@ jobs:
       VOXPRINT_ALLOW_NO_GPU: "1"
       PYTHONUTF8: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
@@ -132,7 +132,7 @@ jobs:
       VOXPRINT_ALLOW_NO_GPU: "1"
       PYTHONUTF8: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"

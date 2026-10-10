@@ -25,7 +25,7 @@ jobs:
       VOXPRINT_ALLOW_NO_GPU: "1"
       VOXPRINT_NO_ENV_PROBE: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
