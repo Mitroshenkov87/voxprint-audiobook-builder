@@ -48,7 +48,7 @@ def library_dirs() -> List[Path]:
             parent = Path(str(entry)).parent
             if parent.name not in _DIR_NAMES:
                 continue
-            located = entry.locate().parent
+            located = Path(entry.locate()).parent
             key = str(located)
             if key in seen or not located.is_dir():
                 continue
