@@ -222,7 +222,7 @@ def version_payload() -> dict:
                 build = int(build_number())
             except (OSError, ValueError, TypeError, KeyError):
                 build = 0
-    version = f"{appinfo.APP_VERSION}-{appinfo.APP_CHANNEL}" if appinfo.APP_CHANNEL else str(appinfo.APP_VERSION)
+    version = appinfo.release_version()
     return {"name": "Voxprint", "version": version, "build": int(build), "codename": codename}
 
 

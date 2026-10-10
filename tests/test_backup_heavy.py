@@ -52,7 +52,7 @@ def test_manifest_round_trip_records_version_build_and_per_file_hashes(tmp_path)
     rep = bk.run_backup(items, target)
     assert rep.copied_files > 0
     data = json.loads((target / bk.BACKUP_DIRNAME / bk.MANIFEST_NAME).read_text(encoding="utf-8"))
-    assert data["version"] == (f"{appinfo.APP_VERSION}-{appinfo.APP_CHANNEL}" if appinfo.APP_CHANNEL else appinfo.APP_VERSION)
+    assert data["version"] == appinfo.release_version()
     assert data["build"] == appinfo.APP_BUILD
     files = {f["path"]: f for f in data["files"]}
     rel = "models/Org--Tiny-1.7B/model.safetensors"

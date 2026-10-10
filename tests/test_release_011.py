@@ -136,19 +136,27 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     # Runs 41-44 published nothing. Offset 655: run 45 stamped 700 (Kaporet). Run 46 failed before publishing;
     # offset 654: run 47 stamped 701 (Shalem), run 48 stamped 702 (Shelishi), run 49 stamped 703 (Toledot),
     # run 50 failed before publishing; offset 653: run 51 stamps 704 (Achim).
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "51"}) == 704 and bn.build_number({}) == 0
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "40"}) == 693
+    # Offset 947: the next build-installer run (52) stamps 999 (Nachon, 1.0.0-rc).
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "52"}) == 999 and bn.build_number({}) == 0
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "51"}) == 998
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34"}) == 700
-    assert bn.info()["offset"] == 653
+    assert bn.info()["offset"] == 947
+    note = bn.info()["offset_note"]
+    assert "947" in note and "run 52" in note and "999 minus the next run number" in note
     name = bn.info()["codename"]
-    assert name == "Achim" and name.isascii() and name.isalpha()
+    assert name == "Nachon" and name.isascii() and name.isalpha()
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     credits = json.loads((root / "credits.json").read_text(encoding="utf-8"))
-    assert credits["app"]["version"] == "0.2.4" and credits["app"]["channel"] == "beta"
-    assert credits["app"]["codename"] == "Achim"
+    assert credits["app"]["version"] == "1.0.0-rc" and credits["app"]["channel"] == "rc"
+    assert credits["app"]["codename"] == "Nachon"
     iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8")
-    assert '#define AppVersion "0.2.4"' in iss
+    assert '#define AppVersion "1.0.0-rc"' in iss
+    assert '#define AppVersionInfo "1.0.0"' in iss
+    assert "VersionInfoVersion={#AppVersionInfo}.{#AppBuild}" in iss
+    log = (root / "CHANGELOG.md").read_text(encoding="utf-8")
+    heading = '## [1.0.0-rc] - 2026-10-10 - build 999 "Nachon"'
+    assert heading in log and log.index("## [Unreleased]") < log.index(heading) < log.index("## [0.2.4-beta]")
     notes = (root / "docs" / "RELEASE-NOTES-700-KAPORET.md").read_text(encoding="utf-8")
     assert "655" in notes and "run 45" in notes and "does not delete" in notes and "Kaporet" in notes
     notes = (root / "docs" / "RELEASE-NOTES-701-SHALEM.md").read_text(encoding="utf-8")
@@ -166,6 +174,12 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
                                                                "commit": "01234567"}
     from core import appinfo
 
+    monkeypatch.setattr(appinfo, "APP_BUILD", 999)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Nachon")
+    monkeypatch.setattr(appinfo, "APP_CHANNEL", "rc")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc")
+    assert appinfo.release_version() == "1.0.0-rc"
+    assert appinfo.version_label() == '1.0.0 RC \u00b7 build 999 "Nachon"'
     monkeypatch.setattr(appinfo, "APP_BUILD", 665)
     monkeypatch.setattr(appinfo, "APP_CODENAME", "Tikkun")
     monkeypatch.setattr(appinfo, "APP_CHANNEL", "beta")

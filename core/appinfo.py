@@ -44,7 +44,7 @@ APP_BUILD: int = int(str(_app().get("build", 0) or 0)) if str(_app().get("build"
 APP_COMMIT: str = str(_app().get("commit", ""))
 #: One Biblical Hebrew word (Latin transliteration) naming the build's changes, from BUILD.json (stamped with the number).
 APP_CODENAME: str = str(_app().get("codename", ""))
-APP_CHANNEL: str = str(_app().get("channel", ""))       # "beta" -> shown as 0.1.1-beta
+APP_CHANNEL: str = str(_app().get("channel", ""))       # "beta" -> 0.2.4-beta; "rc" on 1.0.0-rc is shown as 1.0.0 RC
 
 
 def apply_embedded_stamp(executable: Optional[str] = None) -> None:
@@ -71,9 +71,37 @@ def apply_embedded_stamp(executable: Optional[str] = None) -> None:
 apply_embedded_stamp()
 
 
+def release_version(version: Optional[str] = None, channel: Optional[str] = None) -> str:
+    """``1.0.0-rc`` or ``0.2.4-beta``. A channel already present as a suffix is not repeated."""
+    version = APP_VERSION if version is None else version
+    channel = APP_CHANNEL if channel is None else channel
+    if channel and not str(version).endswith(f"-{channel}"):
+        return f"{version}-{channel}"
+    return str(version)
+
+
+def shown_version(version: Optional[str] = None, channel: Optional[str] = None) -> str:
+    """Version as shown to people.
+
+    ``1.0.0-rc`` is ``1.0.0 RC``. A channel that is not already inside the version stays
+    hyphenated, as in ``0.2.4-beta``.
+    """
+    version = APP_VERSION if version is None else version
+    channel = APP_CHANNEL if channel is None else channel
+    text = str(version)
+    if text.endswith("-rc"):
+        return f"{text[:-3]} RC"
+    if channel and not str(version).endswith(f"-{channel}"):
+        return f"{version}-{channel}"
+    return str(version)
+
+
 def version_label() -> str:
-    """``0.1.1-beta · build 665 "Tikkun"`` - the version as shown to people; a local build shows only the version."""
-    label = f"{APP_VERSION}-{APP_CHANNEL}" if APP_CHANNEL else APP_VERSION
+    """``1.0.0 RC · build 999 "Nachon"`` (an older beta: ``0.1.1-beta · build 665 "Tikkun"``).
+
+    A local build with no CI number shows the version without ``build 0``.
+    """
+    label = shown_version()
     if APP_BUILD:
         label += f" \u00b7 build {APP_BUILD}"
     if APP_CODENAME:

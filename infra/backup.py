@@ -366,7 +366,7 @@ def app_version_build() -> Tuple[str, int]:
     """``("0.1.1-beta", 665)`` from :mod:`core.appinfo` (build ``0`` on a developer checkout)."""
     from core import appinfo
 
-    version = f"{appinfo.APP_VERSION}-{appinfo.APP_CHANNEL}" if appinfo.APP_CHANNEL else appinfo.APP_VERSION
+    version = appinfo.release_version()
     return version, int(appinfo.APP_BUILD)
 
 

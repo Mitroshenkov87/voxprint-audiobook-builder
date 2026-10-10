@@ -5,6 +5,10 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+## [1.0.0-rc] - 2026-10-10 - build 999 "Nachon"
+
+Codename *Nachon* (Biblical Hebrew *nachon*, established, ready; Genesis 41:32). The version is **1.0.0-rc**. The release tag for this build is `v1.0.0-rc`. People see `1.0.0 RC · build 999 "Nachon"`. `BUILD.json` offset is **947**: build-installer run 52 stamps build 999 (52 + 947 = 999). If any *build-installer* run happens before this change is merged, recompute the offset as 999 minus the next run number.
+
 ### Added
 - **Splash easter egg.** Six clicks within two seconds on the start-up splash show `assets/easter-egg.jpg` with the caption `easter_egg.caption` ("Кури ушную серу!", kept in Russian in every UI language) for three seconds or until another click, once per launch. Loading continues under the picture; if the main window is ready, the splash stays only until the picture closes. The picture is original generated artwork and not a real person's likeness (`assets/ICON-LICENSE.txt`).
 - **Runtime users file on every GUI start.** `<app home>\runtime\.users.json` is created at the first GUI start and receives the `audiobook-builder` key (same helper and format as `models\.users.json`). A later start that already has the key does not rewrite the file.

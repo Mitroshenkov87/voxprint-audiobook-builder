@@ -13,7 +13,7 @@ LANGS = i18n.LANGS
 
 
 def test_credits_json_well_formed():
-    assert DATA["app"]["name"] == "Voxprint" and re.fullmatch(r"\d+\.\d+\.\d+", DATA["app"]["version"])
+    assert DATA["app"]["name"] == "Voxprint" and re.fullmatch(r"\d+\.\d+\.\d+(?:-rc)?", DATA["app"]["version"])
     assert DATA["app"]["author"] == "Aleksandr Mitroshenkov"
     comps = DATA["components"]
     ids = [c["id"] for c in comps]
