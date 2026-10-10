@@ -243,8 +243,8 @@ def _skeleton(token: str) -> str:
 
 def _author_marks(token: str):
     """``(yo flags, stress flags)`` for each character of ``token`` except U+0301."""
-    yos = []
-    stresses = []
+    yos: list[bool] = []
+    stresses: list[bool] = []
     for ch in token:
         if ch == "\u0301":
             if stresses:

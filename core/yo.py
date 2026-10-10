@@ -206,8 +206,8 @@ def _peel_stress(text: str) -> tuple:
     Yo forms are the same length as the ye forms, so those indexes still point at the same letters
     after :func:`restore_counted` writes yo.
     """
-    bare = []
-    marks = []
+    bare: list[str] = []
+    marks: list[int] = []
     for ch in text:
         if ch == _STRESS:
             if bare:
