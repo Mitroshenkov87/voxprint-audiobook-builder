@@ -281,7 +281,20 @@ jobs:
       - name: Tests that need no PyTorch
         if: ${{ !inputs.skip_tests }}
         shell: pwsh
-        run: .venv\Scripts\python.exe -m pytest -q --deselect tests/test_ui.py::test_selftest_imports_reports_and_writes_log --deselect tests/test_frozen_install.py --deselect tests/test_linux_package.py::test_text_selftest_passes_without_models
+        run: |
+          $recorded = $null
+          & .venv\Scripts\python.exe -m pytest -q -p faulthandler --deselect tests/test_ui.py::test_selftest_imports_reports_and_writes_log --deselect tests/test_frozen_install.py --deselect tests/test_linux_package.py::test_text_selftest_passes_without_models 2>&1 | ForEach-Object {
+            $line = "$_"
+            Write-Host $line
+            if ($line -match 'VOXPRINT_PYTEST_RC=(\d+)') { $script:recorded = [int]$Matches[1] }
+          }
+          # Same rule as pr-check: prefer the status pytest recorded before shutdown (tests/conftest.py). A Qt DLL
+          # detach on Python 3.14 can make the process exit non-zero after a green session (run 54). No recorded
+          # status means the process died during the tests, and that still fails the step.
+          $rc = $LASTEXITCODE
+          if ($null -ne $script:recorded) { $rc = $script:recorded }
+          Write-Host "pytest process exit $LASTEXITCODE, recorded status $script:recorded -> $rc"
+          exit $rc
       - name: Build number (GITHUB_RUN_NUMBER + BUILD.json offset; first numbered build = 665) and codename into credits.json
         shell: pwsh
         run: |
