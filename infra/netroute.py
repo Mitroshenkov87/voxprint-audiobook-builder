@@ -431,6 +431,9 @@ def urlopen(req, timeout: float = 30.0, context: Optional[ssl.SSLContext] = None
     if isinstance(req, str):
         req = urllib.request.Request(req)
     host = urllib.parse.urlparse(req.full_url).hostname or ""
+    # Loopback never hops, so the source-address connection class is unnecessary.
+    if _is_loopback_host(host):
+        return urllib.request.urlopen(req, timeout=timeout, context=context)  # nosec B310 - loopback only
     routes = candidates(host)
     last: Optional[BaseException] = None
     for i, route in enumerate(routes):

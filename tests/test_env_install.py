@@ -64,7 +64,7 @@ def test_check_versions_counts_actions():
 @pytest.mark.parametrize("smi,flavor", [
     ("| NVIDIA-SMI 581.15  Driver Version: 581.15  CUDA Version: 13.0 |", "cu130"),
     ("NVIDIA-SMI 610.88  KMD Version: 610.88  CUDA UMD Version: 13.3", "cu130"),     # drivers 6xx: "UMD"
-    ("CUDA Version: 12.9", "cu128"), ("CUDA Version: 12.6", "cu126"), ("CUDA Version: 12.4", ""),
+    ("CUDA Version: 12.9", ""), ("CUDA Version: 12.6", ""), ("CUDA Version: 12.4", ""),
     ("CUDA Version: 11.8", ""), ("CUDA Version: 11.2", ""), ("no gpu here", "")])
 def test_torch_flavor_from_driver(smi, flavor):
     assert ep.torch_flavor_for_driver(ep.parse_nvidia_smi_cuda(smi)) == flavor
@@ -86,13 +86,15 @@ def _smi_run(header, query="550.00", fail=None):
 
 
 @pytest.mark.parametrize("header,query,expect", [
-    ("NVIDIA-SMI 570.86  Driver Version: 570.86 |", "570.86.10", (12, 8)),
-    ("no cuda line here", "  560.35.03", (12, 6)),
+    ("NVIDIA-SMI 570.86  Driver Version: 570.86 |", "570.86.10", None),
+    ("no cuda line here", "  560.35.03", None),
     ("no cuda line here", "559.99", None),
-    ("no cuda line here", "569.99\n570.1", (12, 6)),          # first line only
-    ("no cuda line here", "580.88.02", (12, 8)),
+    ("no cuda line here", "569.99\n570.1", None),             # first line only; 569 is below the cu130 driver
+    ("no cuda line here", "580.88.02", None),
+    ("no cuda line here", "600.21.05", (13, 0)),
+    ("no cuda line here", "610.88", (13, 0)),
     ("| CUDA Version: 13.0 |", "550.00", (13, 0)),            # header wins
-    ("CUDA UMD Version: 12.4", "570.00", (12, 4)),
+    ("CUDA UMD Version: 12.4", "600.00", (12, 4)),            # header wins over a driver number that would be CUDA 13
     ("no cuda line here", "not a version", None),
     ("no cuda line here", "", None),
 ])
@@ -122,9 +124,12 @@ def test_cuda_probe_any_exception_is_none():
         return 0, "no cuda line"
 
     assert ep.detect_driver_cuda(query_failed, lambda n: "nvidia-smi") is None
-    assert ep.cuda_from_driver_version("  570.1\n") == (12, 8)
-    assert ep.cuda_from_driver_version("560.0") == (12, 6)
+    assert ep.cuda_from_driver_version("  570.1\n") is None
+    assert ep.cuda_from_driver_version("560.0") is None
+    assert ep.cuda_from_driver_version("600.21") == (13, 0)
     assert ep.torch_flavor_for_driver(ep.cuda_from_driver_version("555.1")) == ""
+    assert ep.torch_flavor_for_driver((13, 0)) == "cu130"
+    assert ep.torch_flavor_for_driver((12, 8)) == ""
 
 
 def test_torch_decisions():
@@ -160,7 +165,7 @@ def fake_machine(smi=None, ffmpeg_ok=True, pythons=None):
 
 
 def test_probe_environment_reuse_upgrade_install_and_report():
-    run, which, calls = fake_machine(smi="CUDA Version: 12.8")
+    run, which, calls = fake_machine(smi="CUDA Version: 13.0")
     inst = {"qwen-asr": "0.0.6", "qwen-tts": "0.1.1", "transformers": "4.57.6", "peft": "0.21.2",
             "accelerate": "1.12.0", "torch": "2.8.0+cpu", "unsloth": "2026.9.11"}.get
     pins = {"qwen-asr": "0.0.6", "qwen-tts": "0.1.1", "transformers": "4.57.6", "peft": "0.18.1",
@@ -174,7 +179,7 @@ def test_probe_environment_reuse_upgrade_install_and_report():
     assert act["accelerate"] == (ACTION_UPGRADE, "outdated")
     assert act["huggingface_hub"] == (ACTION_INSTALL, "missing")
     assert "bitsandbytes" not in act                                         # optional and absent: left alone
-    assert act["torch"] == (ACTION_UPGRADE, "torch_flavor_changed") and rep.wanted_torch_flavor == "cu128"
+    assert act["torch"] == (ACTION_UPGRADE, "torch_flavor_changed") and rep.wanted_torch_flavor == "cu130"
     assert rep.ffmpeg and rep.ffmpeg.ok and rep.ffmpeg.version == "7.1.1"
     assert rep.ignored == {"unsloth": "no_qwen3_tts_training"}
     assert rep.counts() == {ACTION_REUSE: 4, ACTION_UPGRADE: 2, ACTION_OFFER: 0, ACTION_INSTALL: 1}
@@ -629,5 +634,5 @@ def test_ensure_ffmpeg_in_audio_utils_requires_smoke_test(monkeypatch, tmp_path)
 
 
 def test_default_venv_python_matches_supported_runtime():
-    # --verify-install compares the manifest's Python version with the running interpreter (3.11): the default venv is 3.11 too
-    assert ist.PYTHON_VERSION_DEFAULT == "3.11"
+    # --verify-install compares the manifest's Python version with the running interpreter (3.14): the default venv is 3.14 too
+    assert ist.PYTHON_VERSION_DEFAULT == "3.14"

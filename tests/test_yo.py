@@ -62,24 +62,33 @@ def test_endings_underscore_and_capitals_follow_the_dictionary_rules():
 def test_dataset_records_plain_text_and_rebuilds_the_same_bytes():
     from tools.build_yo_dataset import build
 
-    before = (ROOT / "core" / "data" / "yo_runtime.tsv.gz").read_bytes()
-    dataset = (ROOT / "core" / "data" / "yo_dataset.jsonl.gz").read_bytes()
-    rows = [json.loads(line) for line in gzip.decompress(dataset).decode("utf-8").splitlines()]
-    plain = next(row for row in rows if row["word"] == "текст")
-    assert plain["yo_form"] == "текст" and plain["type"] == "unambiguous" and plain["stress"] == 0
-    assert plain["source"] == "project"
-    homo = next(row for row in rows if row["word"] == "все")
-    assert homo["type"] == "homograph" and homo["yo_form"] == "всё" and homo["variants"]
-    keys = {line.split("\t", 1)[0] for line in gzip.decompress(before).decode("utf-8").splitlines()}
-    assert "текст" not in keys and "все" not in keys and "берег" not in keys
-    stats = build()
-    assert stats["runtime_bytes"] == 1323843 and stats["dataset_rows"] == 139996
-    rebuilt = (ROOT / "core" / "data" / "yo_runtime.tsv.gz").read_bytes()
-    rebuilt_dataset = (ROOT / "core" / "data" / "yo_dataset.jsonl.gz").read_bytes()
-    # Python 3.12 gzip.compress(mtime=0) writes OS byte 3; GzipFile writes 255.
-    # The Windows runner is 3.11, so the shipped header is the GzipFile one.
-    assert before[:10] == bytes.fromhex("1f8b08000000000002ff")
-    assert rebuilt == before and rebuilt_dataset == dataset
+    runtime_path = ROOT / "core" / "data" / "yo_runtime.tsv.gz"
+    dataset_path = ROOT / "core" / "data" / "yo_dataset.jsonl.gz"
+    before = runtime_path.read_bytes()
+    dataset = dataset_path.read_bytes()
+    try:
+        rows = [json.loads(line) for line in gzip.decompress(dataset).decode("utf-8").splitlines()]
+        plain = next(row for row in rows if row["word"] == "текст")
+        assert plain["yo_form"] == "текст" and plain["type"] == "unambiguous" and plain["stress"] == 0
+        assert plain["source"] == "project"
+        homo = next(row for row in rows if row["word"] == "все")
+        assert homo["type"] == "homograph" and homo["yo_form"] == "всё" and homo["variants"]
+        keys = {line.split("\t", 1)[0] for line in gzip.decompress(before).decode("utf-8").splitlines()}
+        assert "текст" not in keys and "все" not in keys and "берег" not in keys
+        stats = build()
+        rebuilt = runtime_path.read_bytes()
+        rebuilt_dataset = dataset_path.read_bytes()
+        # Python 3.12 gzip.compress(mtime=0) writes OS byte 3; GzipFile writes 255.
+        # The shipped header is the GzipFile one. The deflate stream can differ by zlib
+        # build (Windows CPython 3.14 wrote 1,324,198 bytes for this same payload), so the
+        # check is the decompressed table, not the compressed size.
+        assert before[:10] == rebuilt[:10] == bytes.fromhex("1f8b08000000000002ff")
+        assert gzip.decompress(rebuilt) == gzip.decompress(before)
+        assert gzip.decompress(rebuilt_dataset) == gzip.decompress(dataset)
+        assert stats["dataset_rows"] == 139996
+    finally:
+        runtime_path.write_bytes(before)
+        dataset_path.write_bytes(dataset)
 
 
 def test_real_dictionary_restores_only_sure_words_and_keeps_abbreviations():
@@ -286,6 +295,18 @@ PREP_YO = [
 def test_prepositional_chem_nem_vsem_take_yo_only_after_a_preposition(src, want):
     assert yo.restore(src) == want
     assert yo.restore(want) == want
+
+
+def test_explicit_yo_and_author_stress_are_not_rewritten():
+    """A yo the author already wrote wins over the dictionary. U+0301 stays on the same letter."""
+    table = yo.load("ещё\nчёрный\n")
+    assert yo.restore("ёще и еще", table) == "ёще и ещё"
+    assert yo.restore("еще\u0301", table) == "ещё\u0301"
+    assert yo.restore("ёще\u0301 еще\u0301", table) == "ёще\u0301 ещё\u0301"
+    assert yo.restore("Вот и все\u0301.") == "Вот и всё\u0301."
+    out = yo.restore("В тексте ёще и еще. На поле све\u0301т.")
+    assert out.count("ёще") == 1 and "ещё" in out and "све\u0301т" in out
+    assert yo.restore(out) == out
 
 
 def test_prepositional_yo_is_context_and_is_counted():

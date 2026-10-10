@@ -45,7 +45,7 @@ Uninstall 668, then install 700. On the 668 uninstall question "Also delete the 
 | CPU-only | not supported | - |
 | Disk | ~32 GB (all models ~25 GB, components ~3 GB, program) + ~4.2 GB for the optional universal model | SSD |
 | Network | needed once for the model download (Hugging Face, or the ModelScope mirror) | - |
-| Driver | NVIDIA driver with CUDA 12.6+ (PyTorch flavor cu126 or cu128, from `nvidia-smi`) | current driver |
+| Driver | NVIDIA driver 600 or newer (CUDA 13, PyTorch flavor `cu130`) | current driver |
 
 The VRAM tiers used by the planner: >= 14 GB -> 1.7B; >= 10 GB -> 1.7B + 8-bit Adam; >= 6 GB -> 0.6B + 8-bit Adam. Speech recognition: Qwen3-ASR-1.7B from ~8 GB of VRAM, else 0.6B (Settings can override it or keep both). There is no CPU-only mode.
 

@@ -22,7 +22,7 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (QApplication, QSlider, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel,
                                QProgressBar, QPushButton, QSpinBox, QToolButton, QVBoxLayout, QWidget)
 
@@ -153,6 +153,7 @@ class NarrateWindow(SubWindow):
         self._speaker_preview: Optional[SpeakerDialog] = None
         self._spk_touched = {"male": False, "male2": False, "female": False}
         self._choice_status = True              # the idle / ready line, until a job writes its own status
+        self._button_retry = False
         self._build()
         self.retranslate()
         self._sync_preset()
@@ -1314,7 +1315,7 @@ class NarrateWindow(SubWindow):
         w.done.connect(self.on_done)
         w.failed.connect(self.on_failed)
         w.cancelled.connect(self.on_cancelled)
-        w.finished.connect(self._refresh_buttons)
+        w.finished.connect(self._after_worker)
         self.worker = w
         w.start()
         self._refresh_buttons()
@@ -1458,12 +1459,32 @@ class NarrateWindow(SubWindow):
         self.lbl_status.setText(tr("narr.cancelled"))
         self.player.set_final(None)
 
+    def _after_worker(self) -> None:
+        """Enable Start once the worker has really stopped.
+
+        ``QThread.finished`` can be delivered while ``isRunning()`` is still true. Refreshing in that slot leaves
+        Start disabled after the thread has stopped, and a later event-loop turn then sees the failure line with the
+        button off. Retry on the next turn until the thread is idle, then refresh.
+        """
+        if self.busy:
+            if not self._button_retry:
+                self._button_retry = True
+                QTimer.singleShot(0, self._retry_buttons)
+            return
+        self._button_retry = False
+        self._refresh_buttons()
+
+    def _retry_buttons(self) -> None:
+        self._button_retry = False
+        self._after_worker()
+
     def on_failed(self, kind: str, message: str, details: str) -> None:
         """Worker signal: failed - the message is shown; finished chunks are still cached."""
         self.progress.setValue(0)
         self.player.set_final(None)
         self.lbl_status.setText(message + "  " + tr("narr.failed_resume"))
         log.error("narration failed: kind=%s %s | %s", kind, message, details)
+        self._after_worker()
 
     def open_result(self) -> None:
         """Open the folder with the audiobook."""

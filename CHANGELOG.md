@@ -5,6 +5,12 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Added
+- **Plotweaver books on the command line.** `python cli.py narrate book.md --speaker-marks marks.txt` reads UTF-8 Markdown or TXT (`#` / `##` chapter headings, blank-line paragraphs). The marks file is one line per paragraph (`NARRATOR`, `MALE: Name`, `FEMALE: Name`). An author-written yo is not replaced by the dictionary, and a U+0301 stress mark is kept through the Russian normalizer, including when ru-normalizr rewrites that mark as a plus immediately before the vowel. See [docs/CLI.md](docs/CLI.md#narrate-a-book).
+
+### Changed
+- **Python 3.14 and PyTorch 2.11.0 `cu130`.** Installers, CI, and `infra/runtime_lock.json` use Python 3.14. The only user-facing PyTorch flavor is `cu130` (NVIDIA driver 600 or newer). CPU wheels stay in the lock for CI. TorchAudio is 2.11.0 of the same flavor: its native ops are built against that torch, and there is no TorchAudio wheel for 2.12–2.14 on `cu130` and Python 3.14. `audioop-lts` is pinned so pydub can import `audioop`. CTranslate2 is installed with `nvidia-cublas-cu12` 12.9.2.10 and `nvidia-cudnn-cu12` 9.27.0.42; `infra/cuda12_libs.py` registers them before that library is imported. See [docs/RUNTIME.md](docs/RUNTIME.md).
+
 ## [1.0.0-rc] - 2026-10-10 - build 999 "Nachon"
 
 Codename *Nachon* (Biblical Hebrew *nachon*, established, ready; Genesis 41:32). The version is **1.0.0-rc**. The release tag for this build is `v1.0.0-rc`. People see `1.0.0 RC · build 999 "Nachon"`. Build-installer run 52 failed in the Windows tests that need no PyTorch (a bash-only test had lost its skip marker) and published nothing, so the `BUILD.json` offset is **946**: run 53 stamps build 999 (53 + 946 = 999).

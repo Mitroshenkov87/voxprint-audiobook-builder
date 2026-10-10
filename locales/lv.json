@@ -115,7 +115,7 @@
  "err.book_empty": "Grāmatā nav teksta.",
  "err.book_read": "Grāmatas failu nevar nolasīt.",
  "err.book_unsafe": "Grāmatas fails izskatās nedrošs vai ir pārāk liels un netika atvērts.",
- "err.book_unsupported": "Neatbalstīts grāmatas formāts. Lietojiet TXT, FB2 (vai FB2.ZIP) vai EPUB.",
+ "err.book_unsupported": "Neatbalstīts grāmatas formāts. Lietojiet TXT, Markdown, FB2 (vai FB2.ZIP) vai EPUB.",
  "err.cancelled": "Darbība tika atcelta.",
  "err.dataset_empty": "Datu kopa ir tukša.",
  "err.dataset_file_missing": "Datu kopas fails nav atrasts: {file}",

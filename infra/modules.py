@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from infra import paths
+from infra.cuda12_libs import prepare as prepare_cuda12
 
 log = logging.getLogger("voxprint.modules")
 
@@ -140,9 +141,9 @@ def driver_cuda() -> Optional[tuple]:
 
 
 def flavor_for(manifest: Dict[str, Any]) -> str:
-    """The PyTorch flavor (``cu128`` / ``cu126``) this PC gets. ``""`` when the manifest has none, or no CUDA flavor fits.
+    """The PyTorch flavor (``cu130``) this PC gets. ``""`` when the manifest has none, or no CUDA flavor fits.
 
-    A CPU wheel is not selected for users. CI sets ``VOXPRINT_TORCH_FLAVOR`` (internal) when it needs one.
+    A CPU wheel is not selected for users. CI sets ``VOXPRINT_TORCH_FLAVOR=cpu`` (internal) when it needs one.
     """
     flavors = list((manifest.get("runtime") or {}).get("flavors") or [])
     if not flavors:
@@ -477,6 +478,10 @@ def activate() -> Optional[Path]:
         import importlib
 
         importlib.invalidate_caches()
+    except Exception:  # noqa: BLE001
+        pass
+    try:                                   # CTranslate2 is a CUDA 12 build; register its libraries before any import of it
+        prepare_cuda12()
     except Exception:  # noqa: BLE001
         pass
     return rd if rd.is_dir() else None

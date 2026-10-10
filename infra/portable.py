@@ -164,12 +164,13 @@ def detect_vram_mb(run: Callable[[List[str]], str] = _run) -> int:
 
 
 def choose_flavor(flavors: List[str], cuda: Optional[Tuple[int, int]]) -> str:
-    """Newest CUDA flavor the driver supports, else ``""`` (no CPU choice).
+    """Newest CUDA flavor the driver supports, else ``""`` (no CPU choice; same rule as ``infra.runtime_reuse.choose_flavor``).
 
-    ``VOXPRINT_TORCH_FLAVOR`` forces one flavor when it is in ``flavors``. That variable is internal (CI/tests).
+    ``VOXPRINT_TORCH_FLAVOR`` forces one flavor. That variable is internal (CI/tests); ``cpu`` is accepted even when
+    it is not a public flavor (CI wheels).
     """
     forced = os.environ.get("VOXPRINT_TORCH_FLAVOR", "").strip()
-    if forced and forced in flavors:
+    if forced == "cpu" or (forced and forced in flavors):
         return forced
     best, best_cu = "", (0, 0)
     for f in flavors:

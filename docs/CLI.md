@@ -83,7 +83,7 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 
 | Argument | Meaning |
 |---|---|
-| `BOOK` | TXT, FB2, `.fb2.zip` or EPUB |
+| `BOOK` | TXT, Markdown (`.md`), FB2, `.fb2.zip` or EPUB |
 | `--voice` | Voice library id or display name |
 | `--out DIR` | Working folder; the job lands in `<DIR>/<book title>/` |
 | `--format` | Repeatable / comma-separated. Default: `opus_single`. Aliases: `opus`, `mp3`, `m4b`, `flac`, `wav`, … |
@@ -97,7 +97,7 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 | `--speed X` | Global reading speed 0.7-1.3 (1 = the voice's own speed) |
 | `--style NAME` | `auto` (detected), `scripture` (solemn, a little slower), `fiction`, `dialogue` |
 | `--no-ordinals` / `--ordinals` | Read numbers after words like chapter / day / verse as ordinals by context ("день 1" -> "день первый", "21st", "3. Kapitel"); default: Settings (on). See [ORDINALS.md](ORDINALS.md) |
-| `--no-yo` / `--yo` | For a Russian book, restore the letter yo where a dictionary is sure ("еще" -> "ещё"). "все" / "всё" is decided from the neighbouring words ("всё равно", "вот и всё", "всё было", "всё, что"; "все люди", "пришли все" stay). Other words the dictionary does not list, including "текст" and ambiguous pairs such as "берег", stay as written. Default: on. Stress marks are not inserted; the base speech model does not read them. |
+| `--no-yo` / `--yo` | For a Russian book, restore the letter yo where a dictionary is sure ("еще" -> "ещё"). "все" / "всё" is decided from the neighbouring words ("всё равно", "вот и всё", "всё было", "всё, что"; "все люди", "пришли все" stay). Other words the dictionary does not list, including "текст" and ambiguous pairs such as "берег", stay as written. A word that already contains yo is not replaced, even when the dictionary would put yo on a different letter. A U+0301 stress mark the author wrote is kept on that letter. When the Russian normalizer rewrites that mark as a plus immediately before the vowel, the plus is turned back into U+0301. Narration does not insert stress marks of its own. The base speech model does not read them. Default: on. |
 | `--ai-disclosure` | Speak a short AI note at the start (opt-in) |
 | `--work-dir DIR` | Remember this folder as the app working folder |
 | `--speakers` | Ask the text model (Gemma) to mark each paragraph narrator, male or female, then narrate those voices. Same path as the Narrate window. Without any voice flag or `--character`, the default cast is used: Natan and Shimon for men, Miriam for women when they are installed, else the first library voices of each gender (never the narrator unless it is the only one). A block whose reply has the wrong number of marks is split and asked again, down to single paragraphs |
@@ -106,7 +106,7 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 | `--male2-voice ID` | Second male voice. Different male characters (by the name in the marks) alternate between `--male-voice` and this voice in order of first appearance: the first man gets `--male-voice`, the second this one, the third `--male-voice` again. A mark without a name uses `--male-voice`. Needs `--male-voice` |
 | `--female2-voice ID` | Second female voice, the same way. Needs `--female-voice` |
 | `--character NAME=ID` | Pin one character to a voice. Repeatable. The name is matched case-insensitively against the marks and wins over the role voices |
-| `--speaker-marks FILE` | Narrate this marks file and do not run Gemma. `voxprint speakers` writes the file |
+| `--speaker-marks FILE` | Narrate this marks file and do not run Gemma. `voxprint speakers` writes numbered lines. A file of one unnumbered line per paragraph (`NARRATOR`, `MALE: Name`, `FEMALE: Name`) is read the same way |
 
 ```
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
@@ -115,7 +115,19 @@ voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann -
 voxprint narrate dialog.txt --voice levi --speakers --out ./out --json        # default cast: Natan, Shimon, Miriam
 voxprint narrate dialog.txt --voice levi --male-voice natan --male2-voice shimon --female-voice rivka --speakers --out ./out --json
 voxprint narrate dialog.txt --voice levi --male-voice natan --character Michael=shimon --female-voice miriam --speaker-marks marks.txt --out ./out
+python cli.py narrate book.md --voice narrator --male-voice tom --female-voice ann --character Ivan=tom --character Anna=ann --speaker-marks marks.txt --out ./audiobooks --format wav --json
 ```
+
+A Plotweaver book is UTF-8 `.md` or `.txt`. A line `# Chapter` or `## Chapter` (also `###`), standing alone between blank lines, is a chapter title. A blank line starts a new paragraph. The letter yo the author wrote is kept, and so is a U+0301 stress mark on a vowel. A plus that the Russian normalizer writes immediately before that vowel is turned back into U+0301. `--yo` still restores yo in words that have neither. `marks.txt` is optional and has one line per paragraph, in order:
+
+```
+NARRATOR
+MALE: Ivan
+NARRATOR
+FEMALE: Anna
+```
+
+Blank lines in the marks file are ignored. A leading `1. ` is optional. `--character Ivan=tom` pins that name to a voice and wins over `--male-voice` / `--female-voice`. The command above writes one WAV per chapter (`01 - …wav`, `02 - …wav`) under `<out>/<book title>/`. The same arguments work as `voxprint narrate` and `python main.py narrate`.
 
 Without `--male2-voice`, `--female2-voice` and `--character`, every man is `--male-voice` and every woman `--female-voice`, as before. `--speakers` and `--speaker-marks` cannot be used together. At least one role voice must differ from the narrator (exit code 2 otherwise). `--male2-voice` without `--male-voice`, a `--character` value without `=`, and any voice flag without `--speakers` or `--speaker-marks` are exit code 2. Voices are loaded one at a time, in book order. When the marks do not match the prepared paragraph count, the narrator reads the whole book, the exit code stays 0, and the JSON `warnings` array contains `Speaker marks do not match the prepared text, so the narrator reads the whole book.` The job writes `<out>/<book>/.debug/speakers.txt` and lists that file in `outputs`.
 
@@ -137,7 +149,7 @@ Ask Gemma who speaks each paragraph and write an editable text file. This comman
 3. MALE: Tom
 ```
 
-Blank lines are ignored. A trailing `mismatch` line (written when a previous narration could not apply the marks) is ignored. Edit the file, then pass it to `narrate --speaker-marks`. If Gemma is not installed the exit code is 4 and the fix is `voxprint models download llm --json`.
+`narrate --speaker-marks` also accepts the same lines without numbers, one per paragraph (`NARRATOR`, `MALE: Name`, `FEMALE: Name`). Blank lines are ignored. A trailing `mismatch` line (written when a previous narration could not apply the marks) is ignored. Edit the file, then pass it to `narrate --speaker-marks`. If Gemma is not installed the exit code is 4 and the fix is `voxprint models download llm --json`.
 
 If the model's reply cannot be read as marks, or the text has dialogue (quotes or a leading em dash) but every paragraph is marked `NARRATOR`, the exit code stays 0 and the JSON `warnings` array says so. The raw reply is saved next to the marks file as `<name>.speakers-raw.txt` and listed in `outputs`. Narration saves the same reply as `<out>/<book>/.debug/speakers-raw.txt`.
 

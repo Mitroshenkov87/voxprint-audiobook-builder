@@ -61,10 +61,16 @@ class Server:
 
         self.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
         self.url = f"http://127.0.0.1:{self.httpd.server_address[1]}"
-        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+        self._thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self._thread.start()
 
     def close(self) -> None:
         self.httpd.shutdown()
+        try:
+            self.httpd.socket.close()
+        except OSError:
+            pass
+        self._thread.join(timeout=5)
 
 
 @pytest.fixture

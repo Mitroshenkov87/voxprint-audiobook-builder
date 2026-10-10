@@ -41,7 +41,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `book_parsers.py` | TXT (heading detection), FB2 (+ `.fb2.zip`, entity guard, cover), EPUB (nav / NCX / spine) -> `Book` / `Chapter`; stdlib only |
 | `num_words.py` | own number-to-words for Russian (cardinals, ordinals with case / gender / number, decimals) and English (cardinals, ordinals, years); no `num2words` (LGPL-2.1, no declension by suffix). Cyrillic *data* |
 | `text_prep.py` | rule-based book preparation: steps `layout, noise, quotes, links, headings, numbers, abbrev, yo` (`STEP_KEYS`), `PrepOptions`, `prepare_text_block`, `prepare_book` -> `(Book, PrepReport)`, `resolve_language`; ru + en for the shared steps, `yo` for Russian only, other languages only the neutral steps |
-| `yo.py` | Russian letter yo from the MIT eyo-kernel safe dictionary (`core/data/yo_safe.txt`, no download). No stress marks: the base TTS model does not read them |
+| `yo.py` | Russian letter yo from the MIT eyo-kernel safe dictionary (`core/data/yo_safe.txt`, no download). Does not insert stress marks (the base TTS model does not read them); a yo or U+0301 the author wrote is kept |
 | `text_cleanup.py` | optional neural clean-up: `CleanupEngine` protocol (`correct`), the **validator** (`validate`: only close spelling fixes, `е`->`ё`, inserted commas; everything else rejected), `BlockCache` (JSON per paragraph), `cleanup_book` (progress / cancel / resume), `SageEngine` (lazy transformers, **not run on real hardware**) |
 | `book_prep.py` | `PrepPlan` (rule options + neural step keys + `engine_factory`) and `run_preparation`: rules -> clean-up -> `.debug/prepared_text.txt` + `prep_report.json` |
 | `chunker.py` | chapter text -> sentence-sized chunks (reuses the clause splitter), pause lengths |
@@ -80,6 +80,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `platform_win.py` | OS check, dark title bar, Acrylic backdrop, process-exists check, GPU shared-memory counter via PDH / typeperf (all guarded by `sys.platform`) |
 | `assets.py` | pinned non-pip assets (ffmpeg): download -> sha256 -> staging -> smoke test -> atomic swap -> rollback; ownership marker `.voxprint-owned` |
 | `env_probe.py` | read-only probe of Python/torch/CUDA/packages/models and the reuse / upgrade / offer / install decision per component |
+| `cuda12_libs.py` | registers the CUDA 12 cublas and cuDNN wheels before CTranslate2 is imported |
 | `install_state.py` | completion manifest, health check with stable reason codes (`--verify-install`), uv-based venv plan for `--repair` |
 | `model_downloader.py`, `modelscope_mirror.py`, `parallel_download.py` | model download from Hugging Face (multi-connection Range for large weights) with ModelScope / own-mirror fallbacks; post-download SHA-256 status |
 | `version_manager.py`, `verified_manifest.py` | PyPI/HF version queries and comparison; the "verified by Voxprint" manifest (`verified_manifest.json`) with update channels |

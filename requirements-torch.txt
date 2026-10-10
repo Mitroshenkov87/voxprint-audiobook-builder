@@ -1,6 +1,6 @@
-# FALLBACK way to install PyTorch with CUDA (the main one is `uv pip install torch --torch-backend=auto`, see build.bat).
-# The cu128 index suits drivers with CUDA 12.8+.
-# TODO-needs-Windows-check: if pytorch.org offers a newer index (cu13x), change the line below.
---index-url https://download.pytorch.org/whl/cu128
-torch
-torchaudio
+# FALLBACK way to install PyTorch with CUDA (the main one is `uv pip install torch --torch-backend=cu130`, see build.bat).
+# cu130 needs an NVIDIA driver that supports CUDA 13 (driver 600 or newer). CPU wheels are for CI only.
+# TorchAudio is the same release as torch. Its native ops are built against that torch.
+--index-url https://download.pytorch.org/whl/cu130
+torch==2.11.0
+torchaudio==2.11.0

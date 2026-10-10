@@ -412,7 +412,7 @@ def build_parser() -> argparse.ArgumentParser:
     n = sub.add_parser(
         "narrate", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
         help="Narrate a book with a trained voice",
-        description="Narrate a TXT, FB2, FB2.ZIP or EPUB book with a voice from the library.",
+        description="Narrate a TXT, Markdown, FB2, FB2.ZIP or EPUB book with a voice from the library.",
         epilog=(
             "Examples:\n"
             "  voxprint narrate book.epub --voice my-voice --out ./audiobooks\n"
@@ -420,12 +420,13 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint narrate book.txt --voice my-voice --out ./audiobooks --pauses --ai-disclosure\n"
             "  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json\n"
             "  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks\n"
+            "  python cli.py narrate book.md --voice narrator --male-voice tom --female-voice ann --character Ivan=tom --character Anna=ann --speaker-marks marks.txt --out ./audiobooks --format wav --json\n"
             "  voxprint narrate book.txt --voice levi --speakers --out ./out\n"
             "  voxprint narrate book.txt --voice levi --male-voice natan --male2-voice shimon --female-voice noa --speakers --out ./out\n"
             "  voxprint narrate book.txt --voice levi --male-voice natan --character David=shimon --speakers --out ./out\n"
         ),
     )
-    n.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
+    n.add_argument("book", help="Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file")
     n.add_argument("--voice", required=True, metavar="ID_OR_NAME",
                    help="Voice library id or display name")
     n.add_argument("--out", required=True, type=Path, metavar="DIR",
@@ -455,7 +456,8 @@ def build_parser() -> argparse.ArgumentParser:
     n.set_defaults(ordinals=None)
     yo_flag = n.add_mutually_exclusive_group()
     yo_flag.add_argument("--yo", dest="yo", action="store_true", default=None,
-                         help="Restore the Russian letter yo where a dictionary is sure (default: on)")
+                         help="Restore the Russian letter yo where a dictionary is sure (default: on). "
+                              "A word that already contains yo, and a U+0301 stress mark the author wrote, stay")
     yo_flag.add_argument("--no-yo", dest="yo", action="store_false",
                          help="Leave the letter e as written; do not restore yo")
     n.set_defaults(yo=None)
@@ -478,7 +480,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Pin one character (the name as written in the marks) to a voice. Repeatable; "
                         "wins over the male / female voices")
     n.add_argument("--speaker-marks", type=Path, default=None, metavar="FILE",
-                   help="Narrate from this marks file instead of running Gemma (voxprint speakers writes it)")
+                   help="Narrate from this marks file instead of running Gemma (voxprint speakers writes it). "
+                        "One line per paragraph: 'N. NARRATOR', 'N. MALE: Name', 'N. FEMALE: Name', "
+                        "or the same lines without the numbers")
     n.add_argument("--work-dir", type=Path, default=None, metavar="DIR",
                    help="Remember this folder as the app working folder")
     n.set_defaults(_handler="narrate")
@@ -674,7 +678,7 @@ def build_parser() -> argparse.ArgumentParser:
             "--speaker-marks marks.txt --out ./audiobooks --json\n"
         ),
     )
-    sp.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
+    sp.add_argument("book", help="Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file")
     sp.add_argument("--out", required=True, type=Path, metavar="FILE", help="Marks file to write")
     sp.set_defaults(_handler="speakers")
 
@@ -710,7 +714,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint prepare book.txt --out prepared.txt --llm --json\n"
         ),
     )
-    pr.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
+    pr.add_argument("book", help="Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file")
     pr.add_argument("--out", required=True, type=Path, metavar="FILE", help="Prepared text file to write (UTF-8)")
     pr.add_argument("--report", type=Path, default=None, metavar="FILE",
                     help="JSON report to write (default: <out stem>.prep_report.json next to --out)")
@@ -743,7 +747,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint translate book.txt --to ru --out book.ru.txt --literary\n"
         ),
     )
-    tr_p.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
+    tr_p.add_argument("book", help="Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file")
     tr_p.add_argument("--to", required=True, choices=("en", "ru", "de"), help="Target language")
     tr_p.add_argument("--from", dest="source", default="", choices=("", "en", "ru", "de", "uk"),
                       help="Source language (default: detected)")
@@ -911,7 +915,7 @@ def cmd_narrate(args: argparse.Namespace, *,
         if not book_path.is_file():
             raise CliError(
                 EXIT_INPUT, f"book not found: {book_path}",
-                hint="Pass a TXT, FB2, FB2.ZIP or EPUB file that exists. "
+                hint="Pass a TXT, Markdown, FB2, FB2.ZIP or EPUB file that exists. "
                      "Example: voxprint narrate book.epub --voice my-voice --out ./audiobooks",
             )
         book = load_book(book_path)
@@ -1038,7 +1042,7 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
         except (OSError, UnicodeError, ValueError) as exc:
             raise CliError(
                 EXIT_INPUT, f"speaker marks cannot be read: {exc}",
-                hint="Each line is 'N. NARRATOR' or 'N. MALE: Name' or 'N. FEMALE: Name'.",
+                hint="Each line is 'NARRATOR', 'MALE: Name' or 'FEMALE: Name'. A leading 'N. ' is optional.",
             ) from exc
     else:
         plan = (plan_fn or llm_tool.make_plan)()
@@ -1889,7 +1893,7 @@ def cmd_check(args: argparse.Namespace, *,
 def _load_book_or_fail(path_text: str, example: str):
     book_path = Path(path_text)
     if not book_path.is_file():
-        raise CliError(EXIT_INPUT, f"book not found: {book_path}", hint=f"Pass a TXT, FB2, FB2.ZIP or EPUB file. Example: {example}")
+        raise CliError(EXIT_INPUT, f"book not found: {book_path}", hint=f"Pass a TXT, Markdown, FB2, FB2.ZIP or EPUB file. Example: {example}")
     return load_book(book_path)
 
 
