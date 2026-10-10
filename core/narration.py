@@ -472,7 +472,7 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
                               for c, a in zip(group, audios)]
                 spent += time.monotonic() - t0
                 for c, audio in zip(group, audios):
-                    while not slots.acquire(timeout=0.2):                # type: ignore[union-attr]
+                    while not slots.acquire(timeout=0.2):
                         cancel.check()
                         _raise_finished(futures)                        # a failed write never frees its wait
                     futures.append(saver.submit(save, c, audio, engine.sample_rate))
