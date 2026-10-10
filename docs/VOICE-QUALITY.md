@@ -113,7 +113,7 @@ than the 0.6B model (Qwen's tables: ru Fleurs 9.9 -> 6.0 % WER, CommonVoice 14.1
 
 | | Value |
 | --- | --- |
-| Automatic choice | 1.7B with a CUDA GPU reporting >= 7.5 GiB (an "8 GB" card), else 0.6B; "CPU only" tasks use 0.6B |
+| Automatic choice | 1.7B with a CUDA GPU reporting >= 7.5 GiB (an "8 GB" card), else 0.6B |
 | Override | Settings -> *Speech recognition model*: automatic / 0.6B / 1.7B / download both (`state/asr_model.json`) |
 | Download | only in the download-all step (first run, Components step 2, `--prefetch`, the setup folder); every file verified by size + SHA-256 (`infra/model_mirrors.json`, hashes-only entry: no backup mirror yet) |
 | At run time | the preferred model if installed, else the other variant (never a download in the middle of a task) |

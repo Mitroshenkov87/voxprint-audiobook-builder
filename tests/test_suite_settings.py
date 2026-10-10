@@ -46,16 +46,16 @@ def test_damaged_file_counts_as_defaults_and_is_rewritten():
     ss.path().parent.mkdir(parents=True, exist_ok=True)
     ss.path().write_text("{broken", encoding="utf-8")
     assert ss.gpu() == "auto"
-    ss.set_value("gpu", "cpu")
-    assert json.loads(ss.path().read_text(encoding="utf-8")) == {"schema": 1, "gpu": "cpu"}
+    ss.set_value("gpu", "cuda:0")
+    assert json.loads(ss.path().read_text(encoding="utf-8")) == {"schema": 1, "gpu": "cuda:0"}
 
 
-@pytest.mark.parametrize("value,expected", [("auto", "auto"), ("CPU", "cpu"), ("cuda", "cuda:0"), ("cuda:2", "cuda:2")])
+@pytest.mark.parametrize("value,expected", [("auto", "auto"), ("cuda", "cuda:0"), ("cuda:2", "cuda:2")])
 def test_gpu_values(value, expected):
     assert ss.set_value("gpu", value) == expected and ss.gpu() == expected
 
 
-@pytest.mark.parametrize("key,value", [("gpu", "vulkan"), ("gpu", "cuda:x"), ("ui_language", "zz"), ("models_dir", "rel/dir"),
+@pytest.mark.parametrize("key,value", [("gpu", "cpu"), ("gpu", "CPU"), ("gpu", "vulkan"), ("gpu", "cuda:x"), ("ui_language", "zz"), ("models_dir", "rel/dir"),
                                        ("theme", ""), ("volume", 3)])
 def test_invalid_values_are_refused(key, value):
     with pytest.raises(ValueError):

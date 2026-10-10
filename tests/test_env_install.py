@@ -64,8 +64,8 @@ def test_check_versions_counts_actions():
 @pytest.mark.parametrize("smi,flavor", [
     ("| NVIDIA-SMI 581.15  Driver Version: 581.15  CUDA Version: 13.0 |", "cu130"),
     ("NVIDIA-SMI 610.88  KMD Version: 610.88  CUDA UMD Version: 13.3", "cu130"),     # drivers 6xx: "UMD"
-    ("CUDA Version: 12.9", "cpu"), ("CUDA Version: 12.6", "cpu"), ("CUDA Version: 12.4", "cpu"),
-    ("CUDA Version: 11.8", "cpu"), ("CUDA Version: 11.2", "cpu"), ("no gpu here", "cpu")])
+    ("CUDA Version: 12.9", ""), ("CUDA Version: 12.6", ""), ("CUDA Version: 12.4", ""),
+    ("CUDA Version: 11.8", ""), ("CUDA Version: 11.2", ""), ("no gpu here", "")])
 def test_torch_flavor_from_driver(smi, flavor):
     assert ep.torch_flavor_for_driver(ep.parse_nvidia_smi_cuda(smi)) == flavor
 
@@ -127,9 +127,9 @@ def test_cuda_probe_any_exception_is_none():
     assert ep.cuda_from_driver_version("  570.1\n") is None
     assert ep.cuda_from_driver_version("560.0") is None
     assert ep.cuda_from_driver_version("600.21") == (13, 0)
-    assert ep.torch_flavor_for_driver(ep.cuda_from_driver_version("555.1")) == "cpu"
+    assert ep.torch_flavor_for_driver(ep.cuda_from_driver_version("555.1")) == ""
     assert ep.torch_flavor_for_driver((13, 0)) == "cu130"
-    assert ep.torch_flavor_for_driver((12, 8)) == "cpu"
+    assert ep.torch_flavor_for_driver((12, 8)) == ""
 
 
 def test_torch_decisions():

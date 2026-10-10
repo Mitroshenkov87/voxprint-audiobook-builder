@@ -7,7 +7,7 @@ program's own settings::
      "ui_language": "ru",            # ISO code; default: the OS language if supported, else "en"
      "theme": "glass-dark",          # unknown -> the program's default theme ("glass-dark" here, our only theme)
      "models_dir": null,             # absolute path, or null = the default folder; VOXPRINT_MODELS_DIR always wins
-     "gpu": "auto"}                  # "auto" | "cuda:N" | "cpu"
+     "gpu": "auto"}                  # "auto" | "cuda:N"  (no CPU choice)
 
 * UTF-8, written atomically (temp file + ``os.replace``); keys this program does not know are kept as they are.
 * A missing key means its default; a missing or damaged file means all defaults (and is rewritten on the next change).
@@ -82,11 +82,11 @@ def normalize_theme(value: object) -> str:
 
 
 def normalize_gpu(value: object) -> Optional[str]:
-    """``auto`` / ``cpu`` / ``cuda:N`` (``cuda`` alone = ``cuda:0``), or ``None`` for anything else."""
+    """``auto`` / ``cuda:N`` (``cuda`` alone = ``cuda:0``), or ``None`` for anything else (including ``cpu``)."""
     if not isinstance(value, str):
         return None
     v = value.strip().lower()
-    if v in ("auto", "cpu"):
+    if v == "auto":
         return v
     if v in ("cuda", "gpu"):
         return "cuda:0"
@@ -169,7 +169,7 @@ def set_value(key: str, value: Any) -> Any:
     elif key == "gpu":
         stored = normalize_gpu(value)
         if stored is None:
-            raise ValueError(f"gpu must be auto, cpu or cuda:N, got {value!r}")
+            raise ValueError(f"gpu must be auto or cuda:N, got {value!r}")
     else:
         raise ValueError(f"not a shared setting: {key!r}")
     data = read_raw()

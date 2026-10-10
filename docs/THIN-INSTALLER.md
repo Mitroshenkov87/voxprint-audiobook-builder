@@ -41,11 +41,11 @@ every file is still at its address with the pinned size). CI only reads the comm
 | 1 | Same CPython minor version as Voxprint (the `Tag:` of the installed wheel, now `cp314`) and `win_amd64` |
 | 2 | `torch` inside `compat.torch` of the lock (now `>=2.11,<2.12`; we ship 2.11.0) |
 | 3 | `torchaudio` in the same `site-packages`: the same release number as `torch`, or TorchAudio 2.11 (the last release) with torch 2.11 or newer |
-| 4 | Flavor: a CPU build only on a PC without an NVIDIA GPU; a CUDA build must not need a newer driver than installed (older CUDA builds are fine); a build without a local tag on Windows counts as CPU |
+| 4 | Flavor: a CUDA build must not need a newer driver than the one installed (an older CUDA build is fine). There is no CPU wheel for users |
 | 5 | `torch/lib`, `torch/__init__.py`, `torchaudio/__init__.py` exist |
 | 6 | The child-process check passes (150 s limit) |
 
-The flavor we download is `cu130` when the driver supports CUDA 13 (driver 600 or newer, or a header that says CUDA 13.0+). Otherwise there is no user-facing wheel. `VOXPRINT_TORCH_FLAVOR=cpu` selects the CPU wheels pinned for CI. See [RUNTIME.md](RUNTIME.md).
+The flavor we download is `cu130` when the driver supports CUDA 13 (driver 600 or newer, or a header that says CUDA 13.0+). Otherwise there is no supported wheel and Voxprint does not install a CPU build. CI jobs that need a CPU wheel set the internal `VOXPRINT_TORCH_FLAVOR=cpu` (see [DEVELOPMENT.md](DEVELOPMENT.md) and [RUNTIME.md](RUNTIME.md)).
 
 ## Start-up flow
 
@@ -87,7 +87,7 @@ Every release's manifest is *pinned*: the exact files (size + SHA-256) this rele
 Installs only the pinned shell packages (Qt, numpy, soundfile ...) into a venv, runs the unit tests that need no PyTorch, builds the shell with
 PyInstaller (`build_thin.bat`), writes `Voxprint-shell-01.zip` + `manifest-thin-<channel>.json` and compiles `Voxprint-Setup-online.exe`
 (`installer/build_online.ps1 -RuntimeLock infra\runtime_lock.json`). It then **really runs the product on the runner**: the frozen shell downloads the whole
-runtime from upstream (CPU PyTorch), imports it, and a second run proves that a PyTorch lying around on the PC is found, checked and reused instead of
+runtime from upstream (a CPU PyTorch wheel, internal to this job), imports it, and a second run proves that a PyTorch lying around on the PC is found, checked and reused instead of
 downloaded. Only then are the installer, its hash and the manifest attached to the release (older assets are never touched).
 
 ## Portable setup folder (foundation; the installer checkbox comes later)

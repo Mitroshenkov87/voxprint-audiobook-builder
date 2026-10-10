@@ -589,13 +589,13 @@ Dieselbe Prüfung läuft ohne Fenster als `Voxprint.exe --auto-repair` (Kapitel 
 | {{err.mismatch_length}} | Prüfen Sie, ob Sie die richtige Audio- und Textdatei gewählt und den ganzen Text gelesen haben. |
 | {{err.mismatch_extra}} | Schneiden Sie die überzählige Sprache am Anfang oder Ende der Aufnahme ab oder wählen Sie den richtigen Text. |
 | {{err.all_dropped}} | Prüfen Sie Mikrofon und Pegel; nehmen Sie an einem ruhigeren Ort neu auf. |
-| {{err.oom}} | Schließen Sie andere Programme, die die Grafikkarte nutzen; Voxprint versucht es mit geringerer Last erneut („{{progress.oom_retry}}“). Als letzter Ausweg: **{{ui.retry_cpu}}**. |
+| {{err.oom}} | Schließen Sie andere Programme, die die Grafikkarte nutzen; Voxprint versucht es mit geringerer Last erneut („{{progress.oom_retry}}“). |
 | {{err.download_failed}} | Prüfen Sie Ihre Internetverbindung und starten Sie neu; der Download läuft an der gleichen Stelle weiter. |
 | {{err.narration_chunk}} | Drücken Sie erneut **{{narr.start}}** – fertige Fragmente bleiben erhalten. |
 | {{err.narration_no_ffmpeg}} | Einstellungen → **{{autorepair.button}}**, oder wählen Sie WAV. |
 | {{err.book_unsupported}} | Wandeln Sie das Buch in TXT, FB2 oder EPUB um. |
 | {{err.book_unsafe}} | Die Datei wirkt beschädigt oder zu groß; versuchen Sie eine andere Kopie. |
-| {{warn.no_gpu}} | Training ist ohne NVIDIA-Karte möglich, aber extrem langsam. |
+| {{warn.no_gpu}} | Voxprint benötigt eine NVIDIA GeForce RTX der 40er-Serie oder neuer. Einen reinen Prozessormodus gibt es nicht. |
 | {{warn.loss_low}} | Die Stimme kann brabbeln. Wählen Sie **{{preset.balanced}}**, nehmen Sie mehr Text auf und hören Sie die schnelle Vorschau an. |
 
 **Die Stimme klingt höher als meine.** Eine leichte Tonhöhen-Drift nach oben (bei einer männlichen Stimme wurden etwa +2…+3 Halbtöne beobachtet) ist ein bekannter Effekt dieser Art von Training. Die automatische Prüfung warnt oberhalb von +4. Probieren Sie die schnelle Vorschau mit beiden Varianten und nehmen Sie die näherliegende.
@@ -634,8 +634,9 @@ Das installierte Programm ist `C:\Program Files\Voxprint\Voxprint.exe` (ein ande
 | 2 | Fehlende oder unbekannte Argumente |
 | 3 | Buch, Audio, Text, Stimme oder Sicherung fehlt oder ist nicht lesbar |
 | 4 | Ein Modell oder eine Komponente ist nicht installiert, oder der Download ist fehlgeschlagen |
-| 5 | Grafikspeicher reicht nicht – beim Training mit `--force-cpu` wiederholen |
+| 5 | Grafikspeicher reicht nicht – andere Programme schließen, die die Grafikkarte nutzen, und denselben Befehl erneut ausführen |
 | 6 | Abgebrochen – denselben Befehl erneut ausführen, um fortzusetzen |
+| 7 | Keine NVIDIA GeForce RTX der 40er-Serie oder neuer. `--version`, `help`, `status` und `diag` laufen weiter |
 
 ## Ein Buch vertonen
 
@@ -657,7 +658,7 @@ voxprint narrate genesis.txt --voice levi --out ./audiobooks --format mp3 --json
 ```
 voxprint train AUDIO [--text SCRIPT] [--name NAME] [--type male|female|child|other]
     [--out DIR] [--consent none|auto|commercial|public_noncommercial|private_only]
-    [--speaker NAME] [--license ID] [--language CODE] [--force-cpu] [--json]
+    [--speaker NAME] [--license ID] [--language CODE] [--json]
 ```
 
 Mit `--text` wird die Aufnahme am Skript ausgerichtet; ohne (eine Datei oder ein Ordner mit Clips) baut die Spracherkennung den Datensatz. `--out` ist der übergeordnete Ordner; jede Stimme bekommt ihren eigenen Ordner `<Stimmenname>_Voxprint`. Ohne `--consent` wird die Stimme als *nur privat* gespeichert; `--consent auto` liest die gesprochene Erklärung, die anderen Werte halten einen selbst bestätigten Umfang fest, und `--license` erlaubt nie mehr als das Einverständnis. Trainieren Sie nur eine Stimme, die Sie nutzen dürfen.

@@ -54,7 +54,7 @@ jobs:
               echo "range=${before}..${{ github.sha }}" >> "$GITHUB_OUTPUT"
             fi
           fi
-      - name: App environment (CPU PyTorch) and audit tools
+      - name: App environment (CPU PyTorch, internal to this audit job) and audit tools
         run: |
           python -m pip install -q uv
           uv venv .app

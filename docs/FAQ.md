@@ -10,10 +10,9 @@ The voice goes into your **voice library**; then pick a book (TXT, FB2, EPUB) an
 (one Opus file, per-chapter MP3, ...). A native Windows 11 application - no command line, no browser, no Gradio, no WSL.
 
 ## Which computer do I need?
-> **Requires Windows 11 (24H2 / build 26100 or newer) and an NVIDIA GPU (16 GB VRAM recommended).**
-> Supported systems: current and previous year OS releases (Windows 11 24H2 and newer; Linux distributions released from 2025). Older systems are not a goal.
-> Without an NVIDIA GPU the dataset is still created, but voice training falls back to the CPU (very slow, with a warning).
-> The code itself also runs on Linux (that is where the test-suite runs); a Linux/macOS GUI release is not a goal yet.
+> **Requires an NVIDIA GeForce RTX 40-series or newer GPU, and Windows 11 (24H2 / build 26100 or newer) or a Linux release from 2025.** 16 GB of VRAM is recommended.
+> There is no CPU-only mode. The program and the installers exit if that GPU is not found.
+> Linux is experimental. A macOS release is not a goal.
 
 Full table: [Downloads and requirements](DOWNLOADS.md#hardware-requirements).
 
@@ -37,7 +36,7 @@ Only with the voice owner's permission and within the voice's licence (CC0, CC-B
 The installer is not code-signed yet, so a new download has no reputation. Download it only from the GitHub releases page. Check the SHA-256 against [DOWNLOADS.md](DOWNLOADS.md) (or the `.sha256` file) with `Get-FileHash .\Voxprint-Setup-online.exe -Algorithm SHA256`, and only then keep or run it. Edge is the strictest: do not click **Delete** on the download bar. Hover the download, then **... -> Keep -> Show more -> Keep anyway**. The file can be removed before you run it. SmartScreen (*Windows protected your PC* -> *More info -> Run anyway*) is usually milder, and an antivirus program may also flag the file. Code signing is being applied for (SignPath Foundation); the warning will go away later. The source is in this repository and the installer is built by a public GitHub Actions workflow; you can also [build it yourself](BUILDING.md).
 
 ## Does it work on Linux or without an NVIDIA GPU?
-Linux is experimental ([LINUX.md](LINUX.md)). Without an NVIDIA GPU the dataset is still created, but training falls back to the CPU (very slow, with a warning).
+Linux is experimental ([LINUX.md](LINUX.md)). The same GPU is required there: an NVIDIA GeForce RTX 40-series or newer. There is no CPU-only mode.
 
 ## Downloads fail with a VPN or an unusual network adapter
 Voxprint tries the normal connection first (8 s connect timeout). If it cannot connect, it lists your local network interfaces (IPv4/IPv6, loopback and link-local skipped) and retries from each address in turn, also without the system proxy; the first one that works is remembered (`state/net_route.json`), used for the rest of the download - resumed ranges and the local -> original -> mirror order included - and re-tested if it stops working. This covers the online installer (`voxprint-fetch`), model, translation-model, voice and update downloads that Voxprint makes itself (`pip` runs of the updater only honour the system proxy). The log line is short, e.g. `network route for huggingface.co: tun0 (10.8.0.2)`.

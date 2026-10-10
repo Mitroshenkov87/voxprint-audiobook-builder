@@ -9,7 +9,9 @@
 #   ~/.local/share/voxprint/venv   its Python environment (PySide6, PyTorch, transformers ...)
 #   ~/.local/share/voxprint/       models, voices, settings, logs (created by the program)
 #   ~/.local/bin/voxprint          the launcher;  ~/.local/share/applications/voxprint.desktop  the menu entry
-# PyTorch: torch 2.11.0 cu130 (NVIDIA driver 600+) with TorchAudio 2.11.0. --cpu installs the CPU wheels (CI).
+# PyTorch: torch 2.11.0 cu130 (NVIDIA driver 600+) with TorchAudio 2.11.0.
+# An NVIDIA GeForce RTX 40-series or newer GPU (compute capability 8.9+) is required. There is no CPU-only install.
+# Internal CI switches, not shown in --help: --skip-gpu-check, --gpu-check-only, and --torch-backend cpu (only with --skip-gpu-check).
 # Re-running the script updates the program (the environment is reused).  `--uninstall` removes it again.
 set -u
 set -o pipefail
@@ -30,11 +32,59 @@ LAUNCHER="$BIN_DIR/voxprint"
 # system packages (Debian / Ubuntu / AnduinOS / Mint names): Qt xcb platform plugin, OpenGL, ffmpeg, venv
 APT_PACKAGES="python3-venv ffmpeg libegl1 libgl1 libdbus-1-3 libfontconfig1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libpulse0"
 
-MODE=install; ASSUME_YES=0; INSTALL_DEPS=0; TORCH=cu130; FROM_DIR=""; NO_DESKTOP=0; PURGE=0; RECREATE=0; SKIP_CHECK=0; NO_SYSCHECK=0
+MODE=install; ASSUME_YES=0; INSTALL_DEPS=0; TORCH=cu130; FROM_DIR=""; NO_DESKTOP=0; PURGE=0; RECREATE=0; SKIP_CHECK=0; NO_SYSCHECK=0; SKIP_GPU=0
 
 say()  { printf '\033[1m==> %s\033[0m\n' "$*"; }
 warn() { printf '\033[33mWARNING: %s\033[0m\n' "$*" >&2; }
 die()  { printf '\033[31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
+
+# RTX 40-series is compute capability 8.9. The best GPU on the machine has to meet that.
+require_gpu() {
+  local line name cap rest driver best_name best_maj best_min maj min
+  if [ "$SKIP_GPU" = 1 ]; then
+    return 0
+  fi
+  best_name=""
+  best_maj=-1
+  best_min=-1
+  if ! command -v nvidia-smi >/dev/null 2>&1; then
+    die "Voxprint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: none."
+  fi
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    driver="${line##*,}"
+    rest="${line%,*}"
+    cap="${rest##*,}"
+    name="${rest%,*}"
+    cap="${cap#"${cap%%[![:space:]]*}"}"
+    cap="${cap%"${cap##*[![:space:]]}"}"
+    name="${name#"${name%%[![:space:]]*}"}"
+    name="${name%"${name##*[![:space:]]}"}"
+    name="${name#\"}"
+    name="${name%\"}"
+    maj=${cap%%.*}
+    min=${cap#*.}
+    case "$maj$min" in
+      *[!0-9]*) continue ;;
+    esac
+    [ -n "$maj" ] && [ -n "$min" ] || continue
+    if [ "$best_maj" -lt 0 ] || [ "$maj" -gt "$best_maj" ] || { [ "$maj" -eq "$best_maj" ] && [ "$min" -gt "$best_min" ]; }; then
+      best_maj=$maj
+      best_min=$min
+      best_name=$name
+    fi
+  done <<EOF
+$(nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv,noheader 2>/dev/null || true)
+EOF
+  if [ -z "$best_name" ]; then
+    die "Voxprint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: none."
+  fi
+  if [ "$best_maj" -gt 8 ] || { [ "$best_maj" -eq 8 ] && [ "$best_min" -ge 9 ]; }; then
+    echo "NVIDIA GPU: $best_name (compute ${best_maj}.${best_min})"
+    return 0
+  fi
+  die "Voxprint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: ${best_name}."
+}
 
 usage() {
   cat <<USAGE
@@ -44,8 +94,7 @@ Voxprint for Linux (experimental) - installer
     --check            only report what is missing (system libraries, Python), change nothing
     --install-deps     install the missing system packages with "sudo apt-get install" (Debian/Ubuntu family)
     --yes, -y          answer yes to questions
-    --cpu              install the CPU build of PyTorch (CI and machines without an NVIDIA GPU)
-    --torch-backend B  wheel index: cu130 (default), cpu. "auto" means cu130
+    --torch-backend B  wheel index: cu130 (default; "auto" means cu130)
     --from-dir DIR     take the program from a checkout / unpacked folder (DIR contains main.py) instead of downloading
     --recreate         delete and recreate the Python environment
     --no-desktop       do not create the menu entry
@@ -62,8 +111,9 @@ while [ $# -gt 0 ]; do
     --check) MODE=check ;;
     --install-deps) INSTALL_DEPS=1 ;;
     --yes|-y) ASSUME_YES=1 ;;
-    --cpu) TORCH=cpu ;;
     --torch-backend) shift; [ $# -gt 0 ] || die "--torch-backend needs a value"; if [ "$1" = auto ]; then TORCH=cu130; else TORCH="$1"; fi ;;
+    --skip-gpu-check) SKIP_GPU=1 ;;   # internal: CI runners have no NVIDIA GPU
+    --gpu-check-only) MODE=gpu-check ;; # internal: unit test of require_gpu
     --from-dir) shift; [ $# -gt 0 ] || die "--from-dir needs a folder"; FROM_DIR="$1" ;;
     --recreate) RECREATE=1 ;;
     --no-desktop) NO_DESKTOP=1 ;;
@@ -93,11 +143,16 @@ if [ "$MODE" = uninstall ]; then
   exit 0
 fi
 
+if [ "$MODE" = gpu-check ]; then
+  require_gpu
+  exit 0
+fi
+
 [ "$(uname -s)" = Linux ] || die "this installer is for Linux (Windows has Voxprint-Setup-*.exe)"
 ARCH="$(uname -m)"
 case "$ARCH" in
   x86_64) ;;
-  aarch64|arm64) warn "ARM64 is untested (PyTorch CPU wheels exist, some dependencies may not install)." ;;
+  aarch64|arm64) warn "ARM64 is untested." ;;
   *) die "unsupported CPU architecture: $ARCH" ;;
 esac
 
@@ -128,6 +183,7 @@ warn_if_old_distro() {
   fi
 }
 warn_if_old_distro
+require_gpu
 
 # ----------------------------------------------------------------------------------------------- system checks
 say "Voxprint for Linux (EXPERIMENTAL) - checking the system"
@@ -170,7 +226,6 @@ else
   echo "System packages: OK"
 fi
 if [ "$MODE" = check ]; then
-  command -v nvidia-smi >/dev/null 2>&1 && echo "NVIDIA driver: $(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null | head -1)" || echo "NVIDIA driver: none found (the CPU build of PyTorch will be used)"
   echo "Check finished."; exit 0
 fi
 "$PY" -c 'import venv, ensurepip' 2>/dev/null || die "python3-venv is missing: sudo apt-get install python3-venv"
@@ -224,19 +279,11 @@ say "Installing the installer tools (pip, uv)"
 UV="$VENV/bin/uv"
 export UV_LINK_MODE=copy UV_CACHE_DIR="${UV_CACHE_DIR:-$CACHE/uv}"
 
-say "Installing PyTorch $TORCH (torch 2.11.0, torchaudio 2.11.0)"
-install_torch() {
-  "$UV" pip install --python "$VPY" "torch==2.11.0" "torchaudio==2.11.0" --index-url "https://download.pytorch.org/whl/$1"
-}
-if ! install_torch "$TORCH"; then
-  if [ "$TORCH" != cpu ]; then
-    warn "PyTorch ($TORCH) failed - falling back to the CPU build"
-    install_torch cpu || die "PyTorch could not be installed"
-    TORCH=cpu
-  else
-    die "PyTorch could not be installed"
-  fi
+if [ "$TORCH" = cpu ] && [ "$SKIP_GPU" != 1 ]; then
+  die "Voxprint has no CPU-only install. An NVIDIA GeForce RTX 40-series or newer GPU is required."
 fi
+say "Installing PyTorch $TORCH (torch 2.11.0, torchaudio 2.11.0)"
+"$UV" pip install --python "$VPY" "torch==2.11.0" "torchaudio==2.11.0" --index-url "https://download.pytorch.org/whl/$TORCH" || die "PyTorch ($TORCH) could not be installed"
 say "Installing the other Python packages (this takes a few minutes)"
 "$UV" pip install --python "$VPY" -r "$APP/requirements.txt" -r "$APP/requirements-verified.txt" || die "installing requirements.txt failed"
 "$UV" pip install --python "$VPY" --no-deps -r "$APP/requirements-nodeps.txt" || die "installing requirements-nodeps.txt failed"

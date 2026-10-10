@@ -7,7 +7,7 @@ from core import train_presets as tp
 from infra.vram_optimizer import GpuInfo, plan_training
 
 G4090 = GpuInfo(True, "NVIDIA GeForce RTX 4090", 24.0, 22.0)
-G3060 = GpuInfo(True, "NVIDIA GeForce RTX 3060", 12.0, 11.0)
+G4060 = GpuInfo(True, "NVIDIA GeForce RTX 4060", 16.0, 14.0)
 NOGPU = GpuInfo(False)
 
 
@@ -32,7 +32,7 @@ def test_estimate_reproduces_the_measured_4090_run_and_scales_with_the_gpu():
     plan = plan_training(G4090, 70)
     est = tp.estimate_seconds(plan, 70, G4090)
     assert 12 + 5 * 24.0 - 6 < est < 12 + 5 * 24.0 + 6           # measured: 24 s/epoch for 70 clips, 12 s load
-    assert tp.estimate_seconds(plan_training(G3060, 70), 70, G3060) > 2.5 * est
+    assert tp.estimate_seconds(plan_training(G4060, 70), 70, G4060) > 2.5 * est
     assert tp.estimate_seconds(plan_training(NOGPU, 70), 70, NOGPU) > 10 * est
     f, b, m = (tp.estimate_seconds(tp.build_plan(x, G4090, 70), 70, G4090) for x in (tp.FAST, tp.BALANCED, tp.MAXIMUM))
     assert f < b < m

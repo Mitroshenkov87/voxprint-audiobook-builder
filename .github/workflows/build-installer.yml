@@ -127,7 +127,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $setup = "build\online-release\Voxprint-Setup-online.exe"
           Write-Host ("setup size: {0:N0} bytes" -f (Get-Item $setup).Length)
-          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke1.log" -Wait -PassThru
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke1.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxsmoke1.log -Tail 60; throw "install exit code $($p.ExitCode)" }
           foreach ($f in Get-ChildItem dist\Voxprint -Recurse -File) {
             $rel = $f.FullName.Substring((Resolve-Path dist\Voxprint).Path.Length + 1)
@@ -142,13 +142,13 @@ jobs:
           if (-not (Select-String -Path $users -Pattern '"audiobook-builder": true' -SimpleMatch -Quiet)) { throw "models users file has no audiobook-builder key" }
           '{"movie-dubber": true}' | Set-Content -Encoding ascii $users
           # second run: everything is reused (no component is downloaded again)
-          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke2.log" -Wait -PassThru
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke2.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxsmoke2.log -Tail 60; throw "second install exit code $($p.ExitCode)" }
           $text = Get-Content -Raw $users
           Write-Host "users file after the second install: $text"
           if (-not ($text.Contains('"audiobook-builder": true') -and $text.Contains('"movie-dubber": true'))) { throw "the other program's key was not kept" }
           # an unreachable manifest must fail the setup (and leave a message, not a crash)
-          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=C:\vxsmoke-bad","/Manifest=http://127.0.0.1:9/manifest.json","/LOG=C:\vxsmoke3.log" -Wait -PassThru
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/DIR=C:\vxsmoke-bad","/Manifest=http://127.0.0.1:9/manifest.json","/LOG=C:\vxsmoke3.log" -Wait -PassThru
           Write-Host "unreachable manifest -> exit code $($p.ExitCode)"
           if ($p.ExitCode -eq 0) { throw "the setup reported success for an unreachable manifest" }
           # uninstall removes the downloaded files
@@ -173,6 +173,8 @@ jobs:
     timeout-minutes: 20
     env:
       PYTHONUTF8: "1"
+      # Internal: the runner has no RTX 40-series GPU. Not a user setting.
+      VOXPRINT_ALLOW_NO_GPU: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -221,7 +223,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $p = Start-Process build\online-release\Voxprint-Setup-thin.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=C:\vxthin","/LOG=C:\vxthin.log" -Wait -PassThru
+          $p = Start-Process build\online-release\Voxprint-Setup-thin.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/DIR=C:\vxthin","/LOG=C:\vxthin.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxthin.log -Tail 60; throw "install exit code $($p.ExitCode)" }
           if (-not (Test-Path C:\vxthin\Voxprint.exe)) { throw "the shell is missing" }
           if (-not (Test-Path C:\vxthin\_internal\modules.json)) { throw "modules.json is missing" }
@@ -250,6 +252,8 @@ jobs:
     env:
       QT_QPA_PLATFORM: offscreen
       PYTHONUTF8: "1"
+      # Internal: unit tests and the CPU PyTorch install on this runner. Not a user setting.
+      VOXPRINT_ALLOW_NO_GPU: "1"
       REL_TAG: ${{ inputs.release_tag }}
     steps:
       - uses: actions/checkout@v4
@@ -320,10 +324,10 @@ jobs:
           $tag = if ($env:REL_TAG) { $env:REL_TAG } else { "v0.0.0-dev" }
           ./installer/build_online.ps1 -Dist dist\thin\Voxprint -Tag $tag -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
           Get-ChildItem build\online-release | Format-Table Name, Length
-      - name: End to end with the frozen shell - download the runtime from upstream (CPU PyTorch) and import it
+      - name: End to end with the frozen shell - download the runtime from upstream (CPU PyTorch, internal CI only) and import it
         shell: pwsh
         env:
-          VOXPRINT_TORCH_FLAVOR: cpu
+          VOXPRINT_TORCH_FLAVOR: cpu   # internal: this runner has no NVIDIA GPU
           VOXPRINT_NO_REUSE: "1"
           VOXPRINT_HOME: C:\vxhome1
         run: |
@@ -354,7 +358,7 @@ jobs:
       - name: End to end - another program's PyTorch is detected, checked and reused instead of downloaded
         shell: pwsh
         env:
-          VOXPRINT_TORCH_FLAVOR: cpu
+          VOXPRINT_TORCH_FLAVOR: cpu   # internal: this runner has no NVIDIA GPU
           VOXPRINT_HOME: C:\vxhome2
         run: |
           $ErrorActionPreference = "Stop"

@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from core.sysmem_spill import DIAGNOSTIC_NOTE
+from infra import gpu_requirement
 
 log = logging.getLogger("voxprint.diag")
 
@@ -247,6 +248,12 @@ def gpu_info(import_torch: bool = True) -> Dict[str, object]:
             out["driver"] = r.stdout.strip().splitlines()[0]
     except Exception:  # noqa: BLE001 - no NVIDIA driver / tool
         pass
+    try:
+        # use_torch follows this call: a CLI status that skipped PyTorch must not import it here either
+        out["requirement"] = gpu_requirement.check_gpu(use_torch=torch is not None).to_dict()
+    except Exception as exc:  # noqa: BLE001 - the report still opens when the probe fails
+        out["requirement"] = {"ok": False, "min_compute": "8.9", "detected": "none", "compute_cap": None,
+                              "source": "none", "override": False, "error": str(exc)}
     return out
 
 
@@ -325,6 +332,13 @@ def summary_lines(info: Dict[str, object]) -> List[str]:
              f"PyTorch {g.get('torch', 'not found')} (CUDA build {g.get('cuda_build')}) | CUDA available: "
              f"{'not checked' if g.get('cuda_available') is None and g.get('cuda_note') else ('yes' if g.get('cuda_available') else 'no')}" + (f" | {g.get('gpu')} {g.get('vram_total_gb')} GB" if g.get("gpu") else "")
              + (f" | driver {g.get('driver')}" if g.get("driver") else "")]
+    req = g.get("requirement") if isinstance(g.get("requirement"), dict) else None
+    if req:
+        state = "met" if req.get("ok") else "not met"
+        lines.append(
+            f"GPU requirement: NVIDIA RTX 40-series or newer (compute >= {req.get('min_compute', '8.9')}): "
+            f"{state} (detected: {req.get('detected') or 'none'})"
+            + (" | internal override" if req.get("override") else ""))
     if g.get("error"):
         lines.append(f"GPU probe error: {g['error']}")
     if g.get("sysmem_fallback"):

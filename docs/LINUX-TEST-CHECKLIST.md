@@ -9,8 +9,8 @@ Mark each line OK / FAIL and note the message. Logs: `~/.local/share/voxprint/lo
 - [ ] `sha256sum install-voxprint-linux.sh` equals the hash in the release notes / `SHA256SUMS-linux.txt`
 - [ ] `bash install-voxprint-linux.sh --check` lists the missing system packages (or says OK)
 - [ ] `bash install-voxprint-linux.sh --install-deps` finishes; the last lines are `SELFTEST_IMPORTS OK`, `SELFTEST_TEXT OK` and "Voxprint is installed"
-- [ ] With an NVIDIA GPU: `~/.local/share/voxprint/install.json` shows a `cu...` backend, not `cpu`; `voxprint --selftest-imports` prints `cuda available: True`
-- [ ] Without an NVIDIA GPU / with `--cpu`: the CPU build is installed (`cuda available: False`) - expected
+- [ ] With an RTX 40-series or newer GPU: `~/.local/share/voxprint/install.json` shows a `cu...` backend; `voxprint --selftest-imports` prints `cuda available: True`
+- [ ] Without that GPU (missing, or older than RTX 40-series): the installer stops with a clear message and a non-zero exit. There is no CPU-only install.
 
 ## 2. Start
 - [ ] Voxprint appears in the application menu with the icon; it starts from there
