@@ -78,6 +78,10 @@ irm https://raw.githubusercontent.com/Mitroshenkov87/voxprint-audiobook-builder/
 * [Models, mirrors and backups](docs/MODELS.md) · [Downloads and hashes](docs/DOWNLOADS.md) · [Runtime](docs/RUNTIME.md) · [Linux](docs/LINUX.md) · [Building and contributing](docs/BUILDING.md)
 * [How it works](docs/HOW-IT-WORKS.md) · [Voice quality](docs/VOICE-QUALITY.md) · [Architecture](docs/ARCHITECTURE.md) · [Tests and verification](docs/TESTING.md) · [Roadmap](docs/ROADMAP.md) · [Changelog](CHANGELOG.md)
 
+## Philosophy
+
+Voxprint apps are complete: the choices about models, settings and pipelines are already made, so you install the app and start working. Like software used to be, there is no account, no subscription and no online sign-in, and your files stay on your computer. Voxprint looks forward. It is built for current operating systems and recent NVIDIA GPUs, and it drops old platforms after two to three years instead of carrying them. Free and open source (Apache-2.0), with modern open formats by default. [Read more](PHILOSOPHY.md)
+
 ## Licence and credits
 Source code: **Apache License 2.0** ([`LICENSE`](LICENSE), [`NOTICE`](NOTICE)). Models and voices keep their own licences - see [docs/LICENSES.md](docs/LICENSES.md). Terms of use (End User Agreement, not legal advice): [docs/legal/](docs/legal/EULA-audiobook-builder.md). Open-source components and credits: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
