@@ -568,15 +568,10 @@ def run(manifest_source: str, dest: Path, cache: Path, status: _Progress, only: 
     if modules is not None:
         # ``""`` is "no supported CUDA flavor": do not fetch a flavored wheel, including a CPU wheel.
         # ``auto`` and ``all`` do not name one flavor (a portable folder resolves ``auto`` above).
-        if flavor == "":
-            def _flavor_ok(comp: dict) -> bool:
-                return not comp.get("flavor")
-        elif flavor in ("auto", "all"):
-            def _flavor_ok(comp: dict) -> bool:
+        def _flavor_ok(comp: dict, wanted: str = flavor) -> bool:
+            if not comp.get("flavor") or wanted in ("auto", "all"):
                 return True
-        else:
-            def _flavor_ok(comp: dict, wanted: str = flavor) -> bool:
-                return not comp.get("flavor") or comp.get("flavor") == wanted
+            return bool(wanted) and comp.get("flavor") == wanted
         ids = {i for m in man.get("modules", []) if m.get("id") in modules for i in m.get("components", [])}
         comps = [c for c in comps if (c["id"] in ids or c.get("module") in modules) and _flavor_ok(c)]
     keep = [c for c in man["components"] if flavored(c)] if (portable is not None and keep_all) else (comps if portable is not None else [])
