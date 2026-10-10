@@ -1,0 +1,19 @@
+1. NARRATOR
+2. NARRATOR
+3. MALE: Иссахар
+4. FEMALE: Ахува
+5. MALE: Зевулун
+6. FEMALE: Ахува
+7. MALE: Иссахар
+8. FEMALE: Ахува
+9. MALE: Зевулун
+10. MALE: Иссахар
+11. FEMALE: Ахува
+12. MALE: Зевулун
+13. MALE: Иссахар
+14. MALE: Зевулун
+15. FEMALE: Ахува
+16. MALE: Иссахар
+17. MALE: Зевулун
+18. FEMALE: Ахува
+19. NARRATOR

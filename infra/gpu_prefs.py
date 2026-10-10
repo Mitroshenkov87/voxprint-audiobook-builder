@@ -1,7 +1,8 @@
-"""GPU settings of this program (``state/gpu.json``): the VRAM cap and the optional fast decode path.
+"""GPU settings of this program (``state/gpu.json``): the optional VRAM cap and the optional fast decode path.
 
-* ``vram_fraction`` - share of the card's total memory narration may plan up to (0.70-0.80, default 0.75;
-  :mod:`core.vram_policy`).  Environment: ``VOXPRINT_VRAM_FRACTION`` (0.75 or 75).
+* ``vram_fraction`` - optional extra cap on the card (0.70-0.80 of the total). Off unless set
+  (:mod:`core.vram_policy` plans from free memory minus a reserve either way). Environment: ``VOXPRINT_VRAM_FRACTION``
+  (``0.75``, ``75``, or ``off``).
 * ``fast_decode`` - ``off`` (default: batched generation) or ``graphs`` (one chunk at a time through faster-qwen3-tts with
   CUDA Graphs; :mod:`core.fast_decode`).  Environment: ``VOXPRINT_FAST_DECODE``.  Off until it is benchmarked on a real PC
   (``voxprint bench``).
@@ -14,7 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from core import vram_policy
 from infra import paths
@@ -42,7 +43,10 @@ def _read() -> Dict[str, Any]:
 
 def _write(key: str, value: Any) -> None:
     data = _read()
-    data[key] = value
+    if value is None:
+        data.pop(key, None)
+    else:
+        data[key] = value
     f = _file()
     tmp = f.with_name(f.name + ".tmp")
     tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
@@ -58,15 +62,27 @@ def normalize_mode(value: object) -> str:
     return v
 
 
-def vram_fraction() -> float:
+_OFF = ("off", "none", "false", "no")
+
+
+def vram_fraction() -> Optional[float]:
+    """The optional user cap, or None when it is off (the default, and ``off`` in the environment or the file)."""
     env = os.environ.get(ENV_FRACTION, "").strip()
     if env:
+        if env.lower() in _OFF:
+            return None
         return vram_policy.clamp_fraction(env)
-    return vram_policy.clamp_fraction(_read().get("vram_fraction", vram_policy.DEFAULT_FRACTION))
+    raw = _read().get("vram_fraction", None)
+    if raw is None or (isinstance(raw, str) and raw.strip().lower() in ("", *_OFF)):
+        return None
+    return vram_policy.clamp_fraction(raw)
 
 
-def set_vram_fraction(value: object) -> float:
-    """Store the cap; values outside 70-80 % are clamped (``ValueError`` for something that is not a number)."""
+def set_vram_fraction(value: object) -> Optional[float]:
+    """Store the cap (clamped to 70-80 %), or clear it with ``off``. ``ValueError`` when ``value`` is not a number or ``off``."""
+    if isinstance(value, str) and value.strip().lower() in _OFF:
+        _write("vram_fraction", None)
+        return None
     try:
         float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError) as exc:

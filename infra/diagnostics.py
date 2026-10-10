@@ -25,6 +25,8 @@ import zipfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from core.sysmem_spill import DIAGNOSTIC_NOTE
+
 log = logging.getLogger("voxprint.diag")
 
 LOG_FILE = "voxprint.log"
@@ -213,7 +215,7 @@ def install_qt_message_handler() -> None:
 # ----------------------------------------------------------------------------------------------- system information
 def gpu_info(import_torch: bool = True) -> Dict[str, object]:
     """GPU name, VRAM, CUDA (torch) and the NVIDIA driver version; empty fields when unknown."""
-    out: Dict[str, object] = {"cuda_available": False}
+    out: Dict[str, object] = {"cuda_available": False, "sysmem_fallback": DIAGNOSTIC_NOTE}
     torch = sys.modules.get("torch")
     if torch is None and import_torch:
         try:
@@ -325,6 +327,8 @@ def summary_lines(info: Dict[str, object]) -> List[str]:
              + (f" | driver {g.get('driver')}" if g.get("driver") else "")]
     if g.get("error"):
         lines.append(f"GPU probe error: {g['error']}")
+    if g.get("sysmem_fallback"):
+        lines.append(str(g["sysmem_fallback"]))
     v = info.get("vulkan")
     if isinstance(v, dict):
         devs = v.get("devices")

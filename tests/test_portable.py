@@ -209,6 +209,18 @@ def test_flavor_rules(monkeypatch):
     assert pt.choose_flavor(f, None) == "cpu"
     monkeypatch.setattr(pt.shutil, "which", lambda n: "nvidia-smi")
     assert pt.detect_cuda(lambda c: "| NVIDIA-SMI 570  Driver Version: 570.1  CUDA Version: 12.8 |") == (12, 8)
+
+    def fake_smi(cmd):
+        if "--query-gpu=driver_version" in cmd:
+            return "  560.35.03\n570.00"
+        return "NVIDIA-SMI 560.35  Driver Version: 560.35 |"
+
+    def broken(_cmd):
+        raise OSError("nvidia-smi")
+
+    assert pt.detect_cuda(fake_smi) == (12, 6)
+    assert pt.detect_cuda(broken) is None
+    assert pt.detect_cuda(lambda c: "551.00" if "--query-gpu=driver_version" in c else "no cuda line") is None
     assert pt.detect_vram_mb(lambda c: "24564\n8192\n") == 24564
     monkeypatch.setattr(pt.shutil, "which", lambda n: None)
     assert pt.detect_cuda() is None and pt.detect_vram_mb() == 0

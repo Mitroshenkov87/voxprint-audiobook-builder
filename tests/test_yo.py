@@ -5,6 +5,7 @@ No model is downloaded. The base TTS model is not loaded: a fake engine records 
 import gzip
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -212,8 +213,6 @@ def test_vse_context_can_be_turned_off_and_is_counted():
 
 def test_dialog_fixture_restores_every_yo_and_adds_none():
     """The 700 test dialogue: 22 yo in the reference (6 of them "vsyo"), none wrong."""
-    import re
-
     src = (FIXTURES / "dialog-ai-torah-01.txt").read_text(encoding="utf-8")
     ref = (FIXTURES / "dialog-ai-torah-01.yo-reference.txt").read_text(encoding="utf-8")
     out = yo.restore(src)
@@ -230,8 +229,6 @@ def test_dialog_fixture_restores_every_yo_and_adds_none():
 
 def test_dialog_02_restores_every_yo():
     """The build 702 dialogue (dialog-ai-torah-02): 21 yo in the reference. 702 missed "признаёт" and "твёрдо" (19/21)."""
-    import re
-
     src = (FIXTURES / "dialog-ai-torah-02.txt").read_text(encoding="utf-8")
     ref = (FIXTURES / "dialog-ai-torah-02.yo-reference.txt").read_text(encoding="utf-8")
     out = yo.restore(src)
@@ -255,3 +252,81 @@ def test_project_additions_for_present_tense_and_tvyordo():
     for src, want in cases.items():
         assert yo.restore(src) == want
     assert yo.restore("Он узнает завтра.") == "Он узнает завтра."   # perfective future stays: not in the additions
+
+
+# Prepositional case: чем / нем / всем take yo only after these prepositions.
+# "всем" after anything else (dative plural, instrumental) stays.
+PREP_YO = [
+    ("о чем", "о чём"),
+    ("О чем договорились.", "О чём договорились."),
+    ("об нем", "об нём"),
+    ("обо всем", "обо всём"),
+    ("в нем", "в нём"),
+    ("во всем", "во всём"),
+    ("при всем желании", "при всём желании"),
+    ("на нем", "на нём"),
+    ("на всем", "на всём"),
+    ("при чем тут это", "при чём тут это"),
+    ("причем", "причём"),
+    ("ни о чем", "ни о чём"),
+    ("понял, чем мы заняты.", "понял, чем мы заняты."),
+    ("больше, чем показывает.", "больше, чем показывает."),
+    ("по всем весам", "по всем весам"),
+    ("ко всем друзьям", "ко всем друзьям"),
+    ("со всем этим", "со всем этим"),
+    ("перед всем миром", "перед всем миром"),
+    ("И всем гостям рады.", "И всем гостям рады."),
+    ("зачем и совсем", "зачем и совсем"),
+    ("о чём и в нём", "о чём и в нём"),
+    ("О ЧЕМ", "О ЧЕМ"),
+]
+
+
+@pytest.mark.parametrize("src,want", PREP_YO)
+def test_prepositional_chem_nem_vsem_take_yo_only_after_a_preposition(src, want):
+    assert yo.restore(src) == want
+    assert yo.restore(want) == want
+
+
+def test_prepositional_yo_is_context_and_is_counted():
+    assert yo.restore("о чем и в нем.", context=False) == "о чем и в нем."
+    out, n = yo.restore_counted("Речь о чем и о нем.")
+    assert out == "Речь о чём и о нём." and n == 2
+
+
+def test_beret_zvezdy_and_uznaet_stay_homographs_and_their_safe_family_is_already_applied():
+    """No homograph risk was not met, so these ye spellings are not forced to yo.
+
+    берёт / берёте clash with берет (the hat) and берете; the rest of that family (берёшь, берём, берётся)
+    is already in the safe list. звёзды (and кинозвёзды, протозвёзды, суперзвёзды) clash with the genitive
+    singular звезды; the oblique plural (звёздам and the rest) is already safe. узнаёт clashes with the
+    perfective future узнает, which the additions test keeps.
+    """
+    assert yo.restore("Одна берет видеокарту.") == "Одна берет видеокарту."
+    assert yo.restore("На нем черный берет.") == "На нём чёрный берет."
+    assert yo.restore("Ты берешь, мы берем, она берется.") == "Ты берёшь, мы берём, она берётся."
+    assert yo.restore("Над садом зажглись звезды.") == "Над садом зажглись звезды."
+    assert yo.restore("Свет одной звезды.") == "Свет одной звезды."
+    assert yo.restore("к звездам и о звездах") == "к звёздам и о звёздах"
+    assert yo.restore("Он узнает завтра.") == "Он узнает завтра."
+    assert yo.restore("Ты узнаешь это.") == "Ты узнаешь это."
+
+
+def test_dialog_04_restores_yo_except_four_homographs():
+    """Dialogue 4 has 19 yo in the reference. чем / нем / всем after a preposition are restored.
+
+    The other four stay, on purpose: узнаёт (twice; perfective future is the same ye spelling),
+    берёт (the hat берет) and звёзды (genitive singular звезды). 15/19, those four documented.
+    """
+    src = (FIXTURES / "dialog-ai-torah-04.txt").read_text(encoding="utf-8")
+    ref = (FIXTURES / "dialog-ai-torah-04.yo-reference.txt").read_text(encoding="utf-8")
+    out = yo.restore(src)
+    words = re.compile(r"\w+")
+    a, b, c = words.findall(src), words.findall(ref), words.findall(out)
+    assert len(a) == len(b) == len(c)
+    yo_lo, yo_up = chr(0x0451), chr(0x0401)
+    needed = [i for i, w in enumerate(b) if yo_lo in w or yo_up in w]
+    assert len(needed) == 19
+    missed = [(a[i], b[i]) for i in needed if c[i] != b[i]]
+    assert missed == [("узнает", "узнаёт"), ("Узнает", "Узнаёт"), ("берет", "берёт"), ("звезды", "звёзды")]
+    assert [i for i, (r, o) in enumerate(zip(b, c)) if r != o and i not in set(needed)] == []

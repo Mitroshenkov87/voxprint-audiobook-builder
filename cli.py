@@ -2110,7 +2110,7 @@ SETTINGS_HELP = {
     "narration.ai_disclosure": "Speak the AI disclosure at the start (on/off)",
     "theme": "Look shared by the Voxprint programs (glass-dark)",
     "gpu": "GPU shared by the Voxprint programs: auto, cpu or cuda:N",
-    "gpu.vram_fraction": "Most of the video memory narration may plan for, 0.70-0.80 of the total",
+    "gpu.vram_fraction": "Optional cap on video memory narration may plan for, 0.70-0.80 of the total (default off)",
     "gpu.fast_decode": "Fast decode with CUDA Graphs (off/graphs; experimental, see voxprint bench)",
     **{f"narration.pause.{k}": f"Pause after a {k} in seconds (0-{pz.MAX_PAUSE_MS / 1000:g})" for k in pz.DEFAULT_LENGTHS_MS},
 }
@@ -2143,7 +2143,7 @@ def settings_values() -> dict:
         "narration.ai_disclosure": bool(ai_disclosure.load_enabled()),
         "theme": suite_settings.theme(),
         "gpu": suite_settings.gpu(),
-        "gpu.vram_fraction": gpu_prefs.vram_fraction(),
+        "gpu.vram_fraction": "off" if (frac := gpu_prefs.vram_fraction()) is None else frac,
         "gpu.fast_decode": gpu_prefs.fast_decode(),
     }
     for kind, ms in lengths.items():
@@ -2176,9 +2176,10 @@ def set_setting(key: str, value: str) -> object:
         from infra import gpu_prefs
 
         try:
-            return gpu_prefs.set_vram_fraction(value)
+            stored = gpu_prefs.set_vram_fraction(value)
         except ValueError as exc:
-            raise CliError(EXIT_BAD_ARGS, f"expected a number such as 0.75, got {value!r}") from exc
+            raise CliError(EXIT_BAD_ARGS, f"expected a number such as 0.75, or off, got {value!r}") from exc
+        return "off" if stored is None else stored
     if key == "gpu.fast_decode":
         from infra import gpu_prefs
 

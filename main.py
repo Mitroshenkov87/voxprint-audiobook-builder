@@ -347,7 +347,7 @@ def main(argv=None) -> int:
     from infra import models_users
 
     models_users.register_quietly()   # this program uses the shared models folder (models\.users.json)
-    models_users.register_runtime_quietly()
+    models_users.register_runtime_quietly()   # runtime\.users.json, created here on the first GUI start
     from infra import suite_settings
 
     suite_settings.migrate_quietly()  # earlier choices (models folder, UI language) into the shared state\suite.json
