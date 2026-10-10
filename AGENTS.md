@@ -26,3 +26,10 @@ Windows (Inno Setup, online/full/thin) and the Linux package: see [docs/BUILDING
 * **Keep the README short** (about one screen per section); put details into `docs/` and link them. English in code, comments and docs.
 * **Reusable parts** are only a few large pieces (the yo normaliser, speaker marking, the resumable model downloader; the exe-patch applier when that file exists). Each stays the one file it already lives in. The module docstring is short: what it does, a usage example, dependencies, licence, and `Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder`. Do not add a folder, a wrapper, or a behaviour change to make a piece reusable. Yo data lives in `core/data/` only. List the files in the README. Never do this for a small helper.
 * Git: `git pull --rebase` before every push; commit only your own files; never rewrite published history.
+
+## Cursor Cloud specific instructions
+* Python is 3.11 in `/opt/voxprint-venv` (the version the tests and the Windows build target). `python`, `python3`, `pip`, and `pytest` on `PATH` are wrappers for that venv. PyTorch is the CPU build 2.11.0; this machine has no NVIDIA GPU.
+* Run tests with `QT_QPA_PLATFORM=offscreen python -m pytest`. The same variable is required for `python main.py --selftest` (opens the studio and quits). `python main.py --selftest-text` checks text preparation, chunking, stub translation, and ffmpeg with no models.
+* A model-free dataset build: `python -m core.cli audio.wav text.txt --out dataset --fake-aligner` (synthetic audio comes from `tests/synth.py`).
+* `tests/test_download_lingering.py::test_a_stall_after_data_is_marked_as_progressed` loses a race on this CPU: the helper writes the `.incomplete` file before the watcher records the baseline, so `progressed` stays false. Treat the rest of the suite as the environment check.
+* After a full `pytest` run the interpreter can segfault while native libraries unload (Qt, torch). The summary line is the result; a small run exits 0.
