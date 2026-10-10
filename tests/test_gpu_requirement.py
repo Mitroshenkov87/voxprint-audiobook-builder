@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -235,6 +237,7 @@ def test_windows_installer_checks_the_gpu_and_hides_the_ci_switch():
         assert next(x for x in text.splitlines() if x.startswith(f"{lang}.GpuNone=")).endswith(none)
 
 
+@pytest.mark.skipif(shutil.which("bash") is None or sys.platform == "win32", reason="bash needed (Windows bash is the WSL stub)")
 def test_linux_installer_gpu_check_and_no_cpu_option(tmp_path):
     script = str(LINUX)
     help_run = subprocess.run(["bash", script, "--help"], capture_output=True, text=True)
