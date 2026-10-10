@@ -23,7 +23,7 @@ import struct
 import unicodedata
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
 from core.book_parsers import Book, Chapter
 from core.errors import BookParseError
@@ -46,7 +46,7 @@ _ATTR_ONE = re.compile(r'([a-z][a-z0-9_]*)="([^"<>]*)"')
 _CONF = re.compile(r"^(?:0(?:\.\d{1,2})?|1(?:\.0{1,2})?)$")
 
 
-def _fail(detail: str) -> None:
+def _fail(detail: str) -> NoReturn:
     """Raise a book error. ``detail`` is English and is shown inside the translated message."""
     raise BookParseError(tr("err.vxbook", detail=detail), details=detail)
 

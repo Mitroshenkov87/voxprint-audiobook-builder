@@ -192,6 +192,16 @@ def _enforce_limits(cues: List[Cue], warnings: List[str]) -> List[Cue]:
     return sorted(kept, key=lambda c: (c.start_paragraph, c.id))
 
 
+def _as_dict(value: Any) -> Dict[Any, Any]:
+    """``value`` when it is a dict, else an empty dict (JSON from a book is untrusted)."""
+    return value if isinstance(value, dict) else {}
+
+
+def _as_list(value: Any) -> List[Any]:
+    """``value`` when it is a list, else an empty list."""
+    return value if isinstance(value, list) else []
+
+
 def plan_for(book: Book) -> Optional[SoundPlan]:
     """The mix for ``book``, or None when the soundscape must not run.
 
@@ -210,7 +220,7 @@ def plan_for(book: Book) -> Optional[SoundPlan]:
     if major != "1":
         _warn(warnings, f"sound extension version {version or '(missing)'} is not supported")
         return None
-    cast = book.sound_cast_document if isinstance(book.sound_cast_document, dict) else {}
+    cast = _as_dict(book.sound_cast_document)
     if cast.get("enabled") is False:
         _warn(warnings, "sound-cast.json turns the soundscape off for this book")
         return None
@@ -218,7 +228,7 @@ def plan_for(book: Book) -> Optional[SoundPlan]:
     if master is None:
         _warn(warnings, "master gain was ignored")
         master = 0.0
-    defaults = doc.get("defaults") if isinstance(doc.get("defaults"), dict) else {}
+    defaults = _as_dict(doc.get("defaults"))
     gains = dict(DEFAULT_GAINS)
     for key, kind in (("bed_gain_db", "bed"), ("accent_gain_db", "accent"),
                       ("sfx_gain_db", "sfx"), ("transition_gain_db", "transition")):
@@ -233,12 +243,12 @@ def plan_for(book: Book) -> Optional[SoundPlan]:
         duck_default = DEFAULT_DUCK_DB
     paras = _paragraphs(book)
     by_index = {row[0]: row for row in paras}
-    raw_cues = doc.get("cues") if isinstance(doc.get("cues"), list) else []
-    overrides = cast.get("cues") if isinstance(cast.get("cues"), dict) else {}
+    raw_cues = _as_list(doc.get("cues"))
+    overrides = _as_dict(cast.get("cues"))
     for key in overrides:
         if not any(isinstance(row, dict) and row.get("id") == key for row in raw_cues):
             _warn(warnings, f"sound-cast override {key} does not match a cue and was dropped")
-    scenes = doc.get("scenes") if isinstance(doc.get("scenes"), list) else []
+    scenes = _as_list(doc.get("scenes"))
     for scene in scenes:
         if isinstance(scene, dict) and scene.get("mood") not in MOODS and scene.get("mood") is not None:
             _warn(warnings, f"scene {scene.get('id')} has an unknown mood and is treated as neutral")
@@ -249,7 +259,7 @@ def plan_for(book: Book) -> Optional[SoundPlan]:
         if not isinstance(row, dict):
             continue
         cid = row.get("id")
-        kind = row.get("kind")
+        kind = str(row.get("kind") or "")
         if not isinstance(cid, str) or not _CUE_ID.match(cid) or cid in seen:
             _warn(warnings, f"cue {cid!r} dropped: bad or repeated id")
             continue
@@ -265,7 +275,7 @@ def plan_for(book: Book) -> Optional[SoundPlan]:
         start = _reanchor(paras, chapter, row.get("start_paragraph"), str(row.get("para_fp") or ""), cid, warnings)
         if start is None:
             continue
-        end = start
+        end: Optional[int] = start
         layer = ""
         if kind == "bed":
             layer = str(row.get("layer") or "")
@@ -300,7 +310,7 @@ def plan_for(book: Book) -> Optional[SoundPlan]:
         if conf is None:
             conf = 0.0
         cue = Cue(
-            id=cid, kind=kind, prompt=prompt.strip(), start_paragraph=start, end_paragraph=end,
+            id=cid, kind=kind, prompt=prompt.strip(), start_paragraph=start, end_paragraph=start if end is None else end,
             chapter_index=by_index[start][2], gain_db=gain, duck_db=float(duck), position=position,
             at_text=at_text, layer=layer, loop=bool(row.get("loop", True)),
             fade_in_ms=int(_num(row.get("fade_in_ms"), 0, 60000, DEFAULT_FADE_IN_MS) or DEFAULT_FADE_IN_MS),

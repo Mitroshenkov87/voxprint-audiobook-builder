@@ -191,7 +191,7 @@ def generate(prompt: str, seconds: float, sample_rate: int, kind: str) -> np.nda
     if not generation_allowed():
         raise SoundscapeModelError("not enough free video memory for ACE-Step")
     try:
-        import acestep  # type: ignore[import-not-found]
+        import acestep
     except ImportError as exc:
         raise SoundscapeModelError("the ACE-Step package is not installed") from exc
     pipeline = getattr(acestep, "pipeline", None)

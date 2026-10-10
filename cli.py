@@ -1051,12 +1051,12 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
             for key in list(pinned):
                 if key.casefold() == who.casefold() or key.casefold() == canon.casefold():
                     pinned[key] = rec.id
-        for vid in set(pinned.values()):
+        for cast_id in set(pinned.values()):
             try:
-                resolve_voice(library, vid)
+                resolve_voice(library, cast_id)
             except CliError as exc:
                 raise CliError(
-                    EXIT_INPUT, f"cast voice not found: {vid}",
+                    EXIT_INPUT, f"cast voice not found: {cast_id}",
                     hint="Install that voice, or override it with --character Name=voice. "
                          "voxprint voices list --json",
                 ) from exc
@@ -1110,12 +1110,12 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
                  "--speakers --out ./audiobooks",
         )
     extra = {}
-    for rec in [*recs.values(), *characters.values()]:
-        if rec is not None and rec.id != narrator.id:
-            extra[rec.id] = rec
-    for vid in pinned.values():
-        if vid and vid != narrator.id and vid not in extra:
-            extra[vid] = resolve_voice(library, vid)
+    for maybe in [*recs.values(), *characters.values()]:
+        if maybe is not None and maybe.id != narrator.id:
+            extra[maybe.id] = maybe
+    for pinned_id in pinned.values():
+        if pinned_id and pinned_id != narrator.id and pinned_id not in extra:
+            extra[pinned_id] = resolve_voice(library, pinned_id)
     return speaker_cast, extra
 
 
