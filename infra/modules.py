@@ -455,7 +455,8 @@ def activate() -> Optional[Path]:
     """Put the runtime folder on ``sys.path`` (after the updater's ``packages`` overlay).  Safe to call repeatedly."""
     rd = paths.app_home() / "runtime"
     try:
-        if rd.is_dir() and any(p.name != "reuse.json" for p in rd.iterdir()):
+        # reuse.json and .users.json are bookkeeping. A users file alone must not put this folder on the import path.
+        if rd.is_dir() and any(p.name not in ("reuse.json", ".users.json") for p in rd.iterdir()):
             sp = str(rd)
             if sp not in sys.path:
                 sys.path.insert(1 if sys.path and sys.path[0] == str(paths.packages_dir()) else 0, sp)

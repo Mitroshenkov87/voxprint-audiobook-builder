@@ -5,6 +5,10 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Added
+- **Splash easter egg.** Six clicks within two seconds on the start-up splash show `assets/easter-egg.jpg` with the caption `easter_egg.caption` ("Кури ушную серу!", kept in Russian in every UI language) for three seconds or until another click, once per launch. Loading continues under the picture; if the main window is ready, the splash stays only until the picture closes. The picture is original generated artwork and not a real person's likeness (`assets/ICON-LICENSE.txt`).
+- **Runtime users file on every GUI start.** `<app home>\runtime\.users.json` is created at the first GUI start and receives the `audiobook-builder` key (same helper and format as `models\.users.json`). A later start that already has the key does not rewrite the file.
+
 ### Changed
 - **NVIDIA driver without a CUDA version line.** When `nvidia-smi` prints no `CUDA Version` or `CUDA UMD Version`, the driver version is used: 570 and newer count as CUDA 12.8 (`cu128`), 560-569 as CUDA 12.6 (`cu126`), and anything older as the CPU build. A probe error stays on CPU.
 - **The Windows installer refuses systems older than Windows 11 24H2** (build 26100), in English, Russian and German. It no longer asks whether to continue. The Linux installer prints a warning when the distribution's release year is before 2025 and continues.

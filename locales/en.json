@@ -797,6 +797,7 @@
  "train.checks_options": "Checks and clip options",
  "splash.loading_ui": "Loading interface…",
  "splash.checking": "Checking components…",
+ "easter_egg.caption": "Кури ушную серу!",
  "modules.try_latest": "Try the latest component versions (falls back to the verified ones if a download fails)",
  "modules.updates": "Updates available: {names} (about {size}; version {old} → {new}).",
  "modules.offer_all": "Quick setup: nothing has been downloaded yet. Press Download to get all components and models, including the optional ones (about {size} in total). Nothing starts without this click.",

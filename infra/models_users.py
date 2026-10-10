@@ -13,8 +13,9 @@ with the Movie Dubber (its ``dubber/infra/model_store.py`` reads and writes the 
   FILE gets two lines, the number of OTHER programs still using the folder and the folder itself.  Only when that number is
   0 does the uninstaller offer to delete the models, and the default answer is "keep" (a silent uninstall keeps them).
 * The same file format is used for the runtime folder (``<app home>/runtime/.users.json``, :func:`runtime_root`):
-  ``--register-runtime-user`` / ``--unregister-runtime-user --out FILE``.  Only the bookkeeping exists so far; the runtime
-  is not shared between the programs yet.
+  ``--register-runtime-user`` / ``--unregister-runtime-user --out FILE``.  A GUI start always writes our key, so the file
+  exists after the first launch (the folder is created then).  Only the bookkeeping exists so far; the runtime is not
+  shared between the programs yet.
 * Unknown keys are kept as they are; a damaged file counts as "no users" for reading and is rewritten on the next write.
 
 Stdlib only; nothing here may fail the start of the app.
@@ -111,10 +112,9 @@ def register_quietly(root: Optional[Path] = None) -> None:
 
 
 def register_runtime_quietly() -> None:
-    """Add our key to ``runtime/.users.json`` when this install has a runtime folder (thin builds); never raises."""
+    """Add our key to ``<app home>/runtime/.users.json`` (created on the first GUI start); never raises."""
     try:
-        if runtime_root().is_dir():
-            register(root=runtime_root())
+        register(root=runtime_root())
     except Exception as exc:  # noqa: BLE001
         log.warning("runtime users file not updated: %s", exc)
 
