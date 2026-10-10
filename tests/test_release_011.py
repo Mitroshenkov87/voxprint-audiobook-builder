@@ -136,13 +136,13 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     # Runs 41-44 published nothing. Offset 655: run 45 stamped 700 (Kaporet). Run 46 failed before publishing;
     # offset 654: run 47 stamped 701 (Shalem), run 48 stamped 702 (Shelishi), run 49 stamped 703 (Toledot),
     # run 50 failed before publishing; offset 653: run 51 stamps 704 (Achim).
-    # Offset 947: the next build-installer run (52) stamps 999 (Nachon, 1.0.0-rc).
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "52"}) == 999 and bn.build_number({}) == 0
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "51"}) == 998
+    # Run 52 failed before publishing; offset 946: run 53 stamps 999 (Nachon, 1.0.0-rc).
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "53"}) == 999 and bn.build_number({}) == 0
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "52"}) == 998
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34"}) == 700
-    assert bn.info()["offset"] == 947
+    assert bn.info()["offset"] == 946
     note = bn.info()["offset_note"]
-    assert "947" in note and "run 52" in note and "999 minus the next run number" in note
+    assert "946" in note and "run 53" in note and "Nachon" in note
     name = bn.info()["codename"]
     assert name == "Nachon" and name.isascii() and name.isalpha()
     from pathlib import Path
