@@ -8,8 +8,7 @@ The longer guide, with JSON fields and exit codes, is [CLI.md](../CLI.md).
 
 ```text
 usage: voxprint [-h] [--json] [--yes] [--dry-run] [--version]
-                {narrate,train,voices,diag,status,capabilities,backup,restore,models,revoice,speakers,check,repair,prepare,translate,settings,bench}
-                ...
+                {narrate,train,voices,diag,status,capabilities,backup,restore,models,revoice,speakers,check,repair,prepare,translate,settings,bench} ...
 
 Voxprint AI Audiobook Builder - headless CLI for scripts and agents. Every command is non-interactive. Guide: docs/AGENTS.md.
 

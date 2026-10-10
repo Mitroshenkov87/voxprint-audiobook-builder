@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
@@ -146,8 +147,18 @@ def _subparsers(parser: argparse.ArgumentParser) -> List[Tuple[List[str], argpar
     return found
 
 
+def _stabilize_help(text: str) -> str:
+    """Join a usage ellipsis onto the choice list.
+
+    Python 3.12 wraps the ``...`` of a subparser onto its own line. Python 3.14
+    keeps ``{choices} ...`` together when the line is wide enough. The page is
+    committed, so both interpreters have to emit the same text.
+    """
+    return re.sub(r"\}\n[ ]+\.\.\.(?=\n)", "} ...", text)
+
+
 def _help_block(title: str, parser: argparse.ArgumentParser, aliases: Sequence[str]) -> str:
-    text = parser.format_help().replace("```", "'''").rstrip()
+    text = _stabilize_help(parser.format_help()).replace("```", "'''").rstrip()
     alias = ""
     if aliases:
         joined = ", ".join(f"`{name}`" for name in aliases)
