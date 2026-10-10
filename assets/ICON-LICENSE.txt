@@ -25,3 +25,8 @@ Easter egg
 assets/easter-egg.jpg is original generated artwork, no real person's likeness.
 ui/splash.py shows it, with the caption easter_egg.caption, after a hidden
 click sequence on the splash.
+
+Suite action icons
+------------------
+assets/icons/ holds the save, save-as, save-copy, export and download drawings.
+See assets/icons/LICENSE.txt. They are original drawings (Apache-2.0).

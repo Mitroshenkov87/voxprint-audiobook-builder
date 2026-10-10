@@ -39,6 +39,8 @@ TOP_FILES = ["main.py", "credits.json", "requirements.txt", "requirements-verifi
 TOP_DIRS = ["core", "infra", "ui", "workers", "locales", "prompts", "licenses", "third_party"]
 EXTRA = ["assets/voxprint.png", "assets/voxprint.ico", "assets/check.png", "assets/splash.jpg", "assets/easter-egg.jpg",
          "assets/ICON-LICENSE.txt",
+         "assets/icons/save.svg", "assets/icons/save-as.svg", "assets/icons/save-copy.svg",
+         "assets/icons/export.svg", "assets/icons/download.svg", "assets/icons/LICENSE.txt",
          "installer/linux/voxprint.desktop", "installer/linux/voxprint-256.png", "installer/linux/" + SCRIPT_NAME,
          "docs/LINUX-TEST-CHECKLIST.md"]
 

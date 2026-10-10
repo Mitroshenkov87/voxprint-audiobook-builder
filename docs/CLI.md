@@ -20,10 +20,11 @@ Maintenance flags (`--selftest`, `--auto-repair`, `--modules-status`, `--install
 |---|---|
 | `--json` | Progress as JSON lines (`type: progress`, with `stage` and `percent`), then one result object (`type: result`) |
 | `--yes`, `-y` | Accepted everywhere. No command prompts |
+| `--dry-run` | Check arguments, discover inputs, check the output path and the result JSON, then exit. Does not load a model, use the GPU, or download anything. Runs on a machine with no RTX GPU |
 | `--version`, `-V` | Print version, build number and codename, then exit |
 | `--help`, `-h` | Help for the current command, with examples. `voxprint narrate --help` is the narrate page |
 
-`--json` and `--yes` may sit before the command or after it. `--version` exits before the command runs.
+`--json`, `--yes` and `--dry-run` may sit before the command or after it. `--version` exits before the command runs.
 
 A packaged `Voxprint.exe` is a windowed program. Stdout reaches a caller that redirects it (a pipe or a file). Every line is flushed. When nothing is attached, or the handle is invalid (Windows error 22, which PowerShell can leave on a windowed exe), the write is skipped and the process still exits with the command's code. It does not open a traceback window.
 
@@ -42,9 +43,11 @@ Pipeline errors that come from the UI catalogs follow `VOXPRINT_LANG` (default f
 | 4 | missing | A model or component is not installed, or its download failed |
 | 5 | gpu | Out of GPU memory |
 | 6 | cancelled | The job stopped on the cancel token. Run the same `narrate` command again to resume cached chunks |
-| 7 | gpu required | No NVIDIA GPU, or the best compute capability is below 8.9 (RTX 40-series). `--version`, `help`, `status` and `diag` still run |
+| 7 | gpu required | No NVIDIA GPU, or the best compute capability is below 8.9 (RTX 40-series). `--version`, `help`, `status`, `diag` and `--dry-run` still run |
 
 `ERROR:` goes to stderr and names a `Fix:` when there is one. With `--json`, stdout still ends with one result object (`ok: false`, `exit_code`, `error`, `hint`).
+
+`--dry-run` uses the same codes. It does not return 4, 5 or 7: a missing model and a missing GPU are reported only by a real run. A dry-run that can read the inputs and the output path exits 0. Shapes and examples: [Dry-run](#dry-run).
 
 ## Version
 
@@ -382,3 +385,64 @@ Result:
 ```
 
 `percent` is 0–100 for the whole narrate or train job, and for the current download or transcription. Lines are flushed as they are printed.
+
+## Dry-run
+
+```
+voxprint --dry-run --json narrate BOOK --voice ID --out DIR
+voxprint --dry-run --json speakers BOOK --out FILE
+voxprint --dry-run --json prepare BOOK --out FILE
+voxprint --dry-run --json translate BOOK --to LANG --out FILE
+voxprint --dry-run --json check
+voxprint --dry-run --json status
+voxprint --dry-run --json voices catalog
+voxprint --dry-run --json settings get KEY
+voxprint --dry-run --json settings set KEY VALUE
+```
+
+`--dry-run` is global. It validates argument parsing, finds the input files, recognises the book format (TXT, Markdown, FB2, FB2.ZIP, EPUB and `.vxbook`; a `.vxbook` is opened and checked as an archive), checks that the output path's parent folder exists, and prints one result object. It does not create that output, load a model, touch the GPU, or download anything. The RTX startup check is skipped, so the same command runs on a Linux machine with no NVIDIA GPU.
+
+`status` and `capabilities` print that object even without `--json`. Every other command prints it when `--json` is set. `repair` is still the `check` alias: the `command` field is `check`.
+
+Every dry-run object has these fields:
+
+| Field | Meaning |
+|---|---|
+| `type` | Always `result` |
+| `ok` | `true` when `exit_code` is 0 |
+| `command` | The command name (`narrate`, `speakers`, `prepare`, `translate`, `check`, `status`, `capabilities`, `voices catalog`, `settings`, …) |
+| `exit_code` | The process exit code |
+| `outputs` | Always `[]`. Nothing was written |
+| `warnings` | Strings. Model commands include `Dry-run does not load models, use the GPU, or download anything.` |
+| `duration_s` | Seconds spent in the check |
+| `error` | `null` on success, otherwise one sentence |
+| `hint` | `null`, or the next step |
+| `dry_run` | Always `true` |
+
+A successful command adds:
+
+| Command | Extra fields |
+|---|---|
+| `narrate` | `input` (`path`, `format`), `output` (the folder), `voice`, `formats` |
+| `speakers` | `input`, `paragraphs` (count), `planned_output` |
+| `prepare` | `input`, `planned_output`, `language`, `steps` |
+| `translate` | `input`, `source`, `target`, `planned_output` |
+| `check` | `items` (empty), `checked`, `fixed`, `failed` |
+| `status` / `capabilities` | The usual status object. `gpu.requirement.source` is `dry-run` (no GPU probe) |
+| `voices catalog` | `voices` (empty). The catalog is not fetched. Warning: `Dry-run does not fetch the voice catalog.` |
+| `settings get` / `settings set` | `key`, `value`. `set` does not write the setting |
+
+```
+voxprint --dry-run --json narrate book.txt --voice narrator --out ./audiobooks
+voxprint --dry-run --json narrate book.vxbook --voice narrator --out ./audiobooks
+voxprint --dry-run --json speakers book.txt --out marks.txt
+voxprint --dry-run --json prepare book.txt --out book.prepared.txt
+voxprint --dry-run --json translate book.txt --to ru --out book.ru.txt
+voxprint --dry-run --json check
+voxprint --dry-run status
+voxprint --dry-run --json voices catalog
+voxprint --dry-run --json settings get narration.ordinals
+voxprint --dry-run --json settings set narration.ordinals off
+```
+
+A missing book, an unreadable `.vxbook`, or an output folder that does not exist is exit code 3. An unknown `--format`, an unknown prepare step, the same language on both sides of `translate`, or an unknown setting is exit code 2. `settings set` in a dry-run returns the value that would be stored and leaves the settings files unchanged.

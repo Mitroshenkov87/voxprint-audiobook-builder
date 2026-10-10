@@ -52,6 +52,7 @@ from ui import job_dialogs
 from ui.mini_player import MiniPlayer
 from ui.speaker_dialog import SpeakerDialog
 from ui.voices_window import make_badge, make_scope_badge
+from ui.suite_icons import apply_button
 from ui.window_base import ColumnFlow, SubWindow, card_frame, fit_to_screen, hint_label
 from workers.narrate_worker import NarrateWorker, RepoDownloadWorker, RepoIndexWorker, TextModelDownloadWorker, TextModelsDownloadWorker
 from workers.narration_runner import NarrationJob, default_output_dir, format_eta, run_narration
@@ -270,6 +271,7 @@ class NarrateWindow(SubWindow):
         self.lbl_model_state.setObjectName("cardnote")
         self.lbl_model_state.setWordWrap(True)
         self.btn_model_download = QPushButton()
+        apply_button(self.btn_model_download, "download")
         mrow.addWidget(self.lbl_model_state, 1)
         mrow.addWidget(self.btn_model_download)
         v.addLayout(mrow)
@@ -302,6 +304,7 @@ class NarrateWindow(SubWindow):
         self.lbl_tr_state.setObjectName("cardnote")
         self.lbl_tr_state.setWordWrap(True)
         self.btn_tr_download = QPushButton()
+        apply_button(self.btn_tr_download, "download")
         srow.addWidget(self.lbl_tr_state, 1)
         srow.addWidget(self.btn_tr_download)
         tv.addLayout(srow)
@@ -328,6 +331,7 @@ class NarrateWindow(SubWindow):
         self.lbl_llm_state.setObjectName("cardnote")
         self.lbl_llm_state.setWordWrap(True)
         self.btn_llm_download = QPushButton()
+        apply_button(self.btn_llm_download, "download")
         lrow.addWidget(self.lbl_llm_state, 1)
         lrow.addWidget(self.btn_llm_download)
         v.addLayout(lrow)

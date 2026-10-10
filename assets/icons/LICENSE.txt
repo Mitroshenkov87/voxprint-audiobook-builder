@@ -1,0 +1,9 @@
+Suite action icons
+==================
+
+save.svg, save-as.svg, save-copy.svg, export.svg and download.svg are original
+drawings made for the Voxprint applications. Apache-2.0.
+
+Each file is a 22 by 22 px stroke icon. The stroke is currentColor, so one
+file is painted for a dark toolbar and for a light button. They are not copied
+from a third-party icon set.

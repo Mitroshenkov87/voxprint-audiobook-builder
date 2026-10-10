@@ -7,8 +7,10 @@ GUI uses (:func:`workers.narration_runner.run_narration`,
 
 Every command is non-interactive.  ``--json`` prints progress as JSON lines and a
 final result object.  ``--yes`` is accepted everywhere (nothing prompts).
+``--dry-run`` checks arguments, input files (including ``.vxbook``) and the output
+path, prints that result, and does not load a model, use the GPU, or download.
 Exit codes: 0 ok, 1 internal, 2 bad args, 3 input file, 4 missing model,
-5 GPU/OOM, 6 cancelled, 7 GPU requirement (no RTX 40-series or newer).  See ``docs/AGENTS.md``.
+5 GPU/OOM, 6 cancelled, 7 GPU requirement (no RTX 40-series or newer).  See ``docs/CLI.md``.
 
 Examples::
 
@@ -46,19 +48,21 @@ from core import ordinals
 from core import pace as pc
 from core import revoice
 from core import speakers as spk
-from core.translate import detect_book_language
+from core.translate import TranslateError, detect_book_language, route
 from core import workspace as ws
 from core import appinfo
 from core.build_stamp import read_trailer
 from infra.stdio_guard import guard_stdio, install_cli_excepthook
 from core.asr import make_default_asr
 from core.book_parsers import load_book
+from core.dry_run import DryRunFailure, check_output, existing_input, load_book_input, schema_error
 from core.book_prep import PrepPlan
-from core.text_prep import STEP_KEYS, STEP_YO, PrepOptions
+from core.text_prep import STEP_KEYS, STEP_YO, PrepOptions, resolve_language
 from core.errors import BackupError, CancelledByUser, DatasetMakerError, OutOfMemoryError_
 from core.events import CancelToken, Stage, overall_percent
 from core.narration import NarrationOptions, NarrationProgress, PauseToken
 from core import soundscape as soundscape_mod
+from core import vram_policy
 from core.voice_info import VOICE_TYPES, normalize_voice_type
 from core.voice_library import VoiceLibrary, VoiceRecord
 from infra import auto_repair
@@ -134,7 +138,7 @@ ALIASES = {
     "vc": "openvoice",
     "openvoice-v2": "openvoice",
 }
-_SKIP_FLAGS = {"--json", "--yes", "-y"}
+_SKIP_FLAGS = {"--json", "--yes", "-y", "--dry-run"}
 _ENTRY_FLAGS = {"--version", "-V", "--help", "-h"}
 
 
@@ -335,7 +339,7 @@ def _run(command: str, args, fn: Callable[[bool, float], int]) -> int:
 
 
 def _add_global_flags(parser: argparse.ArgumentParser, *, suppress: bool) -> None:
-    """``--json`` / ``--yes`` / ``--version`` on one parser.
+    """``--json`` / ``--yes`` / ``--dry-run`` / ``--version`` on one parser.
 
     Subparsers use ``default=SUPPRESS`` so a flag set on a parent parser is not reset to false.
     """
@@ -347,6 +351,11 @@ def _add_global_flags(parser: argparse.ArgumentParser, *, suppress: bool) -> Non
     parser.add_argument(
         "--yes", "-y", dest="assume_yes", action="store_true", default=default,
         help="Accept confirmations. Every command is already non-interactive; this flag is always safe",
+    )
+    parser.add_argument(
+        "--dry-run", dest="dry_run", action="store_true", default=default,
+        help="Check arguments, input files and the output path, then print the result and exit. "
+             "Does not load models, use the GPU, or download anything. Works without an RTX GPU",
     )
     parser.add_argument(
         "--version", "-V", dest="show_version", action="store_true", default=default,
@@ -403,6 +412,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint prepare book.txt --out book.prepared.txt --json\n"
             "  voxprint translate book.txt --to ru --out book.ru.txt --json\n"
             "  voxprint settings list --json\n"
+            "  voxprint status --dry-run --json\n"
             "  voxprint diag --out report.zip\n"
             "  voxprint backup --out E:\\ --json\n"
             "  voxprint restore --from E:\\ --json\n"
@@ -417,6 +427,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             "Examples:\n"
             "  voxprint narrate book.epub --voice my-voice --out ./audiobooks\n"
+            "  voxprint narrate book.vxbook --voice narrator --out ./audiobooks --dry-run --json\n"
             "  voxprint narrate book.fb2 --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json\n"
             "  voxprint narrate book.txt --voice my-voice --out ./audiobooks --pauses --ai-disclosure\n"
             "  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json\n"
@@ -2208,8 +2219,12 @@ def settings_values() -> dict:
     return out
 
 
-def set_setting(key: str, value: str) -> object:
-    """Validate and save one setting; returns the stored value."""
+def set_setting(key: str, value: str, *, persist: bool = True) -> object:
+    """Validate and save one setting; returns the stored value.
+
+    ``persist=False`` returns the value that would be stored and writes nothing.
+    Turning the soundscape on does not download its model in that mode.
+    """
     from core import ai_disclosure, i18n
 
     if key not in SETTINGS_HELP:
@@ -2221,10 +2236,21 @@ def set_setting(key: str, value: str) -> object:
         code = i18n.normalize_code(value)
         if code is None:
             raise CliError(EXIT_BAD_ARGS, f"unsupported language {value!r}", hint="Choose en, de, ru, uk or lv")
+        if not persist:
+            return code
         return i18n.set_language(code, persist=True)
     if key in ("theme", "gpu"):
         from infra import suite_settings
 
+        if not persist:
+            if key == "theme":
+                if not str(value).strip():
+                    raise CliError(EXIT_BAD_ARGS, f"invalid theme {value!r}")
+                return str(value).strip()
+            stored = suite_settings.normalize_gpu(value)
+            if stored is None:
+                raise CliError(EXIT_BAD_ARGS, f"gpu must be auto or cuda:N, got {value!r}")
+            return stored
         try:
             return suite_settings.set_value(key, value)
         except ValueError as exc:
@@ -2232,6 +2258,14 @@ def set_setting(key: str, value: str) -> object:
     if key == "gpu.vram_fraction":
         from infra import gpu_prefs
 
+        if not persist:
+            if str(value).strip().lower() in ("off", "none", "false", "no"):
+                return "off"
+            try:
+                float(value)
+            except (TypeError, ValueError) as exc:
+                raise CliError(EXIT_BAD_ARGS, f"expected a number such as 0.75, or off, got {value!r}") from exc
+            return vram_policy.clamp_fraction(value)
         try:
             stored = gpu_prefs.set_vram_fraction(value)
         except ValueError as exc:
@@ -2240,6 +2274,11 @@ def set_setting(key: str, value: str) -> object:
     if key == "gpu.fast_decode":
         from infra import gpu_prefs
 
+        if not persist:
+            try:
+                return gpu_prefs.normalize_mode(value)
+            except ValueError as exc:
+                raise CliError(EXIT_BAD_ARGS, f"gpu.fast_decode must be off or graphs, got {value!r}") from exc
         try:
             return gpu_prefs.set_fast_decode(value)
         except ValueError as exc:
@@ -2248,6 +2287,8 @@ def set_setting(key: str, value: str) -> object:
         folder = Path(value).expanduser()
         if not folder.is_absolute():
             raise CliError(EXIT_BAD_ARGS, "projects.folder needs an absolute path")
+        if not persist:
+            return str(folder)
         folder.mkdir(parents=True, exist_ok=True)
         ws.save_folder(folder)
         return str(folder)
@@ -2265,22 +2306,28 @@ def set_setting(key: str, value: str) -> object:
             if value not in pc.STYLES:
                 raise CliError(EXIT_BAD_ARGS, f"narration.style must be one of {', '.join(pc.STYLES)}")
             pace.style = value
-        pc.save(pc.Pace(pace.speed, pace.style))
+        if persist:
+            pc.save(pc.Pace(pace.speed, pace.style))
         return pace.speed if key == "narration.speed" else pace.style
     if key == "narration.pauses":
         on = _parse_bool(value)
-        pz.save_enabled(on)
+        if persist:
+            pz.save_enabled(on)
         return on
     if key == "narration.ordinals":
         on = _parse_bool(value)
-        ordinals.save_enabled(on)
+        if persist:
+            ordinals.save_enabled(on)
         return on
     if key == "narration.ai_disclosure":
         on = _parse_bool(value)
-        ai_disclosure.save_enabled(on)
+        if persist:
+            ai_disclosure.save_enabled(on)
         return on
     if key == "narration.soundscape":
         on = _parse_bool(value)
+        if not persist:
+            return on
         if on:
             soundscape_model.enable()
         else:
@@ -2293,10 +2340,12 @@ def set_setting(key: str, value: str) -> object:
         raise CliError(EXIT_BAD_ARGS, f"expected seconds, got {value!r}") from exc
     if not 0 <= sec <= pz.MAX_PAUSE_MS / 1000:
         raise CliError(EXIT_BAD_ARGS, f"{key} must be 0-{pz.MAX_PAUSE_MS / 1000:g} seconds")
-    lengths = pz.load_lengths().to_dict()
-    lengths[kind] = round(sec * 1000)
-    pz.save_lengths(pz.PauseLengths.from_dict(lengths))
-    return round(lengths[kind] / 1000.0, 3)
+    ms = round(sec * 1000)
+    if persist:
+        lengths = pz.load_lengths().to_dict()
+        lengths[kind] = ms
+        pz.save_lengths(pz.PauseLengths.from_dict(lengths))
+    return round(ms / 1000.0, 3)
 
 
 def cmd_bench(args: argparse.Namespace, *, library: Optional[VoiceLibrary] = None,
@@ -2374,6 +2423,272 @@ def cmd_settings(args: argparse.Namespace) -> int:
     return _run("settings", args, body)
 
 
+_DRY_COMMAND = {
+    "narrate": "narrate",
+    "train": "train",
+    "voices_list": "voices list",
+    "voices_export": "voices export",
+    "voices_catalog": "voices catalog",
+    "voices_download": "voices download",
+    "diag": "diag",
+    "status": "status",
+    "models_list": "models list",
+    "models_download": "models download",
+    "revoice": "revoice",
+    "speakers": "speakers",
+    "check": "check",
+    "prepare": "prepare",
+    "translate": "translate",
+    "settings": "settings",
+    "bench": "bench",
+    "backup": "backup",
+    "restore": "restore",
+}
+_DRY_MODEL_WARNING = "Dry-run does not load models, use the GPU, or download anything."
+_STATUS_KEYS = (
+    "version", "build", "codename", "platform", "gpu", "voices", "formats", "modules", "runtime",
+)
+
+
+def _dry_command_name(args: argparse.Namespace) -> str:
+    handler = str(getattr(args, "_handler", "") or "")
+    if handler == "status":
+        return str(getattr(args, "command", None) or "status")
+    return _DRY_COMMAND.get(handler, handler or "unknown")
+
+
+def _dry_payload(command: str, *, ok: bool, code: int, started: float, error=None, hint=None,
+                 warnings=None, extra=None) -> dict:
+    payload = {
+        "type": "result",
+        "ok": ok,
+        "command": command,
+        "exit_code": int(code),
+        "outputs": [],
+        "warnings": list(warnings or []),
+        "duration_s": round(time.perf_counter() - started, 3),
+        "error": error,
+        "hint": hint,
+        "dry_run": True,
+    }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
+def _finish_dry(args: argparse.Namespace, payload: dict, *, extra_keys=(), human=()) -> int:
+    """Print one result object (always for status) and return its exit code."""
+    problem = schema_error(payload, extra_keys if payload.get("ok") else ())
+    if problem:
+        payload = _dry_payload(
+            str(payload.get("command") or ""), ok=False, code=EXIT_INTERNAL, started=time.perf_counter(),
+            error=problem, hint="See docs/CLI.md",
+        )
+    json_mode = bool(getattr(args, "json_output", False)) or payload["command"] in ("status", "capabilities")
+    if json_mode:
+        _write_stream(sys.stdout, json.dumps(payload, ensure_ascii=False))
+    elif human:
+        for line in human:
+            _write_stream(sys.stdout, line)
+    else:
+        state = "ok" if payload["ok"] else "failed"
+        _write_stream(sys.stdout, f"dry-run {state}: {payload['command']}")
+    if not payload["ok"]:
+        _write_stream(sys.stderr, f"ERROR: {payload['error']}")
+        if payload.get("hint"):
+            _write_stream(sys.stderr, f"Fix: {payload['hint']}")
+    return int(payload["exit_code"])
+
+
+def _dry_status_extra() -> dict:
+    """The status object without probing the GPU or loading a model."""
+    info = version_payload()
+    requirement = {
+        "ok": False,
+        "min_compute": "8.9",
+        "detected": "none",
+        "compute_cap": None,
+        "source": "dry-run",
+        "override": False,
+    }
+    return {
+        "version": info["version"],
+        "build": info["build"],
+        "codename": info["codename"],
+        "platform": sys.platform,
+        "gpu": {
+            "cuda_available": False,
+            "name": None,
+            "vram_total_gb": None,
+            "vram_free_gb": None,
+            "torch": None,
+            "driver": None,
+            "requirement": requirement,
+        },
+        "voices": [_voice_payload(v) for v in VoiceLibrary().list_voices()],
+        "formats": list(ex.ALL_FORMATS),
+        "format_aliases": dict(FORMAT_ALIASES),
+        "modules": module_catalog(),
+        "runtime": _runtime_status(),
+    }
+
+
+def _dry_body(args: argparse.Namespace, handler: str):
+    """``(extra fields, required keys, warnings, human lines)`` for one dry-run. Raises on a bad input."""
+    if handler == "narrate":
+        formats = sorted(parse_formats(args.formats))
+        _book, fmt = load_book_input(Path(args.book))
+        output = check_output(Path(args.out), kind="dir")
+        extra = {
+            "input": {"path": str(Path(args.book)), "format": fmt},
+            "output": output,
+            "voice": args.voice,
+            "formats": formats,
+        }
+        return extra, ("input", "output", "voice", "formats"), [_DRY_MODEL_WARNING], [
+            f"dry-run narrate {fmt}: {args.book} -> {output}",
+        ]
+    if handler == "speakers":
+        book, fmt = load_book_input(Path(args.book))
+        paragraphs = [text for _ci, text in spk.paragraphs(book)]
+        if not paragraphs:
+            raise DryRunFailure(EXIT_INPUT, "book has no paragraphs",
+                                hint="The file needs at least one paragraph of text.")
+        planned = check_output(Path(args.out), kind="file")
+        extra = {
+            "input": {"path": str(Path(args.book)), "format": fmt},
+            "paragraphs": len(paragraphs),
+            "planned_output": planned,
+        }
+        return extra, ("input", "paragraphs", "planned_output"), [_DRY_MODEL_WARNING], [
+            f"dry-run speakers: {len(paragraphs)} paragraphs -> {planned}",
+        ]
+    if handler == "prepare":
+        steps = sorted(_prep_steps(args))
+        book, fmt = load_book_input(Path(args.book))
+        language = resolve_language(book, getattr(args, "language", "") or "")
+        planned = check_output(Path(args.out), kind="file")
+        extra = {
+            "input": {"path": str(Path(args.book)), "format": fmt},
+            "planned_output": planned,
+            "language": language,
+            "steps": steps,
+        }
+        return extra, ("input", "planned_output", "language", "steps"), [_DRY_MODEL_WARNING], [
+            f"dry-run prepare {fmt} -> {planned}",
+        ]
+    if handler == "translate":
+        book, fmt = load_book_input(Path(args.book))
+        target = args.to
+        source = args.source or detect_book_language(book)
+        if not source:
+            raise DryRunFailure(EXIT_INPUT, "the book language could not be detected",
+                                hint="Pass --from en|ru|de|uk")
+        if source == target:
+            raise CliError(EXIT_BAD_ARGS, f"the book is already in {target}", hint="Choose another --to language.")
+        try:
+            route(source, target)
+        except TranslateError as exc:
+            raise CliError(EXIT_BAD_ARGS, f"unsupported language pair {source} -> {target}",
+                           hint="Supported: en, ru, de (and uk as a source).") from exc
+        planned = check_output(Path(args.out), kind="file")
+        extra = {
+            "input": {"path": str(Path(args.book)), "format": fmt},
+            "source": source,
+            "target": target,
+            "planned_output": planned,
+        }
+        return extra, ("input", "source", "target", "planned_output"), [_DRY_MODEL_WARNING], [
+            f"dry-run translate {source} -> {target}: {planned}",
+        ]
+    if handler == "check":
+        extra = {"items": [], "checked": 0, "fixed": 0, "failed": 0}
+        return extra, ("items", "checked", "fixed", "failed"), [_DRY_MODEL_WARNING], [
+            "dry-run check: no files were read or changed",
+        ]
+    if handler == "status":
+        return _dry_status_extra(), _STATUS_KEYS, [], ["dry-run status"]
+    if handler == "voices_catalog":
+        return {"voices": []}, ("voices",), ["Dry-run does not fetch the voice catalog."], ["dry-run voices catalog"]
+    if handler == "settings":
+        action = args.settings_action
+        if action == "list":
+            values = settings_values()
+            return {"settings": values}, ("settings",), [], [f"{k} = {v}" for k, v in values.items()]
+        key = args.key
+        if key not in SETTINGS_HELP:
+            raise CliError(EXIT_BAD_ARGS, f"unknown setting {key!r}", hint="voxprint settings list")
+        if action == "get":
+            value = settings_values()[key]
+            return {"key": key, "value": value}, ("key", "value"), [], [str(value)]
+        stored = set_setting(key, args.value, persist=False)
+        return {"key": key, "value": stored}, ("key", "value"), [], [f"{key} = {stored}"]
+    if handler == "models_download":
+        key = canonical_module(args.module)
+        return {"module": key, "downloaded": False}, ("module", "downloaded"), [_DRY_MODEL_WARNING], [
+            f"dry-run models download {key}",
+        ]
+    if handler == "models_list":
+        return {"modules": module_catalog()}, ("modules",), [], ["dry-run models list"]
+    if handler == "voices_list":
+        rows = [_voice_payload(v) for v in VoiceLibrary().list_voices()]
+        return {"voices": rows}, ("voices",), [], ["dry-run voices list"]
+    if handler == "voices_export":
+        resolve_voice(VoiceLibrary(), args.voice)
+        planned = check_output(Path(args.out), kind="file")
+        return {"planned_output": planned}, ("planned_output",), [_DRY_MODEL_WARNING], [
+            f"dry-run voices export -> {planned}",
+        ]
+    if handler == "voices_download":
+        return {"voice": args.voice, "downloaded": False}, ("voice", "downloaded"), [
+            "Dry-run does not fetch or download voices.",
+        ], [f"dry-run voices download {args.voice}"]
+    if handler == "revoice":
+        files = _expand_audio(list(args.audio))
+        output = check_output(Path(args.out), kind="dir") if args.out else ""
+        return {"inputs": [str(p) for p in files], "output": output}, (), [_DRY_MODEL_WARNING], [
+            f"dry-run revoice: {len(files)} file(s)",
+        ]
+    if handler == "train":
+        existing_input(Path(args.audio), "audio")
+        if args.text is not None:
+            existing_input(Path(args.text), "text")
+        output = check_output(Path(args.out), kind="dir") if args.out else ""
+        return {"output": output}, (), [_DRY_MODEL_WARNING], ["dry-run train"]
+    if handler == "backup":
+        output = check_output(Path(args.out), kind="dir")
+        return {"output": output}, (), [_DRY_MODEL_WARNING], [f"dry-run backup -> {output}"]
+    if handler == "restore":
+        source = existing_input(Path(args.src), "backup")
+        return {"source": source}, (), [_DRY_MODEL_WARNING], [f"dry-run restore from {source}"]
+    if handler == "diag":
+        planned = check_output(Path(args.out), kind="file") if args.out else ""
+        return {"planned_output": planned}, (), [], ["dry-run diag"]
+    if handler == "bench":
+        output = check_output(Path(args.out), kind="dir") if args.out else ""
+        return {"output": output}, (), [_DRY_MODEL_WARNING], ["dry-run bench"]
+    raise CliError(EXIT_BAD_ARGS, f"unknown command: {handler}", hint="See: voxprint --help")
+
+
+def run_dry(args: argparse.Namespace) -> int:
+    """Validate ``args`` and print the result JSON. Does not call the command's runner."""
+    started = time.perf_counter()
+    command = _dry_command_name(args)
+    handler = str(getattr(args, "_handler", "") or "")
+    try:
+        extra, keys, warnings, human = _dry_body(args, handler)
+    except DryRunFailure as exc:
+        payload = _dry_payload(command, ok=False, code=exc.code, started=started,
+                               error=exc.message, hint=exc.hint or None)
+        return _finish_dry(args, payload)
+    except CliError as exc:
+        payload = _dry_payload(command, ok=False, code=exc.code, started=started,
+                               error=exc.message, hint=exc.hint or None)
+        return _finish_dry(args, payload)
+    payload = _dry_payload(command, ok=True, code=EXIT_OK, started=started, warnings=warnings, extra=extra)
+    return _finish_dry(args, payload, extra_keys=keys, human=human)
+
+
 def main(argv: Optional[Sequence[str]] = None, *,
          run_narration_fn: Callable[..., object] = run_narration,
          run_task_fn: Callable[..., object] = run_task,
@@ -2429,6 +2744,8 @@ def _dispatch(argv: Optional[Sequence[str]], *, run_narration_fn, run_task_fn, l
             )
         return int(code)
     handler = getattr(args, "_handler", "")
+    if getattr(args, "dry_run", False):
+        return run_dry(args)
     if handler == "narrate":
         return cmd_narrate(args, run_fn=run_narration_fn, library=library, plan_fn=plan_fn)
     if handler == "train":
@@ -2474,7 +2791,7 @@ def _dispatch(argv: Optional[Sequence[str]], *, run_narration_fn, run_task_fn, l
 def is_user_cli(argv: Sequence[str]) -> bool:
     """True when ``argv`` (full ``sys.argv``-style, with program name) starts a user subcommand.
 
-    Global flags (``--json``, ``--yes``, ``--version``, ``--help``) may come first.
+    Global flags (``--json``, ``--yes``, ``--dry-run``, ``--version``, ``--help``) may come first.
     Maintenance flags such as ``--selftest`` stay with ``main.py``.
     """
     rest = list(argv[1:] if argv else [])

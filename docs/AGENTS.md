@@ -285,7 +285,7 @@ Extra fields by command:
 | 4 | missing | `voxprint models download <id> --json`. The `hint` names the id when it can |
 | 5 | gpu | Free video memory and run the same command again. Check `voxprint status --json` |
 | 6 | cancelled | Run the same `narrate` again. Finished chunks are kept |
-| 7 | gpu required | This PC has no NVIDIA GeForce RTX 40-series or newer GPU (compute capability 8.9 or higher). `status` and `diag` still run and report `gpu.requirement` |
+| 7 | gpu required | This PC has no NVIDIA GeForce RTX 40-series or newer GPU (compute capability 8.9 or higher). `status` and `diag` still run and report `gpu.requirement`. `--dry-run` also runs: it checks arguments, files and the output path and does not load a model. Details: [CLI.md](CLI.md#dry-run) |
 
 ## Long jobs
 

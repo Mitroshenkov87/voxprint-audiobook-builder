@@ -163,6 +163,8 @@ def test_lightweight_commands_skip_the_gate_and_the_gui_does_not(gate):
         ["voxprint", "diagnostics"],
         ["voxprint", "--register-models-user"],
         ["voxprint", "--sync-suite-settings"],
+        ["voxprint", "narrate", "book.epub", "--dry-run"],
+        ["voxprint", "--dry-run", "narrate", "a.epub"],
     ):
         assert gate.startup_requires_gpu(argv) is False, argv
     monkey_env = os.environ.copy()

@@ -61,6 +61,7 @@ if /I "%~1"=="onedir" set MODE=--onedir
 echo === Build (%MODE%) ===
 pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --icon "assets\voxprint.ico" --add-data "assets\voxprint.ico;assets" --add-data "assets\check.png;assets" --add-data "assets\splash.jpg;assets" --add-data "assets\easter-egg.jpg;assets" ^
+  --add-data "assets\icons;assets\icons" ^
   --paths . --paths third_party ^
   --add-data "infra\verified_manifest.json;infra" --add-data "infra\assets_manifest.json;infra" --add-data "infra\model_mirrors.json;infra" --add-data "infra\model_release.json;infra" ^
   --add-data "locales;locales" --add-data "prompts;prompts" --add-data "credits.json;." --add-data "licenses;licenses" ^

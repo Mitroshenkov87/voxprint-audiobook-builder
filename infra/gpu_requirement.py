@@ -36,7 +36,7 @@ MIN_COMPUTE_TEXT = "8.9"
 ENV_ALLOW = "VOXPRINT_ALLOW_NO_GPU"
 EXIT_GPU_REQUIRED = 7
 _TRUE = {"1", "true", "yes", "on"}
-_SKIP_FLAGS = {"--json", "--yes", "-y"}
+_SKIP_FLAGS = {"--json", "--yes", "-y", "--dry-run"}
 _HELP_FLAGS = {"--help", "-h", "--version", "-V"}
 _LIGHT_COMMANDS = {"help", "status", "capabilities", "diag", "diagnostics"}
 _BOOKKEEPING = {
@@ -246,13 +246,16 @@ def enforce(*, gui: bool, dialog: Optional[Callable[[str], None]] = None, **dete
 
 
 def startup_requires_gpu(argv: Sequence[str], environ: Optional[dict] = None) -> bool:
-    """False for ``--version``, help, ``status`` / ``diagnostics``, and installer bookkeeping.
+    """False for ``--version``, help, ``status`` / ``diagnostics``, ``--dry-run``, and installer bookkeeping.
 
     ``argv`` is a full ``sys.argv`` (program name first). Other commands, including the GUI, are gated.
+    ``--dry-run`` only validates arguments and files, so it runs on a machine with no RTX GPU.
     """
     if allow_without_gpu(environ):
         return False
     args = list(argv[1:] if argv else [])
+    if any(arg == "--dry-run" for arg in args):
+        return False
     if any(arg in _BOOKKEEPING for arg in args):
         return False
     if any(arg in _HELP_FLAGS for arg in args):
