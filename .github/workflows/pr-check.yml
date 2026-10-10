@@ -93,10 +93,19 @@ jobs:
           # One process per module. A native crash must not abort the rest of the suite, and must still fail this job.
           foreach ($f in Get-ChildItem tests\test_*.py) {
             Write-Host "=== $($f.FullName) ==="
-            & .app\Scripts\python.exe -m pytest -q -p no:cacheprovider -p faulthandler --tb=line $f.FullName
-            # 5: the module collected nothing (optional imports). A crash or a failed test still fails the job.
-            if ($LASTEXITCODE -eq 5) { Write-Host "no tests collected: $($f.Name)" }
-            elseif ($LASTEXITCODE -ne 0) { $failed += $f.Name }
+            $script:recorded = $null
+            & .app\Scripts\python.exe -m pytest -q -p no:cacheprovider -p faulthandler --tb=line $f.FullName 2>&1 | ForEach-Object {
+              $line = "$_"
+              Write-Host $line
+              if ($line -match 'VOXPRINT_PYTEST_RC=(\d+)') { $script:recorded = [int]$Matches[1] }
+            }
+            # Prefer the status pytest recorded before shutdown. A Qt DLL detach on Python 3.14 can still
+            # make the process exit non-zero after a green session. No recorded status means the process
+            # died during the tests: that still fails the job. 5: nothing collected (optional imports).
+            $rc = $LASTEXITCODE
+            if ($null -ne $script:recorded) { $rc = $script:recorded }
+            if ($rc -eq 5) { Write-Host "no tests collected: $($f.Name)" }
+            elseif ($rc -ne 0) { $failed += $f.Name }
           }
           if ($failed.Count -gt 0) {
             Write-Host "Failed modules: $($failed -join ', ')"

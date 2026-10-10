@@ -4,6 +4,15 @@ import os
 from tests import conftest
 
 
+def test_ci_records_the_pytest_status_before_shutdown(monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    conftest.pytest_sessionfinish(None, 0)
+    assert "VOXPRINT_PYTEST_RC=0" in capsys.readouterr().out
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    conftest.pytest_sessionfinish(None, 1)
+    assert "VOXPRINT_PYTEST_RC" not in capsys.readouterr().out
+
+
 def test_off_ci_the_session_exits_normally(monkeypatch):
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     conftest.remember_exit_status(0)
