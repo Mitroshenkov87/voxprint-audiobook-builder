@@ -121,6 +121,7 @@ nav:
       - Template: legal/EULA-TEMPLATE.md
   - Release notes:
       - Template: RELEASE-NOTES-TEMPLATE.md
+      - 1.0.0 Tamim: RELEASE-NOTES-1001-TAMIM.md
       - 1.0.0 Chazak: RELEASE-NOTES-1000-CHAZAK.md
       - 704 Achim: RELEASE-NOTES-704-ACHIM.md
       - 703 Toledot: RELEASE-NOTES-703-TOLEDOT.md

@@ -5,6 +5,20 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+## [1.0.0-rc.3] - 2026-10-10 - build 1001 "Tamim"
+
+Codename *Tamim* (whole and complete): a build ready to be tested end to end. The version is **1.0.0-rc.3**. The release tag for this build is `v1.0.0-rc.3` (a pre-release). People see `1.0.0 RC3 · build 1001 "Tamim"`; the Windows file version is `1.0.0.1001`. The `BUILD.json` offset stays **945**: build-installer run 56 stamps build 1001 (56 + 945 = 1001). Release notes: [docs/RELEASE-NOTES-1001-TAMIM.md](docs/RELEASE-NOTES-1001-TAMIM.md).
+
+### Added
+- **Suite icons.** Save, Save as, Save a copy, Export and Download use the shared stroke drawings (`save`, `save-as`, `save-copy`, `export`, `download`) in place of the floppy-disk save picture. One drawing is painted for a dark toolbar and for a light button.
+- **`voxprint --dry-run`.** A global flag, before or after the command, checks the arguments, finds the input files, recognises the book format and checks that the output folder exists. It prints one JSON result and uses the documented exit codes. It does not load a model, use the GPU or download anything, so another program can validate a command on a machine with no NVIDIA GPU. A dry-run does not return exit codes 4, 5 or 7. See [docs/CLI.md](docs/CLI.md#dry-run).
+- **Unique codename check.** `python tools/codenames.py` reads this changelog and `docs/RELEASE-NOTES-*.md` and fails when `BUILD.json`'s codename repeats an earlier build in this repository. The same check runs in the unit tests. See [docs/RELEASING.md](docs/RELEASING.md).
+- **Public roadmap.** [ROADMAP.md](ROADMAP.md) states the near-term work and the later plans, including how models can sit across video memory, system memory and disk. There are no dates.
+- **Documentation site.** GitHub Pages ([mitroshenkov87.github.io/voxprint-audiobook-builder](https://mitroshenkov87.github.io/voxprint-audiobook-builder/)) is built with MkDocs from this repository. The command reference is generated from the argument parser, and the API pages are generated from the public docstrings. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) maps the modules and the path from a book file to audio.
+
+### Fixed
+- **Installer tests that pass, then crash on the way out.** Build-installer run 54 passed every test that needs no PyTorch, then the pytest process crashed while shutting down, and the job published nothing. The Windows test step now uses the status pytest recorded before shutdown, the same rule as pr-check. A crash during the tests still fails the job.
+
 ## [1.0.0-rc.2] - 2026-10-10 - build 1000 "Chazak"
 
 Codename *Chazak* (Biblical Hebrew *chazak*, be strong; Deuteronomy 31:6, *chazak ve'ematz*): a build that holds under load. The version is **1.0.0-rc.2**. The release tag for this build is `v1.0.0-rc.2` (a pre-release). People see `1.0.0 RC2 · build 1000 "Chazak"`; the Windows file version is `1.0.0.1000`. Build-installer run 53 published 999 Nachon. Run 54 failed in the Windows tests that need no PyTorch (every test passed, then the pytest process crashed on exit) and published nothing, so the `BUILD.json` offset is **945**: run 55 stamps build 1000 (55 + 945 = 1000). That step now uses the status pytest recorded before shutdown, as pr-check does. Release notes: [docs/RELEASE-NOTES-1000-CHAZAK.md](docs/RELEASE-NOTES-1000-CHAZAK.md).
