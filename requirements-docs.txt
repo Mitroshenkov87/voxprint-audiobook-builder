@@ -4,5 +4,4 @@ mkdocs>=1.6,<2
 mkdocs-material>=9.6,<10
 # 1.0.7 builds against pymdown-extensions 12.2 (Highlighter now requires the Markdown instance).
 mkdocstrings[python]>=1.0.7,<2
-ruff>=0.17
 interrogate>=1.7

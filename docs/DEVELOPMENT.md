@@ -44,8 +44,7 @@ On Windows, never run `uv run` without `--no-sync` (it replaces CUDA torch with 
 
 ## Code style
 * Python 3.14, type hints where they help, `from __future__ import annotations`.
-* **Documentation is part of the code.** Every module has a docstring explaining its purpose; every public function/class has a short docstring; add comments for
-  *why* something non-obvious is done (not for what the next line does). Code, comments and docstrings are **English**.
+* **Documentation is part of the code.** A module docstring says what the module is for. A public function or class gets a one-line summary; a longer note belongs only on logic that is genuinely hard to follow. Do not pad a trivial function with an Args or Returns section. The check on `core/`, `infra/`, `cli.py`, `main.py` and the main windows is interrogate at 70% of public code, not a docstring on every object. Add comments for *why* something non-obvious is done (not for what the next line does). Code, comments and docstrings are **English**.
 * Keep `core/` free of Qt and of installer logic, and keep `ui/` free of heavy work (it belongs in `workers/` or `core/`).
 * Windows-only code lives in `infra/platform_win.py` (guarded by `sys.platform`); other modules must import cleanly on Linux.
 * Errors the user can see are `DatasetMakerError` subclasses with a localized message (`tr(...)`) - never show a raw traceback in the UI.

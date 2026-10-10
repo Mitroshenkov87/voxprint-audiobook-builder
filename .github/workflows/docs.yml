@@ -1,5 +1,5 @@
 # Documentation site. Pull requests build with mkdocs --strict and fail when public
-# code has no docstring. A push to main also publishes GitHub Pages.
+# docstring coverage drops under 70%. A push to main also publishes GitHub Pages.
 #
 # Pages has to be enabled once, by the repository owner:
 # Settings -> Pages -> Build and deployment -> Source: GitHub Actions.

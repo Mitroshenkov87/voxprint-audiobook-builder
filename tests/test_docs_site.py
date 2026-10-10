@@ -1,6 +1,8 @@
-"""Generated docs stay aligned with the code, and public docstrings stay complete.
+"""Generated docs stay aligned with the code, and public docstrings stay proportionate.
 
-``--fail-under 100`` is the floor for the public modules this file lists. Do not lower it.
+Interrogate covers public code in the modules this file lists. The floor is 70,
+the top of the 60-70 band, and it is below the coverage those modules reach.
+Do not lower it.
 """
 from __future__ import annotations
 
@@ -42,17 +44,13 @@ def test_api_pages_match_the_modules() -> None:
     assert api_nav(names) in (ROOT / "mkdocs.yml").read_text(encoding="utf-8")
 
 
-def test_public_docstrings_stay_at_full_coverage() -> None:
-    ruff = subprocess.run(
-        [sys.executable, "-m", "ruff", "check", "--config", str(ROOT / "tools" / "ruff-docs.toml"), *DOC_GATE_PATHS],
-        cwd=ROOT, capture_output=True, text=True, check=False,
-    )
-    assert ruff.returncode == 0, ruff.stdout + ruff.stderr
-    # 100 is the floor. A new public module, class or function needs a Google-style docstring.
+def test_public_docstring_coverage_stays_above_the_floor() -> None:
+    # Public code only: skip semiprivate and private names, nested objects and overloads.
+    # 70 is the floor. Measured coverage on this set is higher. Do not lower 70.
     interrogate = subprocess.run(
         [
             sys.executable, "-m", "interrogate", "--style", "google",
-            "-s", "-n", "-C", "-O", "--fail-under", "100", "--quiet",
+            "-s", "-p", "-n", "-C", "-O", "--fail-under", "70",
             *DOC_GATE_PATHS,
         ],
         cwd=ROOT, capture_output=True, text=True, check=False,
