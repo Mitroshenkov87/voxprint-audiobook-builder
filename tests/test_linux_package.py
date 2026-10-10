@@ -3,6 +3,7 @@ and the menu entry.  Nothing is installed; the script is only syntax-checked and
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -106,6 +107,43 @@ def test_the_windows_downloader_installs_the_linux_component(built, tmp_path):
 
 
 @pytest.mark.skipif(shutil.which("bash") is None or sys.platform == "win32", reason="bash needed")
+def _os_release(path: Path, body: str) -> None:
+    path.write_text(body, encoding="utf-8")
+
+
+@pytest.mark.skipif(shutil.which("bash") is None or sys.platform == "win32", reason="bash needed")
+def test_old_distro_warns_and_a_current_one_does_not(tmp_path):
+    """Release year from os-release: before 2025 warns and does not change the exit code."""
+    old = tmp_path / "old"
+    new = tmp_path / "new"
+    plain = tmp_path / "plain"
+    missing = tmp_path / "missing"
+    _os_release(old, 'NAME="Ubuntu"\nVERSION_ID="24.04"\nVERSION="24.04.3 LTS (Noble Numbat)"\nPRETTY_NAME="Ubuntu 24.04.3 LTS"\n')
+    _os_release(new, 'NAME="Ubuntu"\nVERSION_ID="25.04"\nPRETTY_NAME="Ubuntu 25.04"\n')
+    _os_release(plain, 'NAME="Debian GNU/Linux"\nVERSION_ID="13"\nVERSION="13 (trixie)"\nPRETTY_NAME="Debian GNU/Linux 13 (trixie)"\n')
+    dated = tmp_path / "dated"
+    _os_release(dated, 'NAME="openSUSE Tumbleweed"\nVERSION_ID="20241001"\nPRETTY_NAME="openSUSE Tumbleweed"\n')
+
+    def check(path: Path):
+        env = dict(os.environ)
+        env["VOXPRINT_OS_RELEASE"] = str(path)
+        env["VOXPRINT_PYTHON"] = sys.executable
+        return subprocess.run(["bash", str(SCRIPT), "--check"], capture_output=True, text=True, env=env)
+
+    warned = check(old)
+    quiet = check(new)
+    undated = check(plain)
+    tumble = check(dated)
+    absent = check(missing)
+    assert "older than 2025" in warned.stderr and "Installation continues" in warned.stderr
+    assert "Ubuntu 24.04.3 LTS" in warned.stderr
+    assert "older than 2025" not in quiet.stderr
+    assert "older than 2025" not in undated.stderr          # no year in the file: best effort, no warning
+    assert "older than 2025" in tumble.stderr               # calendar year in VERSION_ID
+    assert "older than 2025" not in absent.stderr
+    assert warned.returncode == quiet.returncode == undated.returncode == tumble.returncode == absent.returncode
+
+
 def test_installer_script_syntax_and_help():
     assert subprocess.run(["bash", "-n", str(SCRIPT)], capture_output=True).returncode == 0
     r = subprocess.run(["bash", str(SCRIPT), "--help"], capture_output=True, text=True)

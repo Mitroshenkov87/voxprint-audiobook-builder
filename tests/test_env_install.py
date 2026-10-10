@@ -70,6 +70,63 @@ def test_torch_flavor_from_driver(smi, flavor):
     assert ep.torch_flavor_for_driver(ep.parse_nvidia_smi_cuda(smi)) == flavor
 
 
+def _smi_run(header, query="550.00", fail=None):
+    """Fake ``nvidia-smi``: header text, then the driver-version query. ``fail`` raises on that call."""
+    calls = []
+
+    def run(args):
+        calls.append(list(args))
+        if fail == len(calls):
+            raise OSError("nvidia-smi failed")
+        if "--query-gpu=driver_version" in args:
+            return 0, query
+        return 0, header
+
+    return run, calls
+
+
+@pytest.mark.parametrize("header,query,expect", [
+    ("NVIDIA-SMI 570.86  Driver Version: 570.86 |", "570.86.10", (12, 8)),
+    ("no cuda line here", "  560.35.03", (12, 6)),
+    ("no cuda line here", "559.99", None),
+    ("no cuda line here", "569.99\n570.1", (12, 6)),          # first line only
+    ("no cuda line here", "580.88.02", (12, 8)),
+    ("| CUDA Version: 13.0 |", "550.00", (13, 0)),            # header wins
+    ("CUDA UMD Version: 12.4", "570.00", (12, 4)),
+    ("no cuda line here", "not a version", None),
+    ("no cuda line here", "", None),
+])
+def test_driver_version_fallback_when_header_has_no_cuda_version(header, query, expect):
+    run, calls = _smi_run(header, query)
+    assert ep.detect_driver_cuda(run, lambda n: "/usr/bin/nvidia-smi" if n == "nvidia-smi" else None) == expect
+    queried = [c for c in calls if "--query-gpu=driver_version" in c]
+    if ep.parse_nvidia_smi_cuda(header):
+        assert queried == []
+    else:
+        assert queried == [["/usr/bin/nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"]]
+
+
+def test_cuda_probe_any_exception_is_none():
+    def which_boom(_name):
+        raise RuntimeError("which")
+
+    run, _ = _smi_run("no cuda line", fail=1)
+    assert ep.detect_driver_cuda(run, lambda n: "/usr/bin/nvidia-smi") is None
+    run, _ = _smi_run("no cuda line", fail=2)
+    assert ep.detect_driver_cuda(run, lambda n: "/usr/bin/nvidia-smi") is None
+    assert ep.detect_driver_cuda(lambda a: (0, "x"), which_boom) is None
+
+    def query_failed(args):
+        if "--query-gpu=driver_version" in args:
+            return 1, "570.00"
+        return 0, "no cuda line"
+
+    assert ep.detect_driver_cuda(query_failed, lambda n: "nvidia-smi") is None
+    assert ep.cuda_from_driver_version("  570.1\n") == (12, 8)
+    assert ep.cuda_from_driver_version("560.0") == (12, 6)
+    assert ep.torch_flavor_for_driver(ep.cuda_from_driver_version("555.1")) == "cpu"
+
+
 def test_torch_decisions():
     assert ep.decide_torch(None, "cu128").action == ACTION_INSTALL
     assert ep.decide_torch("2.8.0+cu128", "cu128").action == ACTION_REUSE

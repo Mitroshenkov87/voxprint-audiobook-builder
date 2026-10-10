@@ -5,6 +5,11 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Changed
+- **NVIDIA driver without a CUDA version line.** When `nvidia-smi` prints no `CUDA Version` or `CUDA UMD Version`, the driver version is used: 570 and newer count as CUDA 12.8 (`cu128`), 560-569 as CUDA 12.6 (`cu126`), and anything older as the CPU build. A probe error stays on CPU.
+- **The Windows installer refuses systems older than Windows 11 24H2** (build 26100), in English, Russian and German. It no longer asks whether to continue. The Linux installer prints a warning when the distribution's release year is before 2025 and continues.
+- **Supported systems** are current and previous year OS releases: Windows 11 24H2 and newer, and Linux distributions released from 2025. Older systems are not a goal.
+
 ## [0.2.4-beta] - 2026-10-09 - build 704 "Achim"
 
 Codename *Achim* (Biblical Hebrew *achim*, brothers; Genesis 13:8, "for we are brothers"): Voxprint AI Audiobook Builder and Voxprint AI Movie Dubber now live side by side as sibling programs that share models, settings and one Start menu folder. Build-installer run 50 failed in the Windows tests that need no PyTorch (a test used `torch.cuda` from the stand-in module) and published nothing, so the `BUILD.json` offset is **653** and run 51 stamps build 704. Full installer. Upgrade: install over 703; models, voices and settings stay.

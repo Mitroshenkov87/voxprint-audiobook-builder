@@ -55,7 +55,7 @@ def test_every_custom_message_exists_in_all_languages_and_every_use_is_defined()
 
 def test_no_russian_text_is_left_outside_the_message_table():
     t = text()
-    rest = t.replace(section("CustomMessages"), "")
+    rest = t.replace(section("CustomMessages"), "").replace(section("Messages"), "")
     code_lines = [l for l in rest.splitlines() if re.search("[А-Яа-яЁё]", l) and not l.lstrip().startswith((";", "{"))]
     assert code_lines == []
 
@@ -105,6 +105,22 @@ def test_no_desktop_shortcut_only_start_menu_and_upgrades_remove_the_old_one():
     assert "{group}\\{#AppDisplayName}" in icons and "desktop" not in icons.lower()
     deletes = section("InstallDelete")
     assert "{commondesktop}\\{#AppDisplayName}.lnk" in deletes and "{userdesktop}\\{#AppDisplayName}.lnk" in deletes
+
+
+def test_setup_refuses_windows_older_than_24h2():
+    """Build < 26100 is a hard stop, in every wizard language, with no offer to continue."""
+    t = text()
+    assert "MinVersion=10.0.26100" in section("Setup")
+    assert "WinBuildWarning" not in t and "Continue the installation" not in t
+    body = section("Code").split("function InitializeSetup")[1].split("\nend;")[0]
+    assert "V.Build < 26100" in body and "Result := False" in body and "mbError" in body
+    assert "MB_YESNO" not in body and "IDYES" not in body and "WinBuildTooOld" in body
+    for lang in LANGS:
+        custom = next(x for x in section("CustomMessages").splitlines() if x.startswith(f"{lang}.WinBuildTooOld="))
+        low = next(x for x in section("Messages").splitlines() if x.startswith(f"{lang}.WinVersionTooLowError="))
+        for line in (custom, low):
+            assert "26100" in line and "Windows 11 24H2" in line
+            assert "Windows 10" not in line and "Continue" not in line and "Продолжить" not in line
 
 
 def test_a_backup_folder_is_a_restore_source_not_the_models_folder():

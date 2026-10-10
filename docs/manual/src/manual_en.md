@@ -21,6 +21,8 @@ You need no command line, no browser and no account (a command line exists for s
 | Disk space | about 30 GB for the *Full* setup (models about 25 GB + components about 3 GB) plus about 4.2 GB if you build the optional universal model | an SSD |
 | Internet | during setup (the libraries) and once for the models (about 28 GB together with *Full*; 1.7B speech recognition on GPUs with 8 GB of video memory or more) | – |
 
+Supported systems: current and previous year OS releases (Windows 11 24H2 and newer; Linux distributions released from 2025). Older systems are not a goal.
+
 ## How it works in five steps
 
 1. Read a known text aloud and record it (5–15 minutes).

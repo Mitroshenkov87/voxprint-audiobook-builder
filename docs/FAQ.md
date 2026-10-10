@@ -11,6 +11,7 @@ The voice goes into your **voice library**; then pick a book (TXT, FB2, EPUB) an
 
 ## Which computer do I need?
 > **Requires Windows 11 (24H2 / build 26100 or newer) and an NVIDIA GPU (16 GB VRAM recommended).**
+> Supported systems: current and previous year OS releases (Windows 11 24H2 and newer; Linux distributions released from 2025). Older systems are not a goal.
 > Without an NVIDIA GPU the dataset is still created, but voice training falls back to the CPU (very slow, with a warning).
 > The code itself also runs on Linux (that is where the test-suite runs); a Linux/macOS GUI release is not a goal yet.
 
