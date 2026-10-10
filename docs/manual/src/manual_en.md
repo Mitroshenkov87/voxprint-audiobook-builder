@@ -3,7 +3,7 @@
 **Voxprint AI Audiobook Builder** ({{studio.tagline}}) is a Windows 11 application that does two things, entirely on your own computer:
 
 1. **It teaches a computer voice to sound like a particular person.** You give it a recording of a voice (yours, or of a person who has given you permission) – ideally 5 to 15 minutes – and, if you have it, the text that was read. Voxprint aligns text and sound, cuts the recording into clean pieces and trains a small voice add-on (an *adapter*, technically LoRA) for the speech model **Qwen3-TTS**.
-2. **It reads whole books aloud with that voice.** You pick a book (TXT, FB2 or EPUB) and a voice from your library, and get a finished audiobook with chapters – one Opus file, one MP3 per chapter, and so on.
+2. **It reads whole books aloud with that voice.** You pick a book (TXT, Markdown, FB2, EPUB or a Voxprint book `.vxbook`) and a voice from your library, and get a finished audiobook with chapters – one Opus file, one MP3 per chapter, and so on.
 
 You need no command line, no browser and no account (a command line exists for scripts and agents – chapter 11). Recordings, texts, voices and results stay on the computer. The program only goes online to download models, to check for updates and, if you ask for it, to download voices from the voice repository.
 
@@ -97,7 +97,7 @@ Open this window from the **{{studio.narrate_title}}** card. {{narr.intro}}
 
 | Control | What it does |
 |---|---|
-| **{{narr.choose_book}}** | Opens a file dialog. Supported: `.txt` (UTF-8 or cp1251; headings such as "Chapter 1" or "Глава 2" become chapters), `.fb2` and `.fb2.zip`, `.epub`. Title, author and cover are read when present. |
+| **{{narr.choose_book}}** | Opens a file dialog. Supported: `.txt` (UTF-8 or cp1251; headings such as "Chapter 1" or "Глава 2" become chapters), `.md`, `.fb2` and `.fb2.zip`, `.epub`, and `.vxbook` (a Voxprint book, for example from Voxprint AI Plotweaver, with its roles and cast already set). Title, author and cover are read when present. |
 | File name and info line | After choosing, Voxprint shows the title and "3 chapters · about 7 min of audio" – the number of chapters and the expected length. Before a choice it says *{{narr.no_book}}* |
 
 If the file cannot be opened you get a message such as *{{err.book_unsupported}}* or *{{err.book_empty}}* (see the troubleshooting chapter).
@@ -170,6 +170,17 @@ Since version 0.1.3 every narration follows the punctuation and the structure of
 The **reading speed adapts to the text**: long, comma-rich and descriptive sentences and scripture-like text are read a little slower, dialogue and short lines at the voice's own speed. The five pause lengths, a global **{{narrset.speed}}** (70–130 %) and the **{{narrset.style}}** (*{{narrset.style_auto}}*, *{{narrset.style_scripture}}*, *{{narrset.style_fiction}}*, *{{narrset.style_dialogue}}*) are set in {{ui.settings_title}} → **{{narrset.title}}** (chapter 8) and apply to the next narration. The speed is applied after synthesis by time-stretching with the pitch kept, so changing pauses or speed never synthesizes finished fragments again – the next run only joins them anew.
 
 **▸ {{narr.advanced}}** (collapsed) contains: the exact bitrates per format (changing one switches the quality to "custom": no button is highlighted); **{{narr.choose_folder}}** – the folder where the audiobook is placed; the check box **{{narr.speak_titles}}**; and a read-only *{{narr.sample}}* showing how the first changed paragraph looks after preparation.
+
+### Soundscape (optional)
+
+A Voxprint book (`.vxbook`) can carry sound markup (`sound/1`): quiet background music for a scene and short accents at transitions. When the soundscape is on, Voxprint generates that music locally with **ACE-Step 1.5** (code and weights under the MIT licence; the generated music may be used commercially) and mixes it under the narration. The music is ducked under the voice, and the mixed chapter keeps the narration's loudness.
+
+- **Off by default.** Turn it on in {{ui.settings_title}} → **{{narrset.title}}** → **{{narrset.soundscape}}**.
+- **Downloaded only when you turn it on.** The model is about 10 GB and is fetched once, at that moment. The full download and *Check and repair* never fetch it, and a narration never downloads it.
+- **Only for books that ask for it.** Music plays only for a `.vxbook` whose manifest lists `sound/1`. TXT, Markdown, FB2, EPUB and a `.vxbook` without sound markup stay voice only.
+- **One run without it:** `voxprint narrate book.vxbook --voice ID --no-soundscape` skips the mix and keeps the saved setting.
+
+Details, licences and the markup: [docs/SOUNDSCAPE.md](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/blob/main/docs/SOUNDSCAPE.md).
 
 ## Starting, pausing, stopping
 
@@ -517,7 +528,7 @@ The same check runs without the window as `Voxprint.exe --auto-repair` (chapter 
 | {{err.download_failed}} | Check your internet connection and start again; the download continues where it stopped. |
 | {{err.narration_chunk}} | Press **{{narr.start}}** again – finished fragments are kept. |
 | {{err.narration_no_ffmpeg}} | Settings → **{{autorepair.button}}**, or choose WAV. |
-| {{err.book_unsupported}} | Convert the book to TXT, FB2 or EPUB. |
+| {{err.book_unsupported}} | Convert the book to TXT, Markdown, FB2, EPUB or `.vxbook`. |
 | {{err.book_unsafe}} | The file looks damaged or too large; try another copy. |
 | {{warn.no_gpu}} | Voxprint needs an NVIDIA GeForce RTX 40-series or newer GPU. There is no CPU-only mode. |
 | {{warn.loss_low}} | The voice may babble. Use **{{preset.balanced}}**, record more text, and listen with the quick preview. |
@@ -568,10 +579,10 @@ The installed program is `C:\Program Files\Voxprint\Voxprint.exe` (another folde
 voxprint narrate BOOK --voice ID_OR_NAME --out DIR [--format mp3,m4b,opus,...]
     [--pause-comma S] [--pause-mid S] [--pause-sentence S] [--pause-paragraph S]
     [--pause-chapter S] [--speed X] [--style auto|scripture|fiction|dialogue]
-    [--pauses] [--ai-disclosure] [--json]
+    [--pauses] [--no-soundscape] [--ai-disclosure] [--json]
 ```
 
-The book is a TXT, FB2, `.fb2.zip` or EPUB file; the result lands in `<DIR>/<book title>/`; the default format is one Opus file. The pause flags (seconds), `--speed` (0.7–1.3) and `--style` override the values from {{ui.settings_title}} → {{narrset.title}} for one run; `--pauses` is the opt-in cut at every comma. Running the same command again skips the fragments that are already cached, and changing pauses or speed never synthesizes them again.
+The book is a TXT, Markdown, FB2, `.fb2.zip`, EPUB or `.vxbook` file; the result lands in `<DIR>/<book title>/`; the default format is one Opus file. The pause flags (seconds), `--speed` (0.7–1.3) and `--style` override the values from {{ui.settings_title}} → {{narrset.title}} for one run; `--pauses` is the opt-in cut at every comma; `--no-soundscape` skips the soundscape for one run (see *Soundscape (optional)*). Running the same command again skips the fragments that are already cached, and changing pauses or speed never synthesizes them again.
 
 ```
 voxprint narrate genesis.txt --voice levi --out ./audiobooks --format mp3 --json
