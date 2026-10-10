@@ -10,8 +10,19 @@ from __future__ import annotations
 
 import importlib
 import sys
+from pathlib import Path
 
-from infra.cuda12_libs import import_ctranslate2
+
+def _ensure_root_on_path() -> None:
+    """``python tools/check_native_imports.py`` puts ``tools/`` on ``sys.path``, not the repo root."""
+    root = str(Path(__file__).resolve().parents[1])
+    if root not in sys.path:
+        sys.path.insert(0, root)
+
+
+_ensure_root_on_path()
+
+from infra.cuda12_libs import import_ctranslate2  # noqa: E402 - repo root must be on the path first
 
 #: Import names (not distribution names). ``audioop`` is the module provided by ``audioop-lts``.
 NATIVE = (
