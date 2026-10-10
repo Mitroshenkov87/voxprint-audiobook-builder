@@ -184,7 +184,7 @@ def test_texts_exist_in_every_language(app, tmp_path):
 def test_narrate_book_announces_the_chunk_files_and_they_appear_in_order(tmp_path):
     from tests.test_narration import run
 
-    plans, seen = [], []
+    plans = []
     snapshot = []
 
     def progress(ev):

@@ -442,7 +442,12 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
                 publish.finish(ticket)
                 raise
             else:
-                publish.finish(ticket, lambda path=staged: cache.commit(path, keys[c.index]))
+                key = keys[c.index]
+
+                def commit() -> None:
+                    cache.commit(staged, key)
+
+                publish.finish(ticket, commit)
             if on_saved is not None:
                 on_saved(c)
         finally:
