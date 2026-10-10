@@ -18,7 +18,7 @@ You need no command line, no browser and no account (a command line exists for s
 | Operating system | Windows 11 24H2 (build 26100), 64-bit | Windows 11 26H2 |
 | Graphics card | NVIDIA with about 6 GB video memory (VRAM) | NVIDIA with 16 GB VRAM or more |
 | Without an NVIDIA card | The dataset can still be created; training runs on the processor and takes many hours (the program warns you) | – |
-| Disk space | about 30 GB for the *Full* setup (models about 25 GB + components about 3 GB) plus about 4.2 GB if you build the optional universal model | an SSD |
+| Disk space | about 30 GB for the *Full* setup (models about 26 GB + components about 3 GB) plus about 4.2 GB if you build the optional universal model | an SSD |
 | Internet | during setup (the libraries) and once for the models (about 28 GB together with *Full*; 1.7B speech recognition on GPUs with 8 GB of video memory or more) | – |
 
 Supported systems: current and previous year OS releases (Windows 11 24H2 and newer; Linux distributions released from 2025). Older systems are not a goal.
@@ -123,7 +123,7 @@ The rules cover Russian and English fully. For other languages (for example Germ
 
 ### Optional – translate the book
 
-The card **{{narr.translate_title}}** has a check box (*{{narr.translate_check}}*) and a list of target languages. Voxprint detects the language of the book itself and translates it sentence by sentence **offline on your computer** with the open Opus-MT models (English ↔ Russian, English ↔ German; Russian ↔ German goes through English and is slower and less accurate). The models are about 300 MB per direction and are downloaded once, with a SHA-256 check, when you press **{{prep.model_download}}**. A graphics card is used if there is one, otherwise the processor. Chapters, chapter titles, paragraphs, verse lines, scene breaks and therefore the pauses stay as they are; then the usual text preparation runs for the new language and the book is narrated in it – choose a voice of the target language for the best result.
+The card **{{narr.translate_title}}** has a check box (*{{narr.translate_check}}*) and a list of target languages. Voxprint detects the language of the book itself and translates it sentence by sentence **offline on your computer** with the open Opus-MT models (English, Russian and German, including Russian ↔ German directly). The models are downloaded once, with a SHA-256 check, when you press **{{prep.model_download}}**. A graphics card is used if there is one, otherwise the processor. Chapters, chapter titles, paragraphs, verse lines, scene breaks and therefore the pauses stay as they are; then the usual text preparation runs for the new language and the book is narrated in it – choose a voice of the target language for the best result.
 
 * The translated text is saved next to the audiobook as `translation_xx.txt` (in the folder `Title (xx)`). Open it, read it and edit it; start the same narration again and **your edited text** is narrated. Delete the file to translate anew. Translated sentences are cached, so a stopped job never translates the same sentence twice.
 * *{{narr.translate_note}}*
@@ -415,7 +415,7 @@ When the program finds an older component in an environment it does not own (for
 Out of the box, everything that can run automatically is **already selected** and marked with a star and the word *{{auto.recommended}}*: if you touch nothing, Voxprint works at maximum quality. The models these options need are part of the first-start download, so there is nothing extra to click. The single check boxes stay in their windows.
 
 * Text preparation (Narrate a book): one switch, *{{prep.one}}*, on by default (layout, footnotes, quotes, links, headings, numbers, abbreviations, the Russian letter yo where a dictionary is sure, and Russian typos when that model is downloaded).
-* Translation of the book before narrating (English, Russian, German; Opus-MT models, about 300 MB per direction, downloaded once). Off until you turn it on.
+* Translation of the book before narrating (English, Russian, German; Opus-MT models, downloaded once). Off until you turn it on.
 * Training window: *{{check.checkbox}}* and *{{preview.compare}}* (both need the speech-recognition model, about 1.9 GB, downloaded once).
 * Always on, without a switch: alignment of the text onto the audio and its plausibility check, the audio quality filter, the recognition filters of the audio-only mode.
 * Not included, because they do not exist yet: a punctuation model. Russian stress marks are not written, because the base speech model does not read them; the letter yo is part of Prepare text. Speaker marks are a separate option on the AI text model card.

@@ -1,104 +1,6 @@
 {
  "date": "2026-10-04",
  "models": {
-  "Helsinki-NLP/opus-mt-de-en": {
-   "files": {
-    ".gitattributes": {
-     "card": true,
-     "original_sha256": "9e5095cca6b09f837c602a130decaba2b5a2c824b36871ba5532046f34f10ffe",
-     "sha256": "16fe2c78d6484d20b4abb58a8bb0c10f9c18a9aabcafe42705b32086106b065d",
-     "size": 439
-    },
-    "README.md": {
-     "card": true,
-     "original_sha256": "ae6f262ce3e16c3ee213703b6e89bdc744e6c8d784a1f286a3de8abc86667e89",
-     "sha256": "de3520056aeeba554cdd049e0fe2f4ade2e3faea87d71726b578cd1a60a0f115",
-     "size": 2826
-    },
-    "config.json": {
-     "sha256": "89368ef76ea89581025cdf605caac75b8a22af2c1a90ec57c8a5001f10537eeb",
-     "size": 1381
-    },
-    "generation_config.json": {
-     "sha256": "e5cccf365761fb31175fc978a75f5e857a822f173d0e447aa3a25d7cbcda15a4",
-     "size": 293
-    },
-    "pytorch_model.bin": {
-     "sha256": "e743c3070f61f477cb62fe95ef2c9be2e77f3e488cb6b8030ff8a19e8295c87d",
-     "size": 297928209
-    },
-    "source.spm": {
-     "sha256": "bbd1f495eea99c8e21ae086d9146e0fa7b096c3dfdd9ba07ab8b631889df5c9b",
-     "size": 796845
-    },
-    "target.spm": {
-     "sha256": "678f2a1177d8389f67b66299762dcc4fc567e89b07e212ba91b0c56daecf47ce",
-     "size": 768489
-    },
-    "tokenizer_config.json": {
-     "sha256": "51c3c3260d27cb7c4d11d0c53752b8fe87f2367129d7636fa917ce588b97306c",
-     "size": 42
-    },
-    "vocab.json": {
-     "sha256": "0d70d89fee4a8b4ef99a56d712163baadcabd5600a597f71515547ee70306329",
-     "size": 1273232
-    }
-   },
-   "license": "Apache-2.0",
-   "mirror_repo": "Mitroshenkov87/voxprint-mirror-opus-mt-de-en",
-   "mirror_revision": "b9a8d8140d82985a78f8566de6361f875f4c4463",
-   "source_repo": "Helsinki-NLP/opus-mt-de-en",
-   "source_revision": "1a922f3b32a8e809e17a47d4b32142d8105924e5"
-  },
-  "Helsinki-NLP/opus-mt-en-de": {
-   "files": {
-    ".gitattributes": {
-     "card": true,
-     "original_sha256": "f049f7c0d16eaffe605baca479013bcb7a3847077cf6e548ba7b228831cf9c38",
-     "sha256": "96b3d0d5b405c7268d77a4470da5b2dd7e1534966746e0adaf9d38b6a88a4ef0",
-     "size": 485
-    },
-    "README.md": {
-     "card": true,
-     "original_sha256": "7625de996b7c4c51c217095941cf2e27d2b5cc5b4cd695c382882679f2f53710",
-     "sha256": "965deb8518bf4e8bcf71df6bc93f6e1b1845bcd3158c931242276de9f5cd156b",
-     "size": 4969
-    },
-    "config.json": {
-     "sha256": "41c7890e6f6c1f72c5c626569cfe739a8362080940edbb1747f25173f541653b",
-     "size": 1335
-    },
-    "generation_config.json": {
-     "sha256": "e5cccf365761fb31175fc978a75f5e857a822f173d0e447aa3a25d7cbcda15a4",
-     "size": 293
-    },
-    "pytorch_model.bin": {
-     "sha256": "da068344b1b0c20e6d4a8f77f48e06646b90d679029006b18579e68977206bdd",
-     "size": 297928209
-    },
-    "source.spm": {
-     "sha256": "678f2a1177d8389f67b66299762dcc4fc567e89b07e212ba91b0c56daecf47ce",
-     "size": 768489
-    },
-    "target.spm": {
-     "sha256": "bbd1f495eea99c8e21ae086d9146e0fa7b096c3dfdd9ba07ab8b631889df5c9b",
-     "size": 796845
-    },
-    "tokenizer_config.json": {
-     "sha256": "052c28be2c51ea3398bf9b9de92004270e29a51f8404f9921ec025986ffbefae",
-     "size": 42
-    },
-    "vocab.json": {
-     "sha256": "0d70d89fee4a8b4ef99a56d712163baadcabd5600a597f71515547ee70306329",
-     "size": 1273232
-    }
-   },
-   "license": "CC-BY-4.0",
-   "mirror_repo": "Mitroshenkov87/voxprint-mirror-opus-mt-en-de",
-   "mirror_revision": "080b3a92ae9458c09bffc0514f6c5ddc4e353e80",
-   "source_repo": "Helsinki-NLP/opus-mt-en-de",
-   "source_revision": "6183067f769a302e3861815543b9f312c71b0ca4"
-  },
   "Helsinki-NLP/opus-mt-en-ru": {
    "files": {
     ".gitattributes": {
@@ -196,6 +98,84 @@
    "mirror_revision": "5805a6455515e51e3c035b0ec17cc6c02cfa9934",
    "source_repo": "Helsinki-NLP/opus-mt-ru-en",
    "source_revision": "fbd6dc73284f95536648512cc21d57f19191961a"
+  },
+  "Helsinki-NLP/opus-mt-tc-bible-big-deu_eng_fra_por_spa-gmw": {
+   "files": {
+    "config.json": {
+     "sha256": "1e81eb6f5d208213d9e7a3cb3fbce5f2a631eba7078156c4a8a1875efa97415d",
+     "size": 1104
+    },
+    "generation_config.json": {
+     "sha256": "126b132656f9b9b71f6f1aba136d85f11a00be44a73be6b206e866ffe1b6e1d5",
+     "size": 292
+    },
+    "model.safetensors": {
+     "sha256": "a53ea4daf925e53c698deebc12c60052e70a4eb4ba747c7e627ee1fb7468c444",
+     "size": 903009420
+    },
+    "source.spm": {
+     "sha256": "1fc2d5cb53cd6257b69be3f6a959ff6e35bf99c1f14d45ccc2a3c8546650e197",
+     "size": 806669
+    },
+    "special_tokens_map.json": {
+     "sha256": "09059cedc26bc46bc09a52f05b92d4922e11917e87f3b92059bb1a63a59ab2c4",
+     "size": 65
+    },
+    "target.spm": {
+     "sha256": "dc24a79926c7fe53bcdd4dcdef68fbd96d8bc74f5fc41f5d8d4c45ce0207dc9c",
+     "size": 795621
+    },
+    "tokenizer_config.json": {
+     "sha256": "1c11b6451a5482422070427466ed699c1c523764bcde52b971d70161b79b9dab",
+     "size": 384
+    },
+    "vocab.json": {
+     "sha256": "f937fecd56ffcf15b0b507007532cd307799321ebb571d0212c58d0cf0bb7e2b",
+     "size": 1184571
+    }
+   },
+   "license": "Apache-2.0",
+   "source_repo": "Helsinki-NLP/opus-mt-tc-bible-big-deu_eng_fra_por_spa-gmw",
+   "source_revision": "0a10a154b1d057720d03d8227bc59ea9633c590b"
+  },
+  "Helsinki-NLP/opus-mt-tc-bible-big-gmw-deu_eng_fra_por_spa": {
+   "files": {
+    "config.json": {
+     "sha256": "ced43e35527b752bb5850047eb9266c9ef2ee557d99d86017b8a6a3344bc7cd2",
+     "size": 1104
+    },
+    "generation_config.json": {
+     "sha256": "d9ecd60c8fdc6d0193c3a47b25831547fae3d31bca8943784dfbea35cf06a1c5",
+     "size": 292
+    },
+    "model.safetensors": {
+     "sha256": "2a4d90f33e28e67a522a8d95858799b058617bdca55dc8640c0132f7163a660b",
+     "size": 902107420
+    },
+    "source.spm": {
+     "sha256": "eec711a7a9398a6edbc52f8d0249552bf965f85aee845a17a237783ea95f7ba7",
+     "size": 794713
+    },
+    "special_tokens_map.json": {
+     "sha256": "09059cedc26bc46bc09a52f05b92d4922e11917e87f3b92059bb1a63a59ab2c4",
+     "size": 65
+    },
+    "target.spm": {
+     "sha256": "6f0c6c5e91a1196fd729077284ba6d816a278a58f012a834f1beac1f550aeb91",
+     "size": 806555
+    },
+    "tokenizer_config.json": {
+     "sha256": "4d901d9c244e5217c35c3c09a587c31c1a092ad596a7459c978128567712d573",
+     "size": 384
+    },
+    "vocab.json": {
+     "sha256": "2b5349198e68c4dedc29dde3d6d9d04509e5cf85c6a298d987d1f1ef013ce6a0",
+     "size": 1178193
+    }
+   },
+   "license": "Apache-2.0",
+   "source_repo": "Helsinki-NLP/opus-mt-tc-bible-big-gmw-deu_eng_fra_por_spa",
+   "source_revision": "a6933ed14d06d91d797809258bdb2d52f5487a36"
   },
   "Helsinki-NLP/opus-mt-tc-big-de-zle": {
    "files": {

@@ -47,10 +47,10 @@ APPROX_SIZE_GB = {
     "Qwen/Qwen3-TTS-12Hz-1.7B-Base": 4.5,
     "Qwen/Qwen3-TTS-12Hz-0.6B-Base": 2.5,
     "ai-forever/sage-fredt5-distilled-95m": 0.5,         # Russian text clean-up (first-run download-all; see infra/text_models.py)
-    "Helsinki-NLP/opus-mt-ru-en": 0.4,                    # optional translation models (Opus-MT, one per direction)
+    "Helsinki-NLP/opus-mt-ru-en": 0.4,                    # 2020 Opus-MT fallback (ru<->en only)
     "Helsinki-NLP/opus-mt-en-ru": 0.4,
-    "Helsinki-NLP/opus-mt-de-en": 0.4,
-    "Helsinki-NLP/opus-mt-en-de": 0.4,
+    "Helsinki-NLP/opus-mt-tc-bible-big-deu_eng_fra_por_spa-gmw": 0.91,   # en->de, same snapshot as Movie Dubber
+    "Helsinki-NLP/opus-mt-tc-bible-big-gmw-deu_eng_fra_por_spa": 0.91,   # de->en
     "Helsinki-NLP/opus-mt-tc-big-en-zle": 0.48,           # Opus-MT tc-big (safetensors only): en->ru, ru->en, ru->de, de->ru
     "Helsinki-NLP/opus-mt-tc-big-zle-en": 0.48,
     "Helsinki-NLP/opus-mt-tc-big-zle-de": 0.48,

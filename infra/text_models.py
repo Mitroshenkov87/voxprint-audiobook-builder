@@ -52,7 +52,8 @@ class TextModel:
     #: Glob patterns of the files to download ("" = the whole repository).
     files: Tuple[str, ...] = ()
     pair: Tuple[str, str] = ("", "")   # translation models: (source, target) language
-    #: multi-target Opus-MT tc-big models need the target language as a token in front of every sentence (``>>rus<<``)
+    #: multi-target Opus-MT models need the target language as a token in front of every sentence
+    #: (``>>rus<<``, ``>>deu<<``, ``>>eng<<``)
     target_token: str = ""
 
     @property
@@ -131,12 +132,32 @@ REGISTRY: Tuple[TextModel, ...] = (
     TextModel("opus-en-ru", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT en -> ru", ("en", "ru"), "Helsinki-NLP/opus-mt-en-ru",
               "bb09c99d180016eac6819df3dae68edb1690fdee", 300, "Apache-2.0", True,
               (("pytorch_model.bin", "d15fa58c6bc3efd3629c1b6b86d9aa6d15d2751a4620aa4cdd7eed7b5cbe583b"),), OPUS_FILES, ("en", "ru")),
-    TextModel("opus-de-en", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT de -> en", ("de", "en"), "Helsinki-NLP/opus-mt-de-en",
-              "1a922f3b32a8e809e17a47d4b32142d8105924e5", 295, "Apache-2.0", True,
-              (("pytorch_model.bin", "e743c3070f61f477cb62fe95ef2c9be2e77f3e488cb6b8030ff8a19e8295c87d"),), OPUS_FILES, ("de", "en")),
-    TextModel("opus-en-de", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT en -> de", ("en", "de"), "Helsinki-NLP/opus-mt-en-de",
-              "6183067f769a302e3861815543b9f312c71b0ca4", 295, "CC-BY-4.0", True,
-              (("pytorch_model.bin", "da068344b1b0c20e6d4a8f77f48e06646b90d679029006b18579e68977206bdd"),), OPUS_FILES, ("en", "de")),
+    # en<->de: the tc-bible-big pair Movie Dubber stores, so the shared models folder holds one snapshot.
+    # en->de is deu/eng/fra/por/spa -> gmw (token >>deu<<); de->en is gmw -> those languages (token >>eng<<).
+    TextModel("opus-de-en", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT tc-bible-big de -> en", ("de", "en"),
+              "Helsinki-NLP/opus-mt-tc-bible-big-gmw-deu_eng_fra_por_spa",
+              "a6933ed14d06d91d797809258bdb2d52f5487a36", 905, "Apache-2.0", True,
+              (("config.json", "ced43e35527b752bb5850047eb9266c9ef2ee557d99d86017b8a6a3344bc7cd2"),
+               ("generation_config.json", "d9ecd60c8fdc6d0193c3a47b25831547fae3d31bca8943784dfbea35cf06a1c5"),
+               ("tokenizer_config.json", "4d901d9c244e5217c35c3c09a587c31c1a092ad596a7459c978128567712d573"),
+               ("vocab.json", "2b5349198e68c4dedc29dde3d6d9d04509e5cf85c6a298d987d1f1ef013ce6a0"),
+               ("special_tokens_map.json", "09059cedc26bc46bc09a52f05b92d4922e11917e87f3b92059bb1a63a59ab2c4"),
+               ("model.safetensors", "2a4d90f33e28e67a522a8d95858799b058617bdca55dc8640c0132f7163a660b"),
+               ("source.spm", "eec711a7a9398a6edbc52f8d0249552bf965f85aee845a17a237783ea95f7ba7"),
+               ("target.spm", "6f0c6c5e91a1196fd729077284ba6d816a278a58f012a834f1beac1f550aeb91"),),
+              TC_BIG_FILES, ("de", "en"), ">>eng<<"),
+    TextModel("opus-en-de", KIND_TRANSLATE, STEP_TRANSLATE, "Opus-MT tc-bible-big en -> de", ("en", "de"),
+              "Helsinki-NLP/opus-mt-tc-bible-big-deu_eng_fra_por_spa-gmw",
+              "0a10a154b1d057720d03d8227bc59ea9633c590b", 906, "Apache-2.0", True,
+              (("config.json", "1e81eb6f5d208213d9e7a3cb3fbce5f2a631eba7078156c4a8a1875efa97415d"),
+               ("generation_config.json", "126b132656f9b9b71f6f1aba136d85f11a00be44a73be6b206e866ffe1b6e1d5"),
+               ("tokenizer_config.json", "1c11b6451a5482422070427466ed699c1c523764bcde52b971d70161b79b9dab"),
+               ("vocab.json", "f937fecd56ffcf15b0b507007532cd307799321ebb571d0212c58d0cf0bb7e2b"),
+               ("special_tokens_map.json", "09059cedc26bc46bc09a52f05b92d4922e11917e87f3b92059bb1a63a59ab2c4"),
+               ("model.safetensors", "a53ea4daf925e53c698deebc12c60052e70a4eb4ba747c7e627ee1fb7468c444"),
+               ("source.spm", "1fc2d5cb53cd6257b69be3f6a959ff6e35bf99c1f14d45ccc2a3c8546650e197"),
+               ("target.spm", "dc24a79926c7fe53bcdd4dcdef68fbd96d8bc74f5fc41f5d8d4c45ce0207dc9c"),),
+              TC_BIG_FILES, ("en", "de"), ">>deu<<"),
     TextModel("translate-madlad", KIND_TRANSLATE, STEP_TRANSLATE, "MADLAD-400 3B (CTranslate2 int8)", ("ru", "en", "de", "uk", "be"),
               "", "", 2950, "Apache-2.0", False),
     TextModel("roles", KIND_ROLES, STEP_ROLES, "Speaker / role markup", (), "", "", 0, "", False),

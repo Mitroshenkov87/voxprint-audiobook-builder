@@ -80,9 +80,9 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 * Status: downloaded on first start
 * Licence text: [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt)
 
-### Opus-MT translation models (Helsinki-NLP/opus-mt-tc-big-en-zle, tc-big-zle-en, tc-big-zle-de, tc-big-de-zle; opus-mt-de-en, en-de, ru-en, en-ru)
+### Opus-MT translation models (Helsinki-NLP/opus-mt-tc-big-en-zle, tc-big-zle-en, tc-big-zle-de, tc-big-de-zle; opus-mt-tc-bible-big-deu_eng_fra_por_spa-gmw, gmw-deu_eng_fra_por_spa; opus-mt-ru-en, en-ru)
 
-* Purpose: Offline machine translation of a book before narration (English, Russian, German; Russian <-> German directly). Opus-MT tc-big models, CC-BY-4.0, about 480 MB per direction; the 2020 Opus-MT models (about 300 MB) for English <-> German and as a fallback. Credit: OPUS-MT, University of Helsinki / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: "Democratizing neural machine translation with OPUS-MT", Language Resources and Evaluation 58 (2024); Tiedemann and Thottingal (2020). Machine translation quality varies.
+* Purpose: Offline machine translation of a book before narration (English, Russian, German; Russian <-> German directly). Opus-MT tc-big, CC-BY-4.0, about 480 MB per direction, for Russian with English or German. English <-> German uses Opus-MT tc-bible-big, Apache-2.0, about 900 MB per direction (the same Hugging Face files as Voxprint AI Movie Dubber; a target-language token is prepended). The 2020 Opus-MT models (about 300 MB) remain a fallback for Russian <-> English. Credit: OPUS-MT, University of Helsinki / Helsinki-NLP - J. Tiedemann, M. Aulamo, D. Bakshandaeva, M. Boggia, S.-A. Grönroos, T. Nieminen, A. Raganato, Y. Scherrer, R. Vázquez, S. Virpioja: "Democratizing neural machine translation with OPUS-MT", Language Resources and Evaluation 58 (2024); Tiedemann and Thottingal (2020). Machine translation quality varies.
 * Licence: CC-BY-4.0 / Apache-2.0
 * Project: <https://huggingface.co/Helsinki-NLP>
 * Status: downloaded on first start

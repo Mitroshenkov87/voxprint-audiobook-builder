@@ -18,7 +18,7 @@ Sie brauchen keine Kommandozeile, keinen Browser und kein Benutzerkonto (eine Ko
 | Betriebssystem | Windows 11 24H2 (Build 26100), 64 Bit | Windows 11 26H2 |
 | Grafikkarte | NVIDIA mit etwa 6 GB Videospeicher (VRAM) | NVIDIA mit 16 GB VRAM oder mehr |
 | Ohne NVIDIA-Karte | Der Datensatz wird trotzdem erstellt; das Training läuft auf dem Prozessor und dauert viele Stunden (das Programm warnt Sie) | – |
-| Speicherplatz | etwa 30 GB für die Installationsart *Vollständig* (Modelle etwa 25 GB + Komponenten etwa 3 GB), plus etwa 4,2 GB für das optionale Universalmodell | eine SSD |
+| Speicherplatz | etwa 30 GB für die Installationsart *Vollständig* (Modelle etwa 26 GB + Komponenten etwa 3 GB), plus etwa 4,2 GB für das optionale Universalmodell | eine SSD |
 | Internet | während der Installation (die Bibliotheken) und einmalig für die Modelle (zusammen etwa 28 GB bei *Vollständig*; Spracherkennung 1.7B auf Grafikkarten ab 8 GB Grafikspeicher) | – |
 
 ## So funktioniert es in fünf Schritten
@@ -199,7 +199,7 @@ Die Regeln decken Russisch und Englisch vollständig ab. Für andere Sprachen (z
 
 ### Optional – Buch übersetzen
 
-Die Karte **{{narr.translate_title}}** hat ein Kontrollkästchen (*{{narr.translate_check}}*) und eine Liste der Zielsprachen. Voxprint erkennt die Sprache des Buchs selbst und übersetzt es satzweise **offline auf Ihrem Computer** mit den offenen Opus-MT-Modellen (Englisch ↔ Russisch, Englisch ↔ Deutsch; Russisch ↔ Deutsch läuft über Englisch, langsamer und ungenauer). Die Modelle sind etwa 300 MB pro Richtung groß und werden einmal heruntergeladen, mit SHA-256-Prüfung, wenn Sie **{{prep.model_download}}** drücken. Eine Grafikkarte wird genutzt, falls vorhanden, sonst der Prozessor. Kapitel, Kapitelüberschriften, Absätze, Gedichtzeilen, Szenenwechsel und damit die Pausen bleiben erhalten; danach läuft die übliche Textvorbereitung für die neue Sprache und das Buch wird darin gesprochen – wählen Sie für das beste Ergebnis eine Stimme der Zielsprache.
+Die Karte **{{narr.translate_title}}** hat ein Kontrollkästchen (*{{narr.translate_check}}*) und eine Liste der Zielsprachen. Voxprint erkennt die Sprache des Buchs selbst und übersetzt es satzweise **offline auf Ihrem Computer** mit den offenen Opus-MT-Modellen (Englisch, Russisch und Deutsch, einschließlich Russisch ↔ Deutsch direkt). Die Modelle werden einmal heruntergeladen, mit SHA-256-Prüfung, wenn Sie **{{prep.model_download}}** drücken. Eine Grafikkarte wird genutzt, falls vorhanden, sonst der Prozessor. Kapitel, Kapitelüberschriften, Absätze, Gedichtzeilen, Szenenwechsel und damit die Pausen bleiben erhalten; danach läuft die übliche Textvorbereitung für die neue Sprache und das Buch wird darin gesprochen – wählen Sie für das beste Ergebnis eine Stimme der Zielsprache.
 
 * Der übersetzte Text wird neben dem Hörbuch als `translation_xx.txt` gespeichert (im Ordner `Titel (xx)`). Öffnen, lesen und bearbeiten Sie ihn; starten Sie dieselbe Vertonung erneut, wird **Ihre bearbeitete Fassung** gesprochen. Löschen Sie die Datei, um neu zu übersetzen. Übersetzte Sätze werden zwischengespeichert, ein abgebrochener Auftrag übersetzt also keinen Satz doppelt.
 * *{{narr.translate_note}}*
@@ -491,7 +491,7 @@ Findet das Programm eine ältere Komponente in einer Umgebung, die ihm nicht geh
 Ab Werk ist alles, was automatisch laufen kann, **bereits gewählt** und mit einem Stern und dem Wort „{{auto.recommended}}“ markiert: Wenn Sie nichts anfassen, arbeitet Voxprint mit maximaler Qualität. Die dafür nötigen Modelle gehören zum Download beim ersten Start, es ist nichts extra anzuklicken. Die einzelnen Kontrollkästchen bleiben in ihren Fenstern.
 
 * Textaufbereitung („Buch vertonen“): ein Schalter, „{{prep.one}}“, standardmäßig an (Layout, Fußnoten, Anführungszeichen, Links, Überschriften, Zahlen, Abkürzungen und russische Tippfehler, wenn das Modell heruntergeladen ist).
-* Übersetzung des Buches vor dem Vertonen (Englisch, Russisch, Deutsch; Opus-MT-Modelle, etwa 300 MB je Richtung, einmal geladen). Aus, bis Sie sie einschalten.
+* Übersetzung des Buches vor dem Vertonen (Englisch, Russisch, Deutsch; Opus-MT-Modelle, einmal geladen). Aus, bis Sie sie einschalten.
 * Trainingsfenster: „{{check.checkbox}}“ und „{{preview.compare}}“ (beide brauchen das Spracherkennungsmodell, etwa 1,9 GB, einmal geladen).
 * Immer aktiv, ohne Schalter: Ausrichtung des Textes auf das Audio mit Plausibilitätsprüfung, Audio-Qualitätsfilter, Erkennungsfilter des Nur-Audio-Modus.
 * Nicht enthalten, weil es sie noch nicht gibt: ein Zeichensetzungsmodell. Russische Betonungszeichen werden nicht gesetzt, weil das Sprachmodell sie nicht liest; der Buchstabe jo gehört zu „Text vorbereiten“. Sprechermarken sind eine eigene Option auf der Karte des KI-Textmodells.
