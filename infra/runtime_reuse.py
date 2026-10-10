@@ -417,13 +417,15 @@ def _torchaudio_pairs(torch_ver: str, audio_ver: str) -> bool:
 
 
 def choose_flavor(flavors: List[str], driver_cuda: Optional[Tuple[int, int]]) -> str:
-    """Best flavor of the lock for this PC: the newest CUDA build the driver supports, else ``cpu``.
-    ``VOXPRINT_TORCH_FLAVOR`` forces one (tests, support). ``cpu`` is accepted even when the public
-    flavor list is only ``cu130``: CI installs the CPU wheels and does not offer them to users."""
+    """Best CUDA flavor of the lock for this PC. ``""`` when none fits: users do not get a CPU wheel.
+
+    ``VOXPRINT_TORCH_FLAVOR`` forces a flavor. It is internal (CI and tests); ``cpu`` is accepted even when the
+    public flavor list is only ``cu130``: CI installs the CPU wheels and does not offer them to users.
+    """
     forced = os.environ.get("VOXPRINT_TORCH_FLAVOR", "").strip()
     if forced == "cpu" or (forced and forced in flavors):
         return forced
-    best, best_cu = "cpu", (0, 0)
+    best, best_cu = "", (0, 0)
     for f in flavors:
         cu = env_probe._cuda_tuple(f)
         if cu and driver_cuda and cu <= driver_cuda and cu > best_cu:

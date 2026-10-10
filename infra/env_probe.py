@@ -21,8 +21,10 @@ Unsloth would pull its own pins (trl, xformers, transformers range incl. 5.x) th
 Voxprint keeps its own LoRA loop (core/lora_trainer.py).  If found it is only reported (reason ``no_qwen3_tts_training``).
 
 NVIDIA driver -> PyTorch wheel flavor follows the CUDA version printed by ``nvidia-smi``.  The only wheel we ship
-is ``cu130`` (CUDA 13.0).  When the header has no ``CUDA Version`` / ``CUDA UMD Version``, the driver version is
-used instead: 600 and newer count as CUDA 13.0, anything older has no matching wheel.
+is ``cu130`` (CUDA 13.0).  There is no CPU wheel for users: a driver without CUDA 13 yields ``""`` (no supported
+flavor).  When the header has no ``CUDA Version`` / ``CUDA UMD Version``, the driver version is used instead: 600 and
+newer count as CUDA 13.0, anything older has no matching wheel.  ``VOXPRINT_TORCH_FLAVOR`` (internal, CI) can still
+name a flavor, including ``cpu``, in the runtime selector.
 """
 from __future__ import annotations
 
@@ -124,12 +126,12 @@ def cuda_from_driver_version(text: str) -> Optional[Tuple[int, int]]:
 
 
 def torch_flavor_for_driver(cuda: Optional[Tuple[int, int]]) -> str:
-    """Wheel flavor for the driver's CUDA version; ``cpu`` without an NVIDIA driver or with a too old one."""
+    """Wheel flavor for the driver's CUDA version. ``""`` when no supported CUDA flavor fits (not a CPU install)."""
     if cuda:
         for need, tag in CUDA_FLAVORS:
             if cuda >= need:
                 return tag
-    return "cpu"
+    return ""
 
 
 def torch_flavor_of(version: Optional[str]) -> Optional[str]:
@@ -152,6 +154,8 @@ def decide_torch(installed: Optional[str], wanted_flavor: str, external: bool = 
     """torch has no pin: any reasonably recent build is reusable; the *flavor* must fit the machine.
     CPU build on a machine with an NVIDIA driver, or a CUDA build newer than the driver supports -> replace
     (in Voxprint's own environment); an older CUDA build than the driver offers is fine (drivers are backward compatible)."""
+    if not wanted_flavor:
+        return Decision("torch", installed, "", ACTION_IGNORE, "no_supported_cuda_flavor")
     if installed is None:
         return Decision("torch", None, wanted_flavor, ACTION_INSTALL, "missing")
     have = torch_flavor_of(installed)
@@ -306,7 +310,7 @@ class EnvReport:
     pythons: List[PythonEnv] = field(default_factory=list)
     ffmpeg: Optional[FfmpegInfo] = None
     driver_cuda: Optional[Tuple[int, int]] = None
-    wanted_torch_flavor: str = "cpu"
+    wanted_torch_flavor: str = ""
     ignored: Dict[str, str] = field(default_factory=dict)       # package -> reason code (e.g. unsloth)
 
     def counts(self) -> Dict[str, int]:

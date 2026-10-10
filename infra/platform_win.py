@@ -16,7 +16,6 @@ from typing import Optional
 from core.i18n import tr
 
 MIN_BUILD = 26100          # Windows 11 24H2 and newer (26H2 = 26300)
-BACKDROP_MIN_BUILD = 22621  # DWMWA_SYSTEMBACKDROP_TYPE appeared in 22H2
 
 IS_WINDOWS = sys.platform == "win32"
 
@@ -67,12 +66,10 @@ def check_os(build: Optional[int] = None, is_windows: Optional[bool] = None) -> 
 def apply_backdrop(hwnd: int, dark: bool = True) -> str:
     """Enable Acrylic through ``DwmSetWindowAttribute``.  Returns ``'acrylic'`` or ``'plain'``.
 
-    Without Windows 11 22H2+ (or on any error) it returns ``'plain'`` - the window just stays plainly dark.
+    Supported Windows is 11 24H2 (build 26100) or newer, which already has the backdrop API.
+    On any error the window stays plainly dark.
     """
     if not IS_WINDOWS:
-        return "plain"
-    build = windows_build() or 0
-    if build < BACKDROP_MIN_BUILD:
         return "plain"
     try:
         import ctypes

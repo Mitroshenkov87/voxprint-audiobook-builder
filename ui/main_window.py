@@ -1403,7 +1403,7 @@ class MainWindow(QWidget):
         plan = train_presets.build_plan(preset, gpu, n, manual=self.manual_values() if preset == train_presets.MANUAL else None)
         dur = train_presets.format_duration(train_presets.estimate_seconds(plan, n, gpu), tr("preset.unit_min"),
                                             tr("preset.unit_sec"), tr("preset.unit_hour"))
-        where = gpu.name if gpu.available else tr("preset.cpu")
+        where = gpu.name or "GPU"
         from workers import preview_runner
 
         vs = preview_runner.make_variants(plan, self.chk_compare.isChecked())
@@ -1707,7 +1707,7 @@ class MainWindow(QWidget):
 
     # ------------------------------------------------------------------ friendly error messages
     def show_error(self, kind: str, message: str, details: str = "", url: str = "") -> None:
-        """Friendly message box per error kind; for out-of-memory it offers a retry on the CPU."""
+        """Friendly message box per error kind."""
         box = QMessageBox(self)
         box.setIcon(QMessageBox.Icon.Warning)
         box.setWindowTitle(APP_TITLE)
@@ -1722,21 +1722,14 @@ class MainWindow(QWidget):
             body += f"<br><small>{details}</small>"
         box.setTextFormat(Qt.TextFormat.RichText)
         box.setInformativeText(body.replace("\n", "<br>"))
-        retry_cpu = None
-        if kind == "oom":
-            retry_cpu = box.addButton(tr("ui.retry_cpu"), QMessageBox.ButtonRole.AcceptRole)
-            box.addButton(tr("ui.cancel"), QMessageBox.ButtonRole.RejectRole)
-        else:
-            box.addButton(tr("ui.ok"), QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(tr("ui.ok"), QMessageBox.ButtonRole.AcceptRole)
         self._error_box = box
+        self._retry_cpu_button = None
         box.setModal(True)
         box.finished.connect(lambda _=0: None)
         if os.environ.get("QT_QPA_PLATFORM") == "offscreen":  # do not block in tests
-            self._retry_cpu_button = retry_cpu
             return
         box.exec()
-        if retry_cpu is not None and box.clickedButton() is retry_cpu and self._last_request:
-            self.start(self._last_request.kind, force_cpu=True)
 
     # ------------------------------------------------------------------ updates
     def check_updates(self) -> None:

@@ -164,13 +164,15 @@ def detect_vram_mb(run: Callable[[List[str]], str] = _run) -> int:
 
 
 def choose_flavor(flavors: List[str], cuda: Optional[Tuple[int, int]]) -> str:
-    """Newest CUDA flavor the driver supports, else ``cpu`` (the same rule as ``infra.runtime_reuse.choose_flavor``).
+    """Newest CUDA flavor the driver supports, else ``""`` (no CPU choice; same rule as ``infra.runtime_reuse.choose_flavor``).
 
-    ``VOXPRINT_TORCH_FLAVOR=cpu`` is accepted even when ``cpu`` is not a public flavor (CI wheels)."""
+    ``VOXPRINT_TORCH_FLAVOR`` forces one flavor. That variable is internal (CI/tests); ``cpu`` is accepted even when
+    it is not a public flavor (CI wheels).
+    """
     forced = os.environ.get("VOXPRINT_TORCH_FLAVOR", "").strip()
     if forced == "cpu" or (forced and forced in flavors):
         return forced
-    best, best_cu = "cpu", (0, 0)
+    best, best_cu = "", (0, 0)
     for f in flavors:
         m = re.match(r"^cu(\d{2,3})$", f)
         if not m or not cuda:
@@ -193,7 +195,12 @@ def flavor_of(man: dict, wanted: str = "auto") -> str:
 
 
 def matches_flavor(comp: dict, flavor: str) -> bool:
-    return not comp.get("flavor") or flavor in ("", "all") or comp["flavor"] == flavor
+    """A component with no flavor always matches. ``all`` keeps every flavor. ``""`` keeps none of the flavored wheels."""
+    if not comp.get("flavor"):
+        return True
+    if flavor == "all":
+        return True
+    return bool(flavor) and comp["flavor"] == flavor
 
 
 # ------------------------------------------------------------------------------------------------ components

@@ -3,9 +3,9 @@ name: build-linux
 # EXPERIMENTAL Linux package of Voxprint (no frozen build: the program is Python source, installed into a venv by
 # install-voxprint-linux.sh).  On a clean, free ubuntu-24.04 runner this job
 #   1. builds the package twice: a test copy that points at a local web server, and the release copy that points at GitHub;
-#   2. runs the installer from the test copy exactly as a user would (apt dependencies, venv, PyTorch via uv - CPU here -,
-#      launcher, .desktop entry) and its built-in self-tests (imports of all libraries, text/translation-stub/ffmpeg pipeline
-#      step, offscreen start of the window);
+#   2. runs the installer from the test copy (apt dependencies, venv, PyTorch via uv). This runner has no NVIDIA GPU,
+#      so the job passes the internal --skip-gpu-check switch and VOXPRINT_ALLOW_NO_GPU=1 (not user options; CPU torch
+#      here is for CI only). Then the launcher, the .desktop entry and the self-tests;
 #   3. runs the unit-test suite with the installed environment (QT_QPA_PLATFORM=offscreen);
 #   4. smoke-tests the installed launcher, the menu entry, a second run (update) and --uninstall;
 #   5. on a tag "v*" or a manual run with release_tag: attaches Voxprint-linux-* assets + SHA256SUMS-linux.txt to that release.
@@ -29,6 +29,8 @@ jobs:
     timeout-minutes: 60
     env:
       QT_QPA_PLATFORM: offscreen
+      # Internal: this runner has no RTX 40-series GPU. Not a user setting.
+      VOXPRINT_ALLOW_NO_GPU: "1"
       REL_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
     steps:
       - uses: actions/checkout@v4
@@ -51,7 +53,7 @@ jobs:
           export VOXPRINT_BASE_URL=http://127.0.0.1:8099
           export VOXPRINT_PYTHON="$(python -c 'import sys; print(sys.executable)')"
           bash build/linux-test/install-voxprint-linux.sh --check || true
-          bash build/linux-test/install-voxprint-linux.sh --install-deps --yes --cpu
+          bash build/linux-test/install-voxprint-linux.sh --install-deps --yes --skip-gpu-check --torch-backend cpu
           test -x ~/.local/bin/voxprint
           test -f ~/.local/share/applications/voxprint.desktop
           test -f ~/.local/share/icons/hicolor/256x256/apps/voxprint.png
@@ -73,7 +75,7 @@ jobs:
           sudo apt-get install -y desktop-file-utils
           desktop-file-validate ~/.local/share/applications/voxprint.desktop
           # update path: running the installer again keeps the environment and succeeds quickly
-          VOXPRINT_BASE_URL=http://127.0.0.1:8099 bash build/linux-test/install-voxprint-linux.sh --yes --skip-check
+          VOXPRINT_BASE_URL=http://127.0.0.1:8099 bash build/linux-test/install-voxprint-linux.sh --yes --skip-check --skip-gpu-check
           # the one-file archive installs from its own tree (no network for the program itself)
           mkdir -p /tmp/tarcheck && tar xzf build/linux/Voxprint-linux-experimental.tar.gz -C /tmp/tarcheck
           test -f /tmp/tarcheck/voxprint-linux/app/main.py

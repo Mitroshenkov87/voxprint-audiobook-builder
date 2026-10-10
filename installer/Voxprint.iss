@@ -145,6 +145,12 @@ german.VcRedistStatus=Microsoft Visual C++-Komponenten werden installiert...
 english.WinBuildTooOld=%1 requires Windows 11 24H2 or newer (build 26100). This PC is Windows build %2, which is older. Setup will exit.
 russian.WinBuildTooOld=%1 требует Windows 11 24H2 или новее (сборка 26100). На этом ПК сборка Windows %2 — она старше. Установка будет завершена.
 german.WinBuildTooOld=%1 benötigt Windows 11 24H2 oder neuer (Build 26100). Dieser PC hat Windows-Build %2 und ist damit älter. Die Installation wird beendet.
+english.GpuRequired=Voxprint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: %1.
+russian.GpuRequired=Voxprint нужна видеокарта NVIDIA GeForce RTX 40-й серии или новее. Обнаружено: %1.
+german.GpuRequired=Voxprint benötigt eine NVIDIA GeForce RTX der 40er-Serie oder neuer. Erkannt: %1.
+english.GpuNone=none
+russian.GpuNone=нет
+german.GpuNone=keine
 english.ModelsPageCaption=Models folder
 russian.ModelsPageCaption=Папка моделей
 german.ModelsPageCaption=Modellordner
@@ -271,15 +277,206 @@ var
   PortableFound: String;
 #endif
 
+{ Hidden CI switch: /SKIPGPUCHECK. Not shown in the wizard. Smoke jobs pass it; users do not. }
+function ParamSwitch(const Name: String): Boolean;
+var
+  I: Integer;
+  S: String;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+  begin
+    S := Uppercase(Trim(ParamStr(I)));
+    if (S = '/' + Name) or (S = '-' + Name) then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+function RPos(const Sub, S: String): Integer;
+var
+  I, N: Integer;
+begin
+  Result := 0;
+  N := Length(Sub);
+  for I := Length(S) - N + 1 downto 1 do
+    if Copy(S, I, N) = Sub then
+    begin
+      Result := I;
+      Exit;
+    end;
+end;
+
+function CapMeets(const Cap: String): Boolean;
+var
+  P, Major, Minor: Integer;
+begin
+  Result := False;
+  P := Pos('.', Cap);
+  if P < 2 then Exit;
+  { Pascal Script has no Val. StrToIntDef returns -1 for text that is not a number. }
+  Major := StrToIntDef(Trim(Copy(Cap, 1, P - 1)), -1);
+  Minor := StrToIntDef(Trim(Copy(Cap, P + 1, 8)), -1);
+  if (Major < 0) or (Minor < 0) then Exit;
+  Result := (Major > 8) or ((Major = 8) and (Minor >= 9));
+end;
+
+{ WMI has no compute capability. Accept GeForce RTX 40-series and newer, plus Ada / Blackwell names. }
+function NameIsRtx40(const Name: String): Boolean;
+var
+  U, Digits: String;
+  I, Series: Integer;
+begin
+  U := Uppercase(Name);
+  Result := (Pos('ADA', U) > 0) or (Pos('BLACKWELL', U) > 0);
+  if Result then Exit;
+  I := Pos('RTX', U);
+  if I = 0 then Exit;
+  I := I + 3;
+  while (I <= Length(U)) and (U[I] = ' ') do
+    I := I + 1;
+  Digits := '';
+  while (I <= Length(U)) and (U[I] >= '0') and (U[I] <= '9') do
+  begin
+    Digits := Digits + U[I];
+    I := I + 1;
+  end;
+  if Length(Digits) < 4 then Exit;
+  Series := StrToIntDef(Copy(Digits, 1, 2), 0);
+  Result := Series >= 40;
+end;
+
+function RunHiddenToFile(const CmdLine, OutFile: String): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := Exec(ExpandConstant('{cmd}'), '/C ' + CmdLine + ' > "' + OutFile + '" 2>nul',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+end;
+
+function NextGpuLine(var Text: String; var Line: String): Boolean;
+var
+  P: Integer;
+begin
+  Result := Text <> '';
+  if not Result then Exit;
+  P := Pos(#10, Text);
+  if P = 0 then
+  begin
+    Line := Text;
+    Text := '';
+  end
+  else
+  begin
+    Line := Copy(Text, 1, P - 1);
+    Delete(Text, 1, P);
+  end;
+  Line := Trim(Line);
+end;
+
+function GpuFromSmi(const Text: String; var Detected: String): Boolean;
+var
+  Rest, Line, Name, Cap: String;
+  P, BestMaj, BestMin, CapMaj, CapMin, Dot: Integer;
+  Any: Boolean;
+begin
+  Result := False;
+  BestMaj := -1;
+  BestMin := -1;
+  Any := False;
+  Rest := Text;
+  while NextGpuLine(Rest, Line) do
+  begin
+    if Line = '' then Continue;
+    P := RPos(',', Line);
+    if P < 2 then Continue;
+    Line := Trim(Copy(Line, 1, P - 1));
+    P := RPos(',', Line);
+    if P < 2 then Continue;
+    Cap := Trim(Copy(Line, P + 1, 16));
+    Name := Trim(Copy(Line, 1, P - 1));
+    if (Length(Name) >= 2) and (Name[1] = '"') and (Name[Length(Name)] = '"') then
+      Name := Copy(Name, 2, Length(Name) - 2);
+    Dot := Pos('.', Cap);
+    if Dot < 2 then Continue;
+    CapMaj := StrToIntDef(Trim(Copy(Cap, 1, Dot - 1)), -1);
+    CapMin := StrToIntDef(Trim(Copy(Cap, Dot + 1, 8)), -1);
+    if (CapMaj < 0) or (CapMin < 0) then Continue;
+    if (not Any) or (CapMaj > BestMaj) or ((CapMaj = BestMaj) and (CapMin > BestMin)) then
+    begin
+      Any := True;
+      BestMaj := CapMaj;
+      BestMin := CapMin;
+      Detected := Name;
+      Result := CapMeets(Cap);
+    end;
+  end;
+end;
+
+function GpuFromNames(const Text: String; var Detected: String): Boolean;
+var
+  Rest, Line, Nvidia: String;
+begin
+  Result := False;
+  Nvidia := '';
+  Rest := Text;
+  while NextGpuLine(Rest, Line) do
+  begin
+    if (Pos('NVIDIA', Uppercase(Line)) = 0) and (Pos('GEFORCE', Uppercase(Line)) = 0) then Continue;
+    if Nvidia = '' then Nvidia := Line;
+    if NameIsRtx40(Line) then
+    begin
+      Detected := Line;
+      Result := True;
+      Exit;
+    end;
+  end;
+  if Nvidia <> '' then Detected := Nvidia;
+end;
+
+function GpuOk(var Detected: String): Boolean;
+var
+  OutFile: String;
+  Raw: AnsiString;
+begin
+  Detected := CustomMessage('GpuNone');
+  OutFile := ExpandConstant('{tmp}\voxprint-gpu.txt');
+  if RunHiddenToFile('nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv,noheader', OutFile)
+     and LoadStringFromFile(OutFile, Raw) and (Trim(String(Raw)) <> '') then
+  begin
+    Result := GpuFromSmi(String(Raw), Detected);
+    if Detected = '' then Detected := CustomMessage('GpuNone');
+    Exit;
+  end;
+  if RunHiddenToFile('powershell.exe -NoProfile -Command "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"', OutFile)
+     and LoadStringFromFile(OutFile, Raw) then
+  begin
+    Result := GpuFromNames(String(Raw), Detected);
+    if Detected = '' then Detected := CustomMessage('GpuNone');
+    Exit;
+  end;
+  Result := False;
+end;
+
 function InitializeSetup(): Boolean;
 var
   V: TWindowsVersion;
+  Detected: String;
 begin
   Result := True;
   GetWindowsVersionEx(V);
   if V.Build < 26100 then
   begin
     MsgBox(FmtMessage(CustomMessage('WinBuildTooOld'), ['{#AppDisplayName}', IntToStr(V.Build)]), mbError, MB_OK);
+    Result := False;
+    Exit;
+  end;
+  if ParamSwitch('SKIPGPUCHECK') then Exit;
+  if not GpuOk(Detected) then
+  begin
+    MsgBox(FmtMessage(CustomMessage('GpuRequired'), [Detected]), mbError, MB_OK);
     Result := False;
   end;
 end;

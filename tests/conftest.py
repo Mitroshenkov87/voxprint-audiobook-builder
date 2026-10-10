@@ -31,6 +31,8 @@ def _isolated_home(tmp_path, monkeypatch):
     # (a late answer adds online voices to the list in the middle of a test). Tests that need an index pass their own fetch/URL.
     monkeypatch.setenv("VOXPRINT_VOICES_INDEX", "offline://tests")
     monkeypatch.setenv("VOXPRINT_OWN_ENV", "1")   # the test interpreter counts as Voxprint-owned (auto-upgrade); external-env tests pass external_env=True
+    # Internal: this suite has no RTX 40-series GPU. Not a user option (see infra/gpu_requirement.py).
+    monkeypatch.setenv("VOXPRINT_ALLOW_NO_GPU", "1")
     monkeypatch.delenv("VOXPRINT_NET_IFACE", raising=False)
     from infra import netroute
 

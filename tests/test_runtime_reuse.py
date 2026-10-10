@@ -86,7 +86,7 @@ def test_flavor_choice_follows_the_driver():
     fl = ["cu128", "cu126", "cpu"]
     assert rr.choose_flavor(fl, (13, 0)) == "cu128" and rr.choose_flavor(fl, (12, 8)) == "cu128"
     assert rr.choose_flavor(fl, (12, 7)) == "cu126" and rr.choose_flavor(fl, (12, 6)) == "cu126"
-    assert rr.choose_flavor(fl, (12, 4)) == "cpu" and rr.choose_flavor(fl, None) == "cpu"
+    assert rr.choose_flavor(fl, (12, 4)) == "" and rr.choose_flavor(fl, None) == ""
 
 
 def test_flavor_can_be_forced(monkeypatch):
@@ -99,7 +99,7 @@ def test_cpu_is_forced_for_ci_when_it_is_not_a_public_flavor(monkeypatch):
     assert rr.choose_flavor(["cu130"], (13, 0)) == "cpu"
     monkeypatch.delenv("VOXPRINT_TORCH_FLAVOR")
     assert rr.choose_flavor(["cu130"], (13, 0)) == "cu130"
-    assert rr.choose_flavor(["cu130"], (12, 8)) == "cpu"
+    assert rr.choose_flavor(["cu130"], (12, 8)) == ""          # no CPU fallback for users
 
 
 def test_torchaudio_pairs_only_with_the_same_torch_release():
@@ -258,13 +258,13 @@ def test_install_downloads_only_the_flavor_of_this_pc_from_upstream(upstream, mo
     assert mods.install() == 0 and mods.installed_without_network()
 
 
-def test_a_cpu_pc_gets_the_cpu_build(upstream, monkeypatch):
+def test_a_pc_without_a_supported_cuda_flavor_does_not_download_torch(upstream, monkeypatch):
     srv, *_ = upstream
     monkeypatch.setattr(mods, "driver_cuda", lambda: None)
     monkeypatch.setenv("VOXPRINT_NO_REUSE", "1")
-    mods.install(["torch"])
+    assert mods.install(["torch"]) == 0
     got = {p[0].lstrip("/") for p in srv.requests}
-    assert "torch-2.11.0+cpu-cp311-cp311-win_amd64.whl" in got and not any("cu128" in g for g in got)
+    assert not any("torch" in g for g in got)
 
 
 def test_an_existing_pytorch_is_reused_and_not_downloaded(upstream, tmp_path, monkeypatch):
