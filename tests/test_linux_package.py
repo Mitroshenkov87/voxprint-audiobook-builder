@@ -106,7 +106,6 @@ def test_the_windows_downloader_installs_the_linux_component(built, tmp_path):
     assert any("Voxprint-linux-app.zip" in p for p, _ in srv.requests)
 
 
-@pytest.mark.skipif(shutil.which("bash") is None or sys.platform == "win32", reason="bash needed")
 def _os_release(path: Path, body: str) -> None:
     path.write_text(body, encoding="utf-8")
 
@@ -144,6 +143,7 @@ def test_old_distro_warns_and_a_current_one_does_not(tmp_path):
     assert warned.returncode == quiet.returncode == undated.returncode == tumble.returncode == absent.returncode
 
 
+@pytest.mark.skipif(shutil.which("bash") is None or sys.platform == "win32", reason="bash needed")
 def test_installer_script_syntax_and_help():
     assert subprocess.run(["bash", "-n", str(SCRIPT)], capture_output=True).returncode == 0
     r = subprocess.run(["bash", str(SCRIPT), "--help"], capture_output=True, text=True)
