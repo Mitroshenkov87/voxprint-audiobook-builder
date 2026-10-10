@@ -5,6 +5,10 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Added
+- **Splash easter egg.** Six clicks within two seconds on the start-up splash show `assets/easter-egg.jpg` with the caption `easter_egg.caption` ("Кури ушную серу!", kept in Russian in every UI language) for three seconds or until another click, once per launch. Loading continues under the picture; if the main window is ready, the splash stays only until the picture closes. The picture is original generated artwork and not a real person's likeness (`assets/ICON-LICENSE.txt`).
+- **Runtime users file on every GUI start.** `<app home>\runtime\.users.json` is created at the first GUI start and receives the `audiobook-builder` key (same helper and format as `models\.users.json`). A later start that already has the key does not rewrite the file.
+
 ## [0.2.4-beta] - 2026-10-09 - build 704 "Achim"
 
 Codename *Achim* (Biblical Hebrew *achim*, brothers; Genesis 13:8, "for we are brothers"): Voxprint AI Audiobook Builder and Voxprint AI Movie Dubber now live side by side as sibling programs that share models, settings and one Start menu folder. Build-installer run 50 failed in the Windows tests that need no PyTorch (a test used `torch.cuda` from the stand-in module) and published nothing, so the `BUILD.json` offset is **653** and run 51 stamps build 704. Full installer. Upgrade: install over 703; models, voices and settings stay.
