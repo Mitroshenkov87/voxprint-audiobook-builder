@@ -115,7 +115,7 @@
  "err.book_empty": "The book contains no text.",
  "err.book_read": "The book file cannot be read.",
  "err.book_unsafe": "The book file looks unsafe or is too large and was not opened.",
- "err.book_unsupported": "Unsupported book format. Use TXT, Markdown, FB2 (or FB2.ZIP) or EPUB.",
+ "err.book_unsupported": "Unsupported book format. Use TXT, Markdown, FB2 (or FB2.ZIP), EPUB or a Voxprint book (.vxbook).",
  "err.cancelled": "The operation was cancelled.",
  "err.dataset_empty": "The dataset is empty.",
  "err.dataset_file_missing": "Dataset file not found: {file}",
@@ -872,5 +872,8 @@
  "spk.note": "Each paragraph is the narrator or a character. Edit a row before narration starts.",
  "spk.title": "Speaker marks",
  "spk.tagging": "Marking speakers… {pct}%",
- "spk.mismatch": "Speaker marks do not match the prepared text, so the narrator reads the whole book."
+ "spk.mismatch": "Speaker marks do not match the prepared text, so the narrator reads the whole book.",
+ "err.vxbook": "Could not read this Voxprint book ({detail}).",
+ "narrset.soundscape": "Play a soundscape under narration when the book asks for one",
+ "narrset.soundscape_tip": "Off by default. Turning this on downloads the ACE-Step model (about 10 GB) once. Music and effects play only for a .vxbook that declares the sound extension. Plain books stay silent. The mixed chapter keeps the narration's loudness. Applies to the next narration."
 }

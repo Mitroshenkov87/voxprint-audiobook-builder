@@ -22,7 +22,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -53,6 +53,7 @@ from infra import (
     existing_models,
     netroute,
     preload,
+    soundscape_model,
     sysinfo,
     ui_prefs,
 )
@@ -64,6 +65,21 @@ from workers.auto_repair_worker import AutoRepairWorker
 from workers.backup_worker import BackupWorker
 
 log = logging.getLogger("voxprint.ui.settings")
+
+
+class _SoundscapeEnable(QThread):
+    """Downloads ACE-Step off the UI thread. ``failed`` is empty when the setting was saved."""
+
+    failed = Signal(str)
+
+    def run(self) -> None:
+        try:
+            soundscape_model.enable()
+        except Exception as exc:  # noqa: BLE001 - a failed download is reported back to the checkbox
+            log.warning("soundscape enable failed: %s", exc)
+            self.failed.emit(str(exc))
+            return
+        self.failed.emit("")
 
 if TYPE_CHECKING:  # pragma: no cover - import only for type checkers (avoids a circular import at runtime)
     from ui.main_window import MainWindow
@@ -225,6 +241,11 @@ class SettingsDialog(GlassDialog):
         r = ngrid.rowCount()
         ngrid.addWidget(self.chk_ordinals, r, 0, 1, 2)
         self.chk_ordinals.toggled.connect(self._on_ordinals_toggled)
+        self.chk_soundscape = QCheckBox()
+        self.chk_soundscape.setChecked(soundscape_model.enabled())
+        r = ngrid.rowCount()
+        ngrid.addWidget(self.chk_soundscape, r, 0, 1, 2)
+        self.chk_soundscape.toggled.connect(self._on_soundscape_toggled)
         self.lbl_narr_hint = QLabel()
         self.lbl_narr_hint.setObjectName("cardnote")
         self.lbl_narr_hint.setWordWrap(True)
@@ -407,6 +428,26 @@ class SettingsDialog(GlassDialog):
         """Save "read ordinal numbers by context" (used by the next narration)."""
         ordinals.save_enabled(on)
 
+    def _on_soundscape_toggled(self, on: bool) -> None:
+        """Save the soundscape switch. Turning it on downloads ACE-Step on a worker; turning it off does not delete it."""
+        if not on:
+            soundscape_model.disable()
+            return
+        self.chk_soundscape.setEnabled(False)
+        worker = _SoundscapeEnable(self)
+        self._soundscape_worker = worker
+        worker.failed.connect(self._soundscape_enable_done)
+        worker.start()
+
+    def _soundscape_enable_done(self, error: str) -> None:
+        """Re-enable the checkbox. A download error turns it back off."""
+        self.chk_soundscape.setEnabled(True)
+        if not error:
+            return
+        self.chk_soundscape.blockSignals(True)
+        self.chk_soundscape.setChecked(False)
+        self.chk_soundscape.blockSignals(False)
+
     def reset_narration(self) -> None:
         """Back to the default pause lengths, speed 100 %, automatic style and ordinals on."""
         for kind, ms in pz.DEFAULT_LENGTHS_MS.items():
@@ -486,6 +527,8 @@ class SettingsDialog(GlassDialog):
             self.cmb_style.setItemText(i, text)              # same order as pace.STYLES
         self.chk_ordinals.setText(tr("narrset.ordinals"))
         self.chk_ordinals.setToolTip(tr("narrset.ordinals_tip"))
+        self.chk_soundscape.setText(tr("narrset.soundscape"))
+        self.chk_soundscape.setToolTip(tr("narrset.soundscape_tip"))
         self.lbl_narr_hint.setText(tr("narrset.hint"))
         self.btn_narr_defaults.setText(tr("narrset.defaults"))
 

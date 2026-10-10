@@ -141,17 +141,22 @@ def test_registry_is_consistent_and_placeholders_are_marked():
         m = tm.for_step(step)
         assert m is not None and not m.integrated and tm.state(m) == tm.STATE_PLANNED
     # translation: one integrated Opus-MT model per direction, a pinned commit and the SHA-256 of the weights
-    for key, pair in (("opus-ru-en", ("ru", "en")), ("opus-en-ru", ("en", "ru")), ("opus-de-en", ("de", "en")), ("opus-en-de", ("en", "de"))):
+    for key, pair in (("opus-ru-en", ("ru", "en")), ("opus-en-ru", ("en", "ru"))):
         m = tm.get(key)
         assert m.integrated and m.pair == pair and len(m.revision) == 40 and m.license in ("CC-BY-4.0", "Apache-2.0")
         assert len(dict(m.sha256)["pytorch_model.bin"]) == 64 and "pytorch_model.bin" in m.files and m in tm.translate_candidates(*pair)
-    # tc-big: preferred where it exists, safetensors only, every downloaded file pinned by hash
-    for key, pair in (("opus-big-en-ru", ("en", "ru")), ("opus-big-ru-en", ("ru", "en")), ("opus-big-ru-de", ("ru", "de")),
-                      ("opus-big-de-ru", ("de", "ru"))):
+    # tc-big and tc-bible-big: preferred, safetensors only, every downloaded file pinned by hash
+    for key, pair, token, lic in (
+            ("opus-big-en-ru", ("en", "ru"), ">>rus<<", "CC-BY-4.0"),
+            ("opus-big-ru-en", ("ru", "en"), "", "CC-BY-4.0"),
+            ("opus-big-ru-de", ("ru", "de"), "", "CC-BY-4.0"),
+            ("opus-big-de-ru", ("de", "ru"), ">>rus<<", "CC-BY-4.0"),
+            ("opus-en-de", ("en", "de"), ">>deu<<", "Apache-2.0"),
+            ("opus-de-en", ("de", "en"), ">>eng<<", "Apache-2.0")):
         m = tm.get(key)
-        assert tm.translate_model(*pair) is m and m.license == "CC-BY-4.0" and len(m.revision) == 40
+        assert tm.translate_model(*pair) is m and m.license == lic and len(m.revision) == 40
         assert set(dict(m.sha256)) == set(m.files) and "model.safetensors" in m.files and key in tm.COMPONENT_EXTRAS
-        assert m.target_token == (">>rus<<" if pair[1] == "ru" else "")
+        assert m.target_token == token and "pytorch_model.bin" not in m.files
     assert tm.for_step(tm.STEP_SPELLFIX, "ru").key == "sage-ru" and tm.for_step(tm.STEP_SPELLFIX, "en").key == "spell-en"
 
 

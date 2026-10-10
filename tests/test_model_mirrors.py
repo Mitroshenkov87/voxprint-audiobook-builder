@@ -60,8 +60,8 @@ def test_bundled_manifest_is_valid_and_permissive():
         if e.has_mirror:
             assert e.mirror_repo.startswith("Mitroshenkov87/voxprint-mirror-") and len(e.mirror_revision) == 40
         else:                                    # hashes only (no mirror yet)
-            assert (repo in {"Qwen/Qwen3-ASR-1.7B", "myshell-ai/OpenVoiceV2"}
-                    or repo.startswith("Helsinki-NLP/opus-mt-tc-big-")) and not e.mirror_repo
+            assert (repo in {"Qwen/Qwen3-ASR-1.7B", "myshell-ai/OpenVoiceV2", "ACE-Step/Ace-Step1.5"}
+                    or repo.startswith("Helsinki-NLP/opus-mt-tc-")) and not e.mirror_repo
         assert any(n.endswith((".safetensors", ".bin", ".pth")) for n in e.files)
         assert any(n == "config.json" or n.endswith("/config.json") for n in e.files)
         assert all(len(m["sha256"]) == 64 and m["size"] > 0 for m in e.files.values())

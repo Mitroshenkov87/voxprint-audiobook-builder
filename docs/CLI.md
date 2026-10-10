@@ -76,14 +76,14 @@ voxprint capabilities
 voxprint narrate BOOK --voice ID_OR_NAME --out DIR
     [--format NAME] [--no-pauses|--pauses] [--pause-comma SEC] [--pause-mid SEC] [--pause-sentence SEC]
     [--pause-paragraph SEC] [--pause-chapter SEC] [--speed X] [--style auto|scripture|fiction|dialogue]
-    [--ordinals|--no-ordinals] [--yo|--no-yo] [--ai-disclosure] [--work-dir DIR]
+    [--ordinals|--no-ordinals] [--yo|--no-yo] [--no-soundscape] [--ai-disclosure] [--work-dir DIR]
     [--speakers] [--male-voice ID] [--male2-voice ID] [--female-voice ID] [--female2-voice ID]
     [--character NAME=ID ...] [--speaker-marks FILE] [--json]
 ```
 
 | Argument | Meaning |
 |---|---|
-| `BOOK` | TXT, Markdown (`.md`), FB2, `.fb2.zip` or EPUB |
+| `BOOK` | TXT, Markdown (`.md`), FB2, `.fb2.zip`, EPUB or `.vxbook` |
 | `--voice` | Voice library id or display name |
 | `--out DIR` | Working folder; the job lands in `<DIR>/<book title>/` |
 | `--format` | Repeatable / comma-separated. Default: `opus_single`. Aliases: `opus`, `mp3`, `m4b`, `flac`, `wav`, … |
@@ -97,7 +97,8 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 | `--speed X` | Global reading speed 0.7-1.3 (1 = the voice's own speed) |
 | `--style NAME` | `auto` (detected), `scripture` (solemn, a little slower), `fiction`, `dialogue` |
 | `--no-ordinals` / `--ordinals` | Read numbers after words like chapter / day / verse as ordinals by context ("день 1" -> "день первый", "21st", "3. Kapitel"); default: Settings (on). See [ORDINALS.md](ORDINALS.md) |
-| `--no-yo` / `--yo` | For a Russian book, restore the letter yo where a dictionary is sure ("еще" -> "ещё"). "все" / "всё" is decided from the neighbouring words ("всё равно", "вот и всё", "всё было", "всё, что"; "все люди", "пришли все" stay). Other words the dictionary does not list, including "текст" and ambiguous pairs such as "берег", stay as written. A word that already contains yo is not replaced, even when the dictionary would put yo on a different letter. A U+0301 stress mark the author wrote is kept on that letter. When the Russian normalizer rewrites that mark as a plus immediately before the vowel, the plus is turned back into U+0301. Narration does not insert stress marks of its own. The base speech model does not read them. Default: on. |
+| `--no-yo` / `--yo` | For a Russian book, restore the letter yo where a dictionary is sure ("еще" -> "ещё"). "все" / "всё" is decided from the neighbouring words ("всё равно", "вот и всё", "всё было", "всё, что"; "все люди", "пришли все" stay). Other words the dictionary does not list, including "текст" and ambiguous pairs such as "берег", stay as written. A word that already contains yo is not replaced, even when the dictionary would put yo on a different letter. A U+0301 stress mark the author wrote is kept on that letter. When the Russian normalizer rewrites that mark as a plus immediately before the vowel, the plus is turned back into U+0301. Narration does not insert stress marks of its own. The base speech model does not read them. Default: on. A `.vxbook` already carries its own yo, so this step is skipped for that file |
+| `--no-soundscape` | Do not mix a soundscape on this run. Does not change the saved setting and does not download the model. A soundscape plays only for a `.vxbook` that declares extension `sound/1` and only when `narration.soundscape` is on. See [SOUNDSCAPE.md](SOUNDSCAPE.md) |
 | `--ai-disclosure` | Speak a short AI note at the start (opt-in) |
 | `--work-dir DIR` | Remember this folder as the app working folder |
 | `--speakers` | Ask the text model (Gemma) to mark each paragraph narrator, male or female, then narrate those voices. Same path as the Narrate window. Without any voice flag or `--character`, the default cast is used: Natan and Shimon for men, Miriam for women when they are installed, else the first library voices of each gender (never the narrator unless it is the only one). A block whose reply has the wrong number of marks is split and asked again, down to single paragraphs |
@@ -117,6 +118,8 @@ voxprint narrate dialog.txt --voice levi --male-voice natan --male2-voice shimon
 voxprint narrate dialog.txt --voice levi --male-voice natan --character Michael=shimon --female-voice miriam --speaker-marks marks.txt --out ./out
 python cli.py narrate book.md --voice narrator --male-voice tom --female-voice ann --character Ivan=tom --character Anna=ann --speaker-marks marks.txt --out ./audiobooks --format wav --json
 ```
+
+A `.vxbook` is narrated with the voices in its cast. `--voice` is still required and is the narrator (it overrides the cast narrator). `--character NAME=ID` overrides one character, including an alias. `--speakers` does not call the text model for a `.vxbook`: the file's roles are used. TXT, FB2 and EPUB still use the optional Gemma pass. A cast voice that is not installed is exit code 3 (`--character` can point that name at a voice you do have). The soundscape is separate and stays off unless the setting is on and the file declares `sound/1`. Details: [SOUNDSCAPE.md](SOUNDSCAPE.md).
 
 A Plotweaver book is UTF-8 `.md` or `.txt`. A line `# Chapter` or `## Chapter` (also `###`), standing alone between blank lines, is a chapter title. A blank line starts a new paragraph. The letter yo the author wrote is kept, and so is a U+0301 stress mark on a vowel. A plus that the Russian normalizer writes immediately before that vowel is turned back into U+0301. `--yo` still restores yo in words that have neither. `marks.txt` is optional and has one line per paragraph, in order:
 
@@ -217,6 +220,7 @@ voxprint settings set KEY VALUE [--json]
 | `narration.style` | `auto`, `scripture`, `fiction`, `dialogue` |
 | `narration.pauses` | `on` / `off` |
 | `narration.ordinals` | `on` / `off` |
+| `narration.soundscape` | `on` / `off` (off by default). `on` downloads ACE-Step 1.5 if it is not already on disk. See [SOUNDSCAPE.md](SOUNDSCAPE.md) |
 | `narration.ai_disclosure` | `on` / `off` |
 | `narration.pause.comma`, `.mid`, `.sentence`, `.paragraph`, `.chapter` | Seconds, 0-6 |
 | `theme` | Shared by the Voxprint programs (`state/suite.json`). This program has one look, `glass-dark`; another program's theme id is kept and read as `glass-dark` |

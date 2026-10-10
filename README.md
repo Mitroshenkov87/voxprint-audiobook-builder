@@ -23,7 +23,7 @@ System requirements: an NVIDIA RTX 40-series or newer GPU (compute capability 8.
 > Only record your own voice, or one whose owner agreed. More: [about the scripts](docs/recording-scripts/README.md).
 
 ## What it does
-* **Narrate books** - TXT, FB2 (also `.fb2.zip`) and EPUB with chapters; output as one Opus file, MP3 per chapter or M4B; pause, cancel and resume at any time.
+* **Narrate books** - TXT, FB2 (also `.fb2.zip`), EPUB and `.vxbook` with chapters; output as one Opus file, MP3 per chapter or M4B; pause, cancel and resume at any time. A `.vxbook` can carry its own voices. An optional soundscape (off until you turn it on) plays only when that file asks for one ([details](docs/SOUNDSCAPE.md)).
 * **Pauses that follow the text** (new in 0.1.3) - the text is cut per sentence and at strong breaks, each spoken piece is trimmed of its own silence and measured pauses are inserted: comma 0.25 s, strong break 0.4 s, sentence 0.6 s, paragraph or verse line 1.0 s, chapter or scene break 2.0 s. Adjustable in *Settings -> Narration: pauses and speed* or with `voxprint narrate --pause-...`.
 * **Reading speed that adapts to the text** (new in 0.1.3) - long, descriptive and scripture-like sentences are read a little slower, dialogue at the voice's own pace; a reading style per book (*Automatic*, *Solemn / scripture*, *Fiction*, *Dialogue-heavy*) and a global speed of 70-130 %. Applied after synthesis with the pitch kept, so changing pauses or speed never re-synthesizes finished parts.
 * **Train your voice** - give it a 5-15 minute recording (yours, or of someone who agreed) and the text you read; everything else is automatic ([Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) LoRA).
@@ -68,13 +68,13 @@ irm https://raw.githubusercontent.com/Mitroshenkov87/voxprint-audiobook-builder/
 
 ## Quick start
 1. Install and start Voxprint - the **Studio** opens. Under *Train your voice* choose your recording and the text you read, press **Create voice (LoRA)**.
-2. Open *Narrate a book*, choose a TXT / FB2 / EPUB file and your voice (optionally tick *Translate the book*).
+2. Open *Narrate a book*, choose a TXT / FB2 / EPUB / `.vxbook` file and your voice (optionally tick *Translate the book*).
 3. Press **Start narration** and listen while the rest is being made. The audiobook lands in the projects folder (`%LOCALAPPDATA%\Voxprint\Projects\Audiobooks`, shortcut *Voxprint Projects* in Documents).
 
 ## Documentation
 * **User manual (PDF, 0.1.3 build 667):** [English](docs/manual/Voxprint-Manual-en.pdf) · [Русский](docs/manual/Voxprint-Manual-ru.pdf) · [Deutsch](docs/manual/Voxprint-Manual-de.pdf) (print versions and sources: [`docs/manual/`](docs/manual/); screenshots: [`docs/screenshots/en-667/`](docs/screenshots/en-667/))
 * **Recording scripts** to read when you record a voice (ru / en / de, TXT + PDF): [`docs/recording-scripts/`](docs/recording-scripts/)
-* [User guide](docs/USER-GUIDE.md) · [Command-line interface](docs/CLI.md) · [Driving the app (for agents)](docs/AGENTS.md) · [FAQ](docs/FAQ.md) · [Translation](docs/TRANSLATION.md) · [Re-voice](docs/REVOICE.md) · [Voices and licences](docs/VOICES.md) · [AAC / M4B notice](docs/AAC-M4B.md)
+* [User guide](docs/USER-GUIDE.md) · [Command-line interface](docs/CLI.md) · [Driving the app (for agents)](docs/AGENTS.md) · [FAQ](docs/FAQ.md) · [Translation](docs/TRANSLATION.md) · [Re-voice](docs/REVOICE.md) · [Soundscape](docs/SOUNDSCAPE.md) · [Voices and licences](docs/VOICES.md) · [AAC / M4B notice](docs/AAC-M4B.md)
 * [Models, mirrors and backups](docs/MODELS.md) · [Downloads and hashes](docs/DOWNLOADS.md) · [Runtime](docs/RUNTIME.md) · [Linux](docs/LINUX.md) · [Building and contributing](docs/BUILDING.md)
 * [How it works](docs/HOW-IT-WORKS.md) · [Voice quality](docs/VOICE-QUALITY.md) · [Architecture](docs/ARCHITECTURE.md) · [Tests and verification](docs/TESTING.md) · [Roadmap](docs/ROADMAP.md) · [Changelog](CHANGELOG.md)
 

@@ -257,7 +257,7 @@ def prepare_paragraphs(paras: Sequence[str], language: str, plan: LLMPlan, cache
 def prepare_book(book, plan: LLMPlan, language: str, job_dir: Path, progress=None, cancel=None, chapters=()):
     """The book with its chapter texts prepared for narration (titles unchanged); the result is also written to
     ``<job>/.debug/llm_prepared.txt`` for comparison."""
-    from core.book_parsers import Book, Chapter
+    from core.book_parsers import Chapter
     from core.translate import TranslationCache, split_paragraphs
 
     structure = [split_paragraphs(ch.text) if (not chapters or i in chapters) else None for i, ch in enumerate(book.chapters)]
@@ -281,4 +281,4 @@ def prepare_book(book, plan: LLMPlan, language: str, job_dir: Path, progress=Non
     debug.mkdir(parents=True, exist_ok=True)
     (debug / "llm_prepared.txt").write_text("\n".join(f"=== [{i + 1}] {c.title}\n\n{c.text}\n" for i, c in enumerate(out)),
                                             encoding="utf-8")
-    return Book(book.title, book.author, book.language, out, book.cover, book.cover_ext)
+    return book.carry(chapters=out)

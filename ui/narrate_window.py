@@ -38,12 +38,13 @@ from core.book_parsers import SUPPORTED_EXTENSIONS, Book, load_book
 from core.errors import DatasetMakerError
 from core import num_words as nw
 from core import translate as tl
+from core import soundscape as soundscape_mod
 from core import speakers as spk
 from core import voice_info
 from core.i18n import tr
 from core.languages import language_name
 from core.voice_library import VoiceLibrary
-from infra import bundled_voices, features, llm_tool, text_models
+from infra import bundled_voices, features, llm_tool, soundscape_model, text_models
 from infra import voice_catalog as catalog
 from infra import voice_repository as repo
 from ui.main_window import mark_recommended, open_folder, recommended_text
@@ -729,7 +730,10 @@ class NarrateWindow(SubWindow):
     # ------------------------------------------------------------------ text preparation
     def selected_rule_steps(self) -> Set[str]:
         """Rule-based preparation steps. The one switch turns them all on or all off."""
-        return set(RULE_STEPS) if self.chk_prepare.isChecked() else set()
+        steps = set(RULE_STEPS) if self.chk_prepare.isChecked() else set()
+        if self.book is not None and self.book.explicit_yo:
+            steps.discard(text_prep.STEP_YO)
+        return steps
 
     def _spellfix_applies(self) -> bool:
         """True when Prepare text is on and the Russian typo model is downloaded for this book."""
@@ -920,8 +924,14 @@ class NarrateWindow(SubWindow):
         male, female = str(self.cmb_spk_male.currentData() or ""), str(self.cmb_spk_female.currentData() or "")
         male2 = str(self.cmb_spk_male2.currentData() or "") if male else ""
         narr = self.selected_voice_id()
-        cast = spk.SpeakerCast(lines=self.speaker_lines, male_id=male, female_id=female, male2_id=male2,
-                               tagger=None if self.speaker_lines is not None else self.llm_plan(), narrator_id=narr)
+        characters = dict(self.book.voice_cast) if self.book is not None else {}
+        file_marks = tuple(getattr(self.book, "speaker_marks", ()) or ()) if self.book is not None else ()
+        lines = self.speaker_lines
+        if file_marks and lines is None:
+            lines = [spk.SpeakerLine(role, name) for role, name in file_marks]
+        cast = spk.SpeakerCast(lines=lines, male_id=male, female_id=female, male2_id=male2,
+                               tagger=None if (lines is not None or file_marks) else self.llm_plan(), narrator_id=narr,
+                               characters=characters)
         return cast if cast.uses_several(narr) else None
 
     def preview_speakers(self) -> bool:
@@ -930,7 +940,10 @@ class NarrateWindow(SubWindow):
             return False
         paras = [text for _ci, text in spk.paragraphs(self.book)]
         lines = self.speaker_lines
-        if lines is None or len(lines) != len(paras):
+        file_marks = tuple(getattr(self.book, "speaker_marks", ()) or ())
+        if file_marks and (lines is None or len(lines) != len(paras)):
+            lines = [spk.SpeakerLine(role, name) for role, name in file_marks]
+        elif lines is None or len(lines) != len(paras):
             plan = self.llm_plan()
             if plan is None:
                 return False
@@ -1120,6 +1133,9 @@ class NarrateWindow(SubWindow):
         self.lbl_book_error.setText("")
         self.result = None
         self.speaker_lines = None
+        if book.speaker_marks:
+            self.speaker_lines = [spk.SpeakerLine(role, name) for role, name in book.speaker_marks]
+            self.chk_speakers.setChecked(True)
         self._choice_status = True
         self.lbl_ready.hide()
         self.btn_open.hide()
@@ -1247,7 +1263,10 @@ class NarrateWindow(SubWindow):
             check_chunks=self.chk_check_chunks.isChecked(), llm_prepare=self.llm_prepare_plan(),
             speakers=self.speaker_cast(),
             ordinals=ordinals.load_enabled(),                    # Settings: ordinal numbers by context
-            yo=self.chk_prepare.isChecked())                     # the Prepare switch; Russian yo is one of its steps
+            yo=self.chk_prepare.isChecked() and not (self.book is not None and self.book.explicit_yo),
+            sound=(soundscape_mod.SoundRequest()
+                   if self.book is not None and soundscape_model.enabled() and soundscape_mod.requested(self.book)
+                   else None))
 
     # ------------------------------------------------------------------ state
     @property

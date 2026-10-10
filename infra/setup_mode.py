@@ -51,9 +51,10 @@ def auto_download(state_dir: Optional[Path] = None) -> bool:
 
 def full_sizes(flavor: str = "cu130", platform: str = "win-x64") -> Dict[str, int]:
     """Bytes of the complete download from the pinned sizes: ``models``, ``runtime`` and ``total``."""
-    from infra import bundled_voices, denoise_tool, llm_tool, model_mirrors, quality_models, text_models
+    from infra import bundled_voices, denoise_tool, llm_tool, model_mirrors, quality_models, soundscape_model, text_models
 
-    models = sum(int(m["size"]) for e in model_mirrors.load().values() for m in e.downloadable().values())
+    models = sum(int(m["size"]) for repo, e in model_mirrors.load().items() if repo != soundscape_model.REPO
+                 for m in e.downloadable().values())
     mirrored = set(model_mirrors.load())
     models += sum(m.size_mb * 1024 ** 2 for m in text_models.REGISTRY
                   if m.integrated and m.repo and m.repo not in mirrored)

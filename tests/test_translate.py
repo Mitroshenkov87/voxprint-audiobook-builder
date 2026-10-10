@@ -68,7 +68,11 @@ def test_routes_are_direct_or_through_english(monkeypatch):
     with pytest.raises(tl.TranslateError):
         tl.route("uk", "en")
     assert [m.key for m in text_models.translate_models("ru", "de")] == ["opus-big-ru-de"]
-    assert [m.key for m in text_models.translate_models("en", "de")] == ["opus-en-de"]       # no tc-big en<->de: 2020 model
+    en_de = text_models.translate_models("en", "de")
+    assert [m.key for m in en_de] == ["opus-en-de"]
+    assert en_de[0].repo.endswith("deu_eng_fra_por_spa-gmw") and en_de[0].target_token == ">>deu<<"
+    de_en = text_models.get("opus-de-en")
+    assert de_en.repo.endswith("gmw-deu_eng_fra_por_spa") and de_en.target_token == ">>eng<<"
     with pytest.raises(ValueError):
         text_models.translate_models("fr", "de")
 
@@ -232,7 +236,7 @@ def test_runner_narrates_in_the_target_language(monkeypatch, tmp_path):
 def test_ensure_downloads_only_the_needed_files_and_checks_the_sha256(tmp_path, monkeypatch):
     import hashlib
     from infra import model_downloader as md
-    m = text_models.get("opus-de-en")
+    m = text_models.get("opus-ru-en")
     blob = b"weights"
     calls = []
 
@@ -253,8 +257,8 @@ def test_ensure_downloads_only_the_needed_files_and_checks_the_sha256(tmp_path, 
     assert path == m.local_dir and calls[-1] == (m.repo, m.revision, text_models.OPUS_FILES)
     assert "tf_model.h5" not in text_models.OPUS_FILES and "rust_model.ot" not in text_models.OPUS_FILES
     assert text_models.state(m) == text_models.STATE_READY
-    eng = text_models.make_translator("de", "en")
-    assert eng is not None and eng.tag.startswith("opus-mt-de-en@1a922f3b") and text_models.make_translator("en", "ru") is None
+    eng = text_models.make_translator("ru", "en")
+    assert eng is not None and eng.tag.startswith("opus-mt-ru-en@fbd6dc73284f") and text_models.make_translator("en", "ru") is None
     plan = text_models.build_translate_plan("en", "de")
     assert plan.target == "en" and plan.engine_factory is text_models.make_translator and text_models.build_translate_plan("") is None
 
@@ -345,10 +349,13 @@ def test_translate_card_is_localized_in_en_ru_de(app, lib, tmp_path):
 
 
 # ----------------------------------------------------------------------------- Hugging Face backup mirrors of the Opus-MT models
-def test_bundled_manifest_mirrors_the_four_opus_models_with_the_registry_pins():
+def test_bundled_manifest_mirrors_the_2020_ru_models_and_pins_the_bible_en_de_pair():
     from infra import model_mirrors as mir
+    from infra import model_release as rel
     entries = mir.load()
-    for key, lic in (("opus-ru-en", "CC-BY-4.0"), ("opus-en-ru", "Apache-2.0"), ("opus-de-en", "Apache-2.0"), ("opus-en-de", "CC-BY-4.0")):
+    assert "Helsinki-NLP/opus-mt-de-en" not in entries and "Helsinki-NLP/opus-mt-en-de" not in entries
+    assert "Helsinki-NLP/opus-mt-de-en" not in rel.load() and "Helsinki-NLP/opus-mt-en-de" not in rel.load()
+    for key, lic in (("opus-ru-en", "CC-BY-4.0"), ("opus-en-ru", "Apache-2.0")):
         m = text_models.get(key)
         e = entries[m.repo]
         assert e.license == lic == m.license                                  # the original licence is kept
@@ -358,6 +365,13 @@ def test_bundled_manifest_mirrors_the_four_opus_models_with_the_registry_pins():
         assert e.files["pytorch_model.bin"]["sha256"] == dict(m.sha256)["pytorch_model.bin"]   # same hash as the registry check
         assert len(e.mirror_revision) == 40 and e.files["README.md"]["card"] and e.files[".gitattributes"]["card"]
         assert set(e.downloadable(text_models.OPUS_FILES)) == set(text_models.OPUS_FILES)      # the patterns of the app select all of them
+    for key, token in (("opus-en-de", ">>deu<<"), ("opus-de-en", ">>eng<<")):
+        m = text_models.get(key)
+        e = entries[m.repo]
+        assert m.license == "Apache-2.0" == e.license and not e.has_mirror and not e.mirror_repo
+        assert e.source_revision == m.revision and m.target_token == token
+        assert set(e.downloadable()) == set(text_models.TC_BIG_FILES) == set(m.files) == set(dict(m.sha256))
+        assert e.files["model.safetensors"]["sha256"] == dict(m.sha256)["model.safetensors"]
 
 
 def _opus_fixture(tmp_path, monkeypatch):
@@ -470,6 +484,12 @@ def test_tc_big_is_preferred_the_2020_model_is_the_fallback_and_the_target_token
     ready.add("opus-big-en-ru")
     eng = text_models.make_translator("en", "ru")
     assert eng.prefix == ">>rus<<"
+    ready.add("opus-en-de")
+    de = text_models.make_translator("en", "de")
+    assert de is not None and de.prefix == ">>deu<<" and str(de.dir).endswith("deu_eng_fra_por_spa-gmw")
+    ready.add("opus-de-en")
+    back = text_models.make_translator("de", "en")
+    assert back is not None and back.prefix == ">>eng<<" and str(back.dir).endswith("gmw-deu_eng_fra_por_spa")
     seen = []
 
     class Tok:
@@ -477,7 +497,24 @@ def test_tc_big_is_preferred_the_2020_model_is_the_fallback_and_the_target_token
             seen.extend(texts)
             raise RuntimeError("stop")       # only the tokenizer input matters here
 
+    injected = False
+    try:
+        import torch  # noqa: F401  # the engine imports torch to read the device
+    except ImportError:
+        import sys
+        import types
+        sys.modules["torch"] = types.ModuleType("torch")
+        injected = True
     eng._tok, eng._model, eng.device_name = Tok(), object(), "cpu"
-    with pytest.raises(RuntimeError):
-        eng.translate(["Hello."])
-    assert seen == [">>rus<< Hello."]
+    try:
+        with pytest.raises(RuntimeError):
+            eng.translate(["Hello."])
+        assert seen == [">>rus<< Hello."]
+        seen.clear()
+        back._tok, back._model, back.device_name = Tok(), object(), "cpu"
+        with pytest.raises(RuntimeError):
+            back.translate(["Guten Tag."])
+        assert seen == [">>eng<< Guten Tag."]
+    finally:
+        if injected:
+            sys.modules.pop("torch", None)

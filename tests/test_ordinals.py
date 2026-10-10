@@ -197,10 +197,13 @@ def test_settings_dialog_checkbox(tmp_path):
     i18n.set_language("ru")
     d = SettingsDialog(make_studio(VoiceLibrary(tmp_path / "voices")))
     assert d.chk_ordinals.isChecked() and d.chk_ordinals.text() == i18n.tr("narrset.ordinals")
+    assert d.chk_soundscape.isChecked() is False
+    assert d.chk_soundscape.text() == i18n.tr("narrset.soundscape")
     d.chk_ordinals.setChecked(False)
     assert od.load_enabled() is False
     d.reset_narration()
     assert d.chk_ordinals.isChecked() and od.load_enabled() is True
+    assert d.chk_soundscape.isChecked() is False
     i18n.set_language("en")
 
 

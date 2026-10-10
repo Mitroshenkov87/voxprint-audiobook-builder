@@ -23,13 +23,13 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from core.errors import BookParseError
 from core.i18n import tr
 from core.text_utils import decode_bytes
 
-SUPPORTED_EXTENSIONS = (".txt", ".md", ".fb2", ".epub", ".zip")
+SUPPORTED_EXTENSIONS = (".txt", ".md", ".fb2", ".epub", ".zip", ".vxbook")
 MAX_MEMBER_BYTES = 80 * 1024 * 1024
 MIN_CHAPTER_CHARS = 40          # EPUB documents with less text (title pages, blank pages) are dropped
 
@@ -50,11 +50,53 @@ class Book:
     chapters: List[Chapter] = field(default_factory=list)
     cover: Optional[bytes] = None
     cover_ext: str = ""          # "jpg" | "png" when ``cover`` is set
+    #: A ``.vxbook`` already writes the letter yo. Dictionary restoration must stay off.
+    explicit_yo: bool = False
+    #: One ``(role, name)`` per block :func:`core.speakers.paragraphs` returns, including scene breaks.
+    speaker_marks: Tuple[Tuple[str, str], ...] = ()
+    #: Character name (and alias) -> voice id from ``cast.json``. ``--voice`` / ``--character`` win.
+    voice_cast: Dict[str, str] = field(default_factory=dict)
+    narrator_hint: str = ""
+    #: Alias as written in ``speakers.json`` -> the speaker's display name.
+    alias_to_name: Dict[str, str] = field(default_factory=dict)
+    vxbook_path: str = ""
+    chapter_ids: Tuple[str, ...] = ()
+    #: ``(chapter index, blank-line block index)`` blocks that are not counted paragraphs (scene breaks, subheadings).
+    unnumbered_blocks: Tuple[Tuple[int, int], ...] = ()
+    extensions: Tuple[str, ...] = ()
+    #: Parsed ``sound.json`` when the archive lists it. Sound plays only if ``sound/1`` is also declared.
+    sound_document: Optional[Dict[str, Any]] = None
+    sound_cast_document: Optional[Dict[str, Any]] = None
+    #: ``(index, chapter id, chapter index, fingerprint, plain text)`` of counted paragraphs, from ``book.md``.
+    sound_paragraphs: Tuple[Tuple[int, str, int, str, str], ...] = ()
+    #: Inline ``vx:sound`` mirrors: ``(paragraph index, cue id)``. ``sound.json`` wins on conflict.
+    sound_inline: Tuple[Tuple[int, str], ...] = ()
+    vxbook_warnings: Tuple[str, ...] = ()
 
     @property
     def total_chars(self) -> int:
         """Number of characters of text in all chapters."""
         return sum(len(c.text) for c in self.chapters)
+
+    def carry(self, **changes: Any) -> "Book":
+        """A copy that keeps the ``.vxbook`` fields. Pass replacements (``chapters=...``) as keywords.
+
+        Translation builds a new book and does not use this: a translated text is not the marked book.
+        """
+        current: Dict[str, Any] = {
+            "title": self.title, "author": self.author, "language": self.language, "chapters": self.chapters,
+            "cover": self.cover, "cover_ext": self.cover_ext, "explicit_yo": self.explicit_yo,
+            "speaker_marks": self.speaker_marks, "voice_cast": dict(self.voice_cast),
+            "narrator_hint": self.narrator_hint, "alias_to_name": dict(self.alias_to_name),
+            "vxbook_path": self.vxbook_path, "chapter_ids": self.chapter_ids,
+            "unnumbered_blocks": self.unnumbered_blocks, "extensions": self.extensions,
+            "sound_document": None if self.sound_document is None else dict(self.sound_document),
+            "sound_cast_document": None if self.sound_cast_document is None else dict(self.sound_cast_document),
+            "sound_paragraphs": self.sound_paragraphs, "sound_inline": self.sound_inline,
+            "vxbook_warnings": self.vxbook_warnings,
+        }
+        current.update(changes)
+        return Book(**current)
 
 
 # --------------------------------------------------------------------------- helpers
@@ -475,6 +517,11 @@ def load_book(path) -> Book:
         if not data.strip():
             raise BookParseError(tr("err.book_empty"))
         return parse_txt(decode_bytes(data).text, title=p.stem)
+    elif ext == ".vxbook":
+        # core.vxbook imports Book from this module. The import stays here so the two modules can load.
+        from core.vxbook import load_vxbook
+
+        return load_vxbook(p)
     else:
         raise BookParseError(tr("err.book_unsupported"))
     if not book.title:

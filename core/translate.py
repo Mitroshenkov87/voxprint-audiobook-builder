@@ -5,8 +5,8 @@ The book is translated **sentence by sentence** by a local, offline machine-tran
 chapter titles, paragraphs (blank lines), poem lines and scene breaks stay where they are, so the pauses of
 :mod:`core.pauses` work exactly as for an original text.
 
-* **Pairs.**  Opus-MT has one model per direction.  Available here: ru<->en and de<->en; ru<->de goes through English
-  (two hops, noticeably lower quality).  The source language is detected from the text (:func:`detect_language`).
+* **Pairs.**  Direct Opus-MT directions: ru<->en, en<->de and ru<->de.  en<->de uses the tc-bible-big models and
+  prepends a target-language token (``>>deu<<`` / ``>>eng<<``).  The source language is detected (:func:`detect_language`).
 * **Resumable.**  Every translated sentence is cached on disk (``<job>/.translation/translation_cache.json``, keyed by model
   tag + sentence), so a resumed job never translates a sentence twice.  The finished translation is also written next to
   the audiobook as ``translation_<lang>.txt``: the user can read and **edit** it; on the next run of the same job the

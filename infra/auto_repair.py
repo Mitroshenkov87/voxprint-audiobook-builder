@@ -83,9 +83,10 @@ def model_repos() -> List[str]:
     except Exception as exc:  # noqa: BLE001 - GPU detection may fail; then only the local models are checked
         log.warning("required models unknown: %s", exc)
     present = [r for r in known if md.local_dir_for(r).exists() or md.partial_dir_has_data(r)]
-    from infra import vc_model
+    from infra import soundscape_model, vc_model
 
-    return [r for r in dict.fromkeys(need + extras + present) if r != vc_model.REPO]   # OpenVoice: check_tools
+    # OpenVoice and ACE-Step have their own folders and download only when the user asks.
+    return [r for r in dict.fromkeys(need + extras + present) if r not in (vc_model.REPO, soundscape_model.REPO)]
 
 
 def _text_model(repo: str):

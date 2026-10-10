@@ -803,5 +803,5 @@ def prepare_book(book: Book, options: Optional[PrepOptions] = None, language_hin
                                 prepare_text_block(ch.text, lang, options, counts)))
     report = PrepReport(lang, [k for k in _ORDER if k in options.steps], dict(counts),
                         [k for k in _ORDER if k in options.steps and not _runs(k, lang)])
-    prepared = Book(book.title, book.author, book.language, chapters, book.cover, book.cover_ext)
+    prepared = book.carry(chapters=chapters)
     return prepared, report

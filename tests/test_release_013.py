@@ -207,10 +207,11 @@ def test_check_and_repair_covers_translators_and_the_single_file_models(monkeypa
     for key in text_models.COMPONENT_EXTRAS:                                   # tc-big & co. are checked by hash
         assert text_models.get(key).repo in repos and auto_repair.expected_files(text_models.get(key).repo) is not None
     assert "myshell-ai/OpenVoiceV2" not in repos                              # it has its own folder: a tool
+    assert "ACE-Step/Ace-Step1.5" not in repos                                # soundscape: downloaded only when enabled
     names = {t.name for t in auto_repair.default_tools()}
     assert {"OpenVoice V2", "DNSMOS P.835"} <= names
     setup_mode.set_mode("full")
-    assert set(model_mirrors.load()) - {"myshell-ai/OpenVoiceV2"} <= set(auto_repair.model_repos())
+    assert set(model_mirrors.load()) - {"myshell-ai/OpenVoiceV2", "ACE-Step/Ace-Step1.5"} <= set(auto_repair.model_repos())
 
 
 def test_check_tool_repairs_a_damaged_file_and_skips_a_missing_optional_one(tmp_path, monkeypatch):
