@@ -925,8 +925,12 @@ class NarrateWindow(SubWindow):
         male2 = str(self.cmb_spk_male2.currentData() or "") if male else ""
         narr = self.selected_voice_id()
         characters = dict(self.book.voice_cast) if self.book is not None else {}
-        cast = spk.SpeakerCast(lines=self.speaker_lines, male_id=male, female_id=female, male2_id=male2,
-                               tagger=None if self.speaker_lines is not None else self.llm_plan(), narrator_id=narr,
+        file_marks = tuple(getattr(self.book, "speaker_marks", ()) or ()) if self.book is not None else ()
+        lines = self.speaker_lines
+        if file_marks and lines is None:
+            lines = [spk.SpeakerLine(role, name) for role, name in file_marks]
+        cast = spk.SpeakerCast(lines=lines, male_id=male, female_id=female, male2_id=male2,
+                               tagger=None if (lines is not None or file_marks) else self.llm_plan(), narrator_id=narr,
                                characters=characters)
         return cast if cast.uses_several(narr) else None
 
@@ -936,7 +940,10 @@ class NarrateWindow(SubWindow):
             return False
         paras = [text for _ci, text in spk.paragraphs(self.book)]
         lines = self.speaker_lines
-        if lines is None or len(lines) != len(paras):
+        file_marks = tuple(getattr(self.book, "speaker_marks", ()) or ())
+        if file_marks and (lines is None or len(lines) != len(paras)):
+            lines = [spk.SpeakerLine(role, name) for role, name in file_marks]
+        elif lines is None or len(lines) != len(paras):
             plan = self.llm_plan()
             if plan is None:
                 return False

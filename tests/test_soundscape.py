@@ -15,6 +15,7 @@ import cli as user_cli
 from core import audiobook_export as ex
 from core import narration as nr
 from core import soundscape
+from core import speakers as spk
 from core import voice_info
 from core.audiobook_export import ChapterAudio
 from core.book_parsers import Book, Chapter, load_book
@@ -77,8 +78,8 @@ def test_sample_plan_uses_defaults_cast_and_skips_a_plain_book():
     assert sfx.kind == "sfx" and sfx.gain_db == -20 and sfx.position == "after"
     assert accent.kind == "accent" and accent.gain_db == -18 and accent.position == "before"
     assert transition.kind == "transition" and transition.gain_db == -16
-    assert transition.asset_library == "voxprint-sound" and transition.asset_id == "harp-gliss-major-03"
-    assert any("harp-gliss-major-03" in w for w in plan.warnings)
+    assert "bright morning" in transition.prompt
+    assert not any("asset" in w for w in plan.warnings)
     assert 30 <= soundscape.BED_SECONDS <= 60
     assert soundscape.plan_for(Book("T", chapters=[Chapter("C", "Hello there.\n\nSecond paragraph here.")])) is None
 
@@ -91,6 +92,19 @@ def test_fingerprint_reanchors_or_drops_and_cast_can_turn_sound_off():
     plan = soundscape.plan_for(moved)
     assert _cue(plan, "c3").start_paragraph == 2
     assert any("re-anchored" in w and "c3" in w for w in plan.warnings)
+
+    other = _copy(book)
+    row = next(c for c in other.sound_document["cues"] if c["id"] == "c3")
+    row["start_paragraph"] = 6
+    row["chapter"] = "ch02"
+    plan = soundscape.plan_for(other)
+    assert _cue(plan, "c3").start_paragraph == 2
+
+    ignored = _copy(book)
+    ignored.sound_cast_document["cues"]["c4"]["asset"] = {"library": "voxprint-sound", "id": "harp-gliss-major-03"}
+    plan = soundscape.plan_for(ignored)
+    assert "bright morning" in _cue(plan, "c4").prompt
+    assert not any("asset" in w or "harp" in w for w in plan.warnings)
 
     lost = _copy(book)
     row = next(c for c in lost.sound_document["cues"] if c["id"] == "c3")
@@ -108,6 +122,58 @@ def test_fingerprint_reanchors_or_drops_and_cast_can_turn_sound_off():
     plan = soundscape.plan_for(clash)
     assert _cue(plan, "c3").start_paragraph == 2
     assert any("sound.json" in w and "c3" in w for w in plan.warnings)
+
+
+def test_vxbook_roles_are_used_and_gemma_is_not_asked(tmp_path):
+    asked_vx = []
+
+    class Plan:
+        def factory(self):
+            asked_vx.append("gemma")
+            raise RuntimeError("no model")
+
+    book = load_book(FIXTURE)
+    cast = spk.SpeakerCast(lines=None, male_id="natan", female_id="miriam", tagger=Plan(), narrator_id="levi",
+                           characters={"Анна": "miriam", "Пётр": "natan"})
+    extra = {"miriam": (FakeEngine, "miriam"), "natan": (FakeEngine, "natan")}
+    opts = nr.NarrationOptions(
+        formats={ex.FORMAT_WAV_CHAPTERS}, speak_titles=False, yo=False, ordinals=False, speakers=cast,
+    )
+    res = nr.narrate_book(book, FakeEngine, "levi", tmp_path / "vx", language="russian", ffmpeg=None,
+                          options=opts, extra_engines=extra)
+    assert res.chapters == 2 and asked_vx == []
+
+    plain = Book("Plain", chapters=[Chapter("One", "Hello there friend.\n\nShe said a second line.")])
+    asked = []
+
+    class Asking:
+        def factory(self):
+            asked.append("gemma")
+            raise RuntimeError("no model in this test")
+
+    plain_cast = spk.SpeakerCast(lines=None, male_id="natan", female_id="miriam", tagger=Asking(), narrator_id="levi")
+    nr.narrate_book(plain, FakeEngine, "levi", tmp_path / "plain", language="english", ffmpeg=None,
+                    options=nr.NarrationOptions(
+                        formats={ex.FORMAT_WAV_CHAPTERS}, speak_titles=False, yo=False, ordinals=False, speakers=plain_cast,
+                    ), extra_engines=extra)
+    assert asked == ["gemma"]
+
+
+def test_at_text_starts_at_the_chunk_that_contains_the_snippet():
+    cue = soundscape.Cue(
+        id="a", kind="accent", prompt="sting", start_paragraph=1, end_paragraph=1, chapter_index=0,
+        gain_db=-18, duck_db=0, position="at_text", at_text="second sentence",
+    )
+    spans = [
+        (1, "First sentence here.", 0, 100, 120),
+        (1, "The second sentence is later.", 120, 240, 260),
+    ]
+    assert soundscape._place_sample(cue, spans) == 120
+    missing = soundscape.Cue(
+        id="b", kind="accent", prompt="sting", start_paragraph=1, end_paragraph=1, chapter_index=0,
+        gain_db=-18, duck_db=0, position="at_text", at_text="not in the chunks",
+    )
+    assert soundscape._place_sample(missing, spans) == 0
 
 
 def test_loop_crossfade_covers_the_scene():

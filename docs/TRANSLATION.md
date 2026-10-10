@@ -26,6 +26,7 @@ memory):
 
 The model runs in the pre-built `llama-server` of [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT, Vulkan build, ~33 MB; on laptops with two GPUs the NVIDIA one is chosen from `--list-devices`, logged)
 as a separate process before the narration and is closed - all of its video memory freed - before the voice model loads.
+The GGUF and that one llama.cpp build live in the shared models folder (`<models>/llm/gemma-4-12b-it-Q4_K_M.gguf` and `<models>/llm/llama.cpp-<build>/`), the same folder `state/suite.json` gives every Voxprint program, so Plotweaver can reuse the file.
 Every answer passes a simple guard (same number of paragraphs and verse lines, a sane length ratio, the right language, no
 refusal); a paragraph that fails, or everything after the model fails to start or crashes, is translated by Opus-MT instead
 (or keeps its original text when preparing). Names are kept consistent through a glossary (`.translation/names_xx.txt` in the

@@ -40,13 +40,13 @@ Cues have `kind` `bed`, `accent`, `transition`, or `sfx`. An `sfx` cue is render
 
 A bed has `layer` `music` or `ambience`, and an end paragraph in the same chapter. At most one music bed and one ambience bed overlap. At most one one-shot per paragraph per position, and two one-shots per paragraph. Caps: 200 cues in a chapter, 5000 in a book. A lower `conf` loses.
 
-`position` is `before`, `after`, or `at_text`. `at_text` is a 3–60 character snippet of the paragraph's plain text. It is placed on the nearer edge of the synthesis chunk that contains it. A transition with `before` starts in the pause in front of the paragraph. Paragraph numbers are 1-based and book-wide; headings and scene breaks are not counted.
+`position` is `before`, `after`, or `at_text`. `at_text` is a 3–60 character snippet of the paragraph's plain text. The cue starts at the beginning of the synthesis chunk that contains that snippet. If the snippet is not in any chunk, the cue starts at the paragraph. A transition with `before` starts in the pause in front of the paragraph. Paragraph numbers are 1-based and book-wide; headings and scene breaks are not counted.
 
-`para_fp` is the first 12 hex digits of the SHA-256 of the raw `book.md` paragraph line (UTF-8, no newline), taken before text preparation. When the fingerprint at `start_paragraph` does not match, the cue is moved to the single paragraph in that chapter with the same fingerprint. Otherwise the cue is dropped and a warning is logged. The same rule applies to a bed's `end_para_fp`.
+`para_fp` is the first 12 hex digits of the SHA-256 of the raw `book.md` paragraph line (UTF-8, no newline), taken before text preparation. When the fingerprint or the chapter does not match, the cue is moved to the paragraph with that fingerprint, looking in the named chapter first and then in the rest of the book. If it is not found, the cue is dropped and a warning is logged. The same rule applies to a bed's `end_para_fp`.
 
-`sound-cast.json` is the user's override, keyed by cue id: `disabled`, `gain_db` (−60 to +6), `prompt`, and `asset` (`library` + `id`). Unknown keys are ignored. `enabled: false` turns the soundscape off for that book. `master_gain_db` shifts every cue. An asset is a file at `<models folder>/sound-library/<library>/<id>.wav`. A missing file is logged and the cue is generated from its prompt.
+`sound-cast.json` is the user's override, keyed by cue id: `disabled`, `gain_db` (−60 to +6) and `prompt`. Unknown keys are ignored. `enabled: false` turns the soundscape off for that book. `master_gain_db` shifts every cue. `asset` is reserved and ignored: sound/1 generates every cue from its prompt.
 
-An inline `<!-- vx:sound cue="ID" -->` comment may sit in front of `vx:speaker`. It is optional. When it names a different paragraph than `sound.json`, the JSON paragraph wins and a warning is logged.
+An inline `<!-- vx:sound cue="ID" -->` comment may sit in front of `vx:speaker`. It is optional and is not used for placement. When it names a different paragraph than `sound.json`, the JSON paragraph wins and a warning is logged.
 
 ### Levels
 
@@ -64,8 +64,7 @@ After the mix, speech is scaled back to the root-mean-square it had in the narra
 
 ## Provisional
 
-* The sample's asset library `voxprint-sound` (cue `c4`, id `harp-gliss-major-03`) is not shipped. The missing file falls back to the prompt.
-* `at_text` uses the nearer synthesis-chunk boundary. It is not a word-level aligner timestamp.
+* `at_text` starts the cue at the synthesis chunk that contains the snippet. It is not a word-level aligner timestamp.
 * `infra/soundscape_model.generate` builds `ACEStepPipeline(checkpoint_dir=...)` and calls it with `audio_duration` and `infer_step=8`. The `acestep` package is imported only there. That call has not been run against the weights in this tree.
 
 The sample archive used by the tests is `tests/fixtures/sound-sample.vxbook`.

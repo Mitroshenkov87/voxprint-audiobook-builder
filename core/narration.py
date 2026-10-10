@@ -933,7 +933,14 @@ def _narrate_book_work(book: Book, engine_factory: Callable[[], TTSEngine], engi
     cast = options.speakers if (options.speakers is not None and extra_engines) else None
     if cast is not None:
         speaker_lines = cast.lines
-        if speaker_lines is None and cast.tagger is not None:
+        file_marks = tuple(getattr(book, "speaker_marks", ()) or ())
+        if file_marks:
+            # A .vxbook already names every paragraph. The text model is only for TXT, FB2 and EPUB.
+            if speaker_lines is None:
+                speaker_lines = [spk.SpeakerLine(role, name) for role, name in file_marks]
+            if cast.tagger is not None:
+                log.warning("speaker marks are already in the .vxbook; the text model is not asked")
+        elif speaker_lines is None and cast.tagger is not None:
             code = tplan.target if tplan is not None else (tl.detect_book_language(book) or "en")
             progress(NarrationProgress(0, 1, None, tr("spk.tagging", pct=0), "prepare"))
             tagged = spk.tag_paragraphs(

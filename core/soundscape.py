@@ -8,7 +8,8 @@ Beds are one 30-60 s clip (45 s here), looped with a crossfade for the whole sce
 narration's own loudness: bed -22 dB, accent -18 dB, sfx and transition -16 dB, and an extra 8 dB of ducking while
 speech is present. The mixed chapter is then scaled so the speech keeps that same loudness, and peak-limited.
 
-``at_text`` is placed on the nearest synthesis chunk boundary. ``sound-cast.json`` overrides a cue by id.
+``at_text`` starts at the synthesis chunk that contains the snippet. ``sound-cast.json`` overrides a cue by id
+(``prompt``, ``gain_db``, ``disabled``). An ``asset`` field is ignored: sound/1 is generated from the prompt.
 ``sound.json`` wins when an inline ``vx:sound`` comment disagrees.
 
 Example::
@@ -23,7 +24,6 @@ import hashlib
 import logging
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -31,7 +31,7 @@ import soundfile as sf
 
 from core.audiobook_export import ChapterAudio
 from core.book_parsers import Book
-from infra import paths, soundscape_model
+from infra import soundscape_model
 
 log = logging.getLogger("voxprint.soundscape")
 
@@ -76,8 +76,6 @@ class Cue:
     fade_out_ms: int = DEFAULT_FADE_OUT_MS
     crossfade_ms: int = DEFAULT_CROSSFADE_MS
     conf: float = 0.0
-    asset_library: str = ""
-    asset_id: str = ""
 
 
 @dataclass
@@ -117,22 +115,28 @@ def _paragraphs(book: Book) -> List[Tuple[int, str, int, str, str]]:
 
 def _reanchor(paras: Sequence[Tuple[int, str, int, str, str]], chapter: str, index: object, fingerprint: str,
               cue_id: str, warnings: List[str]) -> Optional[int]:
-    """Paragraph index. On a fingerprint mismatch, search the same chapter; otherwise drop the cue."""
+    """Paragraph index. On a mismatch, search the same chapter, then the rest of the book."""
     if not isinstance(index, int) or isinstance(index, bool):
         _warn(warnings, f"cue {cue_id} dropped: start paragraph is missing")
         return None
     by_index = {row[0]: row for row in paras}
     row = by_index.get(index)
-    if row is not None and (not fingerprint or row[3] == fingerprint):
-        if chapter and row[1] != chapter:
-            _warn(warnings, f"cue {cue_id} chapter {chapter} does not contain paragraph {index}")
-            return None
+    chapter_ok = (not chapter) or (row is not None and row[1] == chapter)
+    fp_ok = (not fingerprint) or (row is not None and row[3] == fingerprint)
+    if row is not None and chapter_ok and fp_ok:
         return index
+    found: List[Tuple[int, str, int, str, str]] = []
     if fingerprint:
-        found = [item for item in paras if item[3] == fingerprint and (not chapter or item[1] == chapter)]
-        if len(found) == 1:
-            _warn(warnings, f"cue {cue_id} re-anchored from paragraph {index} to {found[0][0]}")
-            return found[0][0]
+        in_chapter = [item for item in paras if item[3] == fingerprint and chapter and item[1] == chapter]
+        if len(in_chapter) == 1:
+            found = in_chapter
+        else:
+            anywhere = [item for item in paras if item[3] == fingerprint]
+            if len(anywhere) == 1:
+                found = anywhere
+    if found:
+        _warn(warnings, f"cue {cue_id} re-anchored from paragraph {index} to {found[0][0]}")
+        return found[0][0]
     _warn(warnings, f"cue {cue_id} dropped: paragraph fingerprint not found")
     return None
 
@@ -153,34 +157,8 @@ def _apply_cast(cue: Cue, override: Dict[str, Any], warnings: List[str]) -> Opti
     prompt = override.get("prompt")
     if isinstance(prompt, str) and prompt.strip():
         cue.prompt = prompt.strip()[:300]
-    asset = override.get("asset")
-    if isinstance(asset, dict):
-        library = str(asset.get("library") or "")
-        ident = str(asset.get("id") or "")
-        if library and ident and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,80}", ident):
-            cue.asset_library = library
-            cue.asset_id = ident
-            if _asset_file(library, ident) is None:
-                _warn(warnings, f"cue {cue.id} asset {library}/{ident} is not in the library; generating from the prompt")
+    # sound/1 is all-generated. ``asset`` is reserved for a later minor version and is ignored.
     return cue
-
-
-def _asset_file(library: str, ident: str) -> Optional[Path]:
-    """A curated clip under the models folder, or None when that file is not there.
-
-    The library is an open question. Until one is shipped, a missing file falls back to the prompt.
-    """
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,40}", library):
-        return None
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,80}", ident):
-        return None
-    root = (paths.models_dir() / "sound-library").resolve()
-    candidate = (root / library / f"{ident}.wav").resolve()
-    try:
-        candidate.relative_to(root)
-    except ValueError:
-        return None
-    return candidate if candidate.is_file() else None
 
 
 def _enforce_limits(cues: List[Cue], warnings: List[str]) -> List[Cue]:
@@ -430,7 +408,8 @@ def _place_sample(cue: Cue, spans: Sequence[Tuple[int, str, int, int, int]]) -> 
     """Sample index where a one-shot starts. ``spans`` are ``(paragraph, text, start, speech_end, pause_end)``.
 
     A transition with ``before`` starts at the beginning of the pause in front of the paragraph (the scene or
-    chapter gap). ``at_text`` uses the nearer edge of the chunk that contains the snippet.
+    chapter gap). ``at_text`` starts at the synthesis chunk that contains the snippet. A missing snippet uses
+    the paragraph start.
     """
     rows = [row for row in spans if row[0] == cue.start_paragraph]
     if not rows:
@@ -442,14 +421,9 @@ def _place_sample(cue: Cue, spans: Sequence[Tuple[int, str, int, int, int]]) -> 
         earlier = [row[3] for row in spans if row[3] <= start]
         return max(earlier) if earlier else start
     if cue.position == "at_text" and cue.at_text:
-        for _para, text, start, speech_end, _pause_end in rows:
-            plain = text.replace("\u0301", "")
-            at = plain.find(cue.at_text)
-            if at < 0:
-                continue
-            if at <= len(plain) - at:
+        for _para, text, start, _speech_end, _pause_end in rows:
+            if cue.at_text in text.replace("\u0301", ""):
                 return start
-            return speech_end
         return rows[0][2]
     return rows[0][2]
 
@@ -486,17 +460,6 @@ def _save_cached(folder, key: str, audio: np.ndarray, sr: int) -> None:
 
 def _render(cue: Cue, seconds: float, sr: int, generate: Generator, cache, revision: str) -> Optional[np.ndarray]:
     """One clip, from the cache when the same prompt was already rendered. A failure skips the cue."""
-    asset = _asset_file(cue.asset_library, cue.asset_id) if cue.asset_library and cue.asset_id else None
-    if asset is not None:
-        try:
-            data, file_sr = sf.read(str(asset), dtype="float32", always_2d=False)
-        except (OSError, RuntimeError) as exc:
-            log.warning("soundscape: cue %s asset could not be read (%s); generating from the prompt", cue.id, exc)
-        else:
-            audio = data if getattr(data, "ndim", 1) == 1 else data.mean(axis=1)
-            if int(file_sr) == sr and len(audio):
-                return np.asarray(audio, dtype=np.float32)
-            log.warning("soundscape: cue %s asset sample rate does not match; generating from the prompt", cue.id)
     key = _cache_key(cue.kind, cue.prompt, seconds, revision)
     if cache is not None:
         cached = _load_cached(cache, key)
@@ -504,7 +467,7 @@ def _render(cue: Cue, seconds: float, sr: int, generate: Generator, cache, revis
             return cached
     try:
         audio = generate(cue.prompt, seconds, sr, cue.kind)
-    except Exception as exc:  # noqa: BLE001 - a model or asset failure must not stop the chapter
+    except Exception as exc:  # noqa: BLE001 - a model failure must not stop the chapter
         log.warning("soundscape: cue %s (%s) could not be rendered: %s", cue.id, cue.kind, exc)
         return None
     audio = np.asarray(audio, dtype=np.float32).reshape(-1)
