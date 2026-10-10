@@ -97,6 +97,10 @@ def leave_before_native_shutdown() -> bool:
 
 def pytest_sessionfinish(session, exitstatus):
     remember_exit_status(exitstatus)
+    # The Windows parent trusts this line. Qt shutdown can still change the process exit code after a green
+    # session, and that code is not the test result.
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print(f"VOXPRINT_PYTEST_RC={int(exitstatus)}", flush=True)
 
 
 def pytest_unconfigure(config):
