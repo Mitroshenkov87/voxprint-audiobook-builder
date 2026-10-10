@@ -12,7 +12,8 @@ Compatibility rules (all must hold; every rejection is logged with its reason):
 1. same CPython minor version as the running Voxprint (binary wheels: the ``Tag:`` in the wheel's ``WHEEL`` file, e.g. ``cp311``) and
    64-bit Windows (``win_amd64``);
 2. ``torch`` version inside ``compat.torch`` of ``infra/runtime_lock.json`` (a range around the version we tested);
-3. ``torchaudio`` is installed in the same ``site-packages`` with the same release number as ``torch`` (they are built as a pair);
+3. ``torchaudio`` is installed in the same ``site-packages``, the same release number as ``torch``, and the same flavor
+   when both wheels carry one (its native ops are built against that torch);
 4. flavor: a CPU build is accepted only on a PC without an NVIDIA GPU; a CUDA build must not be newer than the driver supports
    (an older CUDA build than the driver offers is fine); a build without a local tag on Windows is a CPU build;
 5. ``torch/lib`` and the package folders really exist (a half-deleted environment is skipped);
@@ -255,7 +256,7 @@ def assess(ext: ExternalTorch, lock: Dict, wanted_flavor: str, driver_cuda: Opti
         return False, f"unreadable torch version {ext.torch!r}"
     if not ext.torchaudio:
         return False, "torchaudio is not installed next to torch"
-    if ext.torchaudio.split("+")[0] != ext.torch.split("+")[0]:
+    if not _torchaudio_pairs(ext.torch, ext.torchaudio):
         return False, f"torchaudio {ext.torchaudio} does not match torch {ext.torch}"
     have_gpu = driver_cuda is not None and wanted_flavor != "cpu"
     if ext.flavor == "cpu" and have_gpu:
@@ -400,11 +401,27 @@ def extra_paths() -> List[str]:
 
 
 # ------------------------------------------------------------------------------------------------ the decision
+def _torchaudio_pairs(torch_ver: str, audio_ver: str) -> bool:
+    """True when both wheels are the same release. A flavor tag, when both sides have one, must match too.
+
+    TorchAudio's native ops are compiled against that torch. A later torch is not a pair: there is no TorchAudio
+    wheel for 2.12-2.14 on CUDA 13 and Python 3.14.
+    """
+    torch_base, torch_sep, torch_flavor = torch_ver.partition("+")
+    audio_base, audio_sep, audio_flavor = audio_ver.partition("+")
+    if not torch_base or torch_base != audio_base:
+        return False
+    if torch_sep and audio_sep and torch_flavor != audio_flavor:
+        return False
+    return True
+
+
 def choose_flavor(flavors: List[str], driver_cuda: Optional[Tuple[int, int]]) -> str:
     """Best flavor of the lock for this PC: the newest CUDA build the driver supports, else ``cpu``.
-    ``VOXPRINT_TORCH_FLAVOR`` forces one (tests, support)."""
+    ``VOXPRINT_TORCH_FLAVOR`` forces one (tests, support). ``cpu`` is accepted even when the public
+    flavor list is only ``cu130``: CI installs the CPU wheels and does not offer them to users."""
     forced = os.environ.get("VOXPRINT_TORCH_FLAVOR", "").strip()
-    if forced and forced in flavors:
+    if forced == "cpu" or (forced and forced in flavors):
         return forced
     best, best_cu = "cpu", (0, 0)
     for f in flavors:

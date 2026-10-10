@@ -1,4 +1,6 @@
 """Shared pytest setup: every test gets an isolated app-data folder, a fixed language and no network/model-cache access."""
+import ctypes
+import faulthandler
 import os
 import sys
 from pathlib import Path
@@ -41,3 +43,66 @@ def _isolated_home(tmp_path, monkeypatch):
     i18n.reset()
     yield
     i18n.reset()
+
+
+_ci_exit: int | None = None
+
+
+def remember_exit_status(exitstatus: int) -> None:
+    """Remember the session result so :func:`leave_before_native_shutdown` can use it."""
+    global _ci_exit
+    _ci_exit = int(exitstatus)
+
+
+def _terminate_windows(code: int) -> bool:
+    """End this process without ``DLL_PROCESS_DETACH``. ``ExitProcess`` (what ``os._exit`` calls) still runs it,
+    and on Python 3.14 that detach access-violates once Qt is loaded.
+
+    ``faulthandler`` (enabled by the CI pytest command) reports that kill as an access violation and the
+    process exit code becomes the exception code. Silence it first so a green session stays exit 0.
+    """
+    faulthandler.disable()
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    return bool(kernel.TerminateProcess(kernel.GetCurrentProcess(), code & 0xFFFFFFFF))
+
+
+def _qt_loaded() -> bool:
+    """True once this process has imported PySide6 (the Windows hard-exit then crashes the session)."""
+    return any(name == "PySide6" or name.startswith("PySide6.") for name in sys.modules)
+
+
+def leave_before_native_shutdown() -> bool:
+    """On GitHub Actions, exit with the session result and skip interpreter shutdown.
+
+    Python 3.14 and PySide6 print ``QObject: shared QObject was deleted directly`` and then
+    the process dies with a bus error after a green session. The result is already decided.
+    A crash during a test never reaches this function. Off CI the process exits normally.
+    Streams are flushed first: ``os._exit`` does not, and the failure text would never reach the log.
+
+    Windows with Qt loaded exits normally. ``TerminateProcess`` and ``ExitProcess`` both come back as a
+    non-zero status for those sessions (``test_auto_quality`` and ``test_screen_fit``). A Windows session
+    that never imported Qt still uses ``TerminateProcess``, which skips the DLL detach crash.
+    """
+    if os.environ.get("GITHUB_ACTIONS") != "true" or _ci_exit is None:
+        return False
+    code = int(_ci_exit)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    if sys.platform == "win32" and _qt_loaded():
+        return False
+    if sys.platform == "win32" and _terminate_windows(code):
+        return True
+    os._exit(code)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    remember_exit_status(exitstatus)
+    # The Windows parent trusts this line. Qt shutdown can still change the process exit code after a green
+    # session, and that code is not the test result.
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print(f"VOXPRINT_PYTEST_RC={int(exitstatus)}", flush=True)
+
+
+def pytest_unconfigure(config):
+    # After the terminal summary. Earlier than this, os._exit would hide the failure list.
+    leave_before_native_shutdown()

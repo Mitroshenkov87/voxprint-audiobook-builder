@@ -89,8 +89,8 @@ def _gzip_bytes(payload: bytes) -> bytes:
     """Gzip with mtime 0, an empty name and OS byte 255.
 
     ``gzip.compress(..., mtime=0)`` on Python 3.12 takes a shortcut through
-    ``zlib`` and writes OS byte 3. Python 3.11 (the Windows CI runner) writes
-    the same deflate stream through ``GzipFile`` with OS byte 255. The files
+    ``zlib`` and writes OS byte 3. ``GzipFile`` writes the same deflate stream
+    with OS byte 255. The files
     are the same length and differ at byte 9, so a rebuild does not match.
     """
     buf = io.BytesIO()

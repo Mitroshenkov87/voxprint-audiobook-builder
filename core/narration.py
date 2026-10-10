@@ -207,21 +207,22 @@ class ChunkCache:
         p = self.path(key)
         return p.is_file() and p.stat().st_size > 0
 
-    def save(self, key: str, audio: np.ndarray, sr: int) -> None:
-        """Write atomically (temporary file, then rename).
-
-        The temporary name is unique per write: two chunks with the same text (a repeated verse or refrain) have the same
-        key and may be written by two writer threads at once - with one shared ``<key>.part.flac`` the second writer held
-        the file the first one was renaming (Windows ``WinError 32``, build 667).  The rename is retried with backoff
-        while Windows reports the file as in use (an antivirus scan, a reader); if the finished file is already there
-        (the twin chunk won the race) that copy is kept.  Only when the file stays locked does a clear
-        :class:`NarrationError` stop the job (the cache keeps every finished chunk, so a new start resumes)."""
+    def stage(self, key: str, audio: np.ndarray, sr: int) -> Path:
+        """Encode ``audio`` to a unique temporary FLAC. The finished ``<key>.flac`` is not created yet."""
         self.dir.mkdir(parents=True, exist_ok=True)
         tmp = self.dir / (
             f"{key}.{os.getpid()}-{threading.get_ident()}-{time.monotonic_ns()}-{next(_PART_SEQ)}.part.flac")
+        sf.write(str(tmp), np.asarray(audio, dtype=np.float32), sr, format="FLAC", subtype="PCM_16")
+        return tmp
+
+    def commit(self, tmp: Path, key: str) -> None:
+        """Rename a staged file into ``<key>.flac``.
+
+        The rename is retried with backoff while Windows reports the file as in use (an antivirus scan, a reader).
+        If the finished file is already there (the twin chunk won the race) that copy is kept. Only when the file
+        stays locked does a clear :class:`NarrationError` stop the job."""
         dst = self.path(key)
         try:
-            sf.write(str(tmp), np.asarray(audio, dtype=np.float32), sr, format="FLAC", subtype="PCM_16")
             replace_with_retry(tmp, dst)
         except PermissionError as exc:
             if self.has(key):                       # the twin chunk (same key = same text and engine) is on disk
@@ -233,6 +234,22 @@ class ChunkCache:
                 tmp.unlink(missing_ok=True)            # gone after a successful rename; a leftover after a failure
             except OSError:
                 pass
+
+    def save(self, key: str, audio: np.ndarray, sr: int) -> None:
+        """Write atomically (temporary file, then rename).
+
+        The temporary name is unique per write: two chunks with the same text (a repeated verse or refrain) have the same
+        key and may be written by two writer threads at once - with one shared ``<key>.part.flac`` the second writer held
+        the file the first one was renaming (Windows ``WinError 32``, build 667)."""
+        tmp = self.stage(key, audio, sr)
+        try:
+            self.commit(tmp, key)
+        except BaseException:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
 
     def sweep_partial(self, min_age: float = 600.0) -> int:
         """Delete ``*.part.flac`` leftovers of an interrupted write that are older than ``min_age`` seconds (a younger
@@ -319,7 +336,8 @@ def text_steps(language: Optional[str], book_language: Optional[str], options: N
     Ordinals by context come first (they need the digits and the noun next to them).  Russian yo restoration comes
     next, while a dotted abbreviation still has the following word in the case the book used (``мед. училище``).
     The language normalizer runs last: it may capitalise after a full stop, and a second yo pass would then miss
-    the abbreviation.  The normalizer keeps a yo the dictionary already wrote.
+    the abbreviation.  The normalizer keeps a yo the dictionary or the author already wrote, and a U+0301
+    stress mark the author wrote.
     """
     spoken = language if (language or "").strip().lower() not in ("", "auto") else book_language
     ordinal = ordinals.ordinal_step(spoken) if options.ordinals else None
@@ -339,6 +357,33 @@ def default_normalizer(language: Optional[str]) -> Optional[Callable[[str], str]
 
 #: FLAC writers of finished chunks, and how many finished-but-unwritten batches may wait for them (bounded memory).
 WRITER_THREADS = 2
+
+
+class _ChunkPublish:
+    """Tickets for chunk files. Encoding may overlap; the finished file appears only in submission order."""
+
+    def __init__(self) -> None:
+        self.ticket = 0
+        self._next = 0
+        self._cv = threading.Condition()
+
+    def finish(self, ticket: int, fn: Optional[Callable[[], None]] = None) -> None:
+        """Run ``fn`` when ``ticket`` is next, then let the following ticket proceed. ``fn`` runs at most once.
+
+        A failed encode still takes its turn (``fn`` omitted) so a later writer cannot wait forever and
+        ``shutdown(wait=True)`` cannot hang.
+        """
+        with self._cv:
+            while self._next != ticket:
+                self._cv.wait()
+            try:
+                if fn is not None:
+                    fn()
+            finally:
+                self._next += 1
+                self._cv.notify_all()
+
+
 PENDING_WRITE_BATCHES = 2
 
 
@@ -384,14 +429,29 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
     saver = ThreadPoolExecutor(max_workers=WRITER_THREADS, thread_name_prefix="chunk-writer")
     slots: Optional[threading.BoundedSemaphore] = None
     futures: List[Future] = []
+    # Writers encode in parallel, then publish in submission order. A later chunk must not become a file before an
+    # earlier one: the live player only extends a contiguous prefix of the plan. Tickets follow submission, not the
+    # chunk index, because voices are synthesized one at a time and a later voice's early chunk is not submitted yet.
+    publish = _ChunkPublish()
 
-    def save(c: Chunk, audio: np.ndarray, sr: int) -> None:
+    def save(c: Chunk, audio: np.ndarray, sr: int, ticket: int) -> None:
         try:
-            cache.save(keys[c.index], audio, sr)
+            try:
+                staged = cache.stage(keys[c.index], audio, sr)
+            except BaseException:
+                publish.finish(ticket)
+                raise
+            else:
+                key = keys[c.index]
+
+                def commit() -> None:
+                    cache.commit(staged, key)
+
+                publish.finish(ticket, commit)
+            if on_saved is not None:
+                on_saved(c)
         finally:
             slots.release()  # type: ignore[union-attr]
-        if on_saved is not None:
-            on_saved(c)
 
     order: List[str] = []
     buckets: Dict[str, List[Chunk]] = {}
@@ -475,7 +535,9 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
                     while not slots.acquire(timeout=0.2):
                         cancel.check()
                         _raise_finished(futures)                        # a failed write never frees its wait
-                    futures.append(saver.submit(save, c, audio, engine.sample_rate))
+                    ticket = publish.ticket
+                    publish.ticket += 1
+                    futures.append(saver.submit(save, c, audio, engine.sample_rate, ticket))
                     chars_done += max(1, len(texts[c.index]))
                     remaining_chars -= len(texts[c.index])
                     done += 1

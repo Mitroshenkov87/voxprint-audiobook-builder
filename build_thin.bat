@@ -3,6 +3,7 @@ rem  THIN shell of Voxprint (see docs\THIN-INSTALLER.md).  Same environment as b
 rem  and "uv pip install" steps, first): this script only runs PyInstaller with the heavy libraries EXCLUDED, so the folder
 rem  dist\thin\Voxprint contains Qt, numpy, soundfile and the program (about 150-250 MB) - nothing else.  The libraries it leaves
 rem  out are packed as runtime modules by installer\build_online.ps1 -Thin and downloaded by the app (infra\modules.py).
+rem  pydub and audioop-lts (the audioop module on Python 3.13+) stay in the audio module, not in this shell.
 rem  Usage:  build_thin.bat   then   powershell installer\build_online.ps1 -Dist dist\thin\Voxprint -Tag v0.1.0-beta -Thin
 setlocal
 chcp 65001 >nul

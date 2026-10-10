@@ -113,7 +113,7 @@
  "err.book_empty": "У книзі немає тексту.",
  "err.book_read": "Файл книги не вдається прочитати.",
  "err.book_unsafe": "Файл книги виглядає небезпечним або завеликий і не був відкритий.",
- "err.book_unsupported": "Непідтримуваний формат книги. Використовуйте TXT, FB2 (або FB2.ZIP) чи EPUB.",
+ "err.book_unsupported": "Непідтримуваний формат книги. Використовуйте TXT, Markdown, FB2 (або FB2.ZIP) чи EPUB.",
  "err.cancelled": "Операцію скасовано користувачем.",
  "err.dataset_empty": "Датасет порожній.",
  "err.dataset_file_missing": "Не знайдено файл датасету: {file}",
