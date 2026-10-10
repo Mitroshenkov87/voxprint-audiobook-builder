@@ -146,6 +146,7 @@ class CliError(Exception):
     """A CLI failure with a stable exit code, a message and a fix the caller can run."""
 
     def __init__(self, code: int, message: str, *, hint: str = "", details: str = "") -> None:
+        """Store the exit code, the message, the suggested fix and any technical detail."""
         super().__init__(message)
         self.code = int(code)
         self.message = message

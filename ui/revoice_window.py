@@ -91,10 +91,12 @@ class TranscribeWorker(QThread):
     failed = Signal(str)
 
     def __init__(self, files: List[Path], asr_factory: Callable[[], Any], parent=None) -> None:
+        """Store the files to recognise and the recogniser factory."""
         super().__init__(parent)
         self.files, self.asr_factory, self.cancel = list(files), asr_factory, CancelToken()
 
     def run(self) -> None:  # noqa: D401
+        """Recognise the files and emit the text, or a failure message."""
         asr = None
         try:
             asr = self.asr_factory()
@@ -121,11 +123,13 @@ class ConvertWorker(QThread):
     failed = Signal(str)
 
     def __init__(self, source: Path, reference: Path, out_dir: Path, factory: Optional[Callable[[], Any]], parent=None) -> None:
+        """Store the recording, the reference voice and the output folder."""
         super().__init__(parent)
         self.source, self.reference, self.out_dir = source, reference, out_dir
         self.factory, self.cancel = factory, CancelToken()
 
     def run(self) -> None:  # noqa: D401
+        """Convert the recording into the reference voice and emit the output path."""
         converter = None
         try:
             converter = voice_convert.make_converter(self.factory)
@@ -150,10 +154,12 @@ class DownloadWorker(QThread):
     done = Signal(str)
 
     def __init__(self, ensure: Callable[..., Any], parent=None) -> None:
+        """Store the download callable for the voice-conversion model."""
         super().__init__(parent)
         self.ensure = ensure
 
     def run(self) -> None:  # noqa: D401
+        """Download the voice-conversion model and emit an empty string, or the error text."""
         try:
             self.ensure(progress=lambda f, m="": self.progress.emit(f, m))
             self.done.emit("")
@@ -171,6 +177,7 @@ class RevoiceWindow(SubWindow):
                  out_dir: Optional[Path] = None, previewer: Optional[Previewer] = None,
                  library: Optional[VoiceLibrary] = None, vc_factory: Optional[Callable[[], Any]] = None,
                  vc_status: Optional[Callable[[], str]] = None, vc_ensure: Optional[Callable[..., Any]] = None) -> None:
+        """Build the Re-voice window and remember the recogniser, the library and the converter."""
         super().__init__(with_back=True)
         self.asr_factory, self._pick_files = asr_factory, pick_files
         self.out_dir = Path(out_dir) if out_dir else revoice_dir()
@@ -315,9 +322,11 @@ class RevoiceWindow(SubWindow):
         self.cmb_voice.currentIndexChanged.connect(lambda _i: self._refresh())
 
     def window_title(self) -> str:
+        """The translated window title."""
         return tr("revoice.title")
 
     def retranslate(self) -> None:
+        """Apply the current language to every label and button."""
         super().retranslate()
         self.lbl_audio.setText(tr("revoice.audio"))
         self.lbl_audio_hint.setText(tr("revoice.audio_hint"))
@@ -346,6 +355,7 @@ class RevoiceWindow(SubWindow):
     # ------------------------------------------------------------------ state
     @property
     def busy(self) -> bool:
+        """True while recognition, conversion or a model download is running."""
         running = lambda w: bool(w and w.isRunning())
         return running(self.worker) or running(self.converter) or running(self.downloader)
 
@@ -417,6 +427,7 @@ class RevoiceWindow(SubWindow):
         self.btn_narrate.setEnabled(not busy and has_voice and bool(self.ed_text.toPlainText().strip()))
 
     def set_files(self, files: List[Path]) -> None:
+        """Replace the recording list with ``files`` and clear the previous conversion."""
         self.files = [Path(f) for f in files]
         self.output = None
         self.lst_files.clear()
@@ -436,6 +447,7 @@ class RevoiceWindow(SubWindow):
 
     # ------------------------------------------------------------------ audio
     def add_files(self) -> None:
+        """Ask for audio files and add them to the list."""
         if self._pick_files is not None:
             picked = self._pick_files()
         else:
@@ -445,6 +457,7 @@ class RevoiceWindow(SubWindow):
             self.set_files(self.files + sorted(Path(p) for p in picked))
 
     def remove_selected(self) -> None:
+        """Remove the selected recording from the list."""
         r = self.lst_files.currentRow()
         if r >= 0:
             self.set_files(self.files[:r] + self.files[r + 1:])
@@ -456,6 +469,7 @@ class RevoiceWindow(SubWindow):
         return self._current_file()
 
     def play_selected(self) -> None:
+        """Play the selected recording, or the last conversion when there is one."""
         path = self._play_path()
         if path is not None:
             self.previewer.play(path)
@@ -505,6 +519,7 @@ class RevoiceWindow(SubWindow):
 
     # ------------------------------------------------------------------ recognition, direct conversion, hand-over
     def transcribe(self) -> bool:
+        """Start recognition of the current files. False when the window is busy or the list is empty."""
         if self.busy or not self.files:
             return False
         w = TranscribeWorker(self.files, self.asr_factory, self)
@@ -595,6 +610,7 @@ class RevoiceWindow(SubWindow):
         return p
 
     def shutdown(self) -> None:
+        """Stop recording and wait for the background workers to finish."""
         if self._rec is not None:
             self._rec.stop()
         for w in (self.worker, self.converter):

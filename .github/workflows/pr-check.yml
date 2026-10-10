@@ -33,6 +33,7 @@ jobs:
           uv pip install --python .app/bin/python torch==2.11.0 torchaudio==2.11.0 --index-url https://download.pytorch.org/whl/cpu
           uv pip install --python .app/bin/python -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt
           uv pip install --python .app/bin/python --no-deps -r requirements-nodeps.txt
+          uv pip install --python .app/bin/python -r requirements-docs.txt
       - name: Import every native dependency
         run: .app/bin/python tools/check_native_imports.py
       - name: Unit tests
@@ -87,6 +88,7 @@ jobs:
           uv pip install --python .app/Scripts/python.exe torch==2.11.0 torchaudio==2.11.0 --index-url https://download.pytorch.org/whl/cpu
           uv pip install --python .app/Scripts/python.exe -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt
           uv pip install --python .app/Scripts/python.exe --no-deps -r requirements-nodeps.txt
+          uv pip install --python .app/Scripts/python.exe -r requirements-docs.txt
       - name: Import every native dependency
         shell: pwsh
         run: .app\Scripts\python.exe tools\check_native_imports.py

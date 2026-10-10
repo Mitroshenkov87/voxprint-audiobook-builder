@@ -31,6 +31,7 @@ _SOLEMN = re.compile(r"\b(?:бог|господь|господи|сотвори�
 
 
 def clamp_speed(value: object) -> float:
+    """A reading speed inside 0.7-1.3, or 1.0 when ``value`` is not a number."""
     try:
         v = float(value)                      # type: ignore[arg-type]
     except (TypeError, ValueError):
@@ -39,6 +40,7 @@ def clamp_speed(value: object) -> float:
 
 
 def clamp_style(value: object) -> str:
+    """A known style name (``auto``, ``scripture``, ``fiction``, ``dialogue``), or ``auto``."""
     v = str(value or "").strip().lower()
     return v if v in STYLES else AUTO
 
@@ -50,6 +52,7 @@ class Pace:
     style: str = AUTO
 
     def __post_init__(self) -> None:
+        """Clamp the speed and the style after the dataclass is built."""
         self.speed, self.style = clamp_speed(self.speed), clamp_style(self.style)
 
 

@@ -31,6 +31,8 @@ MOS_WARN = 2.6
 
 @dataclass
 class Check:
+    """Measured quality of one synthesised phrase against the reference recording."""
+
     seconds: float
     expected_seconds: float
     wer: Optional[float]
@@ -45,6 +47,7 @@ class Check:
     mos: Optional[float] = None                          # predicted MOS (DNSMOS OVRL, 1-5)
 
     def as_dict(self) -> dict:
+        """A plain dict of the measurements, the verdict and the issue codes."""
         return {"seconds": round(self.seconds, 1), "wer": None if self.wer is None else round(self.wer, 2),
                 "cer": None if self.cer is None else round(self.cer, 3),
                 "f0_hz": round(self.f0, 1), "ref_f0_hz": round(self.ref_f0, 1),

@@ -60,13 +60,16 @@ class ReleaseEntry:
         return {n: m for n, m in self.files.items() if any(fnmatch.fnmatchcase(n, p) for p in pats)}
 
     def url(self, name: str) -> str:
+        """The download URL of file ``name`` in this release."""
         return f"{self.base_url}/{urllib.parse.quote(self.files[name]['asset'])}"
 
     def sizes(self, patterns: Optional[Iterable[str]] = None) -> Dict[str, int]:
+        """File name to size in bytes, limited by glob ``patterns`` when those are given."""
         return {n: int(m["size"]) for n, m in self.selected(patterns).items()}
 
 
 def enabled() -> bool:
+    """True when the GitHub model-release mirror is allowed."""
     off = ("1", "true", "yes", "on")
     return (os.environ.get(ENV_DISABLE, "").strip().lower() not in off
             and os.environ.get("VOXPRINT_NO_MIRROR", "").strip().lower() not in off)
@@ -109,6 +112,7 @@ def entry_for(repo_id: str, revision: Optional[str] = None, path: Optional[Path]
 
 
 def sha256_file(path: Path) -> str:
+    """The SHA-256 hex digest of ``path``."""
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for block in iter(lambda: f.read(1 << 22), b""):
@@ -117,6 +121,7 @@ def sha256_file(path: Path) -> str:
 
 
 def file_ok(path: Path, meta: Dict[str, Any]) -> bool:
+    """True when ``path`` exists, has the pinned size and the pinned SHA-256."""
     try:
         return path.is_file() and path.stat().st_size == int(meta["size"]) and sha256_file(path) == meta["sha256"]
     except OSError:

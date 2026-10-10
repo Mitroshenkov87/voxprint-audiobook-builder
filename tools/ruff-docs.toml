@@ -1,0 +1,9 @@
+# Public docstring gate for core/, infra/, cli.py, main.py and the main windows.
+# Selected from the command line together with those paths. The release audit
+# (tools/audit.py) keeps its own ruff selection and does not read this file.
+
+[lint]
+select = ["D1"]
+
+[lint.pydocstyle]
+convention = "google"

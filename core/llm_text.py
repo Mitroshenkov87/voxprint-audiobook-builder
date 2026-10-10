@@ -37,9 +37,13 @@ _WORD = re.compile(r"[^\W\d_]", re.UNICODE)
 class ChatModel(Protocol):
     """A started model: one prompt in, the answer text out."""
 
-    def complete(self, prompt: str, max_tokens: int = 2048, temperature: float = 0.2) -> str: ...
+    def complete(self, prompt: str, max_tokens: int = 2048, temperature: float = 0.2) -> str:
+        """Send ``prompt`` and return the model's answer text."""
+        ...
 
-    def close(self) -> None: ...
+    def close(self) -> None:
+        """Close the model and free the memory it held."""
+        ...
 
 
 @dataclass

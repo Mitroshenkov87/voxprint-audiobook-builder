@@ -40,6 +40,8 @@ TEXT_RU: Sequence[str] = tuple(_PHRASES)
 
 @dataclass
 class ModeResult:
+    """Timing and video memory for one benchmark mode."""
+
     mode: str
     ok: bool
     reason: str = ""
@@ -57,6 +59,7 @@ class ModeResult:
     wavs: List[str] = field(default_factory=list)
 
     def line(self) -> str:
+        """One terminal line: the speed, or why this mode was skipped."""
         if not self.ok:
             return f"{self.mode:8s} skipped: {self.reason}"
         vram = "" if self.peak_vram_gb is None else (
@@ -156,10 +159,12 @@ def run_mode(mode: str, make_engine: Callable[[str], Any], texts: Sequence[str] 
 
 def run(modes: Sequence[str], make_engine: Callable[[str], Any], texts: Sequence[str] = TEXT_RU,
         out_dir: Optional[Path] = None, log: Callable[[str], None] = lambda _m: None) -> List[ModeResult]:
+    """Run each name in ``modes`` and return one result per mode."""
     return [run_mode(m, make_engine, texts, out_dir, log) for m in modes]
 
 
 def summary(results: Sequence[ModeResult]) -> Dict[str, Any]:
+    """A dict of the mode results, plus how CUDA Graphs compared with batching when both ran."""
     out: Dict[str, Any] = {"modes": [asdict(r) for r in results]}
     ok = {r.mode: r for r in results if r.ok}
     if "batched" in ok and "graphs" in ok and ok["batched"].x_realtime > 0:

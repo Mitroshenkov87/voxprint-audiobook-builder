@@ -1,0 +1,3 @@
+# `infra.assets`
+
+::: infra.assets

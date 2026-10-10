@@ -195,6 +195,7 @@ def scope_of(info: Dict[str, Any]) -> str:
 
 
 def license_for_scope(scope: str) -> str:
+    """The licence id that matches a consent scope (private use when the scope is unknown)."""
     return SCOPE_LICENSE.get(scope, SCOPE_LICENSE[PRIVATE])
 
 

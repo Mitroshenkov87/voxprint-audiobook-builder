@@ -3,6 +3,65 @@
 This document is the map of the code base: which module does what, how data flows through the application, how installation / update / model reuse work and how the UI
 is wired. Read it together with the module docstrings (every module starts with one).
 
+## Components
+
+`main.py` starts the program. With a subcommand it hands off to `cli.py`, which calls the same runners as the windows. With no subcommand it opens the Studio. The windows live in `ui/` and do no heavy work. `workers/` runs that work on a background thread and reports progress. `core/` is the pipeline (books, text, speech, export) and does not import Qt. `infra/` is folders, downloads, the models folder, updates and platform code.
+
+```mermaid
+flowchart LR
+  mainPy[main.py]
+  cliPy[cli.py]
+  uiLayer[ui]
+  workersLayer[workers]
+  coreLayer[core]
+  infraLayer[infra]
+  mainPy --> cliPy
+  mainPy --> uiLayer
+  cliPy --> workersLayer
+  uiLayer --> workersLayer
+  workersLayer --> coreLayer
+  workersLayer --> infraLayer
+```
+
+## Data flow from book to audio
+
+A book file (TXT, Markdown, FB2, EPUB or `.vxbook`) is read into chapters. Optional preparation spells out numbers, restores Russian yo where a dictionary is sure, and can translate or rewrite the text. Optional speaker marks label each paragraph as narrator, male or female. The text is cut into sentence-sized chunks. Each chunk is spoken with Qwen3-TTS plus the chosen voice adapter, or reused from the chunk cache. Finished chunks are joined with the pause lengths, and a soundscape is mixed in only when the book asks for one. ffmpeg then writes the audiobook (Opus, MP3, M4B, FLAC or WAV).
+
+```mermaid
+flowchart TD
+  bookFile[Book file]
+  parseBook[Read chapters]
+  prepareText[Prepare and translate]
+  markSpeakers[Speaker marks]
+  cutChunks[Cut into chunks]
+  speak[Qwen3-TTS plus the voice]
+  cacheChunks[Chunk cache]
+  joinAudio[Join and add pauses]
+  mixSound[Soundscape when the book asks]
+  encode[Encode the audiobook]
+  bookFile --> parseBook --> prepareText --> markSpeakers --> cutChunks --> speak --> cacheChunks --> joinAudio --> mixSound --> encode
+```
+
+The module-level detail of training and of narration is in the sections below.
+
+## GPU, video memory and heat
+
+Narration runs on the GPU. There is no CPU-only mode. Before each batch the program reads how much video memory is free and plans from that, leaving a reserve of the larger of 2 GB and 8 percent of the card. At least one chunk is always allowed. An optional cap of 70 to 80 percent of the card applies only when it is set (`gpu.vram_fraction` or `VOXPRINT_VRAM_FRACTION`); it is off by default. Running out of memory halves the batch and retries.
+
+A long job keeps full speed for the first 2.5 hours. After that, if the median GPU temperature over the last five minutes stays at or above 83 °C, narration pauses for 2.5 minutes before the next batch group. There is no setting to turn that pause off. One job holds the shared GPU lock for its whole run so two Voxprint jobs do not load models at the same time.
+
+A further plan, not built yet, is to place parts of these models in system memory when the card is short. It has to stay inside the reserve and the thermal pause above. See [Smart memory placement](generated/roadmap.md#smart-memory-placement) in the roadmap.
+
+## Models folder
+
+Heavy model files live in the models folder. The default is `%LOCALAPPDATA%\Voxprint\models` on Windows and `~/.local/share/voxprint/models` on Linux (`$XDG_DATA_HOME/voxprint/models` when that variable is set). The installer page "Models folder", `VOXPRINT_MODELS_DIR`, or the shared `models_dir` in `state/suite.json` can point somewhere else. A folder that is a Voxprint backup is restored into the normal folders; it is never used as the live models folder. Voices and settings stay beside the models folder, under the application home, not inside it.
+
+Downloads are checked by size and SHA-256. The speech model, the aligner and the recogniser are the usual first-run set. Gemma 4 12B (GGUF) and llama.cpp live under `models/llm` and are fetched only when a text feature needs them. The soundscape model lives under `models/ace-step-1.5` and is fetched only when the soundscape is turned on. Check & repair verifies the known files and fetches a damaged one again.
+
+## Suite command line
+
+Other programs drive this app with the same commands the windows use: `voxprint` on Linux when the package is installed, `Voxprint.exe` on Windows, or `python main.py` from a source checkout. `--json` prints progress lines and one result object. `--dry-run` checks the inputs and the output path and does not load a model, use the GPU, or download. Exit codes are stable (0 success, 1 internal, 2 bad arguments, 3 bad input, 4 missing model, 5 out of video memory, 6 cancelled, 7 no suitable GPU). The flag list is generated from the parser: [command reference](generated/cli.md). Recipes and JSON fields: [CLI.md](CLI.md) and [AGENTS.md](AGENTS.md).
+
 ## 1. Layers
 
 ```

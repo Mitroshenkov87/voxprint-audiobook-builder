@@ -85,6 +85,7 @@ class SpeakerLine:
     name: str = ""
 
     def __post_init__(self) -> None:
+        """Keep ``role`` only when it is narrator, male or female."""
         role = self.role if self.role in ROLES else "narrator"
         object.__setattr__(self, "role", role)
         object.__setattr__(self, "name", (self.name or "").strip()[:80])
@@ -241,20 +242,25 @@ class TagResult:
     """
 
     def __init__(self, lines: Sequence[SpeakerLine], raw: str = "", warning: str = "") -> None:
+        """Store the parsed lines, the raw marks text and a warning when the marks do not match."""
         self.lines = list(lines)
         self.raw = raw
         self.warning = warning
 
     def __iter__(self) -> Iterator[SpeakerLine]:
+        """Yield each speaker line in order."""
         return iter(self.lines)
 
     def __getitem__(self, item: Union[int, slice]) -> Union[SpeakerLine, List[SpeakerLine]]:
+        """Return one line, or a list when ``item`` is a slice."""
         return self.lines[item]
 
     def __len__(self) -> int:
+        """The number of speaker lines."""
         return len(self.lines)
 
     def __bool__(self) -> bool:
+        """True when there is at least one line."""
         return bool(self.lines)
 
 

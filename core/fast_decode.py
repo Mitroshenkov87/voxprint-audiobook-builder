@@ -106,6 +106,7 @@ def install_rope_compat() -> List[str]:
 
 # ------------------------------------------------------------------------------------------------- availability
 def installed_version() -> Optional[str]:
+    """The installed ``faster-qwen3-tts`` version, or None when the package is missing."""
     try:
         from importlib.metadata import version
 
@@ -147,6 +148,7 @@ class GraphDecoder:
 
     def __init__(self, q: Any, device: str = "cuda:0", dtype: Any = None, max_seq_len: int = MAX_SEQ_LEN,
                  warmup: bool = True) -> None:
+        """Wrap the loaded model ``q`` in talker and predictor CUDA graphs."""
         import torch
         from faster_qwen3_tts import FasterQwen3TTS
         from faster_qwen3_tts.predictor_graph import PredictorGraph

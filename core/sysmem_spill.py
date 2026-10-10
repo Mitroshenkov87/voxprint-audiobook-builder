@@ -42,6 +42,7 @@ class Monitor:
     """Background shared-memory sampler. :meth:`note` is what the thread (and the tests) record."""
 
     def __init__(self, sample: Callable[[], Optional[int]] = _sample_shared, interval: float = SAMPLE_EVERY_S) -> None:
+        """Remember how to read the shared-memory counter and how often to sample it."""
         self._sample = sample
         self.interval = interval
         self.baseline: Optional[int] = None
@@ -52,6 +53,7 @@ class Monitor:
         self._thread: Optional[threading.Thread] = None
 
     def start(self) -> "Monitor":
+        """Start the sampler thread."""
         if self._thread is not None:
             return self
         self._stop.clear()
@@ -60,6 +62,7 @@ class Monitor:
         return self
 
     def stop(self) -> None:
+        """Stop the sampler thread and wait for it to finish."""
         self._stop.set()
         thread = self._thread
         self._thread = None

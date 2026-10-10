@@ -1,0 +1,3 @@
+# `core.translate`
+
+::: core.translate

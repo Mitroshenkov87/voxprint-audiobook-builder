@@ -1,0 +1,3 @@
+# `core.speakers`
+
+::: core.speakers

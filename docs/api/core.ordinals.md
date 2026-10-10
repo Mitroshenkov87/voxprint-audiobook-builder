@@ -1,0 +1,3 @@
+# `core.ordinals`
+
+::: core.ordinals

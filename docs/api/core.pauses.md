@@ -1,0 +1,3 @@
+# `core.pauses`
+
+::: core.pauses

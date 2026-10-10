@@ -52,12 +52,15 @@ class Report:
 
     @property
     def ok(self) -> bool:
+        """True when no checked item failed."""
         return all(i.status != FAILED for i in self.items)
 
     def count(self, *statuses: str) -> int:
+        """How many items have one of ``statuses``."""
         return sum(1 for i in self.items if i.status in statuses)
 
     def summary(self) -> str:
+        """The translated summary, plus the names of the items that failed."""
         text = tr("autorepair.summary", checked=len(self.items), fixed=self.count(REPAIRED, DOWNLOADED),
                   failed=self.count(FAILED))
         bad = [f"{i.name} ({i.detail})" if i.detail else i.name for i in self.items if i.status == FAILED]

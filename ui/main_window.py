@@ -1292,6 +1292,7 @@ class MainWindow(QWidget):
     # ------------------------------------------------------------------ voice-owner consent
     @property
     def consent_mode(self) -> str:
+        """The consent choice in the training form (``auto``, ``manual`` or ``none``)."""
         return str(self.cmb_consent.currentData() or "auto")
 
     def _on_consent_mode(self) -> None:
@@ -1352,9 +1353,11 @@ class MainWindow(QWidget):
 
     @property
     def preset(self) -> str:
+        """The selected training preset id."""
         return str(self.cmb_preset.currentData() or train_presets.DEFAULT_PRESET)
 
     def manual_values(self) -> train_presets.Manual:
+        """Epochs, rank, alpha, learning rate and accumulation from the manual preset fields."""
         return train_presets.Manual(self.sp_epochs.value(), self.sp_rank.value(), self.sp_alpha.value(),
                                     self.sp_lr.value(), self.sp_accum.value())
 

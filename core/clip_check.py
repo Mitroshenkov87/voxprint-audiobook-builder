@@ -52,6 +52,7 @@ class ClipCheckReport:
     texts: List[str] = field(default_factory=list)        # what the recogniser heard, per clip
 
     def as_dict(self) -> dict:
+        """A plain dict of how many clips were checked, dropped and kept."""
         return {"threshold": self.threshold, "checked": self.checked, "dropped": self.dropped, "kept_over": self.kept_over,
                 "failed": self.failed, "min_keep": MIN_KEEP_CLIPS}
 

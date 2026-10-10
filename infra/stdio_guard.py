@@ -15,10 +15,12 @@ class GuardedStream:
     """Delegates to a stream and swallows a dead handle, including errno 22, on ``write`` and ``flush``."""
 
     def __init__(self, inner: Optional[TextIO]) -> None:
+        """Wrap ``inner``. A missing stream is already treated as dead."""
         self._inner = inner
         self._dead = inner is None
 
     def write(self, text: str) -> int:
+        """Write ``text``, or return 0 when the handle is dead."""
         if self._dead or self._inner is None:
             return 0
         try:
@@ -28,6 +30,7 @@ class GuardedStream:
             return 0
 
     def flush(self) -> None:
+        """Flush the inner stream, and mark it dead if that fails."""
         if self._dead or self._inner is None:
             return
         try:
@@ -36,6 +39,7 @@ class GuardedStream:
             self._dead = True
 
     def __getattr__(self, name: str):
+        """Forward any other attribute to the inner stream."""
         if self._inner is None:
             raise AttributeError(name)
         return getattr(self._inner, name)

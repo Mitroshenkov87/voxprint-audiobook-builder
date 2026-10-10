@@ -139,6 +139,7 @@ class HeldLock:
 
     def __init__(self, path: Path, job: str, started: str, eta: datetime,
                  now: Callable[[], datetime]) -> None:
+        """Remember the lock file, the job name and the clock this process owns."""
         self.path = path
         self.job = job
         self.started = started

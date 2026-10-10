@@ -71,6 +71,7 @@ class OpenVoiceConverter:
     key = "openvoice-v2"
 
     def __init__(self, models_dir: Optional[Path] = None) -> None:
+        """Remember the OpenVoice model folder. The weights load on the first conversion."""
         self.models_dir = models_dir
         self._model: Any = None
         self._hps: Any = None
@@ -104,6 +105,7 @@ class OpenVoiceConverter:
         log.info("OpenVoice V2 converter on %s", self._device)
 
     def unload(self) -> None:
+        """Drop the converter and return its video memory."""
         self._model = None
         self._hps = None
         try:

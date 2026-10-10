@@ -76,10 +76,12 @@ def _dir(models_dir: Optional[Path] = None) -> Path:
 
 
 def model_path(models_dir: Optional[Path] = None) -> Path:
+    """Path of the pinned Gemma GGUF file under the models folder."""
     return _dir(models_dir) / str(MODEL["file"])
 
 
 def server_dir(models_dir: Optional[Path] = None) -> Path:
+    """Folder of the unpacked llama.cpp build for this pin."""
     return _dir(models_dir) / f"llama.cpp-{LLAMA_BUILD}"
 
 
@@ -93,6 +95,7 @@ def server_exe(models_dir: Optional[Path] = None) -> Optional[Path]:
 
 
 def model_ready(models_dir: Optional[Path] = None) -> bool:
+    """True when the GGUF file is present at the pinned size."""
     p = model_path(models_dir)              # the hash was checked when it was downloaded; the size catches a damaged copy
     try:
         return p.is_file() and p.stat().st_size == int(cast(Any, MODEL["size"]))
@@ -101,6 +104,7 @@ def model_ready(models_dir: Optional[Path] = None) -> bool:
 
 
 def download_mb() -> int:
+    """Download size of the model plus the llama.cpp archive, in megabytes."""
     a = SERVER_ASSETS.get(platform_key() or "")
     extra = int(cast(Any, a["size"])) if a else 0
     return int((int(cast(Any, MODEL["size"])) + extra) / 1e6)
@@ -234,6 +238,7 @@ class LlamaServer:
 
     def __init__(self, exe: Path, model: Path, ctx: int = 8192, popen=subprocess.Popen, log_dir: Optional[Path] = None,
                  start_timeout: float = 300.0, run=subprocess.run) -> None:
+        """Remember the server binary, the GGUF path and how the process is started."""
         self.exe, self.model, self.ctx, self._popen, self._run = Path(exe), Path(model), ctx, popen, run
         self.log_dir, self.start_timeout = log_dir, start_timeout
         self.proc: Optional[subprocess.Popen[Any]] = None
@@ -242,6 +247,7 @@ class LlamaServer:
         self._http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     def start(self) -> "LlamaServer":
+        """Start ``llama-server`` on a free local port and wait until it answers."""
         with socket.socket() as s:
             s.bind(("127.0.0.1", 0))
             self.port = s.getsockname()[1]
@@ -275,6 +281,7 @@ class LlamaServer:
         raise RuntimeError("llama-server did not become ready in time")
 
     def complete(self, prompt: str, max_tokens: int = 2048, temperature: float = 0.2) -> str:
+        """Send ``prompt`` to the local server and return the answer text."""
         body = json.dumps(chat_body(prompt, max_tokens, temperature)).encode("utf-8")
         req = urllib.request.Request(f"http://127.0.0.1:{self.port}/v1/chat/completions", data=body,
                                      headers={"Content-Type": "application/json"})
@@ -283,6 +290,7 @@ class LlamaServer:
         return reply_text(data)
 
     def close(self) -> None:
+        """Stop the server process and wait for it to exit."""
         p, self.proc = self.proc, None
         if p is None or p.poll() is not None:
             return

@@ -1,0 +1,3 @@
+# `core.appinfo`
+
+::: core.appinfo
