@@ -19,3 +19,9 @@ Splash
 assets/splash.jpg is the square splash: the same logo in a painterly alpine
 evening (darkening blue sky, golden rye, pale haze, a soft red glow), with
 no houses, no river and no text. ui/splash.py loads this filename.
+
+Easter egg
+----------
+assets/easter-egg.jpg is original generated artwork, no real person's likeness.
+ui/splash.py shows it, with the caption easter_egg.caption, after a hidden
+click sequence on the splash.

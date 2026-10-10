@@ -8,6 +8,8 @@ Part of the Voxprint AI Media Suite (with [Voxprint AI Movie Dubber](https://git
 
 > **Beta / experimental (v0.2.4, build 704 "Achim").** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs **Windows 11 (24H2+) and an NVIDIA GPU** (16 GB VRAM recommended). Details: [tests and caveats](docs/TESTING.md).
 
+Supported systems: current and previous year OS releases (Windows 11 24H2 and newer; Linux distributions released from 2025). Older systems are not a goal.
+
 <p align="center"><img src="docs/screenshots/en-667/01-main-window.png" alt="Voxprint Studio" width="420"> <img src="docs/screenshots/en-667/04-voice-library-boaz-tirzah.png" alt="My voices: build 667 screenshot. Tirzah and Gideon are the bundled voices; the picture also shows Boaz, which is retired" width="420"></p>
 <p align="center"><img src="docs/screenshots/en-667/02-narrate-book-top.png" alt="Narrate a book" width="420"> <img src="docs/screenshots/en-667/07-settings-pauses-speed-repair.png" alt="Settings: pauses and reading speed" width="300"></p>
 

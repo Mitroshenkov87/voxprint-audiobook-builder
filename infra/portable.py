@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
-from infra import download_watch, model_mirrors, model_release, modelscope_mirror, vc_model
+from infra import download_watch, env_probe, model_mirrors, model_release, modelscope_mirror, vc_model
 
 log = logging.getLogger("voxprint.portable")
 
@@ -144,10 +144,16 @@ def _run(cmd: List[str], timeout: float = 10.0) -> str:
 
 
 def detect_cuda(run: Callable[[List[str]], str] = _run) -> Optional[Tuple[int, int]]:
-    """CUDA version the NVIDIA driver supports (``nvidia-smi``), or None without an NVIDIA driver."""
-    exe = shutil.which("nvidia-smi")
-    m = re.search(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)", run([exe]) if exe else "")   # 6xx drivers print "CUDA UMD Version"
-    return (int(m.group(1)), int(m.group(2))) if m else None
+    """CUDA version the NVIDIA driver supports (``nvidia-smi``), or None without an NVIDIA driver.
+
+    Same probe as :func:`infra.env_probe.detect_driver_cuda`: the header, then the driver version
+    when the header has no ``CUDA Version`` / ``CUDA UMD Version``.
+    """
+    def runner(args: List[str]) -> Tuple[int, str]:
+        text = run(args)
+        return (0, text) if text else (1, "")
+
+    return env_probe.detect_driver_cuda(runner, shutil.which)
 
 
 def detect_vram_mb(run: Callable[[List[str]], str] = _run) -> int:
