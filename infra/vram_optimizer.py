@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field, replace
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 from core.i18n import tr
 
@@ -125,9 +125,9 @@ def plan_training(gpu: GpuInfo, n_items: int, *, force_cpu: bool = False, langua
     """
     warnings: List[str] = []
     n = max(1, n_items)
-    common = dict(lora_r=LORA_R, lora_alpha=LORA_ALPHA, lr=compute_lr(n), batch_size=1,
-                  grad_accum=compute_grad_accum(n), gradient_checkpointing=True, language=language,
-                  max_seconds_per_item=MAX_AUDIO_SECONDS)
+    common: dict[str, Any] = dict(lora_r=LORA_R, lora_alpha=LORA_ALPHA, lr=compute_lr(n), batch_size=1,
+                                  grad_accum=compute_grad_accum(n), gradient_checkpointing=True, language=language,
+                                  max_seconds_per_item=MAX_AUDIO_SECONDS)
     if n < 20:
         warnings.append(tr("warn.few_segments"))
 

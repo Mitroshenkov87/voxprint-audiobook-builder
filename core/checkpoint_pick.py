@@ -142,7 +142,7 @@ def run_pick(adapter_dir: Path, language: str, *, engine_factory: Callable[[Path
     if asr is not None and callable(getattr(asr, "load", None)):
         asr.load()
     try:
-        cands = []
+        cands: List[Dict[str, Any]] = []
         for (epoch, scale), items in samples.items():
             cancel.check()
             cers, sims, moss, stops = [], [], [], []
@@ -152,15 +152,19 @@ def run_pick(adapter_dir: Path, language: str, *, engine_factory: Callable[[Path
                 sims.append(sim)
                 moss.append(mos_of(mos, audio, sr))
                 stops.append(1.0 if len(audio) / sr >= cap else 0.0)
-            c = {"epoch": epoch, "scale": scale, "cer": _mean(cers), "sim": _mean(sims), "mos": _mean(moss),
-                 "no_stop": float(np.mean(stops)) if stops else 0.0}
-            c["score"] = round(score(c["cer"], c["sim"], c["mos"], c["no_stop"]), 4)
-            cands.append({k: (round(v, 4) if isinstance(v, float) else v) for k, v in c.items()})
+            cer_m, sim_m, mos_m = _mean(cers), _mean(sims), _mean(moss)
+            no_stop = float(np.mean(stops)) if stops else 0.0
+            row: Dict[str, Any] = {"epoch": epoch, "scale": scale, "cer": cer_m, "sim": sim_m, "mos": mos_m,
+                                   "no_stop": no_stop, "score": round(score(cer_m, sim_m, mos_m, no_stop), 4)}
+            cands.append({k: (round(v, 4) if isinstance(v, float) else v) for k, v in row.items()})
     finally:
         if asr is not None and callable(getattr(asr, "unload", None)):
             asr.unload()
     # Ties: the strength nearer the default, then the later epoch (more training on the same evidence)
-    best = max(cands, key=lambda c: (c["score"], -abs(c["scale"] - adapter_strength.DEFAULT_SCALE), c["epoch"]))
+    def _rank(c: Dict[str, Any]) -> tuple[Any, Any, Any]:
+        return (c["score"], -abs(c["scale"] - adapter_strength.DEFAULT_SCALE), c["epoch"])
+
+    best = max(cands, key=_rank)
     progress(Stage.SAVE, 1.0, tr("progress.pick_done", epoch=best["epoch"], scale=f"{best['scale']:.2f}"))
     return {"best_epoch": best["epoch"], "best_scale": best["scale"], "phrases": phrases, "candidates": cands}
 

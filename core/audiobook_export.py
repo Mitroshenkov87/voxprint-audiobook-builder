@@ -470,7 +470,11 @@ class Exporter:
             ext = {FORMAT_M4B: "m4b", FORMAT_M4B_OPUS: "m4b", FORMAT_MP3_SINGLE: "mp3", FORMAT_OPUS_SINGLE: "opus"}[fmt]
             out = self.out_dir / (f"{self.base} (Opus).{ext}" if fmt == FORMAT_M4B_OPUS else f"{self.base}.{ext}")
             cmd = cmd_single(self.ffmpeg or "", fmt, list_file, meta_file, self.meta, out, self.rates)
-            singles[fmt] = (out, self._start(lambda cmd=cmd, out=out: _run_checked(self.run, cmd, out)))
+
+            def _encode(cmd: List[str] = cmd, out: Path = out) -> None:
+                _run_checked(self.run, cmd, out)
+
+            singles[fmt] = (out, self._start(_encode))
         result = ExportResult()
         for i, fmt in enumerate(self.wanted):
             if progress:

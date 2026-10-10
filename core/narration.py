@@ -51,8 +51,12 @@ from core import pauses as pz
 from core import pace as pc
 from core import ai_disclosure
 from core import cpu_budget
+from core import gpu_lock
+from core import gpu_thermal
 from core import speakers as spk
+from core import sysmem_spill
 from core.chunker import DEFAULT_MAX_CHARS, Chunk, chunk_book
+from core.llm_text import LLMPlan
 from core import ordinals
 from core import yo
 from core.errors import CancelledByUser, DatasetMakerError, NarrationError
@@ -131,7 +135,7 @@ class NarrationOptions:
     #: Machine translation of the book before narration (:mod:`core.translate`); ``None`` = narrate the book as it is.
     translate: Optional[tl.TranslatePlan] = None
     #: "Prepare text for narration" with the AI text model (:mod:`core.llm_text`, a ``LLMPlan``); ``None`` = off.
-    llm_prepare: Optional[object] = None
+    llm_prepare: Optional[LLMPlan] = None
     #: Per-chunk speech-recognition check with regeneration (:mod:`core.chunk_check`); the runner builds the checker.
     check_chunks: bool = False
     check_max_cer: float = 0.15
@@ -324,7 +328,7 @@ def text_steps(language: Optional[str], book_language: Optional[str], options: N
     return chain_steps(ordinal, letter, base)
 
 
-def default_normalizer(language: str) -> Optional[Callable[[str], str]]:
+def default_normalizer(language: Optional[str]) -> Optional[Callable[[str], str]]:
     """Russian numbers/abbreviations are spelled out before synthesis (the same normalizer the dataset builder uses)."""
     if (language or "").strip().lower() in ("russian", "ru"):
         from core.normalizer import normalize_for_tts
@@ -351,7 +355,8 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
                       cancel: CancelToken, pause: PauseToken, on_saved: Optional[Callable[[Chunk], None]] = None,
                       engine_future: Optional[Future] = None,
                       background_check: Optional[Callable[[], None]] = None, checker=None,
-                      voices: Optional[Dict[str, tuple]] = None) -> Dict[str, int]:
+                      voices: Optional[Dict[str, tuple]] = None,
+                      thermal: Optional[gpu_thermal.Monitor] = None) -> Dict[str, int]:
     """Synthesize every chunk that is not cached yet.  Returns ``{"cached": n, "made": m}``.
 
     ``texts`` maps a chunk index to the prepared text; ``engine_tag`` identifies the engine without creating it.
@@ -401,9 +406,11 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
         order.insert(0, "")
     used_preload = False
 
+    spill: Optional[sysmem_spill.Monitor] = None
     try:
-        batch_limit = 0                                      # 0 = not known yet (the engine is created lazily)
+        batch_ceiling: Optional[int] = None                  # lowered by an out-of-memory or a sysmem spill; None = follow the fresh plan
         eta: Optional[float] = None                          # last estimate, repeated in the "batch starts" message
+        groups_done = 0
         for vid in order:
             if engine is not None:                           # one model in memory: the previous voice is closed first
                 try:
@@ -411,6 +418,10 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
                 except Exception:  # noqa: BLE001
                     log.warning("engine close failed", exc_info=True)
                 engine = None
+                if spill is not None:
+                    spill.stop()
+                    spill = None
+                batch_ceiling = None                         # the next voice loads its own model; plan from that free memory
             queue = list(buckets[vid])
             while queue:
                 pause.wait(cancel)
@@ -424,10 +435,26 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
                         engine = voices[vid][0]()
                     else:
                         engine = engine_factory()
-                    batch_limit = _batch_limit(engine)
-                    if slots is None:
-                        slots = threading.BoundedSemaphore(max(4, PENDING_WRITE_BATCHES * batch_limit))
-                group = _next_group(queue, texts, batch_limit)
+                    spill = sysmem_spill.start_after_load()  # baseline is the first sample after this load
+                    if thermal is not None:
+                        thermal.retarget(getattr(engine, "device", ""))
+                if groups_done and thermal is not None and thermal.should_cool():
+                    progress(NarrationProgress(done, total, eta, tr("narr.cooling"), "synth"))
+                    thermal.cool(cancel, pause)
+                measured = _batch_limit(engine)              # re-reads torch.cuda.mem_get_info on a real engine
+                limit = measured if batch_ceiling is None else min(measured, batch_ceiling)
+                if spill is not None and spill.tripped():
+                    _free_gpu_cache()
+                    limit = max(1, limit // 2)
+                    batch_ceiling = limit
+                    grown = spill.growth()
+                    spill.mark()
+                    log.warning(
+                        "GPU shared memory grew by %.0f MB after the model load; treating it as out of memory "
+                        "and halving the batch. %s", grown / (1024 * 1024), sysmem_spill.DIAGNOSTIC_NOTE)
+                if slots is None:
+                    slots = threading.BoundedSemaphore(max(4, PENDING_WRITE_BATCHES * max(1, limit)))
+                group = _next_group(queue, texts, limit)
                 # Say what is being generated *before* the (possibly minutes-long) batch call: otherwise the UI and the log
                 # stay on "model loaded" until the first batch is finished and the job looks frozen.
                 first, last = done + 1, done + len(group)
@@ -435,14 +462,17 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
                          sum(len(texts[c.index]) for c in group))
                 progress(NarrationProgress(done, total, eta, tr("narr.synth_batch", first=first, last=last, total=total)))
                 t0 = time.monotonic()
-                audios, batch_limit = _synth_group(engine, [texts[c.index] for c in group], [c.index for c in group], batch_limit)
+                audios, new_limit = _synth_group(engine, [texts[c.index] for c in group], [c.index for c in group], limit)
+                if new_limit < limit:
+                    batch_ceiling = new_limit
+                groups_done += 1
                 if checker is not None:        # on this (GPU) thread, before the writers see the chunk: the cache holds the winner
                     progress(NarrationProgress(done, total, eta, tr("narr.checking", first=first, last=last, total=total)))
                     audios = [checker.check(engine, texts[c.index], keys[c.index], c.index, a, engine.sample_rate)
                               for c, a in zip(group, audios)]
                 spent += time.monotonic() - t0
                 for c, audio in zip(group, audios):
-                    while not slots.acquire(timeout=0.2):                # type: ignore[union-attr]
+                    while not slots.acquire(timeout=0.2):
                         cancel.check()
                         _raise_finished(futures)                        # a failed write never frees its wait
                     futures.append(saver.submit(save, c, audio, engine.sample_rate))
@@ -458,6 +488,8 @@ def synthesize_chunks(chunks: Sequence[Chunk], engine_factory: Callable[[], TTSE
         for f in futures:
             f.result()
     finally:
+        if spill is not None:
+            spill.stop()
         saver.shutdown(wait=True)
         if checker is not None:
             checker.close()                                              # the recogniser leaves (V)RAM with the engine
@@ -498,10 +530,12 @@ SORT_WINDOW_BATCHES = 3
 
 def _batch_limit(engine: TTSEngine) -> int:
     """How many chunks the engine can take at once (1 = no batching: engine without ``synthesize_batch`` or on CPU)."""
-    if not callable(getattr(engine, "synthesize_batch", None)) or not callable(getattr(engine, "max_batch", None)):
+    batch = getattr(engine, "synthesize_batch", None)
+    limit_of = getattr(engine, "max_batch", None)
+    if not callable(batch) or not callable(limit_of):
         return 1
     try:
-        return max(1, int(engine.max_batch()))
+        return max(1, int(limit_of()))
     except Exception:  # noqa: BLE001
         return 1
 
@@ -733,7 +767,42 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
     ``engine_factory`` is called only if some chunk is missing from the cache.  ``chapters`` restricts the job to the
     given 0-based chapter numbers.  ``on_plan`` receives the ordered chunk files (they appear one by one; used by the live
     player).  ``ffmpeg``/``run`` are injectable for tests.  ``checker``: the per-chunk check (:mod:`core.chunk_check`), or None.
+
+    The GPU lock (:mod:`core.gpu_lock`) is held for every stage of this call and removed when it returns. A temperature
+    monitor (:mod:`core.gpu_thermal`) starts with the job.
     """
+    progress_cb = progress or (lambda _p: None)
+    cancel_token = cancel or CancelToken()
+    job_name = str(getattr(book, "title", "") or "").strip() or "audiobook"
+
+    def on_busy(owner: str, other: str) -> None:
+        progress_cb(NarrationProgress(0, 1, None, tr("narr.gpu_busy", owner=owner, job=other), "prepare"))
+
+    thermal = gpu_thermal.Monitor(started=time.monotonic())
+    with gpu_lock.hold(job_name, on_busy=on_busy, cancel=cancel_token) as held:
+        thermal.start()
+
+        def report(item: NarrationProgress) -> None:
+            held.note(item.eta)
+            progress_cb(item)
+
+        try:
+            return _narrate_book_work(
+                book, engine_factory, engine_tag, out_dir, language, narrator, options, report, cancel_token,
+                pause, ffmpeg, run, chapters, on_plan, checker, extra_engines, thermal)
+        finally:
+            thermal.stop()
+
+
+def _narrate_book_work(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag: str, out_dir: Path,
+                       language: str = "", narrator: str = "", options: Optional[NarrationOptions] = None,
+                       progress: Optional[ProgressFn] = None, cancel: Optional[CancelToken] = None,
+                       pause: Optional[PauseToken] = None, ffmpeg: Optional[str] = None,
+                       run: Optional[ex.Run] = None, chapters: Sequence[int] = (),
+                       on_plan: Optional[Callable[[List[Path]], None]] = None, checker=None,
+                       extra_engines: Optional[Dict[str, tuple]] = None,
+                       thermal: Optional[gpu_thermal.Monitor] = None) -> NarrationResult:
+    """The narration stages. :func:`narrate_book` holds the GPU lock around this."""
     options = options or NarrationOptions()
     t_job = time.monotonic()
     stage_s: Dict[str, float] = {}
@@ -848,7 +917,8 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
         handed_over, engine_future = engine_future, None          # from here on synthesize_chunks owns (and closes) it
         counts = synthesize_chunks(chunk_list, engine_factory, engine_tag, cache, texts, progress, cancel, pause,
                                    on_saved=chapters_pipe.chunk_saved, engine_future=handed_over,
-                                   background_check=chapters_pipe.check, checker=checker, voices=extra_engines)
+                                   background_check=chapters_pipe.check, checker=checker, voices=extra_engines,
+                                   thermal=thermal)
 
         stage_s["synthesis"] = time.monotonic() - t_job
         total = len(chunk_list)

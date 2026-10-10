@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
-from infra import download_watch, model_mirrors, model_release, modelscope_mirror, vc_model
+from infra import download_watch, env_probe, model_mirrors, model_release, modelscope_mirror, vc_model
 
 log = logging.getLogger("voxprint.portable")
 
@@ -144,10 +144,16 @@ def _run(cmd: List[str], timeout: float = 10.0) -> str:
 
 
 def detect_cuda(run: Callable[[List[str]], str] = _run) -> Optional[Tuple[int, int]]:
-    """CUDA version the NVIDIA driver supports (``nvidia-smi``), or None without an NVIDIA driver."""
-    exe = shutil.which("nvidia-smi")
-    m = re.search(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)", run([exe]) if exe else "")   # 6xx drivers print "CUDA UMD Version"
-    return (int(m.group(1)), int(m.group(2))) if m else None
+    """CUDA version the NVIDIA driver supports (``nvidia-smi``), or None without an NVIDIA driver.
+
+    Same probe as :func:`infra.env_probe.detect_driver_cuda`: the header, then the driver version
+    when the header has no ``CUDA Version`` / ``CUDA UMD Version``.
+    """
+    def runner(args: List[str]) -> Tuple[int, str]:
+        text = run(args)
+        return (0, text) if text else (1, "")
+
+    return env_probe.detect_driver_cuda(runner, shutil.which)
 
 
 def detect_vram_mb(run: Callable[[List[str]], str] = _run) -> int:
@@ -279,7 +285,8 @@ def diff(old: dict, new: dict, flavor: str = "all", folder: Optional[Path] = Non
 
 def prune(folder: Path, man: dict, flavor: str = "all") -> List[str]:
     """Delete component files that the manifest no longer wants (old versions after an update); returns what was removed."""
-    folder, gone = Path(folder), []
+    folder = Path(folder)
+    gone: List[str] = []
     keep = {component_path(folder, c).resolve() for c in man["components"] if matches_flavor(c, flavor)}
     root = folder / "components"
     if not root.is_dir():
@@ -418,8 +425,11 @@ def fetch_models(folder: Path, repos: List[str], progress: Callable[[float, str]
                 progress(min(0.99, m.done / total) if total else 0.0, m.text(_tr, short, pct))
 
             try:
+                def _idle_ok(held_entry: model_mirrors.MirrorEntry = entry, held_dir: Path = d) -> bool:
+                    return _complete(held_dir, held_entry)
+
                 download_watch.run_watched(fn, root, meter, cancel, on_tick=tick, stall=stall, poll=poll,
-                                           idle_ok=lambda e=entry, d=d: _complete(d, e))
+                                           idle_ok=_idle_ok)
                 done_src = src
                 break
             except Exception as exc:  # noqa: BLE001 - the next source takes over, the partial files stay

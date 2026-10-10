@@ -21,7 +21,8 @@ Unsloth would pull its own pins (trl, xformers, transformers range incl. 5.x) th
 Voxprint keeps its own LoRA loop (core/lora_trainer.py).  If found it is only reported (reason ``no_qwen3_tts_training``).
 
 NVIDIA driver -> PyTorch wheel flavor follows the CUDA version printed by ``nvidia-smi`` (same mapping Unsloth's
-installer uses: cu118 / cu124 / cu126 / cu128 / cu130, else CPU).
+installer uses: cu118 / cu124 / cu126 / cu128 / cu130, else CPU).  When the header has no ``CUDA Version`` /
+``CUDA UMD Version``, the driver version is used instead: 570+ is treated as CUDA 12.8, 560-569 as 12.6, older as CPU.
 """
 from __future__ import annotations
 
@@ -96,10 +97,33 @@ CUDA_FLAVORS: Tuple[Tuple[Tuple[int, int], str], ...] = (
     ((13, 0), "cu130"), ((12, 8), "cu128"), ((12, 6), "cu126"), ((12, 4), "cu124"), ((11, 8), "cu118"))
 
 
+_CUDA_IN_HEADER = re.compile(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)")   # 6xx drivers print "CUDA UMD Version"
+_DRIVER_MAJOR = re.compile(r"^\s*(\d+)\.")
+
+
 def parse_nvidia_smi_cuda(text: str) -> Optional[Tuple[int, int]]:
     """Extract the driver's CUDA version ``(major, minor)`` from ``nvidia-smi`` output, or None."""
-    m = re.search(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)", text or "")   # 6xx drivers print "CUDA UMD Version"
+    m = _CUDA_IN_HEADER.search(text or "")
     return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def cuda_from_driver_version(text: str) -> Optional[Tuple[int, int]]:
+    """Map ``nvidia-smi --query-gpu=driver_version`` when the header has no CUDA version.
+
+    The first line ``major.minor...`` decides: >= 570 -> CUDA 12.8, >= 560 -> CUDA 12.6, otherwise None (CPU).
+    """
+    lines = (text or "").splitlines()
+    if not lines:
+        return None
+    m = _DRIVER_MAJOR.match(lines[0])
+    if not m:
+        return None
+    major = int(m.group(1))
+    if major >= 570:
+        return (12, 8)
+    if major >= 560:
+        return (12, 6)
+    return None
 
 
 def torch_flavor_for_driver(cuda: Optional[Tuple[int, int]]) -> str:
@@ -151,12 +175,25 @@ def decide_torch(installed: Optional[str], wanted_flavor: str, external: bool = 
 
 
 def detect_driver_cuda(run: Runner = _run, which: Callable[[str], Optional[str]] = shutil.which) -> Optional[Tuple[int, int]]:
-    """CUDA version supported by the installed NVIDIA driver (via ``nvidia-smi``), or None without a driver."""
-    exe = which("nvidia-smi")
-    if not exe:
+    """CUDA version supported by the installed NVIDIA driver (via ``nvidia-smi``), or None without a driver.
+
+    The header's ``CUDA Version`` / ``CUDA UMD Version`` wins.  Without that line, the first
+    ``driver_version`` query line is mapped (>= 570 -> 12.8, >= 560 -> 12.6, else None).  Any error is None.
+    """
+    try:
+        exe = which("nvidia-smi")
+        if not exe:
+            return None
+        rc, out = run([exe])
+        found = parse_nvidia_smi_cuda(out) if rc == 0 else None
+        if found:
+            return found
+        rc, out = run([exe, "--query-gpu=driver_version", "--format=csv,noheader"])
+        if rc != 0:
+            return None
+        return cuda_from_driver_version(out)
+    except Exception:  # noqa: BLE001 - a missing or broken nvidia-smi means CPU
         return None
-    rc, out = run([exe])
-    return parse_nvidia_smi_cuda(out) if rc == 0 else None
 
 
 # ------------------------------------------------------------------------------------- ffmpeg
@@ -255,7 +292,8 @@ def probe_python(exe: str, source: str = "path", run: Runner = _run,
         return None
 
 
-def pick_pip_python(envs: List[PythonEnv], want: Tuple[int, int] = tuple(sys.version_info[:2])) -> Optional[str]:
+def pick_pip_python(envs: List[PythonEnv],
+                    want: Tuple[int, int] = (sys.version_info[0], sys.version_info[1])) -> Optional[str]:
     """Python used for ``pip install --target <Voxprint dir>``: same major.minor as Voxprint itself (binary wheels must
     match), newest patch.  pip --target writes only into our folder, the interpreter's environment stays untouched."""
     ok = [e for e in envs if e.version[:2] == tuple(want)]
@@ -288,7 +326,7 @@ class EnvReport:
 
 
 def probe_environment(manifest_pins: Optional[Dict[str, str]] = None,
-                      installed_fn: Callable[[str], Optional[str]] = None,  # type: ignore[assignment]
+                      installed_fn: Optional[Callable[[str], Optional[str]]] = None,
                       run: Runner = _run, which: Callable[[str], Optional[str]] = shutil.which,
                       scan_other_pythons: bool = True, packages: Optional[Dict[str, str]] = None,
                       environ: Optional[Dict[str, str]] = None,
@@ -298,12 +336,14 @@ def probe_environment(manifest_pins: Optional[Dict[str, str]] = None,
     ``offer_upgrade`` instead of ``upgrade``."""
     if external_env is None:
         external_env = not is_own_environment()
-    if installed_fn is None:
-        def installed_fn(n: str) -> Optional[str]:      # type: ignore[misc]
-            try:
-                return metadata.version(n)
-            except metadata.PackageNotFoundError:
-                return None
+
+    def _installed_here(n: str) -> Optional[str]:
+        try:
+            return metadata.version(n)
+        except metadata.PackageNotFoundError:
+            return None
+
+    version_of = installed_fn if installed_fn is not None else _installed_here
     if manifest_pins is None:
         try:
             from infra.verified_manifest import load_bundled
@@ -316,7 +356,7 @@ def probe_environment(manifest_pins: Optional[Dict[str, str]] = None,
     from infra.version_manager import OPTIONAL_PACKAGES
 
     for name, constraint in tracked.items():
-        inst = installed_fn(name)
+        inst = version_of(name)
         pin = manifest_pins.get(name)
         if pin is None and inst is None and name in OPTIONAL_PACKAGES:
             continue                                   # optional and absent: nothing to do
@@ -325,9 +365,9 @@ def probe_environment(manifest_pins: Optional[Dict[str, str]] = None,
             rep.decisions.append(d)
     rep.driver_cuda = detect_driver_cuda(run, which)
     rep.wanted_torch_flavor = torch_flavor_for_driver(rep.driver_cuda)
-    rep.decisions.append(decide_torch(installed_fn("torch"), rep.wanted_torch_flavor, external_env))
+    rep.decisions.append(decide_torch(version_of("torch"), rep.wanted_torch_flavor, external_env))
     for name, reason in IGNORED_PACKAGES.items():
-        if installed_fn(name):
+        if version_of(name):
             rep.ignored[name] = reason
     rep.ffmpeg = probe_ffmpeg(which, run)
     if scan_other_pythons:

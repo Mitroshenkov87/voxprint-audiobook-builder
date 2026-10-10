@@ -660,8 +660,9 @@ class SettingsDialog(GlassDialog):
 
     def toggle_autorepair(self) -> bool:
         """Start the auto-repair (or stop the running one).  Returns True when a run was started."""
-        if self.autorepair_running:
-            self.autorepair_worker.cancel()
+        worker = self.autorepair_worker
+        if worker is not None and worker.isRunning():
+            worker.cancel()
             self.lbl_autorepair_status.setText(tr("ui.stopping"))
             return False
         if self._win.busy or self._win.repairing:

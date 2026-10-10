@@ -73,7 +73,7 @@ def find_names(paras: Sequence[str], limit: int = MAX_GLOSSARY) -> List[str]:
 
     caps: Counter = Counter()
     mid: Counter = Counter()
-    lower = set()
+    lower: set[str] = set()
     for p in paras:
         for sent in split_sentences(" ".join(p.split())):
             words = re.findall(r"[^\W\d_][\w'\u2019-]*", sent)
@@ -139,15 +139,19 @@ class _Session:
     """Starts the model only when a block is not cached; after a crash it stays broken (the rest falls back)."""
 
     def __init__(self, plan: LLMPlan) -> None:
-        self.plan, self.model, self.broken = plan, None, False
+        self.plan = plan
+        self.model: Optional[ChatModel] = None
+        self.broken = False
 
     def ask(self, prompt: str, max_tokens: int) -> Optional[str]:
         if self.broken:
             return None
         try:
-            if self.model is None:
-                self.model = self.plan.factory()
-            return self.model.complete(prompt, max_tokens=max_tokens)
+            model = self.model
+            if model is None:
+                model = self.plan.factory()
+                self.model = model
+            return model.complete(prompt, max_tokens=max_tokens)
         except Exception:  # noqa: BLE001 - any model / process / HTTP failure: fall back for the rest
             log.warning("AI text model failed - the rest uses the fallback", exc_info=True)
             self.broken = True

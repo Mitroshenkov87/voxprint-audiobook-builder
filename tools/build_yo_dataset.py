@@ -18,7 +18,7 @@ import io
 import json
 import sys
 from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Any, Dict, Iterable, List
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -47,7 +47,7 @@ def _records(table: Dict[str, str], kind: str, source: str) -> Iterable[dict]:
         if not _keep(key, table):
             continue
         form = table[key]
-        row = {
+        row: Dict[str, Any] = {
             "word": key,
             "yo_form": form,
             "stress": yo.stress_index(form),

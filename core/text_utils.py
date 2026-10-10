@@ -305,15 +305,17 @@ def attach_spans(words: Sequence[WordTiming], text: str) -> List[str]:
     # extend the spans over adjacent punctuation and set sentence_end
     n = len(text)
     for w in words:
-        if w.char_start is None:
+        start = w.char_start
+        end = w.char_end
+        if start is None or end is None:
             continue
-        e = w.char_end
+        e = end
         while e < n and not text[e].isspace() and not is_kept_char(text[e]):
             e += 1
-        trail = text[w.char_end:e]
+        trail = text[end:e]
         w.sentence_end = any(c in _TERMINATORS for c in trail) or (e >= n)
         w.char_end = e
-        s = w.char_start
+        s = start
         while s > 0 and (unicodedata.category(text[s - 1]) in ("Ps", "Pi") or text[s - 1] in "\"«„“"):
             s -= 1
         w.char_start = s

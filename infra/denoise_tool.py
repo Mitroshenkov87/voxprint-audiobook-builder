@@ -15,7 +15,7 @@ import os
 import stat
 import sys
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, cast
 
 from core.i18n import tr
 from infra import external_models, model_release
@@ -66,7 +66,7 @@ def tool_path(models_dir: Optional[Path] = None, key: Optional[str] = None) -> O
 
     local = paths.models_dir() / "deepfilternet" / str(a["name"])
     try:
-        if local.is_file() and local.stat().st_size == int(a["size"]):
+        if local.is_file() and local.stat().st_size == int(cast(Any, a["size"])):
             return local
     except OSError:
         pass
@@ -79,7 +79,7 @@ def ready(models_dir: Optional[Path] = None, key: Optional[str] = None) -> Optio
     p = tool_path(models_dir, key)
     a = asset(key)
     try:
-        return p if p is not None and p.is_file() and p.stat().st_size == int(a["size"]) else None  # type: ignore[index]
+        return p if p is not None and p.is_file() and p.stat().st_size == int(cast(Any, a)["size"]) else None
     except OSError:
         return None
 
@@ -87,10 +87,14 @@ def ready(models_dir: Optional[Path] = None, key: Optional[str] = None) -> Optio
 def download_size(key: Optional[str] = None) -> int:
     """Bytes of the download on this platform (0 when unsupported)."""
     a = asset(key)
-    return int(a["size"]) if a else 0  # type: ignore[arg-type]
+    return int(cast(Any, a["size"])) if a else 0
 
 
-def ensure(progress: Callable[[float, str], None] = lambda f, m="": None, models_dir: Optional[Path] = None,
+def _silent_progress(f: float, m: str = "") -> None:
+    pass
+
+
+def ensure(progress: Callable[[float, str], None] = _silent_progress, models_dir: Optional[Path] = None,
            opener=None, timeout: float = 30.0, key: Optional[str] = None) -> Path:
     """Download the program if missing (size + SHA-256 checked, resumable) and return its path.  Only call this on the user's
     explicit request.  Raises :class:`infra.model_release.ReleaseError` (also on an unsupported platform)."""
@@ -101,7 +105,7 @@ def ensure(progress: Callable[[float, str], None] = lambda f, m="": None, models
     have = ready(models_dir, key)
     if have is not None:
         return have
-    size = int(a["size"])  # type: ignore[arg-type]
+    size = int(cast(Any, a["size"]))
     done = [0]
 
     def on_bytes(n: int) -> None:

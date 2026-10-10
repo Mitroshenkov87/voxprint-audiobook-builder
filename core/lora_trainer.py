@@ -130,7 +130,7 @@ def speaker_embedding_from_ref(model: Any, ref_wav_path: str, device: Any, dtype
 def speaker_embedding_of(model: Any, wav: Any, device: Any, dtype: Any):
     """Speaker embedding ``[1, D]`` of 24 kHz samples ``wav`` with the model's speaker encoder."""
     import torch
-    from qwen_tts.core.models.modeling_qwen3_tts import mel_spectrogram  # type: ignore
+    from qwen_tts.core.models.modeling_qwen3_tts import mel_spectrogram
 
     with torch.no_grad():
         mel = mel_spectrogram(torch.from_numpy(wav).unsqueeze(0), n_fft=1024, num_mels=128,
@@ -197,7 +197,7 @@ def check_bitsandbytes(device: str) -> bool:
     if not device.startswith("cuda"):
         return False
     try:
-        import bitsandbytes as bnb  # type: ignore
+        import bitsandbytes as bnb
         import torch
 
         p = torch.nn.Parameter(torch.zeros(4096, device=device))
@@ -216,7 +216,7 @@ def make_optimizer(params: List[Any], lr: float, use_8bit: bool, device: str, wa
 
     if use_8bit:
         if check_bitsandbytes(device):
-            import bitsandbytes as bnb  # type: ignore
+            import bitsandbytes as bnb
 
             return bnb.optim.AdamW8bit(params, lr=lr, weight_decay=0.01)
         warnings.append(tr("warn.adam8_unavailable"))
@@ -491,7 +491,7 @@ def _train_once(dataset_dir: Path, output_dir: Path, plan: TrainPlan, progress: 
     data = load_training_rows(dataset_dir)
     models = md.ensure_tts_models(plan.base_model, lambda s, f, m: progress(Stage.TRAIN, 0.0, m))
     cancel.check()
-    from qwen_tts import Qwen3TTSModel  # type: ignore
+    from qwen_tts import Qwen3TTSModel
 
     dtype = torch.bfloat16 if plan.dtype == "bfloat16" else torch.float32
     on_gpu = plan.device.startswith("cuda")

@@ -74,3 +74,51 @@ def test_other_batch_errors_fall_back_to_single_chunks():
 def test_engine_without_batch_api_is_used_serially():
     assert nr._batch_limit(FakeEngine()) == 1
     assert nr._batch_limit(BatchEngine(limit=5)) == 5
+
+
+def test_the_batch_limit_is_read_again_before_every_group(tmp_path):
+    class Counting(BatchEngine):
+        def __init__(self):
+            super().__init__(limit=3)
+            self.queries = 0
+
+        def max_batch(self):
+            self.queries += 1
+            return 3
+
+    eng = Counting()
+    run(tmp_path, engine=eng, book=long_book(), options=nr.NarrationOptions(max_chars=40))
+    assert eng.queries >= 2 and eng.queries >= len(eng.batches)
+
+
+def test_sysmem_growth_halves_the_batch_and_names_the_nvidia_setting(tmp_path, monkeypatch, caplog):
+    import logging
+
+    from core import sysmem_spill
+
+    class Trip:
+        def __init__(self):
+            self.marked = 0
+            self.checks = 0
+
+        def stop(self):
+            pass
+
+        def tripped(self):
+            self.checks += 1
+            return self.checks == 1
+
+        def growth(self):
+            return 300 * 1024 * 1024
+
+        def mark(self):
+            self.marked += 1
+
+    trip = Trip()
+    monkeypatch.setattr(sysmem_spill, "start_after_load", lambda: trip)
+    eng = BatchEngine(limit=8)
+    with caplog.at_level(logging.WARNING, logger="voxprint.narration"):
+        run(tmp_path, engine=eng, book=long_book(), options=nr.NarrationOptions(max_chars=40))
+    assert trip.marked == 1
+    assert eng.batches and max(len(batch) for batch in eng.batches) <= 4
+    assert "Prefer No Sysmem Fallback" in caplog.text

@@ -13,7 +13,7 @@ NEEDS VALIDATION ON A GPU: the default and the candidate values are research-bas
 """
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, cast, overload
 
 #: Range offered in the UI (1.0 = the adapter exactly as trained).
 MIN_SCALE, MAX_SCALE = 0.1, 1.0
@@ -25,6 +25,18 @@ LEGACY_SCALE = 1.0
 PREVIEW_SCALES = (0.35, 0.5, 1.0)
 #: Values the automatic checkpoint pick tries for every candidate epoch.
 PICK_SCALES = (0.35, 0.5, 0.7, 1.0)
+
+
+@overload
+def clamp(value: Any) -> Optional[float]: ...
+
+
+@overload
+def clamp(value: Any, default: None) -> Optional[float]: ...
+
+
+@overload
+def clamp(value: Any, default: float) -> float: ...
 
 
 def clamp(value: Any, default: Optional[float] = None) -> Optional[float]:
@@ -56,7 +68,10 @@ def apply(peft_model: Any, scale: float, adapter: Optional[str] = None) -> int:
         names = [adapter]
     else:
         active = getattr(peft_model, "active_adapters", None) or getattr(peft_model, "active_adapter", "default")
-        names = [active] if isinstance(active, str) else list(active)
+        if isinstance(active, str):
+            names = [active]
+        else:
+            names = list(cast(Any, active))
     n = 0
     for module in peft_model.modules():
         if isinstance(module, LoraLayer):

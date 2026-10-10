@@ -19,7 +19,7 @@ import hashlib
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, cast
 
 import numpy as np
 
@@ -159,7 +159,7 @@ def make_default_checker(language: str, options: Optional[ChunkCheckOptions] = N
     if found is None:
         log.warning("chunk check skipped: no speech recognition model is installed")
         return None
-    path = Path(found[1])
+    path = Path(cast(Any, found[1]))
 
     def factory():
         gb = preload.weights_bytes(path) / 1024 ** 3

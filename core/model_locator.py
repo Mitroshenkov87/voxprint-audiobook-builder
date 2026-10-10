@@ -347,7 +347,9 @@ def check_model_dir(path: Path, repo_id: str) -> Optional[str]:
         index = path / "model.safetensors.index.json"
         if _real_size(index):
             idx = _read_json(index)
-            wm = idx.get("weight_map") if idx else None
+            if not idx:
+                return "model.safetensors.index.json invalid"
+            wm = idx.get("weight_map")
             if not isinstance(wm, dict) or not wm:
                 return "model.safetensors.index.json invalid"
             total = 0
@@ -441,12 +443,12 @@ def _iter_candidates(root: Path, repo_id: str, pinned: Optional[str]) -> Iterato
     for v in _name_variants(repo_id):
         p = root.joinpath(*v.split("/"))
         if _is_dir(p):
-            sha = None
+            revision: Optional[str] = None
             try:
-                sha = (p / ".revision").read_text(encoding="utf-8").strip() or None
+                revision = (p / ".revision").read_text(encoding="utf-8").strip() or None
             except OSError:
                 pass
-            yield p, sha, "folder"
+            yield p, revision, "folder"
 
 
 def find_model(repo_id: str, pinned_revision: Optional[str] = None,

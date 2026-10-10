@@ -1,5 +1,5 @@
 {
- "about": "Context rules for the Russian word vse (all, plural) versus vsyo (everything, still). core/yo.py reads this file. Words are lowercase and written with ye. Apache-2.0, Voxprint project data.",
+ "about": "Context rules for Russian yo. vse (all, plural) versus vsyo (everything, still) by the neighbouring words, and chem / nem / vsem written with yo after the prepositions o, ob, obo, v, vo, na and pri. core/yo.py reads this file. List items are lowercase and written with ye. prepositional.words[].yo keeps yo. Apache-2.0, Voxprint project data.",
  "word": "все",
  "yo_word": "всё",
  "hyphen_tails": [
@@ -220,5 +220,13 @@
   "ли",
   "ют",
   "ят"
- ]
+ ],
+ "prepositional": {
+  "after": ["о", "об", "обо", "в", "во", "на", "при"],
+  "words": [
+   {"ye": "чем", "yo": "чём"},
+   {"ye": "нем", "yo": "нём"},
+   {"ye": "всем", "yo": "всём"}
+  ]
+ }
 }

@@ -24,6 +24,7 @@ from core.events import ProgressCallback, Stage, noop_progress
 from core.i18n import tr
 from core.languages import AUTO, qwen_language
 from core.voice_library import VoiceRecord
+from infra import gpu_prefs
 
 log = logging.getLogger("voxprint.tts")
 
@@ -48,12 +49,11 @@ def max_tokens_for(text: str) -> int:
 
 
 #: Batched synthesis: at most this many chunks per generate call; VRAM per extra sequence (KV cache + activations; measured 0.5-0.6 GB
-#: for chunks up to ~150 characters on an RTX 4090, rounded up for longer ones) and a reserve that is never planned.
-#: The batch is planned from the memory actually free at that moment and never lets the card go above the suite cap
-#: (``gpu.vram_fraction``, default 75 % of the total, 70-80 %; :mod:`core.vram_policy`).
+#: for chunks up to ~150 characters on an RTX 4090, rounded up for longer ones).
+#: The batch is planned from the memory actually free at that moment, leaving ``max(2 GB, 8 % of the card)`` free
+#: (:mod:`core.vram_policy`). ``gpu.vram_fraction`` is an optional extra cap and is off unless the user sets it.
 MAX_BATCH = 12
 VRAM_PER_ITEM_GB = 0.9
-VRAM_RESERVE_GB = 2.0
 
 
 def resolve_device(device: str = "auto") -> str:
@@ -84,15 +84,16 @@ def resolve_device(device: str = "auto") -> str:
 
 
 def plan_batch_now(device: str = "cuda:0", fraction: Optional[float] = None) -> vram_policy.VramPlan:
-    """The VRAM plan for ``device`` from its current free / total memory (``torch.cuda.mem_get_info``)."""
+    """The VRAM plan for ``device`` from its current free / total memory (``torch.cuda.mem_get_info``).
+
+    ``fraction`` None reads the optional user cap (itself off by default). Pass a float to force that cap.
+    """
     import torch
 
     free, total = torch.cuda.mem_get_info(torch.device(device))
     if fraction is None:
-        from infra import gpu_prefs
-
         fraction = gpu_prefs.vram_fraction()
-    return vram_policy.plan(free / 1024 ** 3, total / 1024 ** 3, VRAM_PER_ITEM_GB, MAX_BATCH, fraction, VRAM_RESERVE_GB)
+    return vram_policy.plan(free / 1024 ** 3, total / 1024 ** 3, VRAM_PER_ITEM_GB, MAX_BATCH, fraction)
 
 
 def _attn_candidates(attn: str, use_cuda: bool) -> List[str]:
@@ -164,7 +165,7 @@ class Qwen3AdapterEngine:
         only with a merged adapter on a GPU, :mod:`core.fast_decode`)."""
         import torch
         from peft import PeftModel
-        from qwen_tts import Qwen3TTSModel  # type: ignore
+        from qwen_tts import Qwen3TTSModel
 
         self.adapter_scale = voice.adapter_scale if adapter_scale is None else adapter_strength.clamp(adapter_scale, 1.0)
         self.tag = engine_tag(voice, language, self.adapter_scale)
@@ -180,7 +181,7 @@ class Qwen3AdapterEngine:
         # joins, ffmpeg encodes) - on a GPU it only needs a few; on the CPU it gets nearly all (core/cpu_budget.py).
         self._threads_before = torch.get_num_threads()
         torch.set_num_threads(cpu_budget.plan(use_cuda).torch_threads)
-        self._q = None
+        self._q: Any = None
         self.attn = ""
         _t_load = time.monotonic()
         # "Preload models at startup" (infra/preload.py) may hold this base model in RAM already: take it over instead of
@@ -289,8 +290,9 @@ class Qwen3AdapterEngine:
         """Mono float32 samples for ``text``."""
         import torch
 
-        if getattr(self, "_graph", None) is not None:
-            audio, sr = self._graph.synthesize(text, self.language, self._prompt, max_tokens_for(text))
+        graph = getattr(self, "_graph", None)
+        if graph is not None:
+            audio, sr = graph.synthesize(text, self.language, self._prompt, max_tokens_for(text))
             self.sample_rate = sr
             return audio
         with torch.inference_mode():
@@ -329,7 +331,7 @@ class Qwen3AdapterEngine:
         return [np.asarray(w, dtype=np.float32).reshape(-1) for w in wavs]
 
     def max_batch(self) -> int:
-        """How many chunks to put into one generate call: planned from the VRAM free right now, never above the suite cap
+        """How many chunks to put into one generate call: planned from the VRAM free right now
         (:func:`plan_batch_now`); 1 on the CPU, with CUDA Graphs, or if unknown."""
         if getattr(self, "_graph", None) is not None or not str(getattr(self, "device", "cuda:0")).startswith("cuda"):
             return 1

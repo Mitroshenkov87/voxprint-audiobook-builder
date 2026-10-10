@@ -44,9 +44,9 @@ class GuardedStream:
 def guard_stdio() -> None:
     """Wrap ``sys.stdout`` and ``sys.stderr`` once. A later flush of a dead handle does not raise."""
     if not isinstance(sys.stdout, GuardedStream):
-        sys.stdout = GuardedStream(sys.stdout)  # type: ignore[assignment]
+        sys.stdout = GuardedStream(sys.stdout)
     if not isinstance(sys.stderr, GuardedStream):
-        sys.stderr = GuardedStream(sys.stderr)  # type: ignore[assignment]
+        sys.stderr = GuardedStream(sys.stderr)
 
 
 def install_cli_excepthook() -> None:

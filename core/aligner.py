@@ -23,7 +23,7 @@ from core.i18n import tr
 import abc
 import gc
 import logging
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, List, Optional, Sequence, Tuple
 
 import numpy as np
 
@@ -68,7 +68,7 @@ class Qwen3Aligner(BaseAligner):
         """``device``: ``auto`` (CUDA if available, else CPU), ``cuda:0`` or ``cpu``.  The model is loaded lazily by :meth:`load`."""
         self.model_path = model_path
         self.device = device
-        self._model = None
+        self._model: Any = None
         self.resolved_device = "cpu"
 
     def load(self) -> None:
@@ -77,7 +77,7 @@ class Qwen3Aligner(BaseAligner):
             return
         try:
             import torch
-            from qwen_asr import Qwen3ForcedAligner  # type: ignore
+            from qwen_asr import Qwen3ForcedAligner
         except ImportError as exc:
             raise AlignmentError(
                 tr("err.aligner_missing"),
@@ -90,7 +90,7 @@ class Qwen3Aligner(BaseAligner):
         dtype = torch.bfloat16 if dev.startswith("cuda") else torch.float32
         try:
             self._model = Qwen3ForcedAligner.from_pretrained(self.model_path, dtype=dtype, device_map=dev)
-        except torch.cuda.OutOfMemoryError as exc:  # type: ignore[attr-defined]
+        except torch.cuda.OutOfMemoryError as exc:
             raise OutOfMemoryError_(details=str(exc)) from exc
 
     def unload(self) -> None:
@@ -114,7 +114,7 @@ class Qwen3Aligner(BaseAligner):
         try:
             import torch
 
-            oom_type = torch.cuda.OutOfMemoryError  # type: ignore[attr-defined]
+            oom_type = torch.cuda.OutOfMemoryError
         except Exception:  # noqa: BLE001
             oom_type = MemoryError
         try:
@@ -138,7 +138,7 @@ class CtcAligner(BaseAligner):
         """``batch_size`` is the number of audio windows the emission model processes at once."""
         self.device = device
         self.batch_size = batch_size
-        self._model = None
+        self._model: Any = None
         self._tokenizer = None
 
     def load(self) -> None:
@@ -147,7 +147,7 @@ class CtcAligner(BaseAligner):
             return
         try:
             import torch
-            from ctc_forced_aligner import load_alignment_model  # type: ignore
+            from ctc_forced_aligner import load_alignment_model
         except ImportError as exc:
             raise AlignmentError(tr("err.fallback_missing"), details=str(exc)) from exc
         dev = self.device
@@ -166,7 +166,7 @@ class CtcAligner(BaseAligner):
         if self._model is None:
             self.load()
         import torch
-        from ctc_forced_aligner import (generate_emissions, get_alignments, get_spans,  # type: ignore
+        from ctc_forced_aligner import (generate_emissions, get_alignments, get_spans,
                                         postprocess_results, preprocess_text)
 
         wave = torch.from_numpy(np.asarray(au.resample(audio, sr, 16000), dtype=np.float32))

@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DEFAULT = ROOT / "THIRD_PARTY_NOTICES.md"
@@ -111,10 +112,12 @@ def installed_appendix() -> str:
     rows = []
     for d in metadata.distributions():
         md = d.metadata
-        name = md.get("Name") or d.metadata.get("Summary") or "?"
-        lic = md.get("License-Expression") or ""
+        # importlib.metadata.PackageMetadata has no .get in the stub; EmailMessage does.
+        fields = cast(Mapping[str, str], md)
+        name = fields.get("Name") or fields.get("Summary") or "?"
+        lic = fields.get("License-Expression") or ""
         if not lic:
-            raw = (md.get("License") or "").strip().splitlines()
+            raw = (fields.get("License") or "").strip().splitlines()
             lic = raw[0][:80] if raw and len(raw[0]) < 80 else ""
         if not lic:
             cls = [x.split("::")[-1].strip() for x in (md.get_all("Classifier") or []) if x.startswith("License ::")]

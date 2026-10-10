@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple, TypedDict
 
 import numpy as np
 
@@ -97,7 +97,7 @@ def install_rope_compat() -> List[str]:
         compat = importlib.import_module("qwen_tts._transformers_compat")
         fn = getattr(compat, "_default_rope_parameters", None)
         if callable(fn):
-            compat._default_rope_parameters = tolerant(fn)
+            setattr(compat, "_default_rope_parameters", tolerant(fn))
             done.append("qwen_tts._transformers_compat")
     except Exception:  # noqa: BLE001 - qwen-tts 0.1.1 has no such module
         pass
@@ -148,9 +148,9 @@ class GraphDecoder:
     def __init__(self, q: Any, device: str = "cuda:0", dtype: Any = None, max_seq_len: int = MAX_SEQ_LEN,
                  warmup: bool = True) -> None:
         import torch
-        from faster_qwen3_tts import FasterQwen3TTS  # type: ignore
-        from faster_qwen3_tts.predictor_graph import PredictorGraph  # type: ignore
-        from faster_qwen3_tts.talker_graph import TalkerGraph  # type: ignore
+        from faster_qwen3_tts import FasterQwen3TTS
+        from faster_qwen3_tts.predictor_graph import PredictorGraph
+        from faster_qwen3_tts.talker_graph import TalkerGraph
 
         install_rope_compat()
         dtype = dtype or torch.bfloat16
@@ -185,7 +185,15 @@ class GraphDecoder:
 # ------------------------------------------------------------------------------------------------- optional install
 #: The pinned wheel (pure Python, MIT).  Not part of the installer's locked runtime: it is fetched only on request
 #: (``voxprint bench --install-graphs``) into the packages folder that is put on ``sys.path`` at start.
-WHEEL = {
+class _WheelSpec(TypedDict):
+    version: str
+    file: str
+    url: str
+    sha256: str
+    size: int
+
+
+WHEEL: _WheelSpec = {
     "version": "0.3.2",
     "file": "faster_qwen3_tts-0.3.2-py3-none-any.whl",
     "url": "https://files.pythonhosted.org/packages/ea/c7/49525c63af1644d6706d415c61558c8013c675fbd5ef50bc5e4b7c2641dc/"

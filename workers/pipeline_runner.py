@@ -12,9 +12,10 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional, cast
 
-from core.aligner import make_default_aligner
+from core.aligner import BaseAligner, make_default_aligner
+from core.asr import BaseASR
 from core.dataset_builder import BuildConfig, DatasetBuilder
 from core.errors import DatasetMakerError
 from core.events import CancelToken, ProgressCallback, Stage, noop_progress
@@ -261,7 +262,7 @@ def _denoise_inputs(req: TaskRequest, root: Path, progress: ProgressCallback, ca
 
         files = expand_inputs(req.audio_files)          # folders of clips -> the clips (each cleaned on its own)
     else:
-        files = [req.audio]
+        files = [cast(Path, req.audio)]
     log.info("noise clean-up requested: %d file(s) with %s", len(files), Path(tool).name)
     out, failed = [], 0
     for i, src in enumerate(files):
@@ -531,11 +532,12 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
         if req.text:   # an optional script next to the audio: matched tolerantly (stumbles / re-read lines), see core.script_match
             from core.text_utils import read_text_file
             script_text = read_text_file(req.text).text
-        build = build_from_audio(req.audio_files or [req.audio], dataset_dir, asr, AsrConfig(language=req.asr_language),
+        build = build_from_audio(req.audio_files or [req.audio], dataset_dir, cast(BaseASR, asr),
+                                 AsrConfig(language=req.asr_language),
                                  progress, cancel, script_text=script_text)
     else:
         if aligner_factory is not None:
-            aligner = aligner_factory()
+            aligner = cast(BaseAligner, aligner_factory())
         else:
             path = md.ensure_aligner_model(progress)
             aligner = make_default_aligner(str(path), "cpu" if req.force_cpu else "auto")
@@ -566,13 +568,13 @@ def run_task(req: TaskRequest, progress: ProgressCallback = noop_progress, cance
     if lora:
         from core.lora_trainer import train_lora_from_dataset
 
-        kw = {}
+        kw: dict[str, Any] = {}
         if req.preset != "balanced":   # Balanced is the automatic plan (what train_lora_from_dataset chooses itself)
             from core.train_presets import build_plan
             from infra.vram_optimizer import detect_gpu
 
             kw["plan"] = build_plan(req.preset, detect_gpu(), build.n_segments, force_cpu=req.force_cpu,
-                                    language=build.training_language, manual=req.manual)
+                                    language=build.training_language, manual=cast(Any, req.manual))
         if req.auto_pick:
             kw["holdout_fraction"] = HOLDOUT_FRACTION
         res.adapter_path = train_lora_from_dataset(dataset_dir, output_dir, progress, cancel, req.force_cpu,
@@ -631,7 +633,10 @@ def _restore_backup_source(progress: ProgressCallback) -> None:
     try:
         existing_models.adopt_backup_choice()
         if existing_models.restore_pending():
-            existing_models.restore_backup(lambda f, m="": progress(Stage.MODEL, f, m))
+            def report(fraction: float, message: str = "") -> None:
+                progress(Stage.MODEL, fraction, message)
+
+            existing_models.restore_backup(report)
     except CancelledByUser:
         raise
     except Exception as exc:  # noqa: BLE001 - never block the first-run model step
@@ -644,7 +649,10 @@ def _prefetch_dnsmos(progress: ProgressCallback) -> None:
     from infra import quality_models
 
     try:
-        quality_models.ensure_dnsmos(lambda f, m="": progress(Stage.MODEL, 1.0, m))
+        def report(_fraction: float, message: str = "") -> None:
+            progress(Stage.MODEL, 1.0, message)
+
+        quality_models.ensure_dnsmos(report)
     except Exception as exc:  # noqa: BLE001 - never block the first-run model step
         log.warning("DNSMOS download failed: %s", exc)
 
@@ -655,7 +663,10 @@ def _prefetch_text_extras(progress: ProgressCallback) -> None:
     from infra import text_models
 
     try:
-        text_models.ensure_component_extras(lambda s, f, m="": progress(Stage.MODEL, float(f), m))
+        def report(_stage: Stage, fraction: float, message: str = "") -> None:
+            progress(Stage.MODEL, float(fraction), message)
+
+        text_models.ensure_component_extras(report)
     except Exception as exc:  # noqa: BLE001 - never block the first-run model step
         log.warning("translator / text model download failed: %s", exc)
 
@@ -667,7 +678,10 @@ def _prefetch_text_fallbacks(progress: ProgressCallback) -> None:
 
     for m in text_models.missing_other_integrated():
         try:
-            text_models.ensure(m, lambda s, f, msg="": progress(Stage.MODEL, float(f), msg))
+            def report(_stage: Stage, fraction: float, msg: str = "") -> None:
+                progress(Stage.MODEL, float(fraction), msg)
+
+            text_models.ensure(m, report)
         except Exception as exc:  # noqa: BLE001
             log.warning("%s download failed: %s", m.key, exc)
 
@@ -696,13 +710,19 @@ def _prefetch_small_optional(progress: ProgressCallback) -> None:
                                 ("DeepFilterNet", denoise_tool.ready, denoise_tool.ensure)):
         try:
             if not ready():
-                ensure(lambda f, m="": progress(Stage.MODEL, float(f), m))
+                def report(fraction: float, message: str = "") -> None:
+                    progress(Stage.MODEL, float(fraction), message)
+
+                ensure(report)
         except Exception as exc:  # noqa: BLE001 - never block the first-run model step
             log.warning("%s download failed: %s", name, exc)
     try:   # the bundled open voices Tirzah and Gideon (infra/bundled_voices.py), installed read-only
         from infra import bundled_voices
 
-        bundled_voices.ensure(lambda f, n: progress(Stage.MODEL, float(f), n))
+        def report_voices(fraction: float, name: str) -> None:
+            progress(Stage.MODEL, float(fraction), name)
+
+        bundled_voices.ensure(report_voices)
     except Exception as exc:  # noqa: BLE001
         log.warning("bundled voices download failed: %s", exc)
 
@@ -713,7 +733,10 @@ def _prefetch_big_optional(progress: ProgressCallback) -> None:
 
     try:
         if llm_tool.platform_key() is not None and (llm_tool.server_exe() is None or not llm_tool.model_ready()):
-            llm_tool.ensure(lambda f, m="": progress(Stage.MODEL, float(f), m))
+            def report(fraction: float, message: str = "") -> None:
+                progress(Stage.MODEL, float(fraction), message)
+
+            llm_tool.ensure(report)
     except Exception as exc:  # noqa: BLE001 - never block the first-run model step
         log.warning("AI text model download failed: %s", exc)
 

@@ -16,7 +16,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
@@ -45,6 +45,7 @@ from core import adapter_strength, i18n, model_export, train_presets, voice_info
 from core import consent as consent_mod
 from core.appinfo import APP_DISPLAY_NAME
 from core.errors import DatasetMakerError
+from core.voice_library import VoiceLibrary
 from core.events import Stage
 from core.i18n import tr
 from infra import paths, platform_win, ui_prefs
@@ -60,6 +61,9 @@ from workers.pipeline_runner import (
     last_adapter,
     run_task,
 )
+if TYPE_CHECKING:
+    from ui.upgrade_dialog import UpgradeOfferDialog
+
 from workers.process_worker import (
     PrefetchWorker,
     ProcessWorker,
@@ -378,7 +382,7 @@ class MainWindow(QWidget):
         self.auto_open_folder = auto_open_folder
         self.audio: Optional[Path] = None
         self._gpu = None
-        self.library = None                    # set by the Studio; None -> the default library
+        self.library: Optional[VoiceLibrary] = None  # set by the Studio; None -> the default library
         self._last_voice_id = ""
         self.gpu_fn = gpu_fn or detect_gpu
         self.audio_files: List[Path] = []      # no-transcript mode: several files and/or folders
@@ -393,7 +397,7 @@ class MainWindow(QWidget):
         self.repair_fn = repair_fn
         self.status_worker: Optional[StatusWorker] = None
         self.repair_worker: Optional[RepairWorker] = None
-        self.upgrade_dialog = None
+        self.upgrade_dialog: Optional[UpgradeOfferDialog] = None
         self._health_reasons: list = []
         self._model_states: dict = {}
         self._last_request: Optional[TaskRequest] = None
@@ -1742,7 +1746,12 @@ class MainWindow(QWidget):
         self.lbl_status.setText(tr("upd.checking"))
         self.progress.setValue(0)
         self.update_worker = UpdateWorker(self.updater_factory, parent=self)
-        self.update_worker.progress.connect(lambda p, s, m: (self.progress.setValue(p), self.lbl_status.setText(m)))
+
+        def on_progress(percent, _stage, message) -> None:
+            self.progress.setValue(percent)
+            self.lbl_status.setText(message)
+
+        self.update_worker.progress.connect(on_progress)
         self.update_worker.done.connect(self._on_update_done)
         self.update_worker.offer.connect(lambda offers, w=self.update_worker: self._show_offer(w, offers))
         self.update_worker.failed.connect(lambda k, m, d, u: self.lbl_status.setText(m))
@@ -1804,7 +1813,11 @@ class MainWindow(QWidget):
         w = RepairWorker(self.repair_fn, parent=self)
         self.repair_worker = w
         self.lbl_status.setText(tr("ui.repair_running"))
-        w.progress.connect(lambda p, m: (self.progress.setValue(p), self.lbl_status.setText(m)))
+        def on_progress(percent, message) -> None:
+            self.progress.setValue(percent)
+            self.lbl_status.setText(message)
+
+        w.progress.connect(on_progress)
         w.done.connect(self._on_repair_done)
         w.finished.connect(self._refresh_buttons)
         self.btn_repair.setEnabled(False)
@@ -1832,7 +1845,11 @@ class MainWindow(QWidget):
         if self.busy:
             return
         w = UpdateWorker(self.updater_factory, silent=True, only_if_due=True, parent=self)
-        w.done.connect(lambda s, changed: changed and self.lbl_status.setText(s))
+        def on_done(summary, changed) -> None:
+            if changed:
+                self.lbl_status.setText(summary)
+
+        w.done.connect(on_done)
         w.offer.connect(lambda offers, w=w: self._show_offer(w, offers))
         w.done.connect(lambda *_: self.refresh_status())
         self.update_worker = w
@@ -1859,7 +1876,12 @@ class MainWindow(QWidget):
         w = PrefetchWorker(self.prefetch_fn, parent=self)
         self.prefetch_worker = w
         self.lbl_status.setText(tr("ui.prefetch_start"))
-        w.progress.connect(lambda p, m: (self.progress.setValue(p), self.lbl_status.setText(m)))
+
+        def on_progress(percent, message) -> None:
+            self.progress.setValue(percent)
+            self.lbl_status.setText(message)
+
+        w.progress.connect(on_progress)
         w.done.connect(self._on_prefetch_done)
         w.failed.connect(self._on_prefetch_failed)
         w.finished.connect(self._refresh_buttons)

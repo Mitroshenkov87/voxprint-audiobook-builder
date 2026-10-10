@@ -17,7 +17,7 @@ Miriam). A role whose preferred voice is not installed falls back to the generic
 from __future__ import annotations
 
 import logging
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional, cast
 
 from core.voice_library import VoiceLibrary
 from infra import voice_repository as repo
@@ -92,7 +92,7 @@ def entries() -> List[repo.RepoVoice]:
 
 def total_bytes() -> int:
     """Download size of all bundled voices."""
-    return sum(int(v["size_bytes"]) for v in VOICES)
+    return sum(int(cast(Any, v["size_bytes"])) for v in VOICES)
 
 
 def missing(library: Optional[VoiceLibrary] = None) -> List[repo.RepoVoice]:

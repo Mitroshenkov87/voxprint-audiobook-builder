@@ -45,7 +45,7 @@ def _assign_kill_on_close_job() -> None:
         import ctypes
         from ctypes import wintypes
 
-        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32 = getattr(ctypes, "WinDLL")("kernel32", use_last_error=True)
 
         class _Basic(ctypes.Structure):
             _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
@@ -70,9 +70,9 @@ def _assign_kill_on_close_job() -> None:
         info = _Ext()
         info.BasicLimitInformation.LimitFlags = 0x2000          # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
         if not job or not k32.SetInformationJobObject(job, 9, ctypes.byref(info), ctypes.sizeof(info)):
-            raise OSError(ctypes.get_last_error(), "SetInformationJobObject")
+            raise OSError(getattr(ctypes, "get_last_error")(), "SetInformationJobObject")
         if not k32.AssignProcessToJobObject(job, k32.GetCurrentProcess()):
-            raise OSError(ctypes.get_last_error(), "AssignProcessToJobObject")   # e.g. already in a job on old Windows
+            raise OSError(getattr(ctypes, "get_last_error")(), "AssignProcessToJobObject")   # e.g. already in a job on old Windows
         _job = job
     except Exception as exc:  # noqa: BLE001 - only a safety net; fire() still kills the tree
         log.info("job object not available: %s", exc)

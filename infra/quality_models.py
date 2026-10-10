@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional, cast
 
 from core.i18n import tr
 from infra import external_models, model_release
@@ -40,7 +40,7 @@ def dnsmos_path(models_dir: Optional[Path] = None) -> Path:
 
     local = paths.models_dir() / "dnsmos" / DNSMOS_FILE
     try:
-        if local.is_file() and local.stat().st_size == int(DNSMOS_META["size"]):
+        if local.is_file() and local.stat().st_size == int(cast(Any, DNSMOS_META["size"])):
             return local
     except OSError:
         pass
@@ -59,10 +59,14 @@ def dnsmos_ready(models_dir: Optional[Path] = None) -> bool:
 
 def missing_bytes(models_dir: Optional[Path] = None) -> int:
     """Download size still needed (0 when the file is there)."""
-    return 0 if dnsmos_ready(models_dir) else int(DNSMOS_META["size"])
+    return 0 if dnsmos_ready(models_dir) else int(cast(Any, DNSMOS_META["size"]))
 
 
-def ensure_dnsmos(progress: Callable[[float, str], None] = lambda f, m="": None, models_dir: Optional[Path] = None,
+def _silent_progress(f: float, m: str = "") -> None:
+    pass
+
+
+def ensure_dnsmos(progress: Callable[[float, str], None] = _silent_progress, models_dir: Optional[Path] = None,
                   opener=None, timeout: float = 30.0) -> Path:
     """Download the DNSMOS file if it is missing (size + SHA-256 checked, resumable) and return its path.
 
@@ -71,7 +75,7 @@ def ensure_dnsmos(progress: Callable[[float, str], None] = lambda f, m="": None,
     if dnsmos_ready(models_dir):
         return target
     opener = opener or model_release._open
-    size = int(DNSMOS_META["size"])
+    size = int(cast(Any, DNSMOS_META["size"]))
     errors = []
     for url in DNSMOS_URLS:
         done = [0]

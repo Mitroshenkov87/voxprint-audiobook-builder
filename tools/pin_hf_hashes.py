@@ -41,7 +41,8 @@ def listing(repo: str, revision: str, fetch: Fetch = _get) -> List[dict]:
 
 
 def git_blob_id(data: bytes) -> str:
-    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()  # noqa: S324 - git's object id, not a security hash
+    # Git blob ids are SHA-1 by the git format. This is an integrity check against the listing, not a password hash.
+    return hashlib.sha1(b"blob %d\0" % len(data) + data, usedforsecurity=False).hexdigest()
 
 
 def pin(repo: str, revision: str, files: Optional[Iterable[str]] = None, fetch: Fetch = _get) -> Dict[str, Dict[str, object]]:

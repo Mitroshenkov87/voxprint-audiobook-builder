@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from core import speakers as spk
-from core.book_parsers import Book, Chapter
+from core.book_parsers import Book, Chapter, parse_txt
 from core.chunker import chunk_book
 from core.llm_text import LLMPlan
 from tests.test_llm_text import FakeModel
@@ -153,8 +153,6 @@ def _gemma_reply(prompt: str, paras) -> str:
 
 def test_a_realistic_gemma_reply_marks_the_russian_dialogue():
     """The parse path that returned 21 narrators on the real PC."""
-    from core.book_parsers import parse_txt
-
     text = _FIXTURE.read_text(encoding="utf-8")
     book = parse_txt(text, "spor")
     paras = [para for _ci, para in spk.paragraphs(book)]
@@ -342,3 +340,47 @@ def test_only_a_paragraph_the_model_never_marks_stays_narrator():
     res = spk.tag_paragraphs(paras, "ru", LLMPlan(lambda: FakeModel(answer), "fake"))
     assert [ln.role for ln in res] == ["female", "narrator", "male"]
     assert res.warning == spk.WARN_UNPARSED
+
+
+_DIALOG04 = Path(__file__).resolve().parent / "fixtures" / "yo" / "dialog-ai-torah-04.txt"
+
+
+def _mark_line(line):
+    if line.role == "narrator":
+        return "NARRATOR"
+    return f"{line.role.upper()}: {line.name}"
+
+
+def test_a_one_paragraph_shift_on_dialogue_04_is_asked_again_until_19_match():
+    """Gemma can return the right number of tags shifted by one paragraph (dialogue 4 scored 11/19).
+
+    The marks file is the ground truth. A block longer than one paragraph comes back shifted; a single
+    paragraph comes back right. The check must reject the shift and end at 19/19, and the raw log must
+    say ``[validate]``. A reply that is already right is kept, with no validate line.
+    """
+    text = _DIALOG04.read_text(encoding="utf-8")
+    truth = spk.load_marks((_DIALOG04.parent / "dialog-ai-torah-04.marks.txt").read_text(encoding="utf-8"))
+    paras = [para for _ci, para in spk.paragraphs(parse_txt(text, "torah"))]
+    assert len(paras) == len(truth) == 19
+
+    def reply(prompt, shift):
+        body = prompt.rsplit("TEXT:\n", 1)[1]
+        block = [p.strip() for p in body.split("\n\n") if p.strip()]
+        start = next(i for i, para in enumerate(paras) if para == block[0])
+        chosen = truth[start:start + len(block)]
+        assert len(chosen) == len(block)
+        if shift and len(chosen) > 1:
+            chosen = chosen[1:] + chosen[-1:]
+        return "\n".join(_mark_line(line) for line in chosen)
+
+    straight_model = FakeModel(lambda prompt: reply(prompt, False))
+    straight = spk.tag_paragraphs(paras, "ru", LLMPlan(lambda: straight_model, "fake"))
+    assert list(straight) == truth and straight.warning == "" and straight_model.closed
+    assert "[validate]" not in straight.raw
+    assert straight_model.calls == len(spk._batches(paras))
+
+    shifted = FakeModel(lambda prompt: reply(prompt, True))
+    res = spk.tag_paragraphs(paras, "ru", LLMPlan(lambda: shifted, "fake"))
+    assert list(res) == truth and res.warning == "" and shifted.closed
+    assert "[validate]" in res.raw
+    assert shifted.calls > len(spk._batches(paras))

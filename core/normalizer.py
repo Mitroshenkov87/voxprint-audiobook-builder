@@ -143,7 +143,7 @@ def _engine_ru_normalizr() -> Optional[Callable[[str], str]]:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            import ru_normalizr  # type: ignore
+            import ru_normalizr
 
             ru_normalizr.normalize("тест 1")  # warm-up + check that the dependencies are present
         return ru_normalizr.normalize
@@ -155,7 +155,7 @@ def _engine_ru_normalizr() -> Optional[Callable[[str], str]]:
 def _engine_rutextnorm() -> Optional[Callable[[str], str]]:
     """Return ``rutextnorm.normalize_russian`` if the package works, else ``None``."""
     try:
-        import rutextnorm  # type: ignore
+        import rutextnorm
 
         rutextnorm.normalize_russian("тест 1")
         return rutextnorm.normalize_russian

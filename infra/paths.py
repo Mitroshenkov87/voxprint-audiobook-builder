@@ -244,7 +244,7 @@ def previous_homes() -> list:
         cands += [home / ".voxprint", home / ".local" / "share" / APP_NAME, home / ".local" / "share" / APP_NAME.lower()]
     except (RuntimeError, OSError):
         pass
-    out = []
+    out: list[Path] = []
     for c in cands:
         try:
             r = c.resolve()

@@ -23,7 +23,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, cast
 
 from core import model_cache
 from infra import paths, sysinfo
@@ -120,7 +120,7 @@ def find_targets(base_repo: str, cuda: bool, ready: Optional[Callable[[str], Opt
         found.append(("tts", Path(path)))
     asr = asr_choice.ready(ready)            # the recogniser this PC uses (1.7B / 0.6B), whichever is installed
     if asr is not None:
-        found.append(("asr", Path(asr[1])))
+        found.append(("asr", Path(cast(Any, asr[1]))))
     sage = sage_dir()
     if sage is not None:
         found.append(("sage", Path(sage)))
@@ -196,7 +196,7 @@ def load_tts(path: Path, cuda: bool) -> Any:
     """Qwen3-TTS base on the CPU, in the dtype the engine uses; returns ``(model, attention)`` (SDPA: flash-attn 2 cannot
     be selected while the weights are on the CPU, and it is not available for Windows anyway)."""
     import torch
-    from qwen_tts import Qwen3TTSModel  # type: ignore
+    from qwen_tts import Qwen3TTSModel
 
     dtype = torch.bfloat16 if cuda else torch.float32
     for impl in ("sdpa", "eager"):

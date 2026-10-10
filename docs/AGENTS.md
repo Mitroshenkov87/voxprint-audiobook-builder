@@ -2,7 +2,7 @@
 
 Hand this file to an agent that should **run** Voxprint (OpenClaw, Cursor, Claude Code, or another). It is not the contributor guide. Agents that change the source use the repository root [AGENTS.md](../AGENTS.md).
 
-Voxprint is an offline desktop program. It trains a voice (LoRA on Qwen3-TTS) from a short recording and narrates TXT, FB2 and EPUB books in that voice. Optional pieces (translation, noise clean-up, a text model) are separate downloads. Beta. Apache-2.0. Windows 11 with an NVIDIA GPU is the supported setup; Linux is experimental.
+Voxprint is an offline desktop program. It trains a voice (LoRA on Qwen3-TTS) from a short recording and narrates TXT, FB2 and EPUB books in that voice. Optional pieces (translation, noise clean-up, a text model) are separate downloads. Beta. Apache-2.0. Supported systems: current and previous year OS releases (Windows 11 24H2 and newer; Linux distributions released from 2025). Older systems are not a goal. Linux is experimental.
 
 The command reference with the same flags is [CLI.md](CLI.md).
 

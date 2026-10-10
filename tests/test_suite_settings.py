@@ -137,11 +137,22 @@ def test_main_flags(tmp_path, monkeypatch):
     assert mu.read_users(rt) == {"movie-dubber": True}
 
 
-def test_runtime_register_only_when_the_folder_exists():
-    mu.register_runtime_quietly()
+def test_runtime_register_creates_the_users_file():
     assert not mu.runtime_root().exists()
-    mu.runtime_root().mkdir(parents=True)
     mu.register_runtime_quietly()
+    path = mu.runtime_root() / ".users.json"
+    assert path.is_file() and mu.read_users(mu.runtime_root()) == {"audiobook-builder": True}
+    before = path.stat().st_mtime_ns
+    mu.register_runtime_quietly()                        # already registered: no rewrite
+    assert path.stat().st_mtime_ns == before
+
+
+def test_gui_start_registers_audiobook_builder_in_the_runtime_users_file():
+    pytest.importorskip("PySide6")
+    import main as app_main
+
+    assert not (mu.runtime_root() / ".users.json").exists()
+    assert app_main.main(["Voxprint.exe", "--selftest"]) == 0
     assert mu.read_users(mu.runtime_root()) == {"audiobook-builder": True}
 
 

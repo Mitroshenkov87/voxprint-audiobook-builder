@@ -36,7 +36,7 @@ import shutil
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, cast
 
 from core.errors import BackupError
 from core.events import CancelToken
@@ -424,7 +424,7 @@ def free_bytes(path: Path, usage: Optional[Callable[[Path], object]] = None) -> 
     p = Path(path)
     while not p.exists() and p != p.parent:
         p = p.parent
-    return int((usage or shutil.disk_usage)(p).free)
+    return int(getattr((usage or shutil.disk_usage)(p), "free"))
 
 
 def check_space(need: int, target: Path, usage: Optional[Callable[[Path], object]] = None) -> int:
@@ -754,10 +754,10 @@ def default_pins() -> Dict[str, Tuple[int, str]]:
         folder = "models/" + repo.replace("/", "--")
         for rel, size in sizes.items():
             out.setdefault(f"{folder}/{rel}", (int(size), ""))
-    out[f"models/dnsmos/{DNSMOS_FILE}"] = (int(DNSMOS_META["size"]), str(DNSMOS_META["sha256"]))
+    out[f"models/dnsmos/{DNSMOS_FILE}"] = (int(cast(Any, DNSMOS_META["size"])), str(DNSMOS_META["sha256"]))
     for asset in DENOISE_ASSETS.values():
-        out[f"models/deepfilternet/{asset['name']}"] = (int(asset["size"]), str(asset["sha256"]))
-    out[f"models/llm/{LLM_MODEL['file']}"] = (int(LLM_MODEL["size"]), str(LLM_MODEL["sha256"]))
+        out[f"models/deepfilternet/{asset['name']}"] = (int(cast(Any, asset["size"])), str(asset["sha256"]))
+    out[f"models/llm/{LLM_MODEL['file']}"] = (int(cast(Any, LLM_MODEL["size"])), str(LLM_MODEL["sha256"]))
     return out
 
 
