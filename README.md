@@ -6,7 +6,7 @@ Part of the Voxprint AI Media Suite (with [Voxprint AI Movie Dubber](https://git
 
 ![status: beta](https://img.shields.io/badge/status-beta%20%2F%20experimental-orange) ![licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue) ![platform: Windows 11 + RTX 40+](https://img.shields.io/badge/platform-Windows%2011%20%2B%20RTX%2040%2B-lightgrey)
 
-> **1.0.0 RC (build 999 "Nachon", tag v1.0.0-rc).** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs an **NVIDIA GeForce RTX 40-series or newer** GPU, and **Windows 11 24H2+** or a **Linux release from 2025+**. There is no CPU-only mode. 16 GB of VRAM is recommended. Details: [tests and caveats](docs/TESTING.md).
+> **1.0.0 RC2 (build 1000 "Chazak", tag v1.0.0-rc.2).** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs an **NVIDIA GeForce RTX 40-series or newer** GPU, and **Windows 11 24H2+** or a **Linux release from 2025+**. There is no CPU-only mode. 16 GB of VRAM is recommended. Details: [tests and caveats](docs/TESTING.md).
 
 System requirements: an NVIDIA RTX 40-series or newer GPU (compute capability 8.9 or higher). Windows 11 24H2 or newer, or a Linux distribution released from 2025. Older systems are not supported. There is no CPU-only mode.
 
@@ -70,6 +70,15 @@ irm https://raw.githubusercontent.com/Mitroshenkov87/voxprint-audiobook-builder/
 1. Install and start Voxprint - the **Studio** opens. Under *Train your voice* choose your recording and the text you read, press **Create voice (LoRA)**.
 2. Open *Narrate a book*, choose a TXT / FB2 / EPUB / `.vxbook` file and your voice (optionally tick *Translate the book*).
 3. Press **Start narration** and listen while the rest is being made. The audiobook lands in the projects folder (`%LOCALAPPDATA%\Voxprint\Projects\Audiobooks`, shortcut *Voxprint Projects* in Documents).
+
+## Soundscape (optional)
+A `.vxbook` book with sound markup (`sound/1`, written by Voxprint AI Plotweaver) can get quiet background music and transition accents, generated locally and ducked under the narration.
+* **Off by default.** Turn it on in *Settings -> Narration: pauses and speed -> Play a soundscape under narration when the book asks for one*.
+* **Downloaded only when you turn it on:** the **ACE-Step 1.5** model (about 10 GB; code and weights MIT, generated music usable commercially). The full download never includes it.
+* **Only `.vxbook` books with sound markup.** TXT, Markdown, FB2, EPUB and a `.vxbook` without `sound/1` are never given music.
+* **Skip it for one run:** `voxprint narrate book.vxbook --voice ID --no-soundscape` (the saved setting stays).
+
+Details and licences: [docs/SOUNDSCAPE.md](docs/SOUNDSCAPE.md).
 
 ## Documentation
 * **User manual (PDF, 0.1.3 build 667):** [English](docs/manual/Voxprint-Manual-en.pdf) · [Русский](docs/manual/Voxprint-Manual-ru.pdf) · [Deutsch](docs/manual/Voxprint-Manual-de.pdf) (print versions and sources: [`docs/manual/`](docs/manual/); screenshots: [`docs/screenshots/en-667/`](docs/screenshots/en-667/))

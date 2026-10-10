@@ -68,7 +68,7 @@ If the statement is unclear or missing, the strictest level is used. You can als
 When a statement ends the recording, up to 60 s of unscripted speech at the end is tolerated by the alignment check (15 s otherwise).
 
 ## Narrate a book
-1. **Choose book…**: `.txt` (UTF-8 / cp1251; headings like "Chapter 1", "Глава 2", "Part I" become chapters), `.fb2` / `.fb2.zip`, `.epub`. The book title, author and cover are read when present.
+1. **Choose book…**: `.txt` (UTF-8 / cp1251; headings like "Chapter 1", "Глава 2", "Part I" become chapters), `.md`, `.fb2` / `.fb2.zip`, `.epub`, and `.vxbook` (a Voxprint book with its roles and cast; with sound markup it can also get an optional [soundscape](SOUNDSCAPE.md), off by default). The book title, author and cover are read when present.
 2. Pick the **voice** (a licence badge is shown; for a personal-use-only voice you are reminded not to publish or sell the narration). No voices yet? The window offers *Train your voice* / *My voices*.
 3. **Prepare the text** (one switch, on by default, see [below](#prepare-the-text)). Translation is a separate card and stays off until you turn it on.
 4. Pick the **format** (see below) and a **quality** button (*Compact / Standard / High*), then **Start narration**. Rarely needed things are collapsed: *Other formats*, and *Advanced* (exact bitrates per format, the **working folder** - default `<projects folder>\Audiobooks` (Settings -> *Projects folder*), remembered; each book gets its own sub-folder there for everything of the job - whether chapter titles are read aloud, and a read-only sample of how the first changed paragraph looks after preparation).

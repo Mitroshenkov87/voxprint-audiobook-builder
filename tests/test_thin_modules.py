@@ -260,6 +260,8 @@ def test_components_window_shows_a_failure_and_can_retry(app, monkeypatch):     
     assert wait_for(lambda: d.modules and not d.busy, 10)
     assert d.start_install()
     assert wait_for(lambda: "network down" in d.lbl_status.text() and not d.busy, 10)
+    # Download is enabled once the worker's result has been handled; process events until then (bounded).
+    assert wait_for(d.btn_download.isEnabled, 10)
     assert "Press Download to continue" in d.lbl_status.text() and d.btn_download.isEnabled()
     assert wait_for(lambda: not d.busy, 10)
     assert d.start_install()

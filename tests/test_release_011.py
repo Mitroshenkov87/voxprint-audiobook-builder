@@ -136,27 +136,33 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     # Runs 41-44 published nothing. Offset 655: run 45 stamped 700 (Kaporet). Run 46 failed before publishing;
     # offset 654: run 47 stamped 701 (Shalem), run 48 stamped 702 (Shelishi), run 49 stamped 703 (Toledot),
     # run 50 failed before publishing; offset 653: run 51 stamps 704 (Achim).
-    # Run 52 failed before publishing; offset 946: run 53 stamps 999 (Nachon, 1.0.0-rc).
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "53"}) == 999 and bn.build_number({}) == 0
+    # Run 52 failed before publishing; offset 946: run 53 stamped 999 (Nachon, 1.0.0-rc),
+    # run 54 stamps 1000 (Chazak, 1.0.0-rc.2).
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "54"}) == 1000 and bn.build_number({}) == 0
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "53"}) == 999
     assert bn.build_number({"GITHUB_RUN_NUMBER": "52"}) == 998
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34"}) == 700
     assert bn.info()["offset"] == 946
     note = bn.info()["offset_note"]
-    assert "946" in note and "run 53" in note and "Nachon" in note
+    assert "946" in note and "run 53" in note and "Nachon" in note and "run 54 + 946 = 1000" in note and "Chazak" in note
     name = bn.info()["codename"]
-    assert name == "Nachon" and name.isascii() and name.isalpha()
+    assert name == "Chazak" and name.isascii() and name.isalpha()
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     credits = json.loads((root / "credits.json").read_text(encoding="utf-8"))
-    assert credits["app"]["version"] == "1.0.0-rc" and credits["app"]["channel"] == "rc"
-    assert credits["app"]["codename"] == "Nachon"
+    assert credits["app"]["version"] == "1.0.0-rc.2" and credits["app"]["channel"] == "rc"
+    assert credits["app"]["codename"] == "Chazak"
     iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8")
-    assert '#define AppVersion "1.0.0-rc"' in iss
+    assert '#define AppVersion "1.0.0-rc.2"' in iss
     assert '#define AppVersionInfo "1.0.0"' in iss
     assert "VersionInfoVersion={#AppVersionInfo}.{#AppBuild}" in iss
     log = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     heading = '## [1.0.0-rc] - 2026-10-10 - build 999 "Nachon"'
     assert heading in log and log.index("## [Unreleased]") < log.index(heading) < log.index("## [0.2.4-beta]")
+    heading2 = '## [1.0.0-rc.2] - 2026-10-10 - build 1000 "Chazak"'
+    assert heading2 in log and log.index("## [Unreleased]") < log.index(heading2) < log.index(heading)
+    notes = (root / "docs" / "RELEASE-NOTES-1000-CHAZAK.md").read_text(encoding="utf-8")
+    assert "946" in notes and "run 54" in notes and "Chazak" in notes and "v1.0.0-rc.2" in notes
     notes = (root / "docs" / "RELEASE-NOTES-700-KAPORET.md").read_text(encoding="utf-8")
     assert "655" in notes and "run 45" in notes and "does not delete" in notes and "Kaporet" in notes
     notes = (root / "docs" / "RELEASE-NOTES-701-SHALEM.md").read_text(encoding="utf-8")
@@ -180,6 +186,11 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc")
     assert appinfo.release_version() == "1.0.0-rc"
     assert appinfo.version_label() == '1.0.0 RC \u00b7 build 999 "Nachon"'
+    monkeypatch.setattr(appinfo, "APP_BUILD", 1000)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Chazak")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.2")
+    assert appinfo.release_version() == "1.0.0-rc.2"
+    assert appinfo.version_label() == '1.0.0 RC2 \u00b7 build 1000 "Chazak"'
     monkeypatch.setattr(appinfo, "APP_BUILD", 665)
     monkeypatch.setattr(appinfo, "APP_CODENAME", "Tikkun")
     monkeypatch.setattr(appinfo, "APP_CHANNEL", "beta")

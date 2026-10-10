@@ -247,8 +247,26 @@ class ModulesDialog(GlassDialog):
 
     @property
     def busy(self) -> bool:
+        """A components worker counts as busy until the window has handled its result.
+
+        ``isRunning()`` alone turns false as soon as the thread returns, while its queued result signal
+        (``listed`` / ``done`` / ``failed`` / ``cancelled``) may not be handled yet; Download would then stay off
+        for a moment after the status line already says "press Download".  The result slots clear ``self.worker``;
+        :meth:`_on_worker_finished` clears a worker that ended without a result."""
         restoring = self.restore_worker is not None and self.restore_worker.isRunning()
-        return restoring or (self.worker is not None and self.worker.isRunning())
+        return restoring or self.worker is not None
+
+    def _track(self, w: ModulesWorker) -> None:
+        """Make ``w`` the current worker. Its ``finished`` arrives after its result signal (same thread, queued in order)."""
+        w.finished.connect(self._on_worker_finished)
+        self.worker = w
+
+    def _on_worker_finished(self) -> None:
+        w = self.sender()
+        if w is not None and w is self.worker:              # no result slot ran for it: it is idle now
+            log.warning("components: the %s worker ended without a result", getattr(w, "kind", "?"))
+            self.worker = None
+            self._render()
 
     @property
     def models_running(self) -> bool:
@@ -314,7 +332,7 @@ class ModulesDialog(GlassDialog):
             self._set_line(tr("modules.checking"))
         w = ModulesWorker("list", self.manifest_fn, self.install_fn, parent=self)
         w.listed.connect(self._on_listed)
-        self.worker = w
+        self._track(w)
         w.start()
 
     def _summary(self) -> str:
@@ -409,7 +427,7 @@ class ModulesDialog(GlassDialog):
         w.failed.connect(self._on_failed)
         w.cancelled.connect(self._on_cancelled)
         w.extras_failed.connect(self._on_extras_failed)
-        self.worker = w
+        self._track(w)
         self._set_overall(0.0)
         self._set_line(tr("modules.downloading"))
         w.start()
