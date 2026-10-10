@@ -7,7 +7,7 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [1.0.0-rc] - 2026-10-10 - build 999 "Nachon"
 
-Codename *Nachon* (Biblical Hebrew *nachon*, established, ready; Genesis 41:32). The version is **1.0.0-rc**. The release tag for this build is `v1.0.0-rc`. People see `1.0.0 RC · build 999 "Nachon"`. `BUILD.json` offset is **947**: build-installer run 52 stamps build 999 (52 + 947 = 999). If any *build-installer* run happens before this change is merged, recompute the offset as 999 minus the next run number.
+Codename *Nachon* (Biblical Hebrew *nachon*, established, ready; Genesis 41:32). The version is **1.0.0-rc**. The release tag for this build is `v1.0.0-rc`. People see `1.0.0 RC · build 999 "Nachon"`. Build-installer run 52 failed in the Windows tests that need no PyTorch (a bash-only test had lost its skip marker) and published nothing, so the `BUILD.json` offset is **946**: run 53 stamps build 999 (53 + 946 = 999).
 
 ### Added
 - **Splash easter egg.** Six clicks within two seconds on the start-up splash show `assets/easter-egg.jpg` with the caption `easter_egg.caption` ("Кури ушную серу!", kept in Russian in every UI language) for three seconds or until another click, once per launch. Loading continues under the picture; if the main window is ready, the splash stays only until the picture closes. The picture is original generated artwork and not a real person's likeness (`assets/ICON-LICENSE.txt`).
