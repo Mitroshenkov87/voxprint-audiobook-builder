@@ -243,8 +243,9 @@ def test_engine_device_follows_the_shared_gpu_setting(monkeypatch):
     assert tts_engine.resolve_device("auto") == "cuda:1" and tts_engine.resolve_device("cpu") == "cpu"
     suite_settings.set_value("gpu", "cuda:5")
     assert tts_engine.resolve_device("auto") == "cuda:0"                       # not there: first GPU
-    suite_settings.set_value("gpu", "cpu")
-    assert tts_engine.resolve_device("auto") == "cpu"
+    with pytest.raises(ValueError):
+        suite_settings.set_value("gpu", "cpu")
+    assert tts_engine.resolve_device("auto") == "cuda:0"
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
     assert tts_engine.resolve_device("cuda:1") == "cpu"
 

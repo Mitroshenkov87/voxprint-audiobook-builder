@@ -116,7 +116,7 @@ def test_friendly_errors(app, tmp_path, exc, kind):
     assert wait_for(lambda: bool(w.last_error_text))
     assert w.lbl_ready.isHidden()
     if kind == "oom":
-        assert w._retry_cpu_button is not None
+        assert w._retry_cpu_button is None
     if kind == "download":
         assert exc.url
     if kind == "other":

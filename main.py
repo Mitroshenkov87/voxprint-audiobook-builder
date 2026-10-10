@@ -2,6 +2,7 @@
 
 Flags: ``--prefetch`` (force-download the models; used by the installer), ``--selftest`` (start and quit),
 ``--selftest-imports`` (import every heavy library - checks that a PyInstaller build is complete),
+``--selftest-speech`` (model-free TTS / ASR / aligner smoke),
 ``--selftest-narrate [voice]`` (narrate two sentences headless; writes logs/selftest_narrate.txt),
 ``--verify-install`` (install check with reason codes; also written to logs/verify_install.txt),
 ``--repair`` (rebuild only Voxprint's own environment; logs/repair.txt),
@@ -18,6 +19,8 @@ import logging.handlers
 import os
 import sys
 from typing import Sequence
+
+from infra.gpu_requirement import enforce, startup_is_gui, startup_requires_gpu
 
 
 def _setup_logging() -> None:
@@ -50,6 +53,15 @@ def _selftest_imports(argv=()) -> int:
         _m.activate()
     except Exception as exc:  # noqa: BLE001
         lines.append(f"WARN  runtime folder not activated: {type(exc).__name__}: {exc}")
+    t = time.time()
+    try:                                # CUDA 12 side libraries must be registered before this import (infra/cuda12_libs.py)
+        from infra.cuda12_libs import import_ctranslate2
+
+        mod = import_ctranslate2()
+        lines.append(f"OK    ctranslate2 {getattr(mod, '__version__', '')} ({time.time() - t:.1f}s)")
+    except Exception as exc:  # noqa: BLE001
+        bad += 1
+        lines.append(f"FAIL  ctranslate2: {type(exc).__name__}: {exc}")
     for name in ("requests", "urllib3", "tqdm", "yaml", "tokenizers", "torch", "torchaudio", "transformers", "peft", "accelerate", "safetensors", "qwen_tts", "qwen_asr",
                  "bitsandbytes", "soundfile", "librosa", "scipy.signal", "imageio_ffmpeg", "onnxruntime", "huggingface_hub",
                  "certifi", "PySide6.QtWidgets", "http.cookies", "email.mime.text", "xml.dom.minidom", "logging.config"):
@@ -249,6 +261,11 @@ def main(argv=None) -> int:
 
     guard_stdio()
     argv = list(sys.argv if argv is None else argv)
+    # RTX 40-series (compute >= 8.9) before any heavy import. --version, help, status and diagnostics stay usable.
+    if startup_requires_gpu(argv):
+        blocked = enforce(gui=startup_is_gui(argv))
+        if blocked:
+            return blocked
     # updated packages must be on sys.path BEFORE the heavy libraries are imported
     from infra.updater import activate_overlay
 
@@ -338,6 +355,10 @@ def main(argv=None) -> int:
         from workers import selftest_text
 
         return selftest_text.run()
+    if "--selftest-speech" in argv:   # headless, no GPU/models: sine-wave TTS, fake ASR, fake aligner, WAV
+        from workers import selftest_speech
+
+        return selftest_speech.run()
     if "--selftest-narrate" in argv:   # headless: narrate two sentences with the first voice (argument after the flag = voice id)
         from workers import selftest_narrate
 

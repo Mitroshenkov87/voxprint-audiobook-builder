@@ -42,6 +42,7 @@ Pipeline errors that come from the UI catalogs follow `VOXPRINT_LANG` (default f
 | 4 | missing | A model or component is not installed, or its download failed |
 | 5 | gpu | Out of GPU memory |
 | 6 | cancelled | The job stopped on the cancel token. Run the same `narrate` command again to resume cached chunks |
+| 7 | gpu required | No NVIDIA GPU, or the best compute capability is below 8.9 (RTX 40-series). `--version`, `help`, `status` and `diag` still run |
 
 `ERROR:` goes to stderr and names a `Fix:` when there is one. With `--json`, stdout still ends with one result object (`ok: false`, `exit_code`, `error`, `hint`).
 
@@ -65,7 +66,9 @@ voxprint status --json
 voxprint capabilities
 ```
 
-`capabilities` is the same command. One JSON object: version, build, codename, GPU (`cuda_available`, `name`, VRAM), installed voices (id, name, licence, `consent_scope`), output formats and aliases, and module ids with `installed`. Use it before train or narrate. It does not download anything. With `VOXPRINT_NO_ENV_PROBE=1` the GPU probe does not import PyTorch.
+`capabilities` is the same command. One JSON object: version, build, codename, GPU (`cuda_available`, `name`, VRAM, and `requirement`), installed voices (id, name, licence, `consent_scope`), output formats and aliases, and module ids with `installed`. Use it before train or narrate. It does not download anything. With `VOXPRINT_NO_ENV_PROBE=1` the GPU probe does not import PyTorch.
+
+`gpu.requirement` is `{ok, min_compute, detected, compute_cap, source, override}`. `ok` is true when an NVIDIA GPU of compute capability 8.9 or newer was found (RTX 40-series or newer). `detected` is `none` when no NVIDIA GPU was seen. `compute_cap` is the best capability (`8.9`, `12.0`) or `null`. `source` is `torch`, `nvidia-smi` or `none`. `override` is true only when an internal test switch is set; it does not make `ok` true. `status` and `diag` report this check and do not refuse to start.
 
 ## Narrate a book
 
@@ -80,7 +83,7 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 
 | Argument | Meaning |
 |---|---|
-| `BOOK` | TXT, FB2, `.fb2.zip` or EPUB |
+| `BOOK` | TXT, Markdown (`.md`), FB2, `.fb2.zip` or EPUB |
 | `--voice` | Voice library id or display name |
 | `--out DIR` | Working folder; the job lands in `<DIR>/<book title>/` |
 | `--format` | Repeatable / comma-separated. Default: `opus_single`. Aliases: `opus`, `mp3`, `m4b`, `flac`, `wav`, … |
@@ -94,7 +97,7 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 | `--speed X` | Global reading speed 0.7-1.3 (1 = the voice's own speed) |
 | `--style NAME` | `auto` (detected), `scripture` (solemn, a little slower), `fiction`, `dialogue` |
 | `--no-ordinals` / `--ordinals` | Read numbers after words like chapter / day / verse as ordinals by context ("день 1" -> "день первый", "21st", "3. Kapitel"); default: Settings (on). See [ORDINALS.md](ORDINALS.md) |
-| `--no-yo` / `--yo` | For a Russian book, restore the letter yo where a dictionary is sure ("еще" -> "ещё"). "все" / "всё" is decided from the neighbouring words ("всё равно", "вот и всё", "всё было", "всё, что"; "все люди", "пришли все" stay). Other words the dictionary does not list, including "текст" and ambiguous pairs such as "берег", stay as written. Default: on. Stress marks are not inserted; the base speech model does not read them. |
+| `--no-yo` / `--yo` | For a Russian book, restore the letter yo where a dictionary is sure ("еще" -> "ещё"). "все" / "всё" is decided from the neighbouring words ("всё равно", "вот и всё", "всё было", "всё, что"; "все люди", "пришли все" stay). Other words the dictionary does not list, including "текст" and ambiguous pairs such as "берег", stay as written. A word that already contains yo is not replaced, even when the dictionary would put yo on a different letter. A U+0301 stress mark the author wrote is kept on that letter. When the Russian normalizer rewrites that mark as a plus immediately before the vowel, the plus is turned back into U+0301. Narration does not insert stress marks of its own. The base speech model does not read them. Default: on. |
 | `--ai-disclosure` | Speak a short AI note at the start (opt-in) |
 | `--work-dir DIR` | Remember this folder as the app working folder |
 | `--speakers` | Ask the text model (Gemma) to mark each paragraph narrator, male or female, then narrate those voices. Same path as the Narrate window. Without any voice flag or `--character`, the default cast is used: Natan and Shimon for men, Miriam for women when they are installed, else the first library voices of each gender (never the narrator unless it is the only one). A block whose reply has the wrong number of marks is split and asked again, down to single paragraphs |
@@ -103,7 +106,7 @@ voxprint narrate BOOK --voice ID_OR_NAME --out DIR
 | `--male2-voice ID` | Second male voice. Different male characters (by the name in the marks) alternate between `--male-voice` and this voice in order of first appearance: the first man gets `--male-voice`, the second this one, the third `--male-voice` again. A mark without a name uses `--male-voice`. Needs `--male-voice` |
 | `--female2-voice ID` | Second female voice, the same way. Needs `--female-voice` |
 | `--character NAME=ID` | Pin one character to a voice. Repeatable. The name is matched case-insensitively against the marks and wins over the role voices |
-| `--speaker-marks FILE` | Narrate this marks file and do not run Gemma. `voxprint speakers` writes the file |
+| `--speaker-marks FILE` | Narrate this marks file and do not run Gemma. `voxprint speakers` writes numbered lines. A file of one unnumbered line per paragraph (`NARRATOR`, `MALE: Name`, `FEMALE: Name`) is read the same way |
 
 ```
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
@@ -112,7 +115,19 @@ voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann -
 voxprint narrate dialog.txt --voice levi --speakers --out ./out --json        # default cast: Natan, Shimon, Miriam
 voxprint narrate dialog.txt --voice levi --male-voice natan --male2-voice shimon --female-voice rivka --speakers --out ./out --json
 voxprint narrate dialog.txt --voice levi --male-voice natan --character Michael=shimon --female-voice miriam --speaker-marks marks.txt --out ./out
+python cli.py narrate book.md --voice narrator --male-voice tom --female-voice ann --character Ivan=tom --character Anna=ann --speaker-marks marks.txt --out ./audiobooks --format wav --json
 ```
+
+A Plotweaver book is UTF-8 `.md` or `.txt`. A line `# Chapter` or `## Chapter` (also `###`), standing alone between blank lines, is a chapter title. A blank line starts a new paragraph. The letter yo the author wrote is kept, and so is a U+0301 stress mark on a vowel. A plus that the Russian normalizer writes immediately before that vowel is turned back into U+0301. `--yo` still restores yo in words that have neither. `marks.txt` is optional and has one line per paragraph, in order:
+
+```
+NARRATOR
+MALE: Ivan
+NARRATOR
+FEMALE: Anna
+```
+
+Blank lines in the marks file are ignored. A leading `1. ` is optional. `--character Ivan=tom` pins that name to a voice and wins over `--male-voice` / `--female-voice`. The command above writes one WAV per chapter (`01 - …wav`, `02 - …wav`) under `<out>/<book title>/`. The same arguments work as `voxprint narrate` and `python main.py narrate`.
 
 Without `--male2-voice`, `--female2-voice` and `--character`, every man is `--male-voice` and every woman `--female-voice`, as before. `--speakers` and `--speaker-marks` cannot be used together. At least one role voice must differ from the narrator (exit code 2 otherwise). `--male2-voice` without `--male-voice`, a `--character` value without `=`, and any voice flag without `--speakers` or `--speaker-marks` are exit code 2. Voices are loaded one at a time, in book order. When the marks do not match the prepared paragraph count, the narrator reads the whole book, the exit code stays 0, and the JSON `warnings` array contains `Speaker marks do not match the prepared text, so the narrator reads the whole book.` The job writes `<out>/<book>/.debug/speakers.txt` and lists that file in `outputs`.
 
@@ -134,7 +149,7 @@ Ask Gemma who speaks each paragraph and write an editable text file. This comman
 3. MALE: Tom
 ```
 
-Blank lines are ignored. A trailing `mismatch` line (written when a previous narration could not apply the marks) is ignored. Edit the file, then pass it to `narrate --speaker-marks`. If Gemma is not installed the exit code is 4 and the fix is `voxprint models download llm --json`.
+`narrate --speaker-marks` also accepts the same lines without numbers, one per paragraph (`NARRATOR`, `MALE: Name`, `FEMALE: Name`). Blank lines are ignored. A trailing `mismatch` line (written when a previous narration could not apply the marks) is ignored. Edit the file, then pass it to `narrate --speaker-marks`. If Gemma is not installed the exit code is 4 and the fix is `voxprint models download llm --json`.
 
 If the model's reply cannot be read as marks, or the text has dialogue (quotes or a leading em dash) but every paragraph is marked `NARRATOR`, the exit code stays 0 and the JSON `warnings` array says so. The raw reply is saved next to the marks file as `<name>.speakers-raw.txt` and listed in `outputs`. Narration saves the same reply as `<out>/<book>/.debug/speakers-raw.txt`.
 
@@ -205,7 +220,7 @@ voxprint settings set KEY VALUE [--json]
 | `narration.ai_disclosure` | `on` / `off` |
 | `narration.pause.comma`, `.mid`, `.sentence`, `.paragraph`, `.chapter` | Seconds, 0-6 |
 | `theme` | Shared by the Voxprint programs (`state/suite.json`). This program has one look, `glass-dark`; another program's theme id is kept and read as `glass-dark` |
-| `gpu` | Shared by the Voxprint programs: `auto`, `cpu` or `cuda:N`. Narration uses it; a GPU that is not there falls back to `cuda:0` |
+| `gpu` | Shared by the Voxprint programs: `auto` or `cuda:N`. Narration uses it |
 | `gpu.vram_fraction` | Optional extra cap, 0.70-0.80 of the card (default `off`). Narration already leaves `max(2 GB, 8 % of the card)` free and re-reads free memory before every batch. Set a fraction to also stay under that share of the total. `off` clears it. Environment: `VOXPRINT_VRAM_FRACTION` (`0.75`, `75` or `off`) |
 | `gpu.fast_decode` | `off` (default) or `graphs`: one chunk at a time with CUDA Graphs (needs faster-qwen3-tts, see [Bench](#bench)). Environment: `VOXPRINT_FAST_DECODE` |
 
@@ -226,7 +241,7 @@ Narrates a fixed Russian text (12 phrases) with the same voice once per mode and
 ```
 voxprint train AUDIO [--text SCRIPT] [--name NAME] [--type male|female|child|other] [--out DIR]
                [--consent none|auto|commercial|public_noncommercial|private_only] [--speaker NAME]
-               [--license ID] [--language CODE] [--force-cpu] [--json]
+               [--license ID] [--language CODE] [--json]
 ```
 
 Omit `--text` to train from a folder of clips, or from one recording, in no-transcript mode (speech recognition builds the dataset). With `--text` and a single file, the aligner path is used.
@@ -238,11 +253,10 @@ By default the voice is stored with consent method `none` and scope `private_onl
 ```
 voxprint train recording.wav --text script.txt --name Anna --type female
 voxprint train ./clips --name Anna --type female --out ./voices --json
-voxprint train recording.wav --text script.txt --name Anna --force-cpu
 voxprint train ./clips --name MyVoice --language ru --consent commercial --speaker "Reader Name" --license CC0-1.0
 ```
 
-`--force-cpu` is the retry after exit code 5. A second train creates another voice; it is not a no-op.
+A second train creates another voice; it is not a no-op. Training needs an NVIDIA GeForce RTX 40-series or newer GPU. Out of video memory is exit code 5: close other programs that use the card and run the same command again. There is no CPU-only mode.
 
 ## Voices
 

@@ -8,7 +8,7 @@ GUI uses (:func:`workers.narration_runner.run_narration`,
 Every command is non-interactive.  ``--json`` prints progress as JSON lines and a
 final result object.  ``--yes`` is accepted everywhere (nothing prompts).
 Exit codes: 0 ok, 1 internal, 2 bad args, 3 input file, 4 missing model,
-5 GPU/OOM, 6 cancelled.  See ``docs/AGENTS.md``.
+5 GPU/OOM, 6 cancelled, 7 GPU requirement (no RTX 40-series or newer).  See ``docs/AGENTS.md``.
 
 Examples::
 
@@ -21,11 +21,21 @@ The developer dataset CLI remains ``python -m core.cli`` (see ``core/cli.py``).
 """
 from __future__ import annotations
 
+import sys
+
+from infra.gpu_requirement import EXIT_GPU_REQUIRED, enforce, startup_requires_gpu
+
+# Refuse before the heavy imports below when this file is the process entry.
+# ``main.py`` checks first and then imports this module, so that path is unchanged.
+if __name__ == "__main__" and startup_requires_gpu(sys.argv):
+    _gpu_block = enforce(gui=False)
+    if _gpu_block:
+        raise SystemExit(_gpu_block)
+
 import argparse
 import json
 import logging
 import os
-import sys
 import time
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional, Sequence, Set, cast
@@ -140,8 +150,8 @@ class CliError(Exception):
 
 def hint_for(code: int, command: str) -> str:
     """One-line fix for a stable exit code."""
-    if code == EXIT_GPU and command == "train":
-        return "Retry on the CPU: add --force-cpu. Check the GPU with: voxprint status --json"
+    if code == EXIT_GPU_REQUIRED:
+        return "An NVIDIA GeForce RTX 40-series or newer GPU is required. Check: voxprint status --json"
     if code == EXIT_GPU:
         return "Free video memory and retry. Check the GPU with: voxprint status --json"
     if code == EXIT_MISSING:
@@ -402,7 +412,7 @@ def build_parser() -> argparse.ArgumentParser:
     n = sub.add_parser(
         "narrate", parents=[child], formatter_class=argparse.RawDescriptionHelpFormatter,
         help="Narrate a book with a trained voice",
-        description="Narrate a TXT, FB2, FB2.ZIP or EPUB book with a voice from the library.",
+        description="Narrate a TXT, Markdown, FB2, FB2.ZIP or EPUB book with a voice from the library.",
         epilog=(
             "Examples:\n"
             "  voxprint narrate book.epub --voice my-voice --out ./audiobooks\n"
@@ -410,12 +420,13 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint narrate book.txt --voice my-voice --out ./audiobooks --pauses --ai-disclosure\n"
             "  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json\n"
             "  voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speaker-marks marks.txt --out ./audiobooks\n"
+            "  python cli.py narrate book.md --voice narrator --male-voice tom --female-voice ann --character Ivan=tom --character Anna=ann --speaker-marks marks.txt --out ./audiobooks --format wav --json\n"
             "  voxprint narrate book.txt --voice levi --speakers --out ./out\n"
             "  voxprint narrate book.txt --voice levi --male-voice natan --male2-voice shimon --female-voice noa --speakers --out ./out\n"
             "  voxprint narrate book.txt --voice levi --male-voice natan --character David=shimon --speakers --out ./out\n"
         ),
     )
-    n.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
+    n.add_argument("book", help="Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file")
     n.add_argument("--voice", required=True, metavar="ID_OR_NAME",
                    help="Voice library id or display name")
     n.add_argument("--out", required=True, type=Path, metavar="DIR",
@@ -445,7 +456,8 @@ def build_parser() -> argparse.ArgumentParser:
     n.set_defaults(ordinals=None)
     yo_flag = n.add_mutually_exclusive_group()
     yo_flag.add_argument("--yo", dest="yo", action="store_true", default=None,
-                         help="Restore the Russian letter yo where a dictionary is sure (default: on)")
+                         help="Restore the Russian letter yo where a dictionary is sure (default: on). "
+                              "A word that already contains yo, and a U+0301 stress mark the author wrote, stay")
     yo_flag.add_argument("--no-yo", dest="yo", action="store_false",
                          help="Leave the letter e as written; do not restore yo")
     n.set_defaults(yo=None)
@@ -468,7 +480,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Pin one character (the name as written in the marks) to a voice. Repeatable; "
                         "wins over the male / female voices")
     n.add_argument("--speaker-marks", type=Path, default=None, metavar="FILE",
-                   help="Narrate from this marks file instead of running Gemma (voxprint speakers writes it)")
+                   help="Narrate from this marks file instead of running Gemma (voxprint speakers writes it). "
+                        "One line per paragraph: 'N. NARRATOR', 'N. MALE: Name', 'N. FEMALE: Name', "
+                        "or the same lines without the numbers")
     n.add_argument("--work-dir", type=Path, default=None, metavar="DIR",
                    help="Remember this folder as the app working folder")
     n.set_defaults(_handler="narrate")
@@ -481,7 +495,6 @@ def build_parser() -> argparse.ArgumentParser:
             "Examples:\n"
             "  voxprint train recording.wav --text script.txt --name Anna --type female\n"
             "  voxprint train ./clips --name Anna --type female --out ./voices --json\n"
-            "  voxprint train recording.wav --text script.txt --name Anna --force-cpu --yes\n"
             "  voxprint train ./clips --name MyVoice --language ru --consent commercial --speaker \"Reader Name\" --license CC0-1.0\n"
         ),
     )
@@ -502,7 +515,6 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--speaker", default="", metavar="NAME", help="Name of the person whose voice it is (consent and voice.json)")
     t.add_argument("--language", default="", metavar="LANG",
                    help="Language of the recording, e.g. ru, en, de (default: detected)")
-    t.add_argument("--force-cpu", action="store_true", help="Train on CPU even when a GPU is present")
     t.set_defaults(_handler="train")
 
     v = sub.add_parser(
@@ -666,7 +678,7 @@ def build_parser() -> argparse.ArgumentParser:
             "--speaker-marks marks.txt --out ./audiobooks --json\n"
         ),
     )
-    sp.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
+    sp.add_argument("book", help="Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file")
     sp.add_argument("--out", required=True, type=Path, metavar="FILE", help="Marks file to write")
     sp.set_defaults(_handler="speakers")
 
@@ -702,7 +714,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint prepare book.txt --out prepared.txt --llm --json\n"
         ),
     )
-    pr.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
+    pr.add_argument("book", help="Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file")
     pr.add_argument("--out", required=True, type=Path, metavar="FILE", help="Prepared text file to write (UTF-8)")
     pr.add_argument("--report", type=Path, default=None, metavar="FILE",
                     help="JSON report to write (default: <out stem>.prep_report.json next to --out)")
@@ -735,7 +747,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  voxprint translate book.txt --to ru --out book.ru.txt --literary\n"
         ),
     )
-    tr_p.add_argument("book", help="Path to a TXT, FB2, FB2.ZIP or EPUB file")
+    tr_p.add_argument("book", help="Path to a TXT, Markdown, FB2, FB2.ZIP or EPUB file")
     tr_p.add_argument("--to", required=True, choices=("en", "ru", "de"), help="Target language")
     tr_p.add_argument("--from", dest="source", default="", choices=("", "en", "ru", "de", "uk"),
                       help="Source language (default: detected)")
@@ -903,7 +915,7 @@ def cmd_narrate(args: argparse.Namespace, *,
         if not book_path.is_file():
             raise CliError(
                 EXIT_INPUT, f"book not found: {book_path}",
-                hint="Pass a TXT, FB2, FB2.ZIP or EPUB file that exists. "
+                hint="Pass a TXT, Markdown, FB2, FB2.ZIP or EPUB file that exists. "
                      "Example: voxprint narrate book.epub --voice my-voice --out ./audiobooks",
             )
         book = load_book(book_path)
@@ -1030,7 +1042,7 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
         except (OSError, UnicodeError, ValueError) as exc:
             raise CliError(
                 EXIT_INPUT, f"speaker marks cannot be read: {exc}",
-                hint="Each line is 'N. NARRATOR' or 'N. MALE: Name' or 'N. FEMALE: Name'.",
+                hint="Each line is 'NARRATOR', 'MALE: Name' or 'FEMALE: Name'. A leading 'N. ' is optional.",
             ) from exc
     else:
         plan = (plan_fn or llm_tool.make_plan)()
@@ -1148,7 +1160,6 @@ def cmd_train(args: argparse.Namespace, *,
                 out_root=args.out,
                 voice_display_name=args.name or "",
                 voice_type=vtype,
-                force_cpu=bool(args.force_cpu),
                 **meta,
             )
         else:
@@ -1159,7 +1170,6 @@ def cmd_train(args: argparse.Namespace, *,
                 out_root=args.out,
                 voice_display_name=args.name or "",
                 voice_type=vtype,
-                force_cpu=bool(args.force_cpu),
                 **meta,
             )
         if args.out is not None:      # one work folder per voice: a second voice must not overwrite the first one's report.json
@@ -1622,6 +1632,7 @@ def collect_status(library: Optional[VoiceLibrary] = None) -> dict:
             "vram_free_gb": gpu_raw.get("vram_free_gb"),
             "torch": gpu_raw.get("torch"),
             "driver": gpu_raw.get("driver"),
+            "requirement": gpu_raw.get("requirement"),
         },
         "voices": [_voice_payload(v) for v in lib.list_voices()],
         "formats": list(ex.ALL_FORMATS),
@@ -1882,7 +1893,7 @@ def cmd_check(args: argparse.Namespace, *,
 def _load_book_or_fail(path_text: str, example: str):
     book_path = Path(path_text)
     if not book_path.is_file():
-        raise CliError(EXIT_INPUT, f"book not found: {book_path}", hint=f"Pass a TXT, FB2, FB2.ZIP or EPUB file. Example: {example}")
+        raise CliError(EXIT_INPUT, f"book not found: {book_path}", hint=f"Pass a TXT, Markdown, FB2, FB2.ZIP or EPUB file. Example: {example}")
     return load_book(book_path)
 
 
@@ -2109,7 +2120,7 @@ SETTINGS_HELP = {
     "narration.ordinals": "Read ordinal numbers by context (on/off)",
     "narration.ai_disclosure": "Speak the AI disclosure at the start (on/off)",
     "theme": "Look shared by the Voxprint programs (glass-dark)",
-    "gpu": "GPU shared by the Voxprint programs: auto, cpu or cuda:N",
+    "gpu": "GPU shared by the Voxprint programs: auto or cuda:N",
     "gpu.vram_fraction": "Optional cap on video memory narration may plan for, 0.70-0.80 of the total (default off)",
     "gpu.fast_decode": "Fast decode with CUDA Graphs (off/graphs; experimental, see voxprint bench)",
     **{f"narration.pause.{k}": f"Pause after a {k} in seconds (0-{pz.MAX_PAUSE_MS / 1000:g})" for k in pz.DEFAULT_LENGTHS_MS},
@@ -2345,6 +2356,10 @@ def _dispatch(argv: Optional[Sequence[str]], *, run_narration_fn, run_task_fn, l
         pass
     if _flag_present(raw, "--version", "-V") and not _flag_present(raw, "--help", "-h"):
         return cmd_version(_flag_present(raw, "--json"))
+    if startup_requires_gpu(["voxprint", *raw]):
+        blocked = enforce(gui=False)
+        if blocked:
+            return blocked
     ap = build_parser()
     try:
         args = ap.parse_args(raw)

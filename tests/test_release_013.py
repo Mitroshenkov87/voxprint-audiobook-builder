@@ -32,8 +32,15 @@ def held(tmp_path):
 
     def hold(folder: Path):
         ev = threading.Event()
-        th = threading.Thread(target=ev.wait, daemon=True)
+        started = threading.Event()
+
+        def run():
+            started.set()
+            ev.wait()
+
+        th = threading.Thread(target=run, daemon=True)
         th.start()
+        assert started.wait(2.0) and th.is_alive()
         dw._abandon(folder, th)
         events.append(ev)
         return ev
@@ -110,13 +117,17 @@ def test_a_retry_while_the_abandoned_thread_lives_continues_in_a_fresh_folder(ma
             if not t.exists():
                 t.write_bytes(b)
 
-    got = md.ensure_model(REPO, snapshot_download=hub, revision=SHA_A, mirror_manifest=manifest)
+    # Hugging Face first. A slow probe would try ModelScope, whose socket read is abandoned while still
+    # alive and the retry would continue in ``.partial-2`` instead of the one fresh folder this test checks.
+    got = md.ensure_model(REPO, snapshot_download=hub, revision=SHA_A, mirror_manifest=manifest,
+                          hf_probe=lambda r: True)
     assert md.verify_local_model(got) and not (got / ".cache").exists()
     assert seen == {"dir": part.name + "-1", "had_config": True}
     assert part.is_dir()                                                      # still held: left alone
     release.set()
     dw.wait_released(part, 2.0)
-    md.ensure_model(REPO, snapshot_download=hub, revision=SHA_A, mirror_manifest=manifest)
+    md.ensure_model(REPO, snapshot_download=hub, revision=SHA_A, mirror_manifest=manifest,
+                    hf_probe=lambda r: True)
     assert not part.exists()                                                  # cleaned once nobody holds it
 
 

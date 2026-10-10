@@ -236,9 +236,147 @@ def _map_sentence(raw: str, spoken: str, raw_off: int, spoken_off: int) -> List[
     return out
 
 
+def _drop_stress_plus(token: str) -> str:
+    """Remove a ``+`` that sits immediately before a letter.
+
+    ru-normalizr spells a U+0301 the author wrote as that plus (``све́т`` becomes ``св+ет``).
+    A plus that is not in front of a letter, such as the one in ``C++``, stays.
+    """
+    out: list[str] = []
+    i = 0
+    size = len(token)
+    while i < size:
+        ch = token[i]
+        if ch == "+" and i + 1 < size and token[i + 1].isalpha():
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def _skeleton(token: str, *, fold_plus: bool = False) -> str:
+    """Comparison form of a token: case-folded, yo folded to ye, stress marks removed.
+
+    ``fold_plus`` also drops ru-normalizr's stress plus. It is used only when the author's
+    token already contains U+0301, so a real plus in an unstressed word still counts.
+    """
+    if fold_plus:
+        token = _drop_stress_plus(token)
+    return "".join(ch.casefold().replace("ё", "е") for ch in token if ch != "\u0301")
+
+
+def _author_marks(token: str):
+    """``(yo flags, stress flags)`` for each character of ``token`` except U+0301."""
+    yos: list[bool] = []
+    stresses: list[bool] = []
+    for ch in token:
+        if ch == "\u0301":
+            if stresses:
+                stresses[-1] = True
+            continue
+        yos.append(ch in ("ё", "Ё"))
+        stresses.append(False)
+    return yos, stresses
+
+
+def _paint_author_marks(word: str, yos: list[bool], stresses: list[bool], *, fold_plus: bool = False) -> str:
+    """Copy author yo and U+0301 onto ``word`` when it has the same letters aside from those marks.
+
+    With ``fold_plus``, a plus immediately before a letter is the engine's stress mark and is
+    not copied. The author's U+0301 is written on that letter instead.
+    """
+    out: list[str] = []
+    i = 0
+    idx = 0
+    size = len(word)
+    while idx < size:
+        ch = word[idx]
+        if fold_plus and ch == "+" and idx + 1 < size and word[idx + 1].isalpha():
+            idx += 1
+            continue
+        if ch == "\u0301":
+            idx += 1
+            continue
+        if i >= len(yos):
+            return word
+        if yos[i] and ch in ("е", "Е"):
+            ch = "ё" if ch == "е" else "Ё"
+        out.append(ch)
+        if stresses[i]:
+            out.append("\u0301")
+        i += 1
+        idx += 1
+    if i != len(yos):
+        return word
+    return "".join(out)
+
+
+def _later_has_skeleton(matches, start: int, skeleton: str, *, fold_plus: bool = False, limit: int = 8) -> bool:
+    """True when a spoken token within ``limit`` of ``start`` has ``skeleton``."""
+    for match in matches[start:start + limit]:
+        if _skeleton(match.group(), fold_plus=fold_plus) == skeleton:
+            return True
+    return False
+
+
+def _keep_author_yo_and_stress(raw: str, norm: str) -> str:
+    """Put author yo and U+0301 back onto the words the engine kept.
+
+    The Russian engines may fold yo to ye and drop combining stress. ru-normalizr rewrites a
+    U+0301 as a plus immediately before that letter (``све́т`` becomes ``св+ет``). A word the
+    author already wrote with yo, and a stress mark the author wrote, are copied onto the spoken
+    token with the same letters. Nothing is inserted when the author did not write it. Tokens the
+    engine expanded (a number read as words) are left as the engine wrote them.
+    """
+    if "ё" not in raw and "Ё" not in raw and "\u0301" not in raw:
+        return norm
+    raw_toks = [match.group() for match in _TOKEN_RE.finditer(raw)]
+    matches = list(_TOKEN_RE.finditer(norm))
+    pieces = []
+    cursor = 0
+    i = 0
+    j = 0
+    while i < len(matches):
+        match = matches[i]
+        word = match.group()
+        fold_plus = j < len(raw_toks) and "\u0301" in raw_toks[j]
+        skeleton = _skeleton(word, fold_plus=fold_plus)
+        if j < len(raw_toks) and _skeleton(raw_toks[j]) == skeleton:
+            yos, stresses = _author_marks(raw_toks[j])
+            if any(yos) or any(stresses):
+                painted = _paint_author_marks(word, yos, stresses, fold_plus=fold_plus)
+            else:
+                painted = word
+            pieces.append(norm[cursor:match.start()])
+            pieces.append(painted)
+            cursor = match.end()
+            i += 1
+            j += 1
+        elif j < len(raw_toks) and _later_has_skeleton(
+                matches, i + 1, _skeleton(raw_toks[j]), fold_plus="\u0301" in raw_toks[j]):
+            pieces.append(norm[cursor:match.start()])
+            pieces.append(word)
+            cursor = match.end()
+            i += 1
+        elif j < len(raw_toks):
+            j += 1
+        else:
+            pieces.append(norm[cursor:match.start()])
+            pieces.append(word)
+            cursor = match.end()
+            i += 1
+    pieces.append(norm[cursor:])
+    return "".join(pieces)
+
+
 def _fix_sentence(raw_sent: str, norm: str) -> str:
-    """Tidy an engine's output and restore the sentence terminator the engine removed."""
-    norm = collapse_ws(norm.replace("\u0301", ""))
+    """Tidy an engine's output and restore the sentence terminator the engine removed.
+
+    Author yo and U+0301 are copied back onto words the engine folded. This function does not
+    invent either mark.
+    """
+    norm = _keep_author_yo_and_stress(raw_sent, collapse_ws(norm))
     # the engines drop the period after an abbreviation - restore the sentence terminator
     tail = raw_sent.rstrip("\"'»”’)]} ")[-1:]
     if tail and tail in _TERMINATORS and (not norm or norm[-1] not in _TERMINATORS + "\"'»”’)"):

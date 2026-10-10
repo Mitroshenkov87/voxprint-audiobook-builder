@@ -20,9 +20,11 @@ needs huggingface/transformers#44517, which is still an open PR), Qwen3-TTS uses
 Unsloth would pull its own pins (trl, xformers, transformers range incl. 5.x) that conflict with the verified set.
 Voxprint keeps its own LoRA loop (core/lora_trainer.py).  If found it is only reported (reason ``no_qwen3_tts_training``).
 
-NVIDIA driver -> PyTorch wheel flavor follows the CUDA version printed by ``nvidia-smi`` (same mapping Unsloth's
-installer uses: cu118 / cu124 / cu126 / cu128 / cu130, else CPU).  When the header has no ``CUDA Version`` /
-``CUDA UMD Version``, the driver version is used instead: 570+ is treated as CUDA 12.8, 560-569 as 12.6, older as CPU.
+NVIDIA driver -> PyTorch wheel flavor follows the CUDA version printed by ``nvidia-smi``.  The only wheel we ship
+is ``cu130`` (CUDA 13.0).  There is no CPU wheel for users: a driver without CUDA 13 yields ``""`` (no supported
+flavor).  When the header has no ``CUDA Version`` / ``CUDA UMD Version``, the driver version is used instead: 600 and
+newer count as CUDA 13.0, anything older has no matching wheel.  ``VOXPRINT_TORCH_FLAVOR`` (internal, CI) can still
+name a flavor, including ``cpu``, in the runtime selector.
 """
 from __future__ import annotations
 
@@ -92,9 +94,8 @@ def _run(args: List[str]) -> Tuple[int, str]:
 
 
 # ------------------------------------------------------------------------------------- torch / CUDA flavor
-#: (minimum CUDA version of the driver, wheel tag), checked top-down.
-CUDA_FLAVORS: Tuple[Tuple[Tuple[int, int], str], ...] = (
-    ((13, 0), "cu130"), ((12, 8), "cu128"), ((12, 6), "cu126"), ((12, 4), "cu124"), ((11, 8), "cu118"))
+#: (minimum CUDA version of the driver, wheel tag), checked top-down. Only cu130 is shipped.
+CUDA_FLAVORS: Tuple[Tuple[Tuple[int, int], str], ...] = (((13, 0), "cu130"),)
 
 
 _CUDA_IN_HEADER = re.compile(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)")   # 6xx drivers print "CUDA UMD Version"
@@ -110,7 +111,7 @@ def parse_nvidia_smi_cuda(text: str) -> Optional[Tuple[int, int]]:
 def cuda_from_driver_version(text: str) -> Optional[Tuple[int, int]]:
     """Map ``nvidia-smi --query-gpu=driver_version`` when the header has no CUDA version.
 
-    The first line ``major.minor...`` decides: >= 570 -> CUDA 12.8, >= 560 -> CUDA 12.6, otherwise None (CPU).
+    The first line ``major.minor...`` decides: >= 600 -> CUDA 13.0 (the cu130 wheels need that driver), otherwise None.
     """
     lines = (text or "").splitlines()
     if not lines:
@@ -119,20 +120,18 @@ def cuda_from_driver_version(text: str) -> Optional[Tuple[int, int]]:
     if not m:
         return None
     major = int(m.group(1))
-    if major >= 570:
-        return (12, 8)
-    if major >= 560:
-        return (12, 6)
+    if major >= 600:
+        return (13, 0)
     return None
 
 
 def torch_flavor_for_driver(cuda: Optional[Tuple[int, int]]) -> str:
-    """Wheel flavor for the driver's CUDA version; ``cpu`` without an NVIDIA driver or with a too old one."""
+    """Wheel flavor for the driver's CUDA version. ``""`` when no supported CUDA flavor fits (not a CPU install)."""
     if cuda:
         for need, tag in CUDA_FLAVORS:
             if cuda >= need:
                 return tag
-    return "cpu"
+    return ""
 
 
 def torch_flavor_of(version: Optional[str]) -> Optional[str]:
@@ -155,6 +154,8 @@ def decide_torch(installed: Optional[str], wanted_flavor: str, external: bool = 
     """torch has no pin: any reasonably recent build is reusable; the *flavor* must fit the machine.
     CPU build on a machine with an NVIDIA driver, or a CUDA build newer than the driver supports -> replace
     (in Voxprint's own environment); an older CUDA build than the driver offers is fine (drivers are backward compatible)."""
+    if not wanted_flavor:
+        return Decision("torch", installed, "", ACTION_IGNORE, "no_supported_cuda_flavor")
     if installed is None:
         return Decision("torch", None, wanted_flavor, ACTION_INSTALL, "missing")
     have = torch_flavor_of(installed)
@@ -309,7 +310,7 @@ class EnvReport:
     pythons: List[PythonEnv] = field(default_factory=list)
     ffmpeg: Optional[FfmpegInfo] = None
     driver_cuda: Optional[Tuple[int, int]] = None
-    wanted_torch_flavor: str = "cpu"
+    wanted_torch_flavor: str = ""
     ignored: Dict[str, str] = field(default_factory=dict)       # package -> reason code (e.g. unsloth)
 
     def counts(self) -> Dict[str, int]:

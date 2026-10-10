@@ -1,6 +1,7 @@
 """Averaged speaker embedding over clean clips: selection, averaging, storage, and its use in training, narration (voice-clone
 prompt), the universal model, the cache key, the library and the voice check."""
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -38,7 +39,7 @@ def test_select_clips_keeps_clean_ones_best_first(tmp_path):
              _clip(tmp_path / "clipped.wav", 5.0, amp=1.5), _clip(tmp_path / "quiet.wav", 5.0, amp=0.001),
              _clip(tmp_path / "noisy.wav", 5.0, noise=0.05), _clip(tmp_path / "clean.wav", 5.0)]
     got = [p for p, _ in sc.select_clips(paths + [str(tmp_path / "missing.wav")])]
-    assert [p.rsplit("/", 1)[-1] for p in got] == ["clean.wav", "noisy.wav"]
+    assert [Path(p).name for p in got] == ["clean.wav", "noisy.wav"]
     assert len(sc.select_clips(paths, max_clips=1)) == 1
 
 

@@ -184,7 +184,7 @@ def test_texts_exist_in_every_language(app, tmp_path):
 def test_narrate_book_announces_the_chunk_files_and_they_appear_in_order(tmp_path):
     from tests.test_narration import run
 
-    plans, seen = [], []
+    plans = []
     snapshot = []
 
     def progress(ev):
@@ -195,6 +195,9 @@ def test_narrate_book_announces_the_chunk_files_and_they_appear_in_order(tmp_pat
     assert len(plans) == 1 and len(plans[0]) == len(engine.calls) == res.chunks
     assert len(set(plans[0])) == len(plans[0]) and all(p.suffix == ".flac" for p in plans[0])
     assert snapshot
-    for flags in snapshot:                                   # finished chunks always form a prefix of the plan
+    # The cache is cleared before narrate_book returns, so the last snapshot is all missing.
+    # While the job runs, finished files are a True-prefix of the plan (core.play_queue.PlayQueue.poll).
+    for flags in snapshot:
         assert flags == sorted(flags, reverse=True)
-    assert max(sum(f) for f in snapshot) == len(plans[0]) and any(sum(a) < sum(b) for a, b in zip(snapshot, snapshot[1:]))
+    assert max(sum(flags) for flags in snapshot) == len(plans[0])
+    assert any(sum(a) < sum(b) for a, b in zip(snapshot, snapshot[1:]))

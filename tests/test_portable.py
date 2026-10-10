@@ -203,22 +203,28 @@ def test_the_state_file_remembers_the_folder(tmp_path, web, monkeypatch):
 
 
 def test_flavor_rules(monkeypatch):
+    monkeypatch.setenv("VOXPRINT_TORCH_FLAVOR", "cpu")
+    assert pt.choose_flavor(["cu130"], (13, 0)) == "cpu"
     monkeypatch.delenv("VOXPRINT_TORCH_FLAVOR")
     f = ["cu128", "cu126", "cpu"]
-    assert pt.choose_flavor(f, (12, 9)) == "cu128" and pt.choose_flavor(f, (12, 6)) == "cu126" and pt.choose_flavor(f, (11, 8)) == "cpu"
-    assert pt.choose_flavor(f, None) == "cpu"
+    assert pt.choose_flavor(f, (12, 9)) == "cu128" and pt.choose_flavor(f, (12, 6)) == "cu126" and pt.choose_flavor(f, (11, 8)) == ""
+    assert pt.choose_flavor(f, None) == ""
+    assert pt.matches_flavor({"flavor": "cpu"}, "") is False
+    assert pt.matches_flavor({"flavor": "cu128"}, "cu128") is True
+    assert pt.matches_flavor({"id": "libs"}, "") is True
+    assert pt.matches_flavor({"flavor": "cpu"}, "all") is True
     monkeypatch.setattr(pt.shutil, "which", lambda n: "nvidia-smi")
     assert pt.detect_cuda(lambda c: "| NVIDIA-SMI 570  Driver Version: 570.1  CUDA Version: 12.8 |") == (12, 8)
 
     def fake_smi(cmd):
         if "--query-gpu=driver_version" in cmd:
-            return "  560.35.03\n570.00"
-        return "NVIDIA-SMI 560.35  Driver Version: 560.35 |"
+            return "  610.88\n"
+        return "NVIDIA-SMI 610.88  Driver Version: 610.88 |"
 
     def broken(_cmd):
         raise OSError("nvidia-smi")
 
-    assert pt.detect_cuda(fake_smi) == (12, 6)
+    assert pt.detect_cuda(fake_smi) == (13, 0)
     assert pt.detect_cuda(broken) is None
     assert pt.detect_cuda(lambda c: "551.00" if "--query-gpu=driver_version" in c else "no cuda line") is None
     assert pt.detect_vram_mb(lambda c: "24564\n8192\n") == 24564

@@ -6,13 +6,15 @@ file is pinned (version, size, SHA-256).  Run this tool when the dependencies ch
 commit the lock.  CI never resolves anything: it only reads the committed file.
 
 * pure libraries: ``uv pip compile requirements.txt requirements-verified.txt`` for Windows / the build Python -> the wheel of every
-  pin from the PyPI JSON API (``cp311-win_amd64``, ``abi3`` or ``py3-none-any``; an sdist-only package is marked ``sdist`` - CI builds a pure-Python wheel from it);
+  pin from the PyPI JSON API (``cp314-win_amd64``, ``abi3`` or ``py3-none-any``; an sdist-only package is marked ``sdist`` - CI builds a pure-Python wheel from it);
 * ``requirements-nodeps.txt`` (qwen-asr / qwen-tts conflict on transformers): pinned as they are, without their own dependencies;
-* PyTorch: ``torch`` + ``torchaudio`` of one version for every flavor (cu128, cu126, cpu) from download.pytorch.org;
+* PyTorch: ``torch`` and TorchAudio of one version for the user flavor (cu130) and the CI-only CPU flavor, from
+  download.pytorch.org. TorchAudio's native ops are built against that torch. There is no TorchAudio wheel for
+  2.12-2.14 on cu130 / cp314, so the pair is 2.11.0;
 * the packages that the PyInstaller shell bundles (Qt, numpy, soundfile ...) are NOT listed as downloads - they are listed under
   ``shell`` so that CI installs exactly those versions into the shell's build environment.
 
-Usage: ``python tools/make_runtime_lock.py [--torch 2.11.0] [--python 3.11]``
+Usage: ``python tools/make_runtime_lock.py [--torch 2.11.0] [--torchaudio 2.11.0] [--python 3.14]``
 """
 from __future__ import annotations
 
@@ -32,7 +34,11 @@ ROOT = Path(__file__).resolve().parent.parent
 LOCK = ROOT / "infra" / "runtime_lock.json"
 SCHEMA = 1
 UA = "voxprint-lock/1"
-FLAVORS = ("cu128", "cu126", "cpu")
+#: User-facing CUDA flavor. CPU wheels are still pinned (``CI_FLAVORS``) so CI can install them; they are not offered to users.
+FLAVORS = ("cu130",)
+CI_FLAVORS = ("cpu",)
+#: Same release as ``torch``. TorchAudio's native ops are built against that torch; 2.11.0 is the newest such pair on cu130 / cp314.
+TORCHAUDIO_VERSION = "2.11.0"
 #: Provided by the PyInstaller shell (installed from this lock into the build environment, bundled into the exe).
 SHELL_PROVIDED = {"pyside6", "pyside6-essentials", "pyside6-addons", "shiboken6", "numpy", "soundfile", "cffi", "pycparser",
                   "certifi", "psutil", "packaging"}
@@ -45,13 +51,14 @@ GROUPS = [
     ("audio", "Audio and science libraries", ("scipy", "librosa", "numba", "llvmlite", "scikit-learn", "soxr", "audioread", "pooch",
                                               "joblib", "threadpoolctl", "lazy-loader", "decorator", "msgpack", "onnxruntime",
                                               "av", "pillow", "pydub", "imageio-ffmpeg", "sox", "resampy", "audioop-lts")),
+    ("cuda12", "CUDA 12 libraries for CTranslate2", ("nvidia-cublas-cu12", "nvidia-cudnn-cu12", "ctranslate2")),
     ("text", "Text and language", ("nagisa", "pymorphy3", "pymorphy3-dicts-ru", "ru-normalizr", "rutextnorm", "num2words", "eng-to-ipa",
                                    "sentencepiece", "regex", "dawg2-python", "docopt-ng", "six", "dynet", "cython")),
 ]
 #: Libraries (besides the shell's) that the unit tests import; the thin build's CI installs them to run the suite without PyTorch.
 TEST_EXTRAS = {"huggingface-hub", "requests", "scipy", "pyyaml", "tqdm", "urllib3", "filelock", "fsspec", "typing-extensions",
                "hf-xet", "idna", "charset-normalizer"}
-COMPAT = {"torch": ">=2.8,<2.13", "python_minor_must_match": True}
+COMPAT = {"torch": ">=2.11,<2.12", "python_minor_must_match": True}
 
 
 def norm(n: str) -> str:
@@ -82,7 +89,7 @@ def compile_pins(py: str) -> Dict[str, str]:
 
 
 def wheel_score(fn: str, tag: str) -> Optional[int]:
-    """Higher = more specific; None = not installable on win_amd64 / CPython ``tag`` (e.g. cp311)."""
+    """Higher = more specific; None = not installable on win_amd64 / CPython ``tag`` (e.g. cp314)."""
     from packaging.utils import parse_wheel_filename
 
     try:
@@ -152,7 +159,7 @@ def group_of(name: str) -> str:
     return "libs"
 
 
-def build(py: str, torch_version: str) -> dict:
+def build(py: str, torch_version: str, torchaudio_version: str = TORCHAUDIO_VERSION) -> dict:
     tag = "cp" + py.replace(".", "")
     pins = compile_pins(py)
     shell = {n: v for n, v in sorted(pins.items()) if n in SHELL_PROVIDED}
@@ -161,16 +168,18 @@ def build(py: str, torch_version: str) -> dict:
         libs = list(ex.map(lambda kv: pypi_wheel(kv[0], kv[1], tag), todo.items()))
     for w in libs:
         w["group"] = group_of(w["dist"])
+    versions = {"torch": torch_version, "torchaudio": torchaudio_version}
     torch = []
-    for fl in FLAVORS:
+    for fl in (*FLAVORS, *CI_FLAVORS):
         for pkg in TORCH:
-            w = torch_wheel(pkg, torch_version, fl, tag)
+            w = torch_wheel(pkg, versions[pkg], fl, tag)
             w["group"] = "torch"
             torch.append(w)
     titles = {"torch": "PyTorch (neural networks)", "libs": "Libraries (transformers, PEFT, tokenizers ...)"}
     titles.update({g[0]: g[1] for g in GROUPS})
     return {"schema": SCHEMA, "generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"), "python": py,
-            "platform": "win_amd64", "compat": COMPAT, "torch_version": torch_version, "flavors": list(FLAVORS),
+            "platform": "win_amd64", "compat": COMPAT, "torch_version": torch_version,
+            "torchaudio_version": torchaudio_version, "flavors": list(FLAVORS), "ci_flavors": list(CI_FLAVORS),
             "group_titles": titles, "shell": shell, "wheels": libs + torch}
 
 
@@ -187,7 +196,8 @@ def pyinstaller_metadata_args(lock: dict) -> List[str]:
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--torch", default="2.11.0")
-    ap.add_argument("--python", default="3.11")
+    ap.add_argument("--torchaudio", default=TORCHAUDIO_VERSION)
+    ap.add_argument("--python", default="3.14")
     ap.add_argument("--out", default=str(LOCK))
     ap.add_argument("--shell-requirements", action="store_true", help="print the pinned shell packages (for CI) and exit")
     ap.add_argument("--test-requirements", action="store_true",
@@ -207,10 +217,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                     pins[w["dist"]] = w["version"]
         print("\n".join(f"{n}=={v}" for n, v in pins.items()))
         return 0
-    lock = build(a.python, a.torch)
+    lock = build(a.python, a.torch, a.torchaudio)
     Path(a.out).write_text(json.dumps(lock, indent=1) + "\n", encoding="utf-8")
-    tot = sum(w["size"] for w in lock["wheels"] if w.get("flavor") in (None, "cu128"))
-    print(f"{len(lock['wheels'])} wheels, {tot / 2**20:.0f} MiB for cu128 -> {a.out}")
+    tot = sum(w["size"] for w in lock["wheels"] if w.get("flavor") in (None, "cu130"))
+    print(f"{len(lock['wheels'])} wheels, {tot / 2**20:.0f} MiB for cu130 -> {a.out}")
     return 0
 
 

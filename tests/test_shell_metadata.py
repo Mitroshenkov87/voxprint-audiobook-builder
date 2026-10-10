@@ -22,6 +22,12 @@ def test_cli_prints_one_line_for_the_build_script(capsys):
     assert "\n" not in out and "--copy-metadata packaging" in out
 
 
+def test_full_build_targets_python_314_and_bundles_audioop():
+    bat = (ROOT / "build.bat").read_text(encoding="utf-8")
+    assert "py -3.14" in bat and "--hidden-import audioop" in bat and "cu130" in bat
+    assert "py -3.11" not in bat and "cu128" not in bat
+
+
 def test_build_script_uses_it_and_ships_the_lock_for_the_frozen_check():
     bat = (ROOT / "build_thin.bat").read_text(encoding="utf-8")
     assert "--pyinstaller-metadata-args" in bat and "%META%" in bat and "runtime_lock.json;infra" in bat

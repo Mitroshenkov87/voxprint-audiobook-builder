@@ -97,7 +97,7 @@ One recording plus the text that was read:
 voxprint train recording.wav --text script.txt --name Anna --type female --json
 ```
 
-On exit code 5, retry with `--force-cpu` (slow). When it finishes, `voices list --json` shows the new id. A second train creates another voice.
+When it finishes, `voices list --json` shows the new id. A second train creates another voice. Training needs an NVIDIA GeForce RTX 40-series or newer GPU. Out of video memory is exit code 5: close other programs that use the card and run the same command again. There is no CPU-only mode.
 
 `--out DIR` is the parent folder: each voice gets its own work folder `<DIR>/<voice name>_Voxprint`, so two voices trained with the same `--out` never overwrite each other's `report.json`.
 
@@ -123,9 +123,10 @@ voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3 --js
 voxprint narrate book.epub --voice my-voice --out ./audiobooks --format mp3,m4b,flac,opus --json
 voxprint narrate genesis.txt --voice levi --out ./audiobooks --style scripture --pause-sentence 0.7 --speed 0.95 --json
 voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann --speakers --out ./audiobooks --json
+python cli.py narrate book.md --voice narrator --male-voice tom --female-voice ann --character Ivan=tom --character Anna=ann --speaker-marks marks.txt --out ./audiobooks --format wav --json
 ```
 
-Pauses and speed: `--pause-comma`, `--pause-mid`, `--pause-sentence`, `--pause-paragraph`, `--pause-chapter` (seconds), `--speed` (0.7-1.3) and `--style auto|scripture|fiction|dialogue`; defaults come from the app's Settings. For a Russian book, `--yo` (the default) restores the letter yo where a dictionary is sure; `--no-yo` leaves the letter e as written. Details: [CLI.md](CLI.md#narrate-a-book).
+Pauses and speed: `--pause-comma`, `--pause-mid`, `--pause-sentence`, `--pause-paragraph`, `--pause-chapter` (seconds), `--speed` (0.7-1.3) and `--style auto|scripture|fiction|dialogue`; defaults come from the app's Settings. For a Russian book, `--yo` (the default) restores the letter yo where a dictionary is sure; `--no-yo` leaves the letter e as written. A word that already contains yo, and a U+0301 stress mark the author wrote, are kept. `.md` is read like TXT: `#` / `##` headings are chapters, a blank line is a paragraph. Details: [CLI.md](CLI.md#narrate-a-book).
 
 Multi-voice: `--voice` is the narrator. `--speakers` asks Gemma to mark each paragraph; `--speaker-marks FILE` narrates a file you already edited (`voxprint speakers` writes it). `--male-voice` and `--female-voice` are the role voices. `--male2-voice` / `--female2-voice` add a second voice per role: different characters (by the name in the marks) alternate between the two in order of first appearance. `--character NAME=VOICE` (repeatable) pins one character to a voice. Without those three flags every man and every woman share one voice, as before. The two speaker flags cannot be combined. If the marks do not match the prepared text, the narrator reads the whole book and the JSON `warnings` array says so. `<out>/<book>/.debug/speakers.txt` is listed in `outputs`.
 
@@ -262,7 +263,7 @@ Extra fields by command:
 
 ### `status` object
 
-`gpu`: `{cuda_available, name, vram_total_gb, vram_free_gb, torch, driver}`. `name` is `null` when no CUDA device was seen.
+`gpu`: `{cuda_available, name, vram_total_gb, vram_free_gb, torch, driver, requirement}`. `name` is `null` when no CUDA device was seen. `requirement` is `{ok, min_compute, detected, compute_cap, source, override}`: `ok` is true only for an NVIDIA GPU of compute capability 8.9 or newer, `detected` is `none` when no NVIDIA GPU was seen, `compute_cap` is the best capability or `null`, `source` is `torch`, `nvidia-smi` or `none`, and `override` reports an internal test switch without changing `ok`. `status` prints this and still exits 0.
 
 `formats`: canonical ids (`opus_single`, `mp3_chapters`, `m4b`, `flac_chapters`, …). `format_aliases` maps `mp3`, `opus`, `flac`, `m4b`, `wav` onto those ids.
 
@@ -279,10 +280,11 @@ Extra fields by command:
 | 0 | ok | Read `outputs`. A download that was already installed is also 0, with `downloaded: false` |
 | 1 | internal | `voxprint diag --out voxprint-diagnostics.zip --json` and read `error` |
 | 2 | bad args | `voxprint <command> --help`. Unknown module: `voxprint models list --json` |
-| 3 | input | The path or voice id is wrong. `voxprint voices list --json` for voices. Books are TXT, FB2, `.fb2.zip`, EPUB |
+| 3 | input | The path or voice id is wrong. `voxprint voices list --json` for voices. Books are TXT, Markdown, FB2, `.fb2.zip`, EPUB |
 | 4 | missing | `voxprint models download <id> --json`. The `hint` names the id when it can |
-| 5 | gpu | Free video memory, or `voxprint train ... --force-cpu`. Check `voxprint status --json` |
+| 5 | gpu | Free video memory and run the same command again. Check `voxprint status --json` |
 | 6 | cancelled | Run the same `narrate` again. Finished chunks are kept |
+| 7 | gpu required | This PC has no NVIDIA GeForce RTX 40-series or newer GPU (compute capability 8.9 or higher). `status` and `diag` still run and report `gpu.requirement` |
 
 ## Long jobs
 
@@ -308,7 +310,8 @@ By default a voice trained with this CLI is marked consent method `none` and sco
 | What you see | What to run |
 |---|---|
 | Exit 4, or `installed: false` on a model you need | `voxprint models download required --json` or the id from `models list` |
-| Exit 5 | Close other GPU programs, or add `--force-cpu` on `train` |
+| Exit 5 | Close other programs that use the graphics card and run the same command again |
+| Exit 7 | An NVIDIA GeForce RTX 40-series or newer GPU is required. `voxprint status --json` reports `gpu.requirement` |
 | Exit 3, voice not found | `voxprint voices list --json` and pass `id` |
 | Exit 2 | `voxprint <command> --help` |
 | Exit 1 | `voxprint diag --out report.zip --json` |
