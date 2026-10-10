@@ -101,6 +101,34 @@ case "$ARCH" in
   *) die "unsupported CPU architecture: $ARCH" ;;
 esac
 
+# Best effort from os-release. A year we cannot read is not a warning, and a warning never blocks.
+warn_if_old_distro() {
+  local file id ver pretty year yy q sq
+  q='"'; sq="'"
+  file="${VOXPRINT_OS_RELEASE:-/etc/os-release}"
+  [ -r "$file" ] || return 0
+  id=$(sed -n -- 's/^VERSION_ID=//p' "$file" | head -n 1)
+  ver=$(sed -n -- 's/^VERSION=//p' "$file" | head -n 1)
+  pretty=$(sed -n -- 's/^PRETTY_NAME=//p' "$file" | head -n 1)
+  id=${id#"$q"}; id=${id%"$q"}; id=${id#"$sq"}; id=${id%"$sq"}
+  ver=${ver#"$q"}; ver=${ver%"$q"}; ver=${ver#"$sq"}; ver=${ver%"$sq"}
+  pretty=${pretty#"$q"}; pretty=${pretty%"$q"}; pretty=${pretty#"$sq"}; pretty=${pretty%"$sq"}
+  year=""
+  if printf '%s' "$id" | grep -Eq '^[0-9]{2}\.[0-9]{2}([^0-9]|$)'; then
+    yy=$(printf '%s' "$id" | cut -c 1-2)
+    year=$((2000 + 10#$yy))
+  else
+    year=$(printf '%s\n%s\n%s\n' "$id" "$ver" "$pretty" | grep -Eo '20[0-9]{2}|19[0-9]{2}' | head -n 1 || true)
+  fi
+  case "$year" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+  if [ "$year" -lt 2025 ]; then
+    warn "This Linux distribution looks older than 2025 (${pretty:-${id:-unknown}}). Supported systems: current and previous year OS releases (Linux distributions released from 2025). Older systems are not a goal. Installation continues."
+  fi
+}
+warn_if_old_distro
+
 # ----------------------------------------------------------------------------------------------- system checks
 say "Voxprint for Linux (EXPERIMENTAL) - checking the system"
 PY="${VOXPRINT_PYTHON:-python3}"

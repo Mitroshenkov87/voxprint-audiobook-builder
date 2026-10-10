@@ -100,14 +100,20 @@ LicenseFile=..\docs\legal\EULA-audiobook-builder.txt
 PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-; Windows 11 24H2+ (build 26100). Older versions are not blocked hard - see [Code]: only a soft warning.
-MinVersion=10.0.22000
+; Windows 11 24H2+ (build 26100). Older versions are refused: [Messages] before the wizard, and
+; InitializeSetup again with the detected build number (English, Russian, German).
+MinVersion=10.0.26100
 CloseApplications=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
+
+[Messages]
+english.WinVersionTooLowError=Voxprint AI Audiobook Builder requires Windows 11 24H2 or newer (build 26100). This version of Windows is older and is not supported. Setup will exit.
+russian.WinVersionTooLowError=Voxprint AI Audiobook Builder требует Windows 11 24H2 или новее (сборка 26100). Эта версия Windows старше и не поддерживается. Установка будет завершена.
+german.WinVersionTooLowError=Voxprint AI Audiobook Builder benötigt Windows 11 24H2 oder neuer (Build 26100). Diese Windows-Version ist älter und wird nicht unterstützt. Die Installation wird beendet.
 
 [CustomMessages]
 english.RunPrefetch=Start %1 now
@@ -134,9 +140,9 @@ german.ModeNoSpace=Nicht genug freier Speicher für den vollständigen Download 
 english.VcRedistStatus=Installing Microsoft Visual C++ components...
 russian.VcRedistStatus=Устанавливаю компоненты Microsoft Visual C++…
 german.VcRedistStatus=Microsoft Visual C++-Komponenten werden installiert...
-english.WinBuildWarning=%1 is designed for Windows 11 (build 26100 and newer). Your build is %2: the program may not work correctly.%n%nContinue the installation?
-russian.WinBuildWarning=%1 рассчитан на Windows 11 (сборка 26100 и новее). У вас сборка %2: программа может работать некорректно.%n%nПродолжить установку?
-german.WinBuildWarning=%1 ist für Windows 11 ausgelegt (Build 26100 und neuer). Ihr Build ist %2: Das Programm läuft eventuell nicht korrekt.%n%nInstallation fortsetzen?
+english.WinBuildTooOld=%1 requires Windows 11 24H2 or newer (build 26100). This PC is Windows build %2, which is older. Setup will exit.
+russian.WinBuildTooOld=%1 требует Windows 11 24H2 или новее (сборка 26100). На этом ПК сборка Windows %2 — она старше. Установка будет завершена.
+german.WinBuildTooOld=%1 benötigt Windows 11 24H2 oder neuer (Build 26100). Dieser PC hat Windows-Build %2 und ist damit älter. Die Installation wird beendet.
 english.ModelsPageCaption=Models folder
 russian.ModelsPageCaption=Папка моделей
 german.ModelsPageCaption=Modellordner
@@ -270,8 +276,10 @@ begin
   Result := True;
   GetWindowsVersionEx(V);
   if V.Build < 26100 then
-    Result := MsgBox(FmtMessage(CustomMessage('WinBuildWarning'), ['{#AppDisplayName}', IntToStr(V.Build)]),
-      mbConfirmation, MB_YESNO) = IDYES;
+  begin
+    MsgBox(FmtMessage(CustomMessage('WinBuildTooOld'), ['{#AppDisplayName}', IntToStr(V.Build)]), mbError, MB_OK);
+    Result := False;
+  end;
 end;
 
 { Callback of the Browse button on the models page (True = the dialog may create a new folder). }
