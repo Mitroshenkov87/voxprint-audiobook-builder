@@ -382,7 +382,7 @@ class DatasetBuilder:
             "warnings": warnings,
             "segment_times": [{"file": s.filename, "start": round(s.start, 3), "end": round(s.end, 3),
                                "text": s.text, "text_raw": s.extra.get("text_raw", s.text),
-                               **({"cer": round(clip_cer[id(s)], 3)} if clip_cer.get(id(s)) is not None else {})}
+                               **({"cer": round(cer, 3)} if (cer := clip_cer.get(id(s))) is not None else {})}
                               for s in segments],
         }
         (out / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")

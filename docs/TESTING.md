@@ -66,9 +66,9 @@ The Linux test-suite (`QT_QPA_PLATFORM=offscreen python -m pytest`) covers the p
 
 ## Code audit
 
-`tools/audit.py` runs ruff (bug rules F, E9, B), mypy (basic), bandit (medium+), pip-audit (the app's installed packages), vulture (90 %+ confidence), radon (functions of rank D or worse) and, with `--coverage`, the test suite under coverage, and prints one short summary (details in `audit-report.txt`):
+`tools/audit.py` is the release gate. It runs on every push and pull request to `main`, weekly, and as the first job of the installer workflow. What it blocks on, and which findings are accepted, is [AUDIT.md](AUDIT.md).
 
     python -m pip install -r requirements-audit.txt
-    python tools/audit.py --python <app venv python> [--coverage] [--strict]
+    python tools/audit.py --python <app venv python>
 
-On GitHub: the manual `audit` workflow runs the same script; CodeQL runs weekly / on demand (`codeql.yml`); Dependabot (`.github/dependabot.yml`) opens a few update PRs (the model-critical pins are ignored). Reviewed false positives carry `# nosec <id> - reason` / `# noqa: <code> - reason`.
+CodeQL runs weekly and on demand (`codeql.yml`). Dependabot (`.github/dependabot.yml`) opens a few update PRs (the model-critical pins are ignored). Reviewed false positives carry `# nosec <id> - reason` / `# noqa: <code> - reason`.

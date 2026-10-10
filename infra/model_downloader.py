@@ -26,7 +26,7 @@ import stat
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, cast
 
 from core.errors import ModelDownloadError
 from core.events import ProgressCallback, Stage, noop_progress
@@ -166,7 +166,10 @@ def _import_existing(repo_id: str, revision: Optional[str], progress: ProgressCa
     try:   # a Voxprint backup chosen as the source is restored as a whole (once) - models, voices, ffmpeg
         existing_models.adopt_backup_choice()
         if existing_models.restore_pending():
-            existing_models.restore_backup(lambda f, m="": progress(stage, f, m))
+            def _restore_progress(f: float, m: str = "") -> None:
+                progress(stage, f, m)
+
+            existing_models.restore_backup(_restore_progress)
             restored = local_dir_for(repo_id)
             if verify_local_model(restored):
                 progress(stage, 1.0, tr("progress.model_imported", short=short))
@@ -180,7 +183,10 @@ def _import_existing(repo_id: str, revision: Optional[str], progress: ProgressCa
         if found is None:
             return None
         progress(stage, 0.0, tr("progress.model_importing", short=short, where=str(found.location)))
-        path = existing_models.import_model(found, lambda f, m="": progress(stage, f, m))
+        def _import_progress(f: float, m: str = "") -> None:
+            progress(stage, f, m)
+
+        path = existing_models.import_model(found, _import_progress)
         progress(stage, 1.0, tr("progress.model_imported", short=short))
         return path
     except CancelledByUser:
@@ -284,7 +290,7 @@ class _ByteProgress:
 
         tracker = self
 
-        class _Tqdm(hf_tqdm):  # type: ignore[misc, valid-type]
+        class _Tqdm(hf_tqdm):
             """tqdm replacement that feeds the shared tracker."""
             def __init__(self, *a: Any, **kw: Any) -> None:
                 """Register this bar's total size with the tracker (only for byte bars)."""
@@ -641,7 +647,7 @@ class ModelLock:
                     import msvcrt
 
                     fh.seek(0)
-                    msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                    getattr(msvcrt, "locking")(fh.fileno(), getattr(msvcrt, "LK_NBLCK"), 1)
                 else:
                     import fcntl
 
@@ -683,7 +689,7 @@ class ModelLock:
                 import msvcrt
 
                 fh.seek(0)
-                msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+                getattr(msvcrt, "locking")(fh.fileno(), getattr(msvcrt, "LK_UNLCK"), 1)
             else:
                 import fcntl
 
@@ -952,10 +958,11 @@ def _ensure_model(
         known = model_locator.KNOWN_SIZES.get(repo_id)
         expected = known[1] if known and revision and known[0] == revision else None
         progress(stage, cur["f"], tr("progress.mirror_modelscope", short=short))
-        if mirror_download is _default_mirror_download:
+        chosen = mirror_download if mirror_download is not None else _default_mirror_download
+        if chosen is _default_mirror_download:
             _default_mirror_download(repo_id, partial, report, expected, on_total=meter.set_total)
         else:
-            mirror_download(repo_id, partial, report, expected)
+            chosen(repo_id, partial, report, expected)
         # ModelScope has no commit sha: the revision is confirmed only when the sizes matched the pinned commit
         state["sha"] = revision if expected else None
 
@@ -974,7 +981,8 @@ def _ensure_model(
     def _from_github() -> None:
         """Small models: the release assets of the project repository (every file verified by SHA-256)."""
         progress(stage, cur["f"], tr("progress.mirror_github", short=short))
-        state["sha"] = model_release.download(rel, partial, report, allow_patterns, release_opener)
+        state["sha"] = model_release.download(
+            cast(model_release.ReleaseEntry, rel), partial, report, allow_patterns, release_opener)
 
     def complete() -> bool:
         return partial_is_complete(partial, repo_id, revision, mirror_manifest, allow_patterns)

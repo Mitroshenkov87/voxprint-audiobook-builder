@@ -24,7 +24,7 @@ import shutil
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, cast
 
 from core.errors import CancelledByUser
 from core.events import CancelToken
@@ -231,7 +231,8 @@ def default_tools() -> List[Tool]:
                   lambda p: quality_models.ensure_dnsmos(p))]
     a = denoise_tool.asset()
     if a is not None:
-        tools.append(Tool(denoise_tool.LABEL, lambda: {denoise_tool.tool_path(): {"size": a["size"], "sha256": a["sha256"]}},
+        tools.append(Tool(denoise_tool.LABEL,
+                          lambda: {cast(Path, denoise_tool.tool_path()): {"size": a["size"], "sha256": a["sha256"]}},
                           lambda p: denoise_tool.ensure(p)))
     if llm_tool.platform_key() is not None:
         tools.append(Tool(llm_tool.LABEL,
@@ -282,7 +283,10 @@ def check_tool(tool: Tool, progress: Progress, cancel: CancelToken) -> Item:
             progress(0.0, tr("autorepair.repairing", name=tool.name, n=len(bad)))
         else:
             progress(0.0, tr("autorepair.downloading", name=tool.name))
-        tool.ensure(lambda f, m="": progress(f, m))
+        def _report(f: float, m: str = "") -> None:
+            progress(f, m)
+
+        tool.ensure(_report)
         still = [p for p, meta in tool.files().items() if not model_release.file_ok(Path(p), meta)]
         if still or not tool.extra_ok():
             return Item("model", tool.name, FAILED, tr("autorepair.still_bad", n=max(1, len(still))))

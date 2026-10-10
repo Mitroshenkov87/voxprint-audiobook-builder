@@ -224,7 +224,7 @@ def _acquire(path: Path, job: str, on_busy: Optional[Callable[[str, str], None]]
             except (TypeError, ValueError):
                 got_pid = -1
             if got_pid == os.getpid():
-                return HeldLock(path, job, str(got.get("started") or started), eta, now)
+                return HeldLock(path, job, str((got or {}).get("started") or started), eta, now)
             continue
         owner = str(info.get("owner", "")).strip()
         other = str(info.get("job", "")).strip()

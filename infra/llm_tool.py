@@ -25,7 +25,7 @@ import urllib.request
 import zipfile
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, cast
 
 from core.i18n import tr
 from infra import external_models, model_release
@@ -95,14 +95,15 @@ def server_exe(models_dir: Optional[Path] = None) -> Optional[Path]:
 def model_ready(models_dir: Optional[Path] = None) -> bool:
     p = model_path(models_dir)              # the hash was checked when it was downloaded; the size catches a damaged copy
     try:
-        return p.is_file() and p.stat().st_size == int(MODEL["size"])  # type: ignore[arg-type]
+        return p.is_file() and p.stat().st_size == int(cast(Any, MODEL["size"]))
     except OSError:
         return False
 
 
 def download_mb() -> int:
     a = SERVER_ASSETS.get(platform_key() or "")
-    return int((int(MODEL["size"]) + (int(a["size"]) if a else 0)) / 1e6)  # type: ignore[arg-type]
+    extra = int(cast(Any, a["size"])) if a else 0
+    return int((int(cast(Any, MODEL["size"])) + extra) / 1e6)
 
 
 @lru_cache(maxsize=1)
@@ -138,7 +139,11 @@ def _unpack(archive: Path, dest: Path) -> None:
     (dest / ".complete").write_text(LLAMA_BUILD, encoding="utf-8")
 
 
-def ensure(progress: Callable[[float, str], None] = lambda f, m="": None, models_dir: Optional[Path] = None,
+def _silent_progress(f: float, m: str = "") -> None:
+    pass
+
+
+def ensure(progress: Callable[[float, str], None] = _silent_progress, models_dir: Optional[Path] = None,
            opener=None, timeout: float = 30.0) -> Path:
     """Download llama-server and the GGUF model if missing (size + SHA-256 checked, resumable); returns the model path.
     Only on the user's explicit request.  Raises :class:`infra.model_release.ReleaseError`."""
@@ -161,7 +166,7 @@ def ensure(progress: Callable[[float, str], None] = lambda f, m="": None, models
         _unpack(archive, server_dir(models_dir))
         archive.unlink(missing_ok=True)
     else:
-        on_bytes(int(a["size"]))  # type: ignore[arg-type]
+        on_bytes(int(cast(Any, a["size"])))
     if not model_ready(models_dir):
         url = f"https://huggingface.co/{MODEL['repo']}/resolve/{MODEL['revision']}/{MODEL['file']}"
         model_release.fetch_file(url, model_path(models_dir), {"size": MODEL["size"], "sha256": MODEL["sha256"]},
@@ -231,7 +236,7 @@ class LlamaServer:
                  start_timeout: float = 300.0, run=subprocess.run) -> None:
         self.exe, self.model, self.ctx, self._popen, self._run = Path(exe), Path(model), ctx, popen, run
         self.log_dir, self.start_timeout = log_dir, start_timeout
-        self.proc = None
+        self.proc: Optional[subprocess.Popen[Any]] = None
         self.port = 0
         # localhost only: never through a system proxy
         self._http = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -253,10 +258,11 @@ class LlamaServer:
         out = open(self.log_dir / "llama-server.log", "w", encoding="utf-8", errors="replace")  # noqa: SIM115 - owned by the process
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform.startswith("win") else 0
         t0 = time.monotonic()
-        self.proc = self._popen(cmd, stdout=out, stderr=subprocess.STDOUT, creationflags=flags)
+        proc = self._popen(cmd, stdout=out, stderr=subprocess.STDOUT, creationflags=flags)
+        self.proc = proc
         while time.monotonic() - t0 < self.start_timeout:
-            if self.proc.poll() is not None:
-                raise RuntimeError(f"llama-server exited with code {self.proc.returncode} (see llama-server.log)")
+            if proc.poll() is not None:
+                raise RuntimeError(f"llama-server exited with code {proc.returncode} (see llama-server.log)")
             try:
                 with self._http.open(f"http://127.0.0.1:{self.port}/health", timeout=5) as r:
                     if r.status == 200:

@@ -11,6 +11,7 @@ Privacy: the snapshot keeps setting values, but paths are cut to their last part
 """
 from __future__ import annotations
 
+import importlib
 import json
 import logging
 import logging.handlers
@@ -173,8 +174,8 @@ def skip_missing_sox_probe(which: Optional[Callable[[str], Optional[str]]] = Non
             return io.StringIO("")
         return current(cmd, mode, buffering)
 
-    popen._voxprint_sox_guard = True  # type: ignore[attr-defined]
-    os.popen = popen  # type: ignore[assignment]
+    setattr(popen, "_voxprint_sox_guard", True)
+    os.popen = popen
     return True
 
 
@@ -218,7 +219,7 @@ def gpu_info(import_torch: bool = True) -> Dict[str, object]:
     torch = sys.modules.get("torch")
     if torch is None and import_torch:
         try:
-            import torch  # noqa: F811
+            torch = importlib.import_module("torch")
         except Exception:  # noqa: BLE001
             torch = None
     if torch is None and not import_torch:

@@ -13,7 +13,7 @@ import logging
 import sys
 from pathlib import Path
 
-from core.aligner import FakeAligner, make_default_aligner
+from core.aligner import BaseAligner, FakeAligner, make_default_aligner
 from core.dataset_builder import BuildConfig, DatasetBuilder
 from core.errors import DatasetMakerError
 from core.events import Stage
@@ -41,6 +41,7 @@ def main(argv=None) -> int:
         print(f"[{stage.label}] {frac * 100:5.1f}%  {msg}", flush=True)
 
     try:
+        aligner: BaseAligner
         if args.fake_aligner:
             aligner = FakeAligner()
         else:

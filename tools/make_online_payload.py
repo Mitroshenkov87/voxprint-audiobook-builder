@@ -79,7 +79,8 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
     parts: List[dict] = []
     cur: Optional[zipfile.ZipFile] = None
     cur_path: Optional[Path] = None
-    cur_raw, cur_markers = 0, []
+    cur_raw = 0
+    cur_markers: List[str] = []
 
     def close() -> None:
         nonlocal cur, cur_path, cur_raw, cur_markers

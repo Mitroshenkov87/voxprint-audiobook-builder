@@ -23,7 +23,7 @@ import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Protocol, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Protocol, Sequence, Set, Tuple
 
 from core.book_parsers import Book, Chapter
 from core.errors import DatasetMakerError
@@ -112,7 +112,10 @@ def detect_language(text: str) -> str:
     if not words:
         return ""
     score = {lang: sum(1 for w in words if w in set(st)) / len(words) for lang, st in _STOP.items()}
-    best = max(score, key=score.get)
+    def _stop_hits(lang: str) -> float:
+        return score[lang]
+
+    best = max(score, key=_stop_hits)
     other = "de" if best == "en" else "en"
     if score[best] < 0.06 or score[best] < score[other] * 1.15:
         return ""                                                # French, Spanish ... or too close to call
@@ -434,9 +437,9 @@ class MarianEngine:
         """Remember where the model is; nothing is loaded yet.  ``prefix``: target-language token of a multi-target model."""
         self.dir, self.device_name, self.prefix = Path(model_dir), device, prefix
         self.tag = f"opus-mt-{source}-{target}@{(revision or 'local')[:12]}"
-        self._model = None
-        self._tok = None
-        self._torch = None
+        self._model: Any = None
+        self._tok: Any = None
+        self._torch: Any = None
 
     @property
     def device(self) -> str:

@@ -285,7 +285,8 @@ def diff(old: dict, new: dict, flavor: str = "all", folder: Optional[Path] = Non
 
 def prune(folder: Path, man: dict, flavor: str = "all") -> List[str]:
     """Delete component files that the manifest no longer wants (old versions after an update); returns what was removed."""
-    folder, gone = Path(folder), []
+    folder = Path(folder)
+    gone: List[str] = []
     keep = {component_path(folder, c).resolve() for c in man["components"] if matches_flavor(c, flavor)}
     root = folder / "components"
     if not root.is_dir():
@@ -424,8 +425,11 @@ def fetch_models(folder: Path, repos: List[str], progress: Callable[[float, str]
                 progress(min(0.99, m.done / total) if total else 0.0, m.text(_tr, short, pct))
 
             try:
+                def _idle_ok(held_entry: model_mirrors.MirrorEntry = entry, held_dir: Path = d) -> bool:
+                    return _complete(held_dir, held_entry)
+
                 download_watch.run_watched(fn, root, meter, cancel, on_tick=tick, stall=stall, poll=poll,
-                                           idle_ok=lambda e=entry, d=d: _complete(d, e))
+                                           idle_ok=_idle_ok)
                 done_src = src
                 break
             except Exception as exc:  # noqa: BLE001 - the next source takes over, the partial files stay

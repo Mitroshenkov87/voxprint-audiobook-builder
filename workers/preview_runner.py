@@ -11,7 +11,7 @@ import logging
 import shutil
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional, cast
 
 import numpy as np
 
@@ -141,7 +141,7 @@ def best_scale(entries: List[dict]) -> Optional[float]:
         return None
     order = sorted(entries, key=lambda e: (abs(e["scale"] - adapter_strength.DEFAULT_SCALE), e["scale"]))
     pseudo = [PreviewItem(str(i), "", 0, 0, 0, 0.0, 0, Path(), 0.0, 0.0, e["check"]) for i, e in enumerate(order)]
-    return order[int(recommend(pseudo))]["scale"]
+    return order[int(cast(Any, recommend(pseudo)))]["scale"]
 
 
 AUTO = "auto"     # ``mos=AUTO``: the DNSMOS scorer if it is downloaded (core.mos.default_mos), never a download
@@ -245,8 +245,11 @@ def run_previews(dataset_dir, out_dir, base_plan: TrainPlan, *, compare: bool, l
     from core.tts_engine import max_tokens_for, FRAMES_PER_SECOND
 
     cancel = cancel or CancelToken()
-    if train_fn is None:
-        from core.lora_trainer import train_lora_from_dataset as train_fn   # noqa: N813
+    train = train_fn
+    if train is None:
+        from core.lora_trainer import train_lora_from_dataset
+
+        train = train_lora_from_dataset
     out_dir = Path(out_dir)
     text = SAMPLE_TEXT.get((language or "english").lower(), SAMPLE_TEXT["english"])
     variants = make_variants(base_plan, compare)
@@ -263,7 +266,7 @@ def run_previews(dataset_dir, out_dir, base_plan: TrainPlan, *, compare: bool, l
         n = subset(dataset_dir, sdir, clips_for_time_cap(v.plan, gpu, MAX_CLIPS))
         progress(Stage.TRAIN, base_f, tr("preview.training", v=v.key, n=n, epochs=v.plan.epochs))
         t0 = time.time()
-        adapter = Path(train_fn(sdir, out_dir / f"adapter_{v.key}", sub, cancel, force_cpu, plan=v.plan, language=language))
+        adapter = Path(train(sdir, out_dir / f"adapter_{v.key}", sub, cancel, force_cpu, plan=v.plan, language=language))
         t_train = time.time() - t0
         cancel.check()
         progress(Stage.TRAIN, base_f + 0.9 / len(variants), tr("preview.synthesizing", v=v.key))
@@ -295,7 +298,7 @@ def run_previews(dataset_dir, out_dir, base_plan: TrainPlan, *, compare: bool, l
                            v.plan.grad_accum, first["wav"], first["seconds"], t_train, first["check"], n,
                            scales=entries if first["scale"] is not None else [])
         if item.scales:
-            item.use_scale(best_scale(item.scales))
+            item.use_scale(cast(float, best_scale(item.scales)))
         items.append(item)
     progress(Stage.TRAIN, 1.0, tr("preview.done"))
     return items

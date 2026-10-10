@@ -36,6 +36,8 @@ TAU = 0.3
 class _H:
     """Attribute access for the checkpoint's JSON config (``hps.data.sampling_rate``)."""
 
+    data: Any
+
     def __init__(self, data: dict) -> None:
         for key, value in data.items():
             setattr(self, key, _H(value) if isinstance(value, dict) else value)

@@ -178,7 +178,7 @@ def export_merged_model(adapter_dir, out_dir, base_dir=None, progress: ProgressC
     progress(Stage.MODEL, 0.9, tr("progress.model_loading"))
     if load_model is None:
         def load_model(d: Path):  # noqa: F811
-            from qwen_tts import Qwen3TTSModel  # type: ignore
+            from qwen_tts import Qwen3TTSModel
 
             return Qwen3TTSModel.from_pretrained(str(d), dtype=torch.bfloat16, attn_implementation="eager").model
     hf_model = load_model(base_dir)

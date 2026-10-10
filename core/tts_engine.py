@@ -165,7 +165,7 @@ class Qwen3AdapterEngine:
         only with a merged adapter on a GPU, :mod:`core.fast_decode`)."""
         import torch
         from peft import PeftModel
-        from qwen_tts import Qwen3TTSModel  # type: ignore
+        from qwen_tts import Qwen3TTSModel
 
         self.adapter_scale = voice.adapter_scale if adapter_scale is None else adapter_strength.clamp(adapter_scale, 1.0)
         self.tag = engine_tag(voice, language, self.adapter_scale)
@@ -181,7 +181,7 @@ class Qwen3AdapterEngine:
         # joins, ffmpeg encodes) - on a GPU it only needs a few; on the CPU it gets nearly all (core/cpu_budget.py).
         self._threads_before = torch.get_num_threads()
         torch.set_num_threads(cpu_budget.plan(use_cuda).torch_threads)
-        self._q = None
+        self._q: Any = None
         self.attn = ""
         _t_load = time.monotonic()
         # "Preload models at startup" (infra/preload.py) may hold this base model in RAM already: take it over instead of
@@ -290,8 +290,9 @@ class Qwen3AdapterEngine:
         """Mono float32 samples for ``text``."""
         import torch
 
-        if getattr(self, "_graph", None) is not None:
-            audio, sr = self._graph.synthesize(text, self.language, self._prompt, max_tokens_for(text))
+        graph = getattr(self, "_graph", None)
+        if graph is not None:
+            audio, sr = graph.synthesize(text, self.language, self._prompt, max_tokens_for(text))
             self.sample_rate = sr
             return audio
         with torch.inference_mode():

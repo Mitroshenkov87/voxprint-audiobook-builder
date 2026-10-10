@@ -147,7 +147,10 @@ def main(argv=None) -> int:
     starts = {p: marks[p] for p in seen}
     if "synth" not in starts:
         starts["synth"] = 0.0
-    order = sorted(starts, key=starts.get)
+    def started_at(phase: str) -> float:
+        return starts[phase]
+
+    order = sorted(starts, key=started_at)
     print(f"book: {a.chapters} chapters, {sum(len(c.text) for c in book.chapters)} chars, {res.chunks} chunks, "
           f"{res.seconds / 60:.1f} min of audio; mock GPU busy {engine.gpu_seconds:.1f} s")
     print(f"  {'setup':<9} {starts[order[0]]:7.2f} s   (chunking, text normalisation, model load)")

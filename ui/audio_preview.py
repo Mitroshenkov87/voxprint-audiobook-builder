@@ -34,10 +34,15 @@ class Previewer(QObject):
         try:
             from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 
-            self._audio = QAudioOutput()
-            self._player = QMediaPlayer()
-            self._player.setAudioOutput(self._audio)
-            self._player.playbackStateChanged.connect(self._on_state)
+            audio = QAudioOutput()
+            player = QMediaPlayer()
+            self._audio = audio
+            self._player = player
+            # PySide6 stubs type these constructors as None.
+            if player is None or audio is None:
+                return False
+            player.setAudioOutput(audio)
+            player.playbackStateChanged.connect(self._on_state)
             return True
         except Exception:  # noqa: BLE001 - missing backend / no audio device
             log.info("Qt Multimedia unavailable; falling back to the system player", exc_info=True)
@@ -59,8 +64,11 @@ class Previewer(QObject):
         self.stop()
         self.current = Path(path)
         if self._ensure_player():
-            self._player.setSource(QUrl.fromLocalFile(str(path)))
-            self._player.play()
+            player = self._player
+            if player is None:
+                return
+            player.setSource(QUrl.fromLocalFile(str(path)))
+            player.play()
         else:
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
             self.current = None

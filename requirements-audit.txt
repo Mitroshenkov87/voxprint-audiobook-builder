@@ -4,4 +4,3 @@ bandit
 pip-audit
 vulture
 radon
-coverage

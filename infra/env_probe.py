@@ -292,7 +292,8 @@ def probe_python(exe: str, source: str = "path", run: Runner = _run,
         return None
 
 
-def pick_pip_python(envs: List[PythonEnv], want: Tuple[int, int] = tuple(sys.version_info[:2])) -> Optional[str]:
+def pick_pip_python(envs: List[PythonEnv],
+                    want: Tuple[int, int] = (sys.version_info[0], sys.version_info[1])) -> Optional[str]:
     """Python used for ``pip install --target <Voxprint dir>``: same major.minor as Voxprint itself (binary wheels must
     match), newest patch.  pip --target writes only into our folder, the interpreter's environment stays untouched."""
     ok = [e for e in envs if e.version[:2] == tuple(want)]
@@ -325,7 +326,7 @@ class EnvReport:
 
 
 def probe_environment(manifest_pins: Optional[Dict[str, str]] = None,
-                      installed_fn: Callable[[str], Optional[str]] = None,  # type: ignore[assignment]
+                      installed_fn: Optional[Callable[[str], Optional[str]]] = None,
                       run: Runner = _run, which: Callable[[str], Optional[str]] = shutil.which,
                       scan_other_pythons: bool = True, packages: Optional[Dict[str, str]] = None,
                       environ: Optional[Dict[str, str]] = None,
@@ -335,12 +336,14 @@ def probe_environment(manifest_pins: Optional[Dict[str, str]] = None,
     ``offer_upgrade`` instead of ``upgrade``."""
     if external_env is None:
         external_env = not is_own_environment()
-    if installed_fn is None:
-        def installed_fn(n: str) -> Optional[str]:      # type: ignore[misc]
-            try:
-                return metadata.version(n)
-            except metadata.PackageNotFoundError:
-                return None
+
+    def _installed_here(n: str) -> Optional[str]:
+        try:
+            return metadata.version(n)
+        except metadata.PackageNotFoundError:
+            return None
+
+    version_of = installed_fn if installed_fn is not None else _installed_here
     if manifest_pins is None:
         try:
             from infra.verified_manifest import load_bundled
@@ -353,7 +356,7 @@ def probe_environment(manifest_pins: Optional[Dict[str, str]] = None,
     from infra.version_manager import OPTIONAL_PACKAGES
 
     for name, constraint in tracked.items():
-        inst = installed_fn(name)
+        inst = version_of(name)
         pin = manifest_pins.get(name)
         if pin is None and inst is None and name in OPTIONAL_PACKAGES:
             continue                                   # optional and absent: nothing to do
@@ -362,9 +365,9 @@ def probe_environment(manifest_pins: Optional[Dict[str, str]] = None,
             rep.decisions.append(d)
     rep.driver_cuda = detect_driver_cuda(run, which)
     rep.wanted_torch_flavor = torch_flavor_for_driver(rep.driver_cuda)
-    rep.decisions.append(decide_torch(installed_fn("torch"), rep.wanted_torch_flavor, external_env))
+    rep.decisions.append(decide_torch(version_of("torch"), rep.wanted_torch_flavor, external_env))
     for name, reason in IGNORED_PACKAGES.items():
-        if installed_fn(name):
+        if version_of(name):
             rep.ignored[name] = reason
     rep.ffmpeg = probe_ffmpeg(which, run)
     if scan_other_pythons:

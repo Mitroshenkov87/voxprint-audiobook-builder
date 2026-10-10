@@ -90,7 +90,11 @@ def check_clips(pieces: Sequence[np.ndarray], sr: int, texts: Sequence[str], asr
             progress((i + 1) / n)
     finally:
         asr.unload()
-    bad = sorted((i for i, c in enumerate(rep.cers) if c is not None and c > max_cer), key=lambda i: -rep.cers[i])
+    def _worst(item: tuple[int, float]) -> float:
+        return -item[1]
+
+    scored = [(i, c) for i, c in enumerate(rep.cers) if c is not None and c > max_cer]
+    bad = [i for i, _cer in sorted(scored, key=_worst)]
     allowed = max(0, n - max(0, min_keep))                 # how many clips may go without falling below the minimum
     for i in bad[:allowed]:                                 # the worst first
         keep[i] = False

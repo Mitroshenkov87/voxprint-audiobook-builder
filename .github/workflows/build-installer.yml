@@ -5,6 +5,8 @@ name: build-installer
 # "online-smoke" and "thin-smoke" test the installer chain with a fake program folder in a few minutes (smoke_only=true).
 # The former heavy job "build" (full installer + multi-GB payload parts, also run on every "v*" tag push) was REMOVED on purpose: those
 # assets were deleted from the release and must never be recreated.  Releases are built only by a manual run of "build-thin".
+# The audit job runs first. The installer jobs do not start when ruff, mypy, bandit (high), gitleaks, or an
+# un-allowlisted pip-audit high/critical finding fails that job. Vulture and radon do not fail it.
 on:
   workflow_dispatch:
     inputs:
@@ -27,7 +29,10 @@ permissions:
   contents: write      # attach the installer to the release
 
 jobs:
+  audit:
+    uses: ./.github/workflows/audit.yml
   install-script:
+    needs: audit
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
@@ -83,6 +88,7 @@ jobs:
           }
           exit 0
   online-smoke:
+    needs: audit
     runs-on: windows-latest
     timeout-minutes: 15
     env:
@@ -162,6 +168,7 @@ jobs:
   # THIN installer (docs/THIN-INSTALLER.md): fake shell + fake site-packages -> build_online.ps1 -Thin -> silent install installs only the
   # shell -> the app's module manager downloads the runtime modules.  Also checks the Windows adapter enumeration of netroute.
   thin-smoke:
+    needs: audit
     runs-on: windows-latest
     timeout-minutes: 20
     env:
@@ -236,6 +243,7 @@ jobs:
   # Besides building, the job really installs the runtime from upstream with the frozen shell (CPU PyTorch = 100 MB) and imports it,
   # then repeats it with "another program's" PyTorch to prove the reuse path.
   build-thin:
+    needs: audit
     if: ${{ github.event_name == 'workflow_dispatch' && !inputs.smoke_only }}
     runs-on: windows-latest
     timeout-minutes: 60

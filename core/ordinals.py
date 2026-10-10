@@ -64,8 +64,8 @@ _NOT_ALONE = r"(?![\w])(?!\s*[-–—]\s*\d)(?![.,:]\d)(?!\s*(?:,|и|and|und)\s*
 @lru_cache(maxsize=1)
 def _ru_tables():
     rules = RULES["ru"]
-    forms: Dict[str, Tuple[str, str]] = {}
-    for gender, table in rules["after"].values():          # type: ignore[union-attr]
+    forms = {}
+    for gender, table in rules["after"].values():
         for form, case in table.items():
             forms[form] = (gender, case)
     after = re.compile(r"(?<![\w-])(?i:(" + _alternation(forms) + r"))(\s+)(\d{1,4}|[IVXLCDM]+)" + _NOT_ALONE
@@ -99,7 +99,7 @@ def _ru(text: str) -> str:
                 spec = ("m", "prep") if prev_word in preps else defaults["м"]
             else:
                 spec = defaults.get(ending, ("m", "nom"))
-        gender, case = spec                                  # type: ignore[misc]
+        gender, case = spec
         if ending in ("е", "ые") and noun is None and n % 10 == 0 and prev_word in ("в", "во"):
             gender, case = "p", "acc"                        # "в 90-е" - the nineties
         if ending == "е" and nxt and nxt.group(1).lower() in ("годы", "гг"):
@@ -122,7 +122,7 @@ def _ru(text: str) -> str:
 @lru_cache(maxsize=1)
 def _en_tables():
     rules = RULES["en"]
-    nouns = list(rules["after"])                             # type: ignore[arg-type]
+    nouns = list(rules["after"])
     suffix = re.compile(r"(?<![\w.,])(\d{1,6})(?i:(" + _alternation(rules["suffix"]) + r"))(?![\w])")
     # a Roman numeral only as a heading ("Chapter IV", "Part I." / "Part I:"): "part I explain" keeps its pronoun
     roman = re.compile(r"(?<![\w-])(?i:(" + _alternation(nouns) + r"))(\s+)([IVXLCDM]+)(?=\s*(?:$|[.:\n—–]))", re.MULTILINE)
@@ -180,7 +180,7 @@ def de_ordinal_stem(n: int) -> str:
 
 @lru_cache(maxsize=1)
 def _de_tables():
-    nouns: Dict[str, str] = RULES["de"]["before"]           # type: ignore[assignment]
+    nouns = RULES["de"]["before"]
     pattern = re.compile(r"(?<![\w.,])(\d{1,4})\.(\s+)(?i:(" + _alternation(nouns) + r"))\b")
     return nouns, pattern
 

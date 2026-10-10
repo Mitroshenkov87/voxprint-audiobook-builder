@@ -41,12 +41,17 @@ class QtBackend(QObject):
         try:
             from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 
-            self._audio = QAudioOutput()
-            self._player = QMediaPlayer()
-            self._player.setAudioOutput(self._audio)
-            self._player.positionChanged.connect(self.position.emit)
-            self._player.mediaStatusChanged.connect(self._status)
-            self._player.errorOccurred.connect(lambda *_a: self.failed.emit())
+            audio = QAudioOutput()
+            player = QMediaPlayer()
+            self._audio = audio
+            self._player = player
+            # PySide6 stubs type these constructors as None.
+            if player is None or audio is None:
+                return False
+            player.setAudioOutput(audio)
+            player.positionChanged.connect(self.position.emit)
+            player.mediaStatusChanged.connect(self._status)
+            player.errorOccurred.connect(lambda *_a: self.failed.emit())
             return True
         except Exception:  # noqa: BLE001 - no backend / no audio device
             log.info("Qt Multimedia unavailable", exc_info=True)
@@ -63,11 +68,15 @@ class QtBackend(QObject):
         if not self._ensure():
             self.failed.emit()
             return False
-        self._player.setSource(QUrl.fromLocalFile(str(path)))
+        player = self._player
+        if player is None:
+            self.failed.emit()
+            return False
+        player.setSource(QUrl.fromLocalFile(str(path)))
         if start_ms:
-            self._player.setPosition(int(start_ms))
+            player.setPosition(int(start_ms))
         if play:
-            self._player.play()
+            player.play()
         return True
 
     def play(self) -> None:

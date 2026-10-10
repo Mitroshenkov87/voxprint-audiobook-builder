@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, cast
 
 MAX_WINDOW = 4          #: a piece may contain at most this many consecutive script lines
 MIN_RATIO = 0.82        #: minimal letter similarity between a recognised piece and the script window
@@ -90,13 +90,17 @@ def match_clips(clip_texts: Sequence[str], script_lines: Sequence[str], min_rati
         m = _best_window(lt, keys, script_lines) if lt else None
         cands.append(m if m is not None and m.ratio >= min_ratio else None)
     out = [ClipMatch("no_match") if c is None else c for c in cands]
-    claimed = set()
-    order = sorted((i for i, c in enumerate(cands) if c is not None), key=lambda i: (-round(cands[i].ratio, 3), -i))
-    for i in order:
-        c = cands[i]
-        span = set(range(c.line_start, c.line_start + c.n_lines))
+    claimed: set[int] = set()
+
+    def _rank(pair: tuple[int, ClipMatch]) -> tuple[float, int]:
+        return (-round(pair[1].ratio, 3), -pair[0])
+
+    ranked = [(i, match) for i, match in enumerate(cands) if match is not None]
+    for i, match in sorted(ranked, key=_rank):
+        start = cast(int, match.line_start)
+        span = set(range(start, start + match.n_lines))
         if span & claimed:
-            out[i] = ClipMatch("repeat", c.ratio, c.line_start, c.n_lines)
+            out[i] = ClipMatch("repeat", match.ratio, start, match.n_lines)
         else:
             claimed |= span
     return out

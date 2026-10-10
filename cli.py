@@ -28,7 +28,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Callable, Optional, Sequence, Set
+from typing import Any, Callable, Iterable, Optional, Sequence, Set, cast
 
 from core import audiobook_export as ex
 from core import pauses as pz
@@ -859,7 +859,7 @@ def _voice_payload(voice: VoiceRecord) -> dict:
 def _narration_progress(json_mode: bool):
     def cb(p: NarrationProgress) -> None:
         if json_mode:
-            extra = {"done": p.done, "total": p.total}
+            extra: dict[str, Any] = {"done": p.done, "total": p.total}
             if p.eta is not None and p.eta >= 0:
                 extra["eta_s"] = round(float(p.eta), 1)
             _emit_progress(p.phase, p.fraction * 100.0, p.message, **extra)
@@ -1045,13 +1045,13 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
         rec = recs[flag]
         return rec.id if rec is not None else ""
 
-    cast = spk.SpeakerCast(
+    speaker_cast = spk.SpeakerCast(
         lines=lines, male_id=vid("--male-voice"), female_id=vid("--female-voice"),
-        tagger=tagger, narrator_id=narrator.id,
+        tagger=cast(Any, tagger), narrator_id=narrator.id,
         male2_id=vid("--male2-voice"), female2_id=vid("--female2-voice"),
         characters={who: rec.id for who, rec in characters.items()},
     )
-    if not cast.uses_several(narrator.id):
+    if not speaker_cast.uses_several(narrator.id):
         raise CliError(
             EXIT_BAD_ARGS, "pick a male or female voice that is not the narrator",
             hint="Example: voxprint narrate book.txt --voice narrator --male-voice tom --female-voice ann "
@@ -1061,7 +1061,7 @@ def _speaker_job(args, narrator, library: VoiceLibrary, plan_fn: Optional[Callab
     for rec in [*recs.values(), *characters.values()]:
         if rec is not None and rec.id != narrator.id:
             extra[rec.id] = rec
-    return cast, extra
+    return speaker_cast, extra
 
 
 PAUSE_HELP = {"comma": "comma", "mid": "strong mid-sentence break (dash, colon, semicolon, comma + conjunction)",
@@ -1777,7 +1777,7 @@ def cmd_revoice(args: argparse.Namespace, *,
                 _write_stream(sys.stdout, f"[transcribe] {float(frac) * 100:5.1f}%  {title}")
 
         fn = transcribe_fn or _default_transcribe
-        chapters = list(fn(files, revoice_language(args.language), progress, CancelToken()))
+        chapters = list(cast(Iterable[Any], fn(files, revoice_language(args.language), progress, CancelToken())))
         if not any(str(text).strip() for _title, text in chapters):
             raise CliError(
                 EXIT_INPUT, "recogniser returned no text",
@@ -1824,10 +1824,10 @@ def cmd_speakers(args: argparse.Namespace, *,
             if json_mode:
                 _emit_progress("prepare", float(frac) * 100.0, "Marking speakers")
 
-        tagged = spk.tag_paragraphs(paras, detect_book_language(book) or "en", plan, progress)
+        tagged = spk.tag_paragraphs(paras, detect_book_language(book) or "en", cast(Any, plan), progress)
         dest = Path(args.out)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(spk.dump_marks(tagged), encoding="utf-8")
+        dest.write_text(spk.dump_marks(tagged.lines), encoding="utf-8")
         raw_path = dest.with_name(f"{dest.stem}.speakers-raw.txt")
         raw_path.write_text(tagged.raw, encoding="utf-8")
         warnings = speaker_warning_lines(tagged.warning)
@@ -1851,7 +1851,7 @@ def cmd_check(args: argparse.Namespace, *,
             elif message:
                 _write_stream(sys.stdout, f"[{int(float(frac) * 100):3d}%] {message}")
 
-        report = (repair_fn or auto_repair.run)(progress)
+        report = cast(auto_repair.Report, (repair_fn or auto_repair.run)(progress))
         items = [{"kind": i.kind, "name": i.name, "status": i.status, "detail": i.detail} for i in report.items]
         failed = [i for i in items if i["status"] == auto_repair.FAILED]
         fixed = [i for i in items if i["status"] in (auto_repair.REPAIRED, auto_repair.DOWNLOADED)]
@@ -1919,8 +1919,9 @@ def _prep_steps(args) -> frozenset:
     """Rule steps from ``--steps`` / ``--no-rules`` / ``--no-yo`` (default: all, as the Prepare text switch)."""
     from core import text_prep as tp
 
+    steps: set[str] = set()
     if getattr(args, "no_rules", False):
-        steps = set()
+        pass
     elif getattr(args, "steps", None):
         steps = set()
         for item in args.steps:
@@ -1986,7 +1987,7 @@ def cmd_prepare(args: argparse.Namespace, *,
                 warnings.append(f"Typo fix skipped: the model {getattr(model, 'key', '')} is not downloaded "
                                 f"(voxprint models download {getattr(model, 'key', '')}).")
         factory = cleanup_factory or (text_models.cleanup_engine_for if neural else None)
-        plan = PrepPlan(PrepOptions(steps), neural, factory)
+        plan = PrepPlan(PrepOptions(steps), neural, cast(Any, factory))
         if json_mode:
             _emit_progress("prepare", 0.0, "Preparing the text")
 
@@ -2007,7 +2008,7 @@ def cmd_prepare(args: argparse.Namespace, *,
             with tempfile.TemporaryDirectory(prefix="voxprint-prepare-") as tmp:
                 work = Path(args.work_dir) if args.work_dir else Path(tmp)
                 prepared = llm_text.prepare_book(
-                    prepared, llm_plan, report.get("language") or language or "en", work,
+                    prepared, cast(Any, llm_plan), report.get("language") or language or "en", work,
                     lambda f: progress(0.5 + 0.5 * float(f), "Text model: narration rewrite"))
             llm_tag = str(getattr(llm_plan, "tag", "") or "text model")
         report["llm"] = llm_tag
@@ -2072,7 +2073,7 @@ def cmd_translate(args: argparse.Namespace, *,
             llm = (plan_fn or llm_tool.make_plan)()
             if llm is None:
                 raise CliError(EXIT_MISSING, "text model is not installed", hint="voxprint models download llm --json")
-        plan = tl.TranslatePlan(target, source, factory or text_models.make_translator, llm=llm)
+        plan = tl.TranslatePlan(target, source, cast(Any, factory or text_models.make_translator), llm=llm)
         if json_mode:
             _emit_progress("translate", 0.0, "Translating")
 
@@ -2337,7 +2338,9 @@ def _dispatch(argv: Optional[Sequence[str]], *, run_narration_fn, run_task_fn, l
               installed_fn, plan_fn, repair_fn) -> int:
     raw = list(sys.argv[1:] if argv is None else argv)
     try:
-        sys.stdout.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
+        reconfigure = getattr(sys.stdout, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(line_buffering=True)
     except (AttributeError, OSError):
         pass
     if _flag_present(raw, "--version", "-V") and not _flag_present(raw, "--help", "-h"):

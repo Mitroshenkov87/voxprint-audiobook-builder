@@ -30,7 +30,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Protocol, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Protocol, Sequence, Tuple
 
 from core.book_parsers import Book, Chapter
 from core.events import CancelToken
@@ -306,8 +306,8 @@ class SageEngine:
         self.revision = revision
         self.device = device
         self.tag = f"sage-fredt5-distilled-95m@{revision or 'local'}"
-        self._tok = None
-        self._model = None
+        self._tok: Any = None
+        self._model: Any = None
 
     def _load(self) -> None:
         """Import transformers and load the tokenizer and model once."""
