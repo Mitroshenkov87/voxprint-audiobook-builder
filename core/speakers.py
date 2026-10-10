@@ -12,7 +12,11 @@ narrator, narration synthesizes each paragraph with that voice. With only the na
 kept for the preview and every paragraph is spoken by the narrator.
 
 The model is asked for tags, not a rewrite, so a bad answer cannot change the book. A paragraph it fails to mark stays
-with the narrator, and the result carries a warning instead of looking like a successful all-narrator pass.
+with the narrator, and the result carries a warning instead of looking like a successful all-narrator pass. A reply
+that has one tag per paragraph can still be shifted by a line. A paragraph that opens with a dialogue dash is a
+character line, and the mark's name has to be the speaker named in that paragraph or in the preceding narration.
+A paragraph with no dash and no quotation marks is the narrator. A block that fails this check is asked again, one
+paragraph at a time, and the reason is logged as ``[validate]``.
 """
 from __future__ import annotations
 
@@ -66,6 +70,12 @@ MAX_PARAS = 12
 MAX_CHARS = 3500
 WARN_UNPARSED = "unparsed"
 WARN_NO_SPEAKERS = "no_speakers"
+# A dialogue dash at the start of a paragraph: em dash, en dash, or a hyphen with a space ("- Hello").
+_CHARACTER_LINE = re.compile(r"^\s*[\u2014\u2013]\s+\S|^\s*-\s+\S")
+# Quotation marks mean speech in English and German. Those paragraphs are not forced to the narrator by the dash rule.
+_QUOTED_SPEECH = re.compile("[\"\u00ab\u00bb\u201e\u201c\u201d]")
+_ATTRIB_SPLIT = re.compile(r"[\u2014\u2013]| - ")
+_NAME_TOKEN = re.compile(r"[^\W\d_]+(?:-[^\W\d_]+)*")
 
 
 @dataclass(frozen=True)
@@ -248,6 +258,94 @@ class TagResult:
         return bool(self.lines)
 
 
+def _is_character_line(text: str) -> bool:
+    """True when ``text`` opens with a dialogue dash (em dash, en dash, or ``- ``)."""
+    return _CHARACTER_LINE.match(text or "") is not None
+
+
+def _looks_like_name(word: str) -> bool:
+    """A capitalised word that is not an abbreviation (``EBU`` has no lowercase letter)."""
+    return len(word) >= 2 and word[0].isupper() and any(ch.islower() for ch in word[1:])
+
+
+def _attribution_name(text: str) -> str:
+    """The speaker named in a dash line's attribution (``— said Name``), or ``""``.
+
+    The opening dash is the speech itself. A later dash starts an attribution: the first capitalised word there is
+    the name. ``— said he`` has none.
+    """
+    if not _is_character_line(text):
+        return ""
+    body = re.sub(r"^\s*[\u2014\u2013-]\s+", "", text.strip(), count=1)
+    for part in _ATTRIB_SPLIT.split(body)[1:]:
+        # The attribution is one clause. A dash that only sets off a phrase ("second — a pause. Loudness")
+        # must not take the next sentence's capital as a name.
+        clause = re.split(r"[.!?…]|\.\.\.", part, maxsplit=1)[0]
+        for word in _NAME_TOKEN.findall(clause):
+            if _looks_like_name(word):
+                return word
+    return ""
+
+
+def _speaker_lexicon(paras: Sequence[str]) -> List[str]:
+    """Names taken from attributions, first spelling kept, so narration can be matched against them."""
+    out: List[str] = []
+    seen = set()
+    for text in paras:
+        name = _attribution_name(text)
+        key = _name_key(name)
+        if key and key not in seen:
+            seen.add(key)
+            out.append(name)
+    return out
+
+
+def _named_in(text: str, names: Sequence[str]) -> List[str]:
+    """``names`` that occur in ``text`` as a whole word, in lexicon order."""
+    found: List[str] = []
+    for name in names:
+        if re.search(r"(?<!\w)" + re.escape(name) + r"(?!\w)", text or "", re.IGNORECASE):
+            found.append(name)
+    return found
+
+
+def _paragraph_expectation(paras: Sequence[str], index: int, lexicon: Sequence[str]) -> Tuple[str, str]:
+    """``(role, name)`` the mark for ``paras[index]`` has to satisfy.
+
+    ``role`` is ``character`` (a leading dialogue dash), ``narrator`` (no dash and no quotation marks) or ``""``
+    when quotation marks carry the speech and the dash rule does not decide. ``name`` is set for a character line
+    whose speaker the paragraph itself names, or, failing that, whose preceding narration names exactly one known
+    speaker.
+    """
+    text = paras[index]
+    if _is_character_line(text):
+        name = _attribution_name(text)
+        if not name and index > 0 and not _is_character_line(paras[index - 1]):
+            hits = _named_in(paras[index - 1], lexicon)
+            if len(hits) == 1:
+                name = hits[0]
+        return "character", name
+    if _QUOTED_SPEECH.search(text or ""):
+        return "", ""
+    return "narrator", ""
+
+
+def _mark_mismatches(paras: Sequence[str], block: Sequence[int], marks: Sequence[SpeakerLine]) -> List[str]:
+    """English reasons the marks do not fit ``block``, empty when every mark fits."""
+    lexicon = _speaker_lexicon(paras)
+    reasons: List[str] = []
+    for index, mark in zip(block, marks):
+        role, name = _paragraph_expectation(paras, index, lexicon)
+        number = index + 1
+        if role == "narrator" and mark.role != "narrator":
+            reasons.append(f"paragraph {number}: narration marked {mark.role}")
+        elif role == "character" and mark.role == "narrator":
+            reasons.append(f"paragraph {number}: character line marked narrator")
+        if name and _name_key(mark.name) != _name_key(name):
+            reasons.append(f"paragraph {number}: name does not match")
+    return reasons
+
+
 def _tag_block(model, template: str, language: str, paras: Sequence[str], block: Sequence[int],
                raw_parts: List[str]) -> List[Optional[SpeakerLine]]:
     """Marks for the paragraphs ``block`` (indexes into ``paras``); ``None`` for a paragraph the model could not mark.
@@ -255,13 +353,28 @@ def _tag_block(model, template: str, language: str, paras: Sequence[str], block:
     When the reply has a different number of tags than the block has paragraphs (Gemma sometimes merges a title with the
     first paragraph, or splits one paragraph in two), the block is split in half and each half is asked again, down to
     single paragraphs. One bad answer then costs only the paragraphs it really concerns, not the whole block (build 702
-    lost 10 of 26 marks to one merged title). Every reply is kept in ``raw_parts``.
+    lost 10 of 26 marks to one merged title). A reply with the right number of tags can still be shifted by one
+    paragraph: each mark is checked against its text (:func:`_mark_mismatches`) and a block that fails is asked again
+    one paragraph at a time, through this same function. The check is logged as ``[validate]``. Every reply is kept
+    in ``raw_parts``.
     """
     text = "\n\n".join(paras[i] for i in block)
     prompt = fill(template, language=NAMES.get(language, language or "English"), text=text)
     answer = model.complete(prompt, max_tokens=min(2048, 48 * len(block) + 32))
     raw_parts.append(answer or "")
     parsed = parse_tags(answer or "", len(block))
+    if parsed is not None and len(block) > 1:
+        reasons = _mark_mismatches(paras, block, parsed)
+        if reasons:
+            shown = reasons[:8]
+            detail = "; ".join(shown)
+            if len(reasons) > len(shown):
+                detail += f"; +{len(reasons) - len(shown)} more"
+            raw_parts.append(f"[validate] {detail}; asking one paragraph at a time")
+            out: List[Optional[SpeakerLine]] = []
+            for index in block:
+                out.extend(_tag_block(model, template, language, paras, [index], raw_parts))
+            return out
     if parsed is not None:
         return list(parsed)
     if len(block) == 1:
@@ -277,7 +390,8 @@ def tag_paragraphs(paras: Sequence[str], language: str, plan: LLMPlan,
     """Mark ``paras``. The model is closed before return.
 
     A block whose reply does not fit is split and asked again (:func:`_tag_block`); only a single paragraph the model still
-    cannot mark stays narrator. ``warning`` is ``unparsed`` when such a paragraph is left (or the model raises), and
+    cannot mark stays narrator. A reply with one tag per paragraph that does not match the text (a shifted line) is asked
+    again one paragraph at a time. ``warning`` is ``unparsed`` when a paragraph is left unmarked (or the model raises), and
     ``no_speakers`` when every paragraph is the narrator but the text obviously contains dialogue. The raw replies are kept
     either way.
     """

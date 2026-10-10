@@ -13,6 +13,10 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 - **NVIDIA driver without a CUDA version line.** When `nvidia-smi` prints no `CUDA Version` or `CUDA UMD Version`, the driver version is used: 570 and newer count as CUDA 12.8 (`cu128`), 560-569 as CUDA 12.6 (`cu126`), and anything older as the CPU build. A probe error stays on CPU.
 - **The Windows installer refuses systems older than Windows 11 24H2** (build 26100), in English, Russian and German. It no longer asks whether to continue. The Linux installer prints a warning when the distribution's release year is before 2025 and continues.
 - **Supported systems** are current and previous year OS releases: Windows 11 24H2 and newer, and Linux distributions released from 2025. Older systems are not a goal.
+- **Letter yo in the prepositional case.** `чем`, `нем` and `всем` are written `чём`, `нём` and `всём` after `о`, `об`, `обо`, `в`, `во`, `на` or `при`. `всем` as a dative plural or an instrumental (`по всем`, `ко всем`, `со всем`) stays. On test dialogue 4 this is 15 of 19 yo. `узнаёт`, `берёт` and `звёзды` stay homographs: `узнает` is also the perfective future, `берет` is also the hat, and `звезды` is also the genitive singular. Their safe relatives (`берёшь`, `звёздам`, reflexive `узнаёшься`) were already in the dictionary.
+
+### Fixed
+- **Speaker marks shifted by one paragraph.** A reply with one tag per paragraph was kept even when the tags had slid onto the next line (on test dialogue 4 that was 11 of 19). Each mark is now checked against its paragraph: a line that opens with a dialogue dash is a character, and the name has to be the one that paragraph or the preceding narration gives; a line with no dash and no quotation marks is the narrator. A block that fails is asked again, one paragraph at a time. The check is logged as `[validate]` in `.debug/speakers-raw.txt`.
 
 ## [0.2.4-beta] - 2026-10-09 - build 704 "Achim"
 

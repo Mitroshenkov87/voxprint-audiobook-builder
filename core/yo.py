@@ -8,16 +8,19 @@ table). The source lists and the dataset card live next to that table; see ``cor
 
 The stock Qwen3-TTS base model does not read stress marks, so this module never inserts U+0301 or
 ``+``. It writes yo only when the runtime table has a different spelling. Ambiguous words stay as
-written, except the most frequent one: "vse" (all, plural) versus "vsyo" (everything, still), which is
-decided from its neighbours by the small rule table ``core/data/yo_context.json`` (copy it too; without
-it that word is left alone). Licence: Apache-2.0 for this file and the rule table; the word list is MIT
-(e2yo/eyo-kernel).
+written, except two context rules in ``core/data/yo_context.json`` (copy it too; without it those
+words are left alone). "vse" (all, plural) versus "vsyo" (everything, still) is decided from the
+neighbouring words. "chem", "nem" and "vsem" are written with yo after the prepositions o, ob, obo,
+v, vo, na and pri (prepositional case). "na" is in that list because with these three pronouns it is
+always prepositional. "vsem" after any other word, including a dative plural, stays.
+Licence: Apache-2.0 for this file and the rule table; the word list is MIT (e2yo/eyo-kernel).
 
 Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
 """
 from __future__ import annotations
 
 import gzip
+import json
 import re
 import sys
 import threading
@@ -188,7 +191,8 @@ def dictionary() -> Dict[str, str]:
 def restore(text: str, table: Optional[Dict[str, str]] = None, context: bool = True) -> str:
     """``text`` with yo written back where ``table`` (default: the shipped dictionary) is sure.
 
-    ``context`` (default on) also decides "vse" / "vsyo" from the neighbouring words; see :func:`restore_vse`.
+    ``context`` (default on) also decides "vse" / "vsyo" and the prepositional "chem" / "nem" / "vsem"
+    from the neighbouring words; see :func:`restore_vse` and :func:`restore_prep_counted`.
     """
     return restore_counted(text, table, context)[0]
 
@@ -212,6 +216,8 @@ def restore_counted(text: str, table: Optional[Dict[str, str]] = None, context: 
     if context:
         out, more = restore_vse_counted(out)
         changed += more
+        out, more = restore_prep_counted(out)
+        changed += more
     return out, changed
 
 
@@ -222,7 +228,7 @@ _NBSP_SPACE = " \t\u00a0"
 
 
 def context_path() -> Path:
-    """The rule table for "vse" / "vsyo" (``core/data/yo_context.json``)."""
+    """The rule table (``core/data/yo_context.json``): "vse" / "vsyo" and the prepositional pronouns."""
     return _data_file("yo_context.json")
 
 
@@ -232,8 +238,6 @@ def _context_rules() -> dict:
     if _CTX is None:
         with _CTX_LOCK:
             if _CTX is None:
-                import json
-
                 path = context_path()
                 try:
                     raw = json.loads(path.read_text(encoding="utf-8"))
@@ -357,6 +361,55 @@ def restore_vse_counted(text: str) -> tuple:
 def restore_vse(text: str) -> str:
     """:func:`restore_vse_counted` without the count."""
     return restore_vse_counted(text)[0]
+
+
+def restore_prep_counted(text: str) -> tuple:
+    """``(text, changes)`` with yo in "chem" / "nem" / "vsem" after a preposition.
+
+    Prepositional case: after o, ob, obo, v, vo, na or pri the ye spellings are written with yo. "na" takes
+    the prepositional with these pronouns (the accusative is not chem / nem / vsem). "vsem" as a dative
+    plural or an instrumental ("ko vsem", "po vsem", "so vsem", "pered vsem") is not one of those
+    prepositions, so it stays, and so does "chem" as the instrumental or a comparative ("chem my", "bolshe,
+    chem"). An all-caps word is left alone. The lists are data (``prepositional`` in ``yo_context.json``).
+    """
+    rules = _context_rules()
+    block = rules.get("prepositional")
+    if not text or not isinstance(block, dict):
+        return text or "", 0
+    after = frozenset(fold(str(word)).lower() for word in (block.get("after") or ()))
+    pairs = []
+    for item in block.get("words") or ():
+        if not isinstance(item, dict):
+            continue
+        ye = str(item.get("ye") or "")
+        yo_form = str(item.get("yo") or "")
+        if len(ye) >= 2 and yo_form and fold(yo_form).lower() == ye.lower():
+            pairs.append((ye, yo_form))
+    if not after or not pairs:
+        return text or "", 0
+    letters = _charset(_LETTERS)
+    alts = []
+    for i, (ye, _yo_form) in enumerate(pairs):
+        alts.append("(?P<w" + str(i) + ">" + _charset(ye[0] + ye[0].upper()) + re.escape(ye[1:]) + ")")
+    pattern = re.compile("(?<!" + letters + ")(?:" + "|".join(alts) + ")(?!" + letters + ")")
+    out = []
+    last = 0
+    changed = 0
+    for match in pattern.finditer(text):
+        prev = fold(_word_before(text, match.start())).lower()
+        if prev not in after:
+            continue
+        which = next(i for i in range(len(pairs)) if match.group("w" + str(i)))
+        _ye, yo_form = pairs[which]
+        found = match.group("w" + str(which))
+        out.append(text[last:match.start()])
+        out.append(found[0] + yo_form[1:])
+        last = match.end()
+        changed += 1
+    if not changed:
+        return text, 0
+    out.append(text[last:])
+    return "".join(out), changed
 
 
 def applies(language: Optional[str]) -> bool:
