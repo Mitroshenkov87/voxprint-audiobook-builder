@@ -311,15 +311,15 @@ end;
 
 function CapMeets(const Cap: String): Boolean;
 var
-  P, Major, Minor, Code: Integer;
+  P, Major, Minor: Integer;
 begin
   Result := False;
   P := Pos('.', Cap);
   if P < 2 then Exit;
-  Val(Trim(Copy(Cap, 1, P - 1)), Major, Code);
-  if Code <> 0 then Exit;
-  Val(Trim(Copy(Cap, P + 1, 8)), Minor, Code);
-  if Code <> 0 then Exit;
+  { Pascal Script has no Val. StrToIntDef returns -1 for text that is not a number. }
+  Major := StrToIntDef(Trim(Copy(Cap, 1, P - 1)), -1);
+  Minor := StrToIntDef(Trim(Copy(Cap, P + 1, 8)), -1);
+  if (Major < 0) or (Minor < 0) then Exit;
   Result := (Major > 8) or ((Major = 8) and (Minor >= 9));
 end;
 
@@ -379,7 +379,7 @@ end;
 function GpuFromSmi(const Text: String; var Detected: String): Boolean;
 var
   Rest, Line, Name, Cap: String;
-  P, BestMaj, BestMin, Maj, Min, Code, Dot: Integer;
+  P, BestMaj, BestMin, CapMaj, CapMin, Dot: Integer;
   Any: Boolean;
 begin
   Result := False;
@@ -401,15 +401,14 @@ begin
       Name := Copy(Name, 2, Length(Name) - 2);
     Dot := Pos('.', Cap);
     if Dot < 2 then Continue;
-    Val(Copy(Cap, 1, Dot - 1), Maj, Code);
-    if Code <> 0 then Continue;
-    Val(Copy(Cap, Dot + 1, 8), Min, Code);
-    if Code <> 0 then Continue;
-    if (not Any) or (Maj > BestMaj) or ((Maj = BestMaj) and (Min > BestMin)) then
+    CapMaj := StrToIntDef(Trim(Copy(Cap, 1, Dot - 1)), -1);
+    CapMin := StrToIntDef(Trim(Copy(Cap, Dot + 1, 8)), -1);
+    if (CapMaj < 0) or (CapMin < 0) then Continue;
+    if (not Any) or (CapMaj > BestMaj) or ((CapMaj = BestMaj) and (CapMin > BestMin)) then
     begin
       Any := True;
-      BestMaj := Maj;
-      BestMin := Min;
+      BestMaj := CapMaj;
+      BestMin := CapMin;
       Detected := Name;
       Result := CapMeets(Cap);
     end;
