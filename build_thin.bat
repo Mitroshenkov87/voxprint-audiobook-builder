@@ -34,6 +34,7 @@ python tools\embed_build_stamp.py --write-module || (echo [ERROR] build stamp. &
 echo === Build thin shell ===
 pyinstaller --onedir --windowed --noconfirm --clean --name Voxprint --distpath dist\thin --workpath build\thin-work --specpath build\thin-work ^
   --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" --add-data "%CD%\assets\splash.jpg;assets" --add-data "%CD%\assets\easter-egg.jpg;assets" ^
+  --add-data "%CD%\assets\icons;assets\icons" ^
   --paths "%CD%" --paths "%CD%\infra" --paths "%CD%\third_party" --paths "%CD%\build\stdlib_bundle" --hidden-import _vx_stdlib ^
   --hidden-import openvoice --hidden-import openvoice.models --hidden-import openvoice.modules ^
   --hidden-import openvoice.attentions --hidden-import openvoice.commons ^

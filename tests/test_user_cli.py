@@ -108,6 +108,7 @@ def test_is_user_cli():
     assert user_cli.is_user_cli(["Voxprint.exe", "voices", "list"])
     assert user_cli.is_user_cli(["Voxprint.exe", "--version"])
     assert user_cli.is_user_cli(["Voxprint.exe", "--json", "status"])
+    assert user_cli.is_user_cli(["voxprint", "--dry-run", "narrate", "b.vxbook", "--voice", "v", "--out", "o"])
     assert user_cli.is_user_cli(["Voxprint.exe", "capabilities"])
     assert user_cli.is_user_cli(["Voxprint.exe", "models", "download", "denoise"])
     assert user_cli.is_user_cli(["Voxprint.exe", "revoice", "clip.wav"])
@@ -323,7 +324,7 @@ def test_version_json(capsys):
 def test_help_is_layered_and_has_examples(capsys):
     assert user_cli.main(["--help"]) == 0
     top = capsys.readouterr().out
-    assert "Examples:" in top and "--json" in top and "--version" in top
+    assert "Examples:" in top and "--json" in top and "--version" in top and "--dry-run" in top
     assert "narrate" in top and "status" in top
     assert "--voice" not in top
     assert user_cli.main(["narrate", "--help"]) == 0

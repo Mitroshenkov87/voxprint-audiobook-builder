@@ -539,6 +539,8 @@
  "voices.badge_personal": "Только личное использование · {license}",
  "voices.by_author": "автор: {author}",
  "voices.cancel": "Отмена",
+ "icons.save_as": "Сохранить как",
+ "icons.save_copy": "Сохранить копию",
  "voices.export": "Экспорт…",
  "voices.open_folder": "Открыть папку",
  "voices.export_title": "Экспорт голоса",

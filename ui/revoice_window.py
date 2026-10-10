@@ -39,6 +39,7 @@ from core.i18n import tr
 from core.voice_library import VoiceLibrary
 from infra import vc_model
 from ui.audio_preview import Previewer
+from ui.suite_icons import apply_button
 from ui.window_base import SubWindow, card_frame, fit_to_screen, hint_label
 
 log = logging.getLogger("voxprint.revoice")
@@ -245,6 +246,7 @@ class RevoiceWindow(SubWindow):
         self.btn_direct = QPushButton()
         self.lbl_direct = hint_label()
         self.btn_vc_download = QPushButton()
+        apply_button(self.btn_vc_download, "download")
         for b in (self.btn_to_text, self.btn_direct, self.btn_vc_download):
             b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         rv.addWidget(self.btn_direct)

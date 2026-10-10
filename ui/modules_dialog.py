@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
 from core.i18n import tr
 from infra import backup, modules as mods
 from ui import screen_fit
+from ui.suite_icons import apply_button
 from ui.glass import GlassDialog, fit_height
 from workers.backup_runner import run_restore_job
 from workers.backup_worker import BackupWorker
@@ -193,6 +194,7 @@ class ModulesDialog(GlassDialog):
         self.lbl_overall.setVisible(False)
         self.btn_download = QPushButton()
         self.btn_download.setObjectName("primary")
+        apply_button(self.btn_download, "download", surface="primary")
         self.btn_restore = QPushButton()
         self.chk_link = QCheckBox()
         self.lbl_link_warn = QLabel()

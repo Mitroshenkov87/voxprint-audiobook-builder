@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 from typing import Any, Callable, List, Optional, cast
 
-from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtCore import QSize, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QComboBox,
@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QToolBar,
     QVBoxLayout,
     QWidget,
 )
@@ -46,6 +47,7 @@ from infra import voice_catalog as catalog
 from infra import voice_repository as repo
 from ui.audio_preview import Previewer
 from ui.glass import GlassDialog
+from ui.suite_icons import apply_button, make_icon
 from ui.window_base import SubWindow, card_frame, fit_to_screen, hint_label
 from workers.narrate_worker import RepoDownloadWorker, RepoIndexWorker
 
@@ -170,6 +172,7 @@ class RemoteCard(QFrame):
         self.lbl_state = QLabel(tr("voices.remote_state"))
         self.lbl_state.setObjectName("carddesc")
         self.btn_download = QPushButton(tr("voices.remote_download") if progress < 0 else tr("voices.remote_downloading", p=int(progress * 100)))
+        apply_button(self.btn_download, "download")
         self.btn_download.setEnabled(not busy and progress < 0)
         self.btn_download.clicked.connect(lambda: self.download.emit(self.key))
         row.addWidget(self.lbl_state)
@@ -186,6 +189,8 @@ class VoiceCard(QFrame):
     edit = Signal(str)
     delete = Signal(str)
     export = Signal(str)
+    save_as = Signal(str)
+    save_copy = Signal(str)
     open_folder = Signal(str)
 
     def __init__(self, rec: VoiceRecord, playing: bool = False) -> None:
@@ -233,6 +238,12 @@ class VoiceCard(QFrame):
         self.btn_edit = QPushButton(tr("voices.edit"))
         self.btn_delete = QPushButton(tr("voices.delete"))
         self.btn_export = QPushButton(tr("voices.export"))
+        apply_button(self.btn_export, "export")
+        export_menu = QMenu(self.btn_export)
+        self.act_save_as = export_menu.addAction(make_icon("save-as"), tr("icons.save_as"))
+        self.act_save_copy = export_menu.addAction(make_icon("save-copy"), tr("icons.save_copy"))
+        self.act_export = export_menu.addAction(make_icon("export"), tr("voices.export"))
+        self.btn_export.setMenu(export_menu)
         self.btn_folder = QPushButton(tr("voices.open_folder"))
         if rec.bundled:
             for b in (self.btn_edit, self.btn_delete):
@@ -246,7 +257,9 @@ class VoiceCard(QFrame):
         self.btn_narrate.clicked.connect(lambda: self.narrate.emit(self.voice_id))
         self.btn_edit.clicked.connect(lambda: self.edit.emit(self.voice_id))
         self.btn_delete.clicked.connect(lambda: self.delete.emit(self.voice_id))
-        self.btn_export.clicked.connect(lambda: self.export.emit(self.voice_id))
+        self.act_save_as.triggered.connect(lambda: self.save_as.emit(self.voice_id))
+        self.act_save_copy.triggered.connect(lambda: self.save_copy.emit(self.voice_id))
+        self.act_export.triggered.connect(lambda: self.export.emit(self.voice_id))
         self.btn_folder.clicked.connect(lambda: self.open_folder.emit(self.voice_id))
 
 
@@ -266,6 +279,13 @@ class VoiceEditDialog(GlassDialog):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(18, 14, 18, 14)
         lay.setSpacing(10)
+        self.toolbar = QToolBar()
+        self.toolbar.setObjectName("suiteToolbar")
+        self.toolbar.setIconSize(QSize(22, 22))
+        self.toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.act_save = self.toolbar.addAction(make_icon("save"), tr("voices.save"))
+        self.act_save.triggered.connect(self.accept)
+        lay.addWidget(self.toolbar)
         self.edt_name = QLineEdit(str(rec.info.get("name") or rec.name))   # the stored default, not the localized display name
         self.edt_name.setMaxLength(voice_info.MAX_NAME_CHARS)
         self.edt_author = QLineEdit(str(rec.info.get("author", "")))
@@ -325,6 +345,7 @@ class VoiceEditDialog(GlassDialog):
         self.btn_cancel = QPushButton(tr("voices.cancel"))
         self.btn_save = QPushButton(tr("voices.save"))
         self.btn_save.setObjectName("primary")
+        apply_button(self.btn_save, "save", surface="primary")
         row.addWidget(self.btn_cancel)
         row.addWidget(self.btn_save)
         lay.addLayout(row)
@@ -397,6 +418,7 @@ class RepoDialog(GlassDialog):
         self.btn_close = QPushButton()
         self.btn_download = QPushButton()
         self.btn_download.setObjectName("primary")
+        apply_button(self.btn_download, "download", surface="primary")
         brow.addWidget(self.btn_close)
         brow.addWidget(self.btn_download)
         lay.addLayout(brow)
@@ -534,19 +556,22 @@ class VoicesWindow(SubWindow):
         self.repo_dialog: Optional[RepoDialog] = None
         self.lbl_intro = hint_label()
         self.body.addWidget(self.lbl_intro)
-        bar = QHBoxLayout()
+        self.toolbar = QToolBar()
+        self.toolbar.setObjectName("suiteToolbar")
+        self.toolbar.setIconSize(QSize(22, 22))
+        self.toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.btn_import = QPushButton()
         menu = QMenu(self.btn_import)
         self.act_folder = menu.addAction("")
         self.act_zip = menu.addAction("")
         self.btn_import.setMenu(menu)
         self.btn_repo = QPushButton()
-        bar.addWidget(self.btn_import)
-        bar.addWidget(self.btn_repo)
+        apply_button(self.btn_repo, "download")
         self.btn_reload = QPushButton()
-        bar.addWidget(self.btn_reload)
-        bar.addStretch(1)
-        self.body.addLayout(bar)
+        self.toolbar.addWidget(self.btn_import)
+        self.toolbar.addWidget(self.btn_repo)
+        self.toolbar.addWidget(self.btn_reload)
+        self.body.addWidget(self.toolbar)
         self.lbl_status = QLabel()
         self.lbl_status.setObjectName("status")
         self.lbl_status.setWordWrap(True)
@@ -617,6 +642,8 @@ class VoicesWindow(SubWindow):
             c.narrate.connect(self.narrate_with.emit)
             c.edit.connect(self.edit_voice)
             c.delete.connect(self.delete_voice)
+            c.save_as.connect(self.save_voice_as)
+            c.save_copy.connect(self.save_voice_copy)
             c.export.connect(self.export_voice)
             c.open_folder.connect(self.open_voice_folder)
             self.cards_box.addWidget(c)
@@ -766,6 +793,10 @@ class VoicesWindow(SubWindow):
         box.setText(tr("voices.export_text", name=rec.name, mb=mb))
         small = box.addButton(tr("voices.export_small", mb=mb), QMessageBox.ButtonRole.AcceptRole)
         full = box.addButton(tr("voices.export_full"), QMessageBox.ButtonRole.ActionRole)
+        small.setIcon(make_icon("save-copy"))
+        full.setIcon(make_icon("export"))
+        small.setIconSize(QSize(22, 22))
+        full.setIconSize(QSize(22, 22))
         box.addButton(tr("voices.cancel"), QMessageBox.ButtonRole.RejectRole)
         box.setDefaultButton(small)
         box.exec()
@@ -778,6 +809,32 @@ class VoicesWindow(SubWindow):
         path, _ = QFileDialog.getSaveFileName(self, tr("voices.export_title"), default, "Voxprint voice (*.zip)")
         if path:
             self.do_export(voice_id, Path(path))
+
+    def save_voice_as(self, voice_id: str) -> None:
+        """Ask for a zip path and write the small voice file there."""
+        rec = self.library.get(voice_id)
+        if rec is None:
+            return
+        default = str(self.library.root / f"{rec.id}.zip")
+        path, _ = QFileDialog.getSaveFileName(self, tr("icons.save_as"), default, "Voxprint voice (*.zip)")
+        if path:
+            self.do_export(voice_id, Path(path))
+
+    def save_voice_copy(self, voice_id: str) -> None:
+        """Write ``{id}-copy.zip`` (or ``-copy-N``) next to the library without asking."""
+        rec = self.library.get(voice_id)
+        if rec is None:
+            return
+        self.do_export(voice_id, self._copy_dest(rec.id))
+
+    def _copy_dest(self, voice_id: str) -> Path:
+        root = self.library.root
+        dest = root / f"{voice_id}-copy.zip"
+        n = 2
+        while dest.exists():
+            dest = root / f"{voice_id}-copy-{n}.zip"
+            n += 1
+        return dest
 
     def do_export(self, voice_id: str, dest: Path) -> Optional[Path]:
         """Write the export (separate from the dialogs so it can be tested)."""

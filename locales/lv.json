@@ -539,6 +539,8 @@
  "voices.badge_personal": "Tikai personīgai lietošanai · {license}",
  "voices.by_author": "autors: {author}",
  "voices.cancel": "Atcelt",
+ "icons.save_as": "Saglabāt kā",
+ "icons.save_copy": "Saglabāt kopiju",
  "voices.export": "Eksportēt…",
  "voices.open_folder": "Atvērt mapi",
  "voices.export_title": "Eksportēt balsi",
