@@ -41,6 +41,26 @@ def test_unchanged_text_and_other_languages_are_identity():
     assert e.spoken == "There are 5 apples." and not e.changed
 
 
+def test_author_stress_survives_an_engine_that_writes_a_plus():
+    """ru-normalizr spells U+0301 as a plus immediately before the stressed letter."""
+    raw = "В тексте ёще и ещё\u0301. На поле све\u0301т. Язык C++."
+
+    def as_plus(text: str) -> str:
+        out: list[str] = []
+        for ch in text:
+            if ch == "\u0301":
+                if out:
+                    out.insert(len(out) - 1, "+")
+                continue
+            out.append(ch)
+        return "".join(out)
+
+    spoken = nz.normalize_for_tts(raw, "Russian", ("plus", as_plus)).spoken
+    assert spoken == "В тексте ёще и ещё\u0301. На поле све\u0301т. Язык C++."
+    expanded = nz.normalize_for_tts("В зале 2 человека. На поле све\u0301т.", "Russian", ("plus", as_plus)).spoken
+    assert "два" in expanded and "све\u0301т" in expanded and "+" not in expanded
+
+
 def test_author_yo_and_stress_survive_an_engine_that_strips_them():
     raw = "В тексте ёще и ещё\u0301. На поле све\u0301т. В зале 2 человека."
 

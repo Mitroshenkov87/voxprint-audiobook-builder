@@ -101,7 +101,9 @@ def test_plotweaver_markdown_narrates_chapters_voices_yo_and_stress(tmp_path, ca
     ivan = " ".join(engines["tom"].calls)
     anna = " ".join(engines["ann"].calls)
     assert "ёще" in narr and "ещё" in narr and "еще" not in narr
-    assert "све\u0301т" in narr and "мед. училище" in narr
+    assert "све\u0301т" in narr
+    # ru-normalizr capitalizes after a period ("Мед. Училище"); the builtin pass does not.
+    assert "мед. училище" in narr.casefold()
     assert "ещё\u0301" in ivan and "ёще" not in ivan
     assert "Привет" in anna and "Привет" not in narr
     assert "ещё\u0301" not in narr

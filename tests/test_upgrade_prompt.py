@@ -61,14 +61,21 @@ def test_is_own_environment(monkeypatch):
 def test_probe_external_offers_and_torch_is_not_swapped_silently():
     from tests.test_env_install import fake_machine
 
-    run, which, _ = fake_machine(smi="CUDA Version: 12.8")
-    inst = {"accelerate": "1.12.0", "torch": "2.8.0+cpu", "transformers": "4.57.3"}.get
     pins = {"accelerate": "1.15.0", "transformers": "4.57.6"}
+    inst = {"accelerate": "1.12.0", "torch": "2.8.0+cpu", "transformers": "4.57.3"}.get
     kw = dict(scan_other_pythons=False, packages={"accelerate": "", "transformers": ">=4.57.6,<5"})
+    # CUDA 12.8 is below the cu130 driver line, so the machine wants the CPU build.
+    # An installed CPU torch is already that flavor and is reused.
+    run, which, _ = fake_machine(smi="CUDA Version: 12.8")
     rep = ep.probe_environment(pins, inst, run, which, external_env=True, **kw)
     act = {d.name: d.action for d in rep.decisions}
-    assert act == {"accelerate": ACTION_OFFER, "transformers": ACTION_OFFER, "torch": ACTION_OFFER}
-    assert rep.counts()[ACTION_OFFER] == 3 and rep.counts()[ACTION_UPGRADE] == 0
+    assert act == {"accelerate": ACTION_OFFER, "transformers": ACTION_OFFER, "torch": ACTION_REUSE}
+    assert rep.counts()[ACTION_OFFER] == 2 and rep.counts()[ACTION_UPGRADE] == 0
+    # CUDA 13 with a CPU torch is a flavor change. In an external environment the decision is an offer.
+    run13, which13, _ = fake_machine(smi="CUDA Version: 13.0")
+    rep13 = ep.probe_environment(pins, inst, run13, which13, external_env=True, **kw)
+    assert {d.name: d.action for d in rep13.decisions}["torch"] == ACTION_OFFER
+    assert rep13.counts()[ACTION_UPGRADE] == 0
     msgs = "\n".join(ep.user_messages(rep))
     assert "1.12.0" in msgs and "1.15.0" in msgs
     own = ep.probe_environment(pins, inst, run, which, external_env=False, **kw)
