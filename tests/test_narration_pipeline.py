@@ -115,18 +115,18 @@ def test_output_is_byte_identical_with_one_or_many_workers(tmp_path, monkeypatch
 def test_pending_writes_are_bounded(tmp_path, monkeypatch):
     engine = FakeEngine()
     saved, peak = [], []
-    orig = nr.ChunkCache.save
+    orig = nr.ChunkCache.commit
 
-    def slow_save(self, key, audio, sr):
+    def slow_commit(self, tmp, key):
         time.sleep(0.03)
-        orig(self, key, audio, sr)
+        orig(self, tmp, key)
         saved.append(key)
     orig_synth = engine.synthesize
 
     def synth(text):
         peak.append(len(engine.calls) - len(saved))            # chunks made but not on disk yet
         return orig_synth(text)
-    monkeypatch.setattr(nr.ChunkCache, "save", slow_save)
+    monkeypatch.setattr(nr.ChunkCache, "commit", slow_commit)
     engine.synthesize = synth
     nr.narrate_book(book(6), lambda: engine, engine.tag, tmp_path / "out", language="english", ffmpeg=None,
                     options=nr.NarrationOptions(formats={ex.FORMAT_WAV_CHAPTERS}))

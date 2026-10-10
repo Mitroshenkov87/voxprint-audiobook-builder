@@ -1,0 +1,22 @@
+"""CI leaves the process after a finished pytest session so Qt shutdown cannot turn a pass into a signal."""
+import os
+
+from tests import conftest
+
+
+def test_off_ci_the_session_exits_normally(monkeypatch):
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    conftest.remember_exit_status(0)
+    assert conftest.leave_before_native_shutdown() is False
+    assert os.environ.get("GITHUB_ACTIONS") is None
+
+
+def test_ci_exits_with_the_session_status_after_the_summary(monkeypatch):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    seen = []
+    monkeypatch.setattr(conftest.os, "_exit", seen.append)
+    conftest.remember_exit_status(1)
+    conftest.leave_before_native_shutdown()
+    conftest.remember_exit_status(0)
+    conftest.leave_before_native_shutdown()
+    assert seen == [1, 0]

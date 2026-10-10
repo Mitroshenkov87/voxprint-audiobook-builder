@@ -42,8 +42,15 @@ jobs:
           # test_thin_modules) must not abort the rest of the suite, and must still fail this job.
           for f in tests/test_*.py; do
             echo "=== $f ==="
-            if ! .app/bin/python -m pytest -q -p no:cacheprovider -p faulthandler --tb=line "$f"; then
-              echo "FAILED $f"
+            set +e
+            .app/bin/python -m pytest -q -p no:cacheprovider -p faulthandler --tb=line "$f"
+            rc=$?
+            set -e
+            # 5: the module collected nothing (optional imports such as weasyprint). A signal or a failed test still fails the job.
+            if [ "$rc" -eq 0 ] || [ "$rc" -eq 5 ]; then
+              if [ "$rc" -eq 5 ]; then echo "no tests collected in $f"; fi
+            else
+              echo "FAILED $f (exit $rc)"
               fail=1
               failed="$failed $f"
             fi
@@ -87,7 +94,9 @@ jobs:
           foreach ($f in Get-ChildItem tests\test_*.py) {
             Write-Host "=== $($f.FullName) ==="
             & .app\Scripts\python.exe -m pytest -q -p no:cacheprovider -p faulthandler --tb=line $f.FullName
-            if ($LASTEXITCODE -ne 0) { $failed += $f.Name }
+            # 5: the module collected nothing (optional imports). A crash or a failed test still fails the job.
+            if ($LASTEXITCODE -eq 5) { Write-Host "no tests collected: $($f.Name)" }
+            elseif ($LASTEXITCODE -ne 0) { $failed += $f.Name }
           }
           if ($failed.Count -gt 0) {
             Write-Host "Failed modules: $($failed -join ', ')"

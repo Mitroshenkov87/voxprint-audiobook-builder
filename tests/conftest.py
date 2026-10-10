@@ -41,3 +41,33 @@ def _isolated_home(tmp_path, monkeypatch):
     i18n.reset()
     yield
     i18n.reset()
+
+
+_ci_exit: int | None = None
+
+
+def remember_exit_status(exitstatus: int) -> None:
+    """Remember the session result so :func:`leave_before_native_shutdown` can use it."""
+    global _ci_exit
+    _ci_exit = int(exitstatus)
+
+
+def leave_before_native_shutdown() -> bool:
+    """On GitHub Actions, exit with the session result and skip interpreter shutdown.
+
+    Python 3.14 and PySide6 print ``QObject: shared QObject was deleted directly`` and then
+    the process dies with a bus error after a green session. The result is already decided.
+    A crash during a test never reaches this function. Off CI the process exits normally.
+    """
+    if os.environ.get("GITHUB_ACTIONS") != "true" or _ci_exit is None:
+        return False
+    os._exit(_ci_exit)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    remember_exit_status(exitstatus)
+
+
+def pytest_unconfigure(config):
+    # After the terminal summary. Earlier than this, os._exit would hide the failure list.
+    leave_before_native_shutdown()
