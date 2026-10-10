@@ -9,7 +9,7 @@
 #   ~/.local/share/voxprint/venv   its Python environment (PySide6, PyTorch, transformers ...)
 #   ~/.local/share/voxprint/       models, voices, settings, logs (created by the program)
 #   ~/.local/bin/voxprint          the launcher;  ~/.local/share/applications/voxprint.desktop  the menu entry
-# PyTorch: torch 2.14.1 cu130 (NVIDIA driver 600+) with TorchAudio 2.11.0. --cpu installs the CPU wheels (CI).
+# PyTorch: torch 2.11.0 cu130 (NVIDIA driver 600+) with TorchAudio 2.11.0. --cpu installs the CPU wheels (CI).
 # Re-running the script updates the program (the environment is reused).  `--uninstall` removes it again.
 set -u
 set -o pipefail
@@ -224,9 +224,9 @@ say "Installing the installer tools (pip, uv)"
 UV="$VENV/bin/uv"
 export UV_LINK_MODE=copy UV_CACHE_DIR="${UV_CACHE_DIR:-$CACHE/uv}"
 
-say "Installing PyTorch $TORCH (torch 2.14.1, torchaudio 2.11.0)"
+say "Installing PyTorch $TORCH (torch 2.11.0, torchaudio 2.11.0)"
 install_torch() {
-  "$UV" pip install --python "$VPY" "torch==2.14.1" "torchaudio==2.11.0" --index-url "https://download.pytorch.org/whl/$1"
+  "$UV" pip install --python "$VPY" "torch==2.11.0" "torchaudio==2.11.0" --index-url "https://download.pytorch.org/whl/$1"
 }
 if ! install_torch "$TORCH"; then
   if [ "$TORCH" != cpu ]; then

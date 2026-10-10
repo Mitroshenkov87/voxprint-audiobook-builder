@@ -7,8 +7,8 @@ rem                                    if --onefile with PyTorch gets too big/sl
 rem  Requires Windows 11 x64 and Python 3.14 (py launcher). The models are NOT part of the exe: they are downloaded on first start.
 rem
 rem  Install rules (from our research, see README):
-rem   * PyTorch through "uv pip install torch torchaudio --torch-backend=cu130" (driver 600+);
-rem     fallback: the cu130 index from requirements-torch.txt. TorchAudio stays at 2.11.0.
+rem   * PyTorch through "uv pip install torch==2.11.0 torchaudio==2.11.0 --torch-backend=cu130" (driver 600+);
+rem     fallback: the cu130 index from requirements-torch.txt. Torch and TorchAudio are the same release.
 rem   * NEVER run "uv run" without --no-sync: it re-syncs the environment and replaces CUDA torch with the CPU build.
 rem   * flash-attn is not installed on Windows (training uses eager/SDPA attention).
 rem   * qwen-asr and qwen-tts pin different transformers versions -> they are installed with --no-deps.
@@ -28,7 +28,7 @@ python -m pip install -U pip wheel uv || exit /b 1
 
 echo === PyTorch (cu130) ===
 if not defined VOX_TORCH_BACKEND set VOX_TORCH_BACKEND=cu130
-uv pip install torch==2.14.1 torchaudio==2.11.0 --torch-backend=%VOX_TORCH_BACKEND%
+uv pip install torch==2.11.0 torchaudio==2.11.0 --torch-backend=%VOX_TORCH_BACKEND%
 if errorlevel 1 (
     echo [i] uv could not select wheels - trying the cu130 index
     python -m pip install -r requirements-torch.txt || exit /b 1

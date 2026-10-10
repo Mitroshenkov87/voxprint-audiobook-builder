@@ -139,6 +139,35 @@ def test_all_formats_and_layout(tmp_path):
 
 # ----------------------------------------------------------------------------- resume / pause / cancel / ETA
 
+def test_chunk_files_appear_as_a_prefix_of_the_plan(tmp_path, monkeypatch):
+    """A later writer can finish encoding first. The finished file still appears only after earlier chunks."""
+    real = nr.ChunkCache.stage
+    calls = {"n": 0}
+
+    def slow_first(self, key, audio, sr):
+        n = calls["n"]
+        calls["n"] = n + 1
+        if n == 0:
+            time.sleep(0.4)
+        return real(self, key, audio, sr)
+
+    monkeypatch.setattr(nr.ChunkCache, "stage", slow_first)
+    plans, snapshot = [], []
+
+    def progress(ev):
+        if plans:
+            snapshot.append([p.is_file() for p in plans[0]])
+
+    res, engine, _ff, _events = run(
+        tmp_path, on_plan=plans.append, events=type("L", (list,), {"append": lambda self, e: progress(e)})())
+    assert len(plans) == 1 and len(plans[0]) == len(engine.calls) == res.chunks
+    assert calls["n"] >= 2 and snapshot
+    for flags in snapshot:
+        assert flags == sorted(flags, reverse=True), flags
+    assert max(sum(flags) for flags in snapshot) == len(plans[0])
+    assert any(sum(a) < sum(b) for a, b in zip(snapshot, snapshot[1:]))
+
+
 def test_resume_after_a_failure_reuses_finished_chunks(tmp_path):
     flaky = FakeEngine(fail_from=4)
     with pytest.raises(NarrationError) as ei:

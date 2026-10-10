@@ -1,6 +1,6 @@
 # Voxprint - dependencies (no hard pins here; only lower bounds and the upper bounds that are needed).
 # Installation order on Windows (done by build.bat):
-#   1) uv pip install torch==2.14.1 torchaudio==2.11.0 --torch-backend=cu130    (fallback: requirements-torch.txt)
+#   1) uv pip install torch==2.11.0 torchaudio==2.11.0 --torch-backend=cu130    (fallback: requirements-torch.txt)
 #   2) uv pip install -r requirements.txt -r requirements-verified.txt   (this file + the verified versions)
 #   3) uv pip install --no-deps -r requirements-nodeps.txt     (qwen-asr, qwen-tts - see the comment below)
 # Do not use "uv run" without --no-sync (it replaces CUDA torch with the CPU build). flash-attn is not needed on Windows.
@@ -24,8 +24,8 @@ transformers>=4.57.6,<5
 huggingface_hub>=0.34,<1.0              # transformers 4.57 requires huggingface-hub<1.0
 sentencepiece                           # tokenizer of the Opus-MT translation models (MarianTokenizer)
 ctranslate2                             # CTranslate2 wheels are CUDA 12 builds; see infra/cuda12_libs.py
-nvidia-cublas-cu12                      # CUDA 12 runtime for CTranslate2 (not shipped by torch cu130)
-nvidia-cudnn-cu12
+nvidia-cublas-cu12==12.9.2.10           # CUDA 12 runtime for CTranslate2 (not shipped by torch cu130)
+nvidia-cudnn-cu12==9.27.0.42
 accelerate>=1.12
 peft>=0.17                              # tested: 0.18.1 (as in Alexandria) and 0.21.2
 bitsandbytes>=0.46                      # 8-bit AdamW (wheels exist for Windows); without it plain AdamW is used

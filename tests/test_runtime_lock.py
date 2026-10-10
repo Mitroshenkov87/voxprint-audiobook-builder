@@ -28,8 +28,8 @@ def test_every_file_is_pinned_and_comes_from_its_upstream_site():
 
 def test_torch_has_the_user_flavor_and_the_ci_cpu_wheels():
     assert LOCK["flavors"] == ["cu130"] and LOCK["ci_flavors"] == ["cpu"]
-    assert LOCK["torch_version"] == "2.14.1" and LOCK["torchaudio_version"] == "2.11.0"
-    assert LOCK["compat"]["torch"] == ">=2.14,<2.15"
+    assert LOCK["torch_version"] == "2.11.0" and LOCK["torchaudio_version"] == "2.11.0"
+    assert LOCK["compat"]["torch"] == ">=2.11,<2.12"
     versions = {"torch": LOCK["torch_version"], "torchaudio": LOCK["torchaudio_version"]}
     for pkg in mk.TORCH:
         flavors = {w["flavor"]: w for w in LOCK["wheels"] if w["dist"] == pkg}
@@ -40,8 +40,10 @@ def test_torch_has_the_user_flavor_and_the_ci_cpu_wheels():
     assert not [w for w in LOCK["wheels"] if w["group"] == "torch" and w["dist"] not in mk.TORCH]
     names = {w["dist"] for w in LOCK["wheels"]}
     assert {"audioop-lts", "ctranslate2", "nvidia-cublas-cu12", "nvidia-cudnn-cu12"} <= names
-    cuda12 = {w["dist"] for w in LOCK["wheels"] if w["group"] == "cuda12"}
-    assert cuda12 == {"ctranslate2", "nvidia-cublas-cu12", "nvidia-cudnn-cu12"}
+    cuda12 = {w["dist"]: w["version"] for w in LOCK["wheels"] if w["group"] == "cuda12"}
+    assert set(cuda12) == {"ctranslate2", "nvidia-cublas-cu12", "nvidia-cudnn-cu12"}
+    assert cuda12["nvidia-cublas-cu12"] == "12.9.2.10" and cuda12["nvidia-cudnn-cu12"] == "9.27.0.42"
+    assert "torchcodec" not in names
     from packaging.version import Version
     assert Version(LOCK["shell"]["pyside6"]) >= Version("6.11")
 

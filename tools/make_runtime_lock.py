@@ -8,12 +8,13 @@ commit the lock.  CI never resolves anything: it only reads the committed file.
 * pure libraries: ``uv pip compile requirements.txt requirements-verified.txt`` for Windows / the build Python -> the wheel of every
   pin from the PyPI JSON API (``cp314-win_amd64``, ``abi3`` or ``py3-none-any``; an sdist-only package is marked ``sdist`` - CI builds a pure-Python wheel from it);
 * ``requirements-nodeps.txt`` (qwen-asr / qwen-tts conflict on transformers): pinned as they are, without their own dependencies;
-* PyTorch: ``torch`` of one version for the user flavor (cu130) and the CI-only CPU flavor, plus TorchAudio 2.11
-  (the last TorchAudio release; it pairs with every later torch) from download.pytorch.org;
+* PyTorch: ``torch`` and TorchAudio of one version for the user flavor (cu130) and the CI-only CPU flavor, from
+  download.pytorch.org. TorchAudio's native ops are built against that torch. There is no TorchAudio wheel for
+  2.12-2.14 on cu130 / cp314, so the pair is 2.11.0;
 * the packages that the PyInstaller shell bundles (Qt, numpy, soundfile ...) are NOT listed as downloads - they are listed under
   ``shell`` so that CI installs exactly those versions into the shell's build environment.
 
-Usage: ``python tools/make_runtime_lock.py [--torch 2.14.1] [--torchaudio 2.11.0] [--python 3.14]``
+Usage: ``python tools/make_runtime_lock.py [--torch 2.11.0] [--torchaudio 2.11.0] [--python 3.14]``
 """
 from __future__ import annotations
 
@@ -36,7 +37,7 @@ UA = "voxprint-lock/1"
 #: User-facing CUDA flavor. CPU wheels are still pinned (``CI_FLAVORS``) so CI can install them; they are not offered to users.
 FLAVORS = ("cu130",)
 CI_FLAVORS = ("cpu",)
-#: TorchAudio 2.11 is the final release. It has no torch pin and is the pair for torch 2.11 and every later torch.
+#: Same release as ``torch``. TorchAudio's native ops are built against that torch; 2.11.0 is the newest such pair on cu130 / cp314.
 TORCHAUDIO_VERSION = "2.11.0"
 #: Provided by the PyInstaller shell (installed from this lock into the build environment, bundled into the exe).
 SHELL_PROVIDED = {"pyside6", "pyside6-essentials", "pyside6-addons", "shiboken6", "numpy", "soundfile", "cffi", "pycparser",
@@ -57,7 +58,7 @@ GROUPS = [
 #: Libraries (besides the shell's) that the unit tests import; the thin build's CI installs them to run the suite without PyTorch.
 TEST_EXTRAS = {"huggingface-hub", "requests", "scipy", "pyyaml", "tqdm", "urllib3", "filelock", "fsspec", "typing-extensions",
                "hf-xet", "idna", "charset-normalizer"}
-COMPAT = {"torch": ">=2.14,<2.15", "python_minor_must_match": True}
+COMPAT = {"torch": ">=2.11,<2.12", "python_minor_must_match": True}
 
 
 def norm(n: str) -> str:
@@ -194,7 +195,7 @@ def pyinstaller_metadata_args(lock: dict) -> List[str]:
 
 def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--torch", default="2.14.1")
+    ap.add_argument("--torch", default="2.11.0")
     ap.add_argument("--torchaudio", default=TORCHAUDIO_VERSION)
     ap.add_argument("--python", default="3.14")
     ap.add_argument("--out", default=str(LOCK))

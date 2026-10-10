@@ -102,10 +102,12 @@ def test_cpu_is_forced_for_ci_when_it_is_not_a_public_flavor(monkeypatch):
     assert rr.choose_flavor(["cu130"], (12, 8)) == "cpu"
 
 
-def test_torchaudio_2_11_pairs_with_a_later_torch():
-    assert rr._torchaudio_pairs("2.14.1+cu130", "2.11.0+cu130")
+def test_torchaudio_pairs_only_with_the_same_torch_release():
+    assert rr._torchaudio_pairs("2.11.0+cu130", "2.11.0+cu130")
     assert rr._torchaudio_pairs("2.11.0+cpu", "2.11.0+cpu")
-    assert not rr._torchaudio_pairs("2.14.1+cu130", "2.10.0+cu130")
+    assert not rr._torchaudio_pairs("2.14.1+cu130", "2.11.0+cu130")
+    assert not rr._torchaudio_pairs("2.11.0+cu130", "2.11.0+cpu")
+    assert not rr._torchaudio_pairs("2.11.0+cu130", "2.10.0+cu130")
 
 
 # ------------------------------------------------------------------------------------------------ decision and memory

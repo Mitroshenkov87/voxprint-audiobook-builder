@@ -41,6 +41,20 @@ NATIVE = (
 )
 
 
+def check_torchaudio_ops() -> None:
+    """Load a TorchAudio op. Importing the package is not enough: a mismatched torch fails here.
+
+    ``importlib`` stays inside this function so ``import tools.check_native_imports`` can list
+    ``NATIVE`` on a machine that has not installed torch yet. The checker reports that failure
+    the same way as the other native imports.
+    """
+    torch = importlib.import_module("torch")
+    torchaudio = importlib.import_module("torchaudio")
+    out = torchaudio.functional.resample(torch.zeros(16), 16000, 8000)
+    if out.numel() != 8 or not bool(torch.isfinite(out).all()):
+        raise RuntimeError(f"torchaudio.functional.resample returned shape {tuple(out.shape)}")
+
+
 def main() -> int:
     bad = 0
     for name in NATIVE:
@@ -50,6 +64,12 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             bad += 1
             print(f"FAIL  {name}: {type(exc).__name__}: {exc}")
+    try:
+        check_torchaudio_ops()
+        print("OK    torchaudio.functional.resample")
+    except Exception as exc:  # noqa: BLE001
+        bad += 1
+        print(f"FAIL  torchaudio.functional.resample: {type(exc).__name__}: {exc}")
     try:
         import_ctranslate2()
         print("OK    ctranslate2")

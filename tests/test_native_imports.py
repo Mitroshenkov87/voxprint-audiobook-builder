@@ -4,7 +4,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from tools.check_native_imports import NATIVE
+import pytest
+
+from tools.check_native_imports import NATIVE, check_torchaudio_ops
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -25,3 +27,9 @@ def test_running_the_file_finds_infra_without_pythonpath(tmp_path):
         [sys.executable, "-c", code], cwd=tmp_path, env=env, capture_output=True, text=True,
     )
     assert proc.returncode == 0, proc.stderr
+
+
+def test_torchaudio_resample_runs_when_torch_is_installed():
+    pytest.importorskip("torch")
+    pytest.importorskip("torchaudio")
+    check_torchaudio_ops()

@@ -195,6 +195,15 @@ def server():
     httpd.shutdown()
 
 
+def test_loopback_uses_the_stdlib_opener(server, monkeypatch):
+    def refuse(*_a, **_k):
+        raise AssertionError("loopback must not build the source-address opener")
+
+    monkeypatch.setattr(nr, "_opener", refuse)
+    with nr.urlopen(f"http://127.0.0.1:{server}/", timeout=5) as r:
+        assert r.read() == b"hello"
+
+
 def test_source_address_and_short_connect_timeout_with_real_sockets(server, monkeypatch):
     """The default attempt 'times out' (mocked socket.create_connection); the hop binds the source address and succeeds."""
     calls = []

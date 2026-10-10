@@ -6,7 +6,7 @@ our batched path already reaches ~2-3x realtime with 8-12 chunks per generate ca
 
 Package: ``faster-qwen3-tts`` 0.3.x (MIT, Andres Marafioti, https://github.com/andimarafioti/faster-qwen3-tts).  0.3.x is the
 last line written for ``qwen-tts`` 0.1.1 + ``transformers`` 4.57 (our pins); 0.4+ needs ``qwen-tts-hf`` + transformers 5 and
-must not be installed.  Pure Python (``torch.cuda.CUDAGraph``; no Triton, no flash-attn), so it works with torch 2.14 cu130 on
+must not be installed.  Pure Python (``torch.cuda.CUDAGraph``; no Triton, no flash-attn), so it works with torch 2.11 cu130 on
 Windows.  It is an optional module: when it is missing or the graphs cannot be captured, narration silently keeps the batched
 path.
 
