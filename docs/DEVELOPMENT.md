@@ -13,18 +13,22 @@ Please read [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) first - it explains the mo
 * **No behaviour changes in pure refactor / documentation PRs.**
 
 ## Development setup
-The test-suite runs on Linux, macOS or Windows **without a GPU and without network access**.
+The test suite runs on Linux, macOS or Windows **without an RTX 40-series GPU and without network access**.
+A CPU build of PyTorch is **internal**: it exists so this suite and the CI jobs can import the libraries. It is not a way to run Voxprint, and there is no CPU-only mode for users.
 
 ```bash
 git clone <your fork>
 cd voxprint-audiobook-builder
 python -m venv .venv && . .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install torch --index-url https://download.pytorch.org/whl/cpu    # CPU torch is enough for the tests
+pip install torch --index-url https://download.pytorch.org/whl/cpu    # internal, tests only
 pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt
 pip install --no-deps -r requirements-nodeps.txt          # qwen-asr / qwen-tts: their transformers pins conflict
 QT_QPA_PLATFORM=offscreen python -m pytest                # ~250 tests; Windows: set QT_QPA_PLATFORM=offscreen
 ```
-Running the GUI and the full pipeline needs Windows 11 and an NVIDIA GPU - see "Run from source" in [docs/BUILDING.md](BUILDING.md).
+
+`tests/conftest.py` sets `VOXPRINT_ALLOW_NO_GPU=1`, and the CI workflows set the same variable. It lets a process start when no RTX 40-series GPU is present. It is internal. Do not document it for users and do not set it on a machine where the real check should run. The Windows installer smoke jobs pass the hidden `/SKIPGPUCHECK` switch for the same reason; the Linux CI install passes `--skip-gpu-check`.
+
+Running the GUI and the full pipeline needs Windows 11 24H2+ or a Linux release from 2025, and an NVIDIA RTX 40-series or newer GPU - see "Run from source" in [docs/BUILDING.md](BUILDING.md).
 A dry run of the pipeline without any model: `python -m core.cli audio.wav text.txt --out dataset --fake-aligner`.
 
 On Windows, never run `uv run` without `--no-sync` (it replaces CUDA torch with the CPU build).

@@ -8,7 +8,7 @@ GUI uses (:func:`workers.narration_runner.run_narration`,
 Every command is non-interactive.  ``--json`` prints progress as JSON lines and a
 final result object.  ``--yes`` is accepted everywhere (nothing prompts).
 Exit codes: 0 ok, 1 internal, 2 bad args, 3 input file, 4 missing model,
-5 GPU/OOM, 6 cancelled.  See ``docs/AGENTS.md``.
+5 GPU/OOM, 6 cancelled, 7 GPU requirement (no RTX 40-series or newer).  See ``docs/AGENTS.md``.
 
 Examples::
 
@@ -21,11 +21,21 @@ The developer dataset CLI remains ``python -m core.cli`` (see ``core/cli.py``).
 """
 from __future__ import annotations
 
+import sys
+
+from infra.gpu_requirement import EXIT_GPU_REQUIRED, enforce, startup_requires_gpu
+
+# Refuse before the heavy imports below when this file is the process entry.
+# ``main.py`` checks first and then imports this module, so that path is unchanged.
+if __name__ == "__main__" and startup_requires_gpu(sys.argv):
+    _gpu_block = enforce(gui=False)
+    if _gpu_block:
+        raise SystemExit(_gpu_block)
+
 import argparse
 import json
 import logging
 import os
-import sys
 import time
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional, Sequence, Set, cast
@@ -140,8 +150,8 @@ class CliError(Exception):
 
 def hint_for(code: int, command: str) -> str:
     """One-line fix for a stable exit code."""
-    if code == EXIT_GPU and command == "train":
-        return "Retry on the CPU: add --force-cpu. Check the GPU with: voxprint status --json"
+    if code == EXIT_GPU_REQUIRED:
+        return "An NVIDIA GeForce RTX 40-series or newer GPU is required. Check: voxprint status --json"
     if code == EXIT_GPU:
         return "Free video memory and retry. Check the GPU with: voxprint status --json"
     if code == EXIT_MISSING:
@@ -481,7 +491,6 @@ def build_parser() -> argparse.ArgumentParser:
             "Examples:\n"
             "  voxprint train recording.wav --text script.txt --name Anna --type female\n"
             "  voxprint train ./clips --name Anna --type female --out ./voices --json\n"
-            "  voxprint train recording.wav --text script.txt --name Anna --force-cpu --yes\n"
             "  voxprint train ./clips --name MyVoice --language ru --consent commercial --speaker \"Reader Name\" --license CC0-1.0\n"
         ),
     )
@@ -502,7 +511,6 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--speaker", default="", metavar="NAME", help="Name of the person whose voice it is (consent and voice.json)")
     t.add_argument("--language", default="", metavar="LANG",
                    help="Language of the recording, e.g. ru, en, de (default: detected)")
-    t.add_argument("--force-cpu", action="store_true", help="Train on CPU even when a GPU is present")
     t.set_defaults(_handler="train")
 
     v = sub.add_parser(
@@ -1148,7 +1156,6 @@ def cmd_train(args: argparse.Namespace, *,
                 out_root=args.out,
                 voice_display_name=args.name or "",
                 voice_type=vtype,
-                force_cpu=bool(args.force_cpu),
                 **meta,
             )
         else:
@@ -1159,7 +1166,6 @@ def cmd_train(args: argparse.Namespace, *,
                 out_root=args.out,
                 voice_display_name=args.name or "",
                 voice_type=vtype,
-                force_cpu=bool(args.force_cpu),
                 **meta,
             )
         if args.out is not None:      # one work folder per voice: a second voice must not overwrite the first one's report.json
@@ -1622,6 +1628,7 @@ def collect_status(library: Optional[VoiceLibrary] = None) -> dict:
             "vram_free_gb": gpu_raw.get("vram_free_gb"),
             "torch": gpu_raw.get("torch"),
             "driver": gpu_raw.get("driver"),
+            "requirement": gpu_raw.get("requirement"),
         },
         "voices": [_voice_payload(v) for v in lib.list_voices()],
         "formats": list(ex.ALL_FORMATS),
@@ -2109,7 +2116,7 @@ SETTINGS_HELP = {
     "narration.ordinals": "Read ordinal numbers by context (on/off)",
     "narration.ai_disclosure": "Speak the AI disclosure at the start (on/off)",
     "theme": "Look shared by the Voxprint programs (glass-dark)",
-    "gpu": "GPU shared by the Voxprint programs: auto, cpu or cuda:N",
+    "gpu": "GPU shared by the Voxprint programs: auto or cuda:N",
     "gpu.vram_fraction": "Optional cap on video memory narration may plan for, 0.70-0.80 of the total (default off)",
     "gpu.fast_decode": "Fast decode with CUDA Graphs (off/graphs; experimental, see voxprint bench)",
     **{f"narration.pause.{k}": f"Pause after a {k} in seconds (0-{pz.MAX_PAUSE_MS / 1000:g})" for k in pz.DEFAULT_LENGTHS_MS},
@@ -2345,6 +2352,10 @@ def _dispatch(argv: Optional[Sequence[str]], *, run_narration_fn, run_task_fn, l
         pass
     if _flag_present(raw, "--version", "-V") and not _flag_present(raw, "--help", "-h"):
         return cmd_version(_flag_present(raw, "--json"))
+    if startup_requires_gpu(["voxprint", *raw]):
+        blocked = enforce(gui=False)
+        if blocked:
+            return blocked
     ap = build_parser()
     try:
         args = ap.parse_args(raw)

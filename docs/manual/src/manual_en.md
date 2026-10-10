@@ -513,13 +513,13 @@ The same check runs without the window as `Voxprint.exe --auto-repair` (chapter 
 | {{err.mismatch_length}} | Check that you chose the right audio and text and read the whole text. |
 | {{err.mismatch_extra}} | Trim the extra speech from the start or end of the recording, or choose the correct text. |
 | {{err.all_dropped}} | Check the microphone and level; record again in a quieter place. |
-| {{err.oom}} | Close other programs that use the graphics card; Voxprint retries with a lighter load (*{{progress.oom_retry}}*). As a last resort **{{ui.retry_cpu}}**. |
+| {{err.oom}} | Close other programs that use the graphics card; Voxprint retries with a lighter load (*{{progress.oom_retry}}*). |
 | {{err.download_failed}} | Check your internet connection and start again; the download continues where it stopped. |
 | {{err.narration_chunk}} | Press **{{narr.start}}** again – finished fragments are kept. |
 | {{err.narration_no_ffmpeg}} | Settings → **{{autorepair.button}}**, or choose WAV. |
 | {{err.book_unsupported}} | Convert the book to TXT, FB2 or EPUB. |
 | {{err.book_unsafe}} | The file looks damaged or too large; try another copy. |
-| {{warn.no_gpu}} | Training works without an NVIDIA card but is extremely slow. |
+| {{warn.no_gpu}} | Voxprint needs an NVIDIA GeForce RTX 40-series or newer GPU. There is no CPU-only mode. |
 | {{warn.loss_low}} | The voice may babble. Use **{{preset.balanced}}**, record more text, and listen with the quick preview. |
 
 **The voice sounds higher than mine.** A small upward pitch drift (about +2…+3 semitones was seen on a male voice) is a known effect of this kind of training. The automatic check warns above +4. Try the quick preview with both variants and take the one that is closer.
@@ -558,8 +558,9 @@ The installed program is `C:\Program Files\Voxprint\Voxprint.exe` (another folde
 | 2 | Missing or unknown arguments |
 | 3 | Book, audio, transcript, voice or backup missing or unreadable |
 | 4 | A model or component is not installed, or its download failed |
-| 5 | Out of GPU memory – for training, retry with `--force-cpu` |
+| 5 | Out of GPU memory – close other programs that use the graphics card and run the same command again |
 | 6 | Cancelled – run the same command again to resume |
+| 7 | No NVIDIA GeForce RTX 40-series or newer GPU. `--version`, `help`, `status` and `diag` still run |
 
 ## Narrate a book
 
@@ -581,7 +582,7 @@ voxprint narrate genesis.txt --voice levi --out ./audiobooks --format mp3 --json
 ```
 voxprint train AUDIO [--text SCRIPT] [--name NAME] [--type male|female|child|other]
     [--out DIR] [--consent none|auto|commercial|public_noncommercial|private_only]
-    [--speaker NAME] [--license ID] [--language CODE] [--force-cpu] [--json]
+    [--speaker NAME] [--license ID] [--language CODE] [--json]
 ```
 
 With `--text` the recording is aligned to the script; without it (one file or a folder of clips) speech recognition builds the dataset. `--out` is the parent folder; every voice gets its own `<voice name>_Voxprint`. Without `--consent` the voice is stored as *private only*; `--consent auto` reads the spoken statement, the other values record a scope you confirmed yourself, and `--license` can never allow more than the consent. Only train a voice you have the right to use.

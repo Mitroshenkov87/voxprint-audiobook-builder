@@ -34,7 +34,7 @@ voice recording and a text file to ready output files you can load into a neural
   clip, `metadata.jsonl`, a report. Bad fragments (clipping, silence, noise) are dropped automatically.
 * Russian text normalization (numbers, abbreviations are spelled out) before alignment; UTF-8 / cp1251 text input; WAV, FLAC, MP3, M4A, OGG ... audio input.
 * **LoRA voice training** with the Alexandria recipe (r=32, alpha=128 on the talker), parameters chosen from your VRAM
-  (1.7B or 0.6B base, 8-bit Adam, CPU fallback, automatic retry plan after out-of-memory).
+  (1.7B or 0.6B base, 8-bit Adam, automatic retry plan after out-of-memory). An RTX 40-series or newer GPU is required.
 * Optional **universal model** (~4 GB, `custom_voice` format) merged from the adapter - works in any Qwen3-TTS app.
 * **`voice.json`** next to the adapter (schema 3): id, name, language (BCP-47 code), creation date (UTC), speech duration, epochs, base model, author, speaker, prepared by, organization, project link, licence (+ URL), gender, age group, the derived voice type, description and the derived `commercial_use`.
 * **Settings** dialog (gear): language (English, Deutsch, Русский, Українська, Latviešu), update check, model/data folders, repair, About.

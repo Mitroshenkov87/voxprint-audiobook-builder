@@ -140,7 +140,10 @@ def driver_cuda() -> Optional[tuple]:
 
 
 def flavor_for(manifest: Dict[str, Any]) -> str:
-    """The PyTorch flavor (``cu128`` / ``cu126`` / ``cpu``) this PC gets; '' when the manifest has none (classic modules)."""
+    """The PyTorch flavor (``cu128`` / ``cu126``) this PC gets. ``""`` when the manifest has none, or no CUDA flavor fits.
+
+    A CPU wheel is not selected for users. CI sets ``VOXPRINT_TORCH_FLAVOR`` (internal) when it needs one.
+    """
     flavors = list((manifest.get("runtime") or {}).get("flavors") or [])
     if not flavors:
         return ""
@@ -416,7 +419,7 @@ def install(module_ids: Optional[List[str]] = None, progress: Optional[Progress]
         # a setup folder (installer option "Keep a portable setup folder") is used first: valid files there need no download,
         # newly downloaded ones are kept in it; without internet its own manifest is used
         n, used = of.run_channel(src, latest, runtime_dir(), cache_dir(), st, "latest" if prefer_latest() else "pinned",
-                                 modules=[m.id for m in chosen], portable=setup_folder(), flavor=flavor_for(man) or "auto",
+                                 modules=[m.id for m in chosen], portable=setup_folder(), flavor=flavor_for(man),
                                  prune=True)
     except of.FetchError as exc:
         if st.was_cancelled:

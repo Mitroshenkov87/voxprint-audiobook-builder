@@ -42,6 +42,7 @@ Pipeline errors that come from the UI catalogs follow `VOXPRINT_LANG` (default f
 | 4 | missing | A model or component is not installed, or its download failed |
 | 5 | gpu | Out of GPU memory |
 | 6 | cancelled | The job stopped on the cancel token. Run the same `narrate` command again to resume cached chunks |
+| 7 | gpu required | No NVIDIA GPU, or the best compute capability is below 8.9 (RTX 40-series). `--version`, `help`, `status` and `diag` still run |
 
 `ERROR:` goes to stderr and names a `Fix:` when there is one. With `--json`, stdout still ends with one result object (`ok: false`, `exit_code`, `error`, `hint`).
 
@@ -65,7 +66,9 @@ voxprint status --json
 voxprint capabilities
 ```
 
-`capabilities` is the same command. One JSON object: version, build, codename, GPU (`cuda_available`, `name`, VRAM), installed voices (id, name, licence, `consent_scope`), output formats and aliases, and module ids with `installed`. Use it before train or narrate. It does not download anything. With `VOXPRINT_NO_ENV_PROBE=1` the GPU probe does not import PyTorch.
+`capabilities` is the same command. One JSON object: version, build, codename, GPU (`cuda_available`, `name`, VRAM, and `requirement`), installed voices (id, name, licence, `consent_scope`), output formats and aliases, and module ids with `installed`. Use it before train or narrate. It does not download anything. With `VOXPRINT_NO_ENV_PROBE=1` the GPU probe does not import PyTorch.
+
+`gpu.requirement` is `{ok, min_compute, detected, compute_cap, source, override}`. `ok` is true when an NVIDIA GPU of compute capability 8.9 or newer was found (RTX 40-series or newer). `detected` is `none` when no NVIDIA GPU was seen. `compute_cap` is the best capability (`8.9`, `12.0`) or `null`. `source` is `torch`, `nvidia-smi` or `none`. `override` is true only when an internal test switch is set; it does not make `ok` true. `status` and `diag` report this check and do not refuse to start.
 
 ## Narrate a book
 
@@ -205,7 +208,7 @@ voxprint settings set KEY VALUE [--json]
 | `narration.ai_disclosure` | `on` / `off` |
 | `narration.pause.comma`, `.mid`, `.sentence`, `.paragraph`, `.chapter` | Seconds, 0-6 |
 | `theme` | Shared by the Voxprint programs (`state/suite.json`). This program has one look, `glass-dark`; another program's theme id is kept and read as `glass-dark` |
-| `gpu` | Shared by the Voxprint programs: `auto`, `cpu` or `cuda:N`. Narration uses it; a GPU that is not there falls back to `cuda:0` |
+| `gpu` | Shared by the Voxprint programs: `auto` or `cuda:N`. Narration uses it |
 | `gpu.vram_fraction` | Optional extra cap, 0.70-0.80 of the card (default `off`). Narration already leaves `max(2 GB, 8 % of the card)` free and re-reads free memory before every batch. Set a fraction to also stay under that share of the total. `off` clears it. Environment: `VOXPRINT_VRAM_FRACTION` (`0.75`, `75` or `off`) |
 | `gpu.fast_decode` | `off` (default) or `graphs`: one chunk at a time with CUDA Graphs (needs faster-qwen3-tts, see [Bench](#bench)). Environment: `VOXPRINT_FAST_DECODE` |
 
@@ -226,7 +229,7 @@ Narrates a fixed Russian text (12 phrases) with the same voice once per mode and
 ```
 voxprint train AUDIO [--text SCRIPT] [--name NAME] [--type male|female|child|other] [--out DIR]
                [--consent none|auto|commercial|public_noncommercial|private_only] [--speaker NAME]
-               [--license ID] [--language CODE] [--force-cpu] [--json]
+               [--license ID] [--language CODE] [--json]
 ```
 
 Omit `--text` to train from a folder of clips, or from one recording, in no-transcript mode (speech recognition builds the dataset). With `--text` and a single file, the aligner path is used.
@@ -238,11 +241,10 @@ By default the voice is stored with consent method `none` and scope `private_onl
 ```
 voxprint train recording.wav --text script.txt --name Anna --type female
 voxprint train ./clips --name Anna --type female --out ./voices --json
-voxprint train recording.wav --text script.txt --name Anna --force-cpu
 voxprint train ./clips --name MyVoice --language ru --consent commercial --speaker "Reader Name" --license CC0-1.0
 ```
 
-`--force-cpu` is the retry after exit code 5. A second train creates another voice; it is not a no-op.
+A second train creates another voice; it is not a no-op. Training needs an NVIDIA GeForce RTX 40-series or newer GPU. Out of video memory is exit code 5: close other programs that use the card and run the same command again. There is no CPU-only mode.
 
 ## Voices
 

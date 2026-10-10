@@ -19,6 +19,8 @@ import os
 import sys
 from typing import Sequence
 
+from infra.gpu_requirement import enforce, startup_is_gui, startup_requires_gpu
+
 
 def _setup_logging() -> None:
     """Rotating ``logs/voxprint.log`` (5 MB x 6) with exception hooks (infra/diagnostics.py); the console if the file fails."""
@@ -249,6 +251,11 @@ def main(argv=None) -> int:
 
     guard_stdio()
     argv = list(sys.argv if argv is None else argv)
+    # RTX 40-series (compute >= 8.9) before any heavy import. --version, help, status and diagnostics stay usable.
+    if startup_requires_gpu(argv):
+        blocked = enforce(gui=startup_is_gui(argv))
+        if blocked:
+            return blocked
     # updated packages must be on sys.path BEFORE the heavy libraries are imported
     from infra.updater import activate_overlay
 

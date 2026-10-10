@@ -10,7 +10,7 @@ is repacked or uploaded by us, so a CI build takes minutes instead of an hour an
 | Part | Source | Pinned by | Fallback |
 |---|---|---|---|
 | Voxprint shell (Qt, numpy, soundfile, our code) | our GitHub release (`Voxprint-shell-01.zip`) | SHA-256 in the manifest | — |
-| PyTorch + torchaudio (2.11.0; `cu128`, `cu126` or `cpu`) | `download.pytorch.org/whl/<flavor>/` | `infra/runtime_lock.json` | optional mirror (`urls`) |
+| PyTorch + torchaudio (2.11.0; `cu130`, `cu128` or `cu126`) | `download.pytorch.org/whl/<flavor>/` | `infra/runtime_lock.json` | optional mirror (`urls`) |
 | ~70 other libraries (transformers, scipy, librosa, onnxruntime, peft ...) | PyPI (`files.pythonhosted.org`) | `infra/runtime_lock.json` | optional mirror |
 | 3 sdist-only pure-Python packages (`eng-to-ipa`, `sox`, `docopt`) | built from the hash-checked PyPI sdist in CI, shipped as small wheels in our release | SHA-256 in the manifest | — |
 | Visual C++ runtime | Microsoft (`aka.ms/vs/17/release/vc_redist.x64.exe`, fetched by CI and embedded in the setup) — installed only if the PC lacks 14.29 or newer | — | — |
@@ -41,11 +41,11 @@ every file is still at its address with the pinned size). CI only reads the comm
 | 1 | Same CPython minor version as Voxprint (the `Tag:` of the installed wheel, now `cp311`) and `win_amd64` |
 | 2 | `torch` inside `compat.torch` of the lock (now `>=2.8,<2.13`; we tested 2.11.0) |
 | 3 | `torchaudio` in the same `site-packages`, same release number as `torch` |
-| 4 | Flavor: a CPU build only on a PC without an NVIDIA GPU; a CUDA build must not need a newer driver than installed (older CUDA builds are fine); a build without a local tag on Windows counts as CPU |
+| 4 | Flavor: a CUDA build must not need a newer driver than the one installed (an older CUDA build is fine). There is no CPU wheel for users |
 | 5 | `torch/lib`, `torch/__init__.py`, `torchaudio/__init__.py` exist |
 | 6 | The child-process check passes (150 s limit) |
 
-The flavor we download follows the driver (`nvidia-smi`): CUDA ≥ 12.8 → `cu128`, ≥ 12.6 → `cu126`, otherwise `cpu` (`VOXPRINT_TORCH_FLAVOR` forces one).
+The flavor we download follows the driver (`nvidia-smi`): CUDA 12.8 or newer → `cu128`, CUDA 12.6 or newer → `cu126`. There is no CPU flavor for users. CI jobs that need a CPU wheel set an internal variable (see [DEVELOPMENT.md](DEVELOPMENT.md)).
 
 ## Start-up flow
 
@@ -87,7 +87,7 @@ Every release's manifest is *pinned*: the exact files (size + SHA-256) this rele
 Installs only the pinned shell packages (Qt, numpy, soundfile ...) into a venv, runs the unit tests that need no PyTorch, builds the shell with
 PyInstaller (`build_thin.bat`), writes `Voxprint-shell-01.zip` + `manifest-thin-<channel>.json` and compiles `Voxprint-Setup-online.exe`
 (`installer/build_online.ps1 -RuntimeLock infra\runtime_lock.json`). It then **really runs the product on the runner**: the frozen shell downloads the whole
-runtime from upstream (CPU PyTorch), imports it, and a second run proves that a PyTorch lying around on the PC is found, checked and reused instead of
+runtime from upstream (a CPU PyTorch wheel, internal to this job), imports it, and a second run proves that a PyTorch lying around on the PC is found, checked and reused instead of
 downloaded. Only then are the installer, its hash and the manifest attached to the release (older assets are never touched).
 
 ## Portable setup folder (foundation; the installer checkbox comes later)

@@ -61,7 +61,7 @@ def auto_repo(gpu=None) -> str:
 
 
 def preferred_repo(choice: Optional[str] = None, gpu=None, force_cpu: bool = False) -> str:
-    """The model to use.  ``force_cpu`` (the "CPU only" option) means 0.6B unless the user explicitly chose 1.7B."""
+    """The model to use.  ``force_cpu`` is internal (tests): it picks 0.6B unless 1.7B was chosen explicitly."""
     choice = choice or preference()
     if choice == USE_LARGE:
         return LARGE

@@ -236,7 +236,7 @@ def test_gpu_factor_table_is_ordered_by_speed():
     """Sanity of the scaling table: a faster card never gets a bigger factor (spec-derived, only the 4090 is measured)."""
     from core import train_presets as tp
 
-    order = ["5090", "4090", "4080", "3090", "4070 ti", "3080", "4070", "4060 ti", "3070", "4060", "2080", "3060", "2070", "2060", "1080", "1070", "1060"]
+    order = ["5090", "4090", "4080", "4070 ti", "4070", "4060 ti", "4060"]
     f = dict(tp.GPU_FACTORS)
     assert f["4090"] == 1.0
     vals = [f[k] for k in order]

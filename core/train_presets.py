@@ -31,9 +31,8 @@ CPU_FACTOR = 40.0                  # rough: a CPU is ~40x slower than a 4090 for
 #: (substring of the GPU name, speed factor relative to the RTX 4090 = 1.0); first match wins.  Estimates from the
 #: relative training throughput of the cards (geometric mean of the dense bf16 tensor-core and memory-bandwidth ratios to the
 #: 4090; checked against the measured 4090 only), not measured on the other cards - rounded UP, an overestimate beats a surprise.
-GPU_FACTORS = (("5090", 0.7), ("4090", 1.0), ("4080", 1.5), ("3090", 1.7), ("4070 ti", 1.9), ("4070", 2.4), ("3080", 2.0),
-               ("4060 ti", 2.6), ("3070", 2.8), ("4060", 3.2), ("3060", 3.6), ("2080", 3.2), ("2070", 3.8), ("2060", 4.5),
-               ("1080", 5.0), ("1070", 6.0), ("1060", 8.0))
+GPU_FACTORS = (("5090", 0.7), ("4090", 1.0), ("4080", 1.5), ("4070 ti", 1.9), ("4070", 2.4),
+               ("4060 ti", 2.6), ("4060", 3.2))
 
 
 @dataclass(frozen=True)
