@@ -1,5 +1,6 @@
 """Shared pytest setup: every test gets an isolated app-data folder, a fixed language and no network/model-cache access."""
 import ctypes
+import faulthandler
 import os
 import sys
 from pathlib import Path
@@ -55,7 +56,12 @@ def remember_exit_status(exitstatus: int) -> None:
 
 def _terminate_windows(code: int) -> bool:
     """End this process without ``DLL_PROCESS_DETACH``. ``ExitProcess`` (what ``os._exit`` calls) still runs it,
-    and on Python 3.14 that detach access-violates once Qt is loaded."""
+    and on Python 3.14 that detach access-violates once Qt is loaded.
+
+    ``faulthandler`` (enabled by the CI pytest command) reports that kill as an access violation and the
+    process exit code becomes the exception code. Silence it first so a green session stays exit 0.
+    """
+    faulthandler.disable()
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     return bool(kernel.TerminateProcess(kernel.GetCurrentProcess(), code & 0xFFFFFFFF))
 
@@ -66,10 +72,13 @@ def leave_before_native_shutdown() -> bool:
     Python 3.14 and PySide6 print ``QObject: shared QObject was deleted directly`` and then
     the process dies with a bus error after a green session. The result is already decided.
     A crash during a test never reaches this function. Off CI the process exits normally.
+    Streams are flushed first: ``os._exit`` does not, and the failure text would never reach the log.
     """
     if os.environ.get("GITHUB_ACTIONS") != "true" or _ci_exit is None:
         return False
     code = int(_ci_exit)
+    sys.stdout.flush()
+    sys.stderr.flush()
     if sys.platform == "win32" and _terminate_windows(code):
         return True
     os._exit(code)

@@ -34,3 +34,21 @@ def test_windows_ci_terminates_without_dll_detach(monkeypatch):
     conftest.remember_exit_status(1)
     conftest.leave_before_native_shutdown()
     assert terminated == [0, 1] and exited == []
+
+
+def test_windows_terminate_silences_faulthandler_before_the_kill(monkeypatch):
+    order = []
+
+    class Kernel:
+        def GetCurrentProcess(self):
+            order.append("proc")
+            return 7
+
+        def TerminateProcess(self, handle, code):
+            order.append(("kill", handle, code))
+            return 1
+
+    monkeypatch.setattr(conftest.faulthandler, "disable", lambda: order.append("dis"))
+    monkeypatch.setattr(conftest.ctypes, "WinDLL", lambda *a, **k: Kernel(), raising=False)
+    assert conftest._terminate_windows(0) is True
+    assert order == ["dis", "proc", ("kill", 7, 0)]
