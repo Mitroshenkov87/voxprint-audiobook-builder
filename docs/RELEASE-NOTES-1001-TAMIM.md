@@ -30,7 +30,7 @@ Code signing is being applied for (SignPath Foundation). The warning will go awa
 
 New:
 
-- **Suite icons.** Save, Save as, Save a copy, Export and Download are stroke icons. They replace the floppy-disk save picture.
+- **Suite icons.** Save, Save as, Save a copy, Export and Download are stroke icons. They replace the old save picture.
 - **Dry-run for other programs.** `voxprint --dry-run --json <command>` checks the arguments, the files and the output folder, prints JSON and exits with the documented codes. It does not load a model, use a GPU or download anything, so it runs on a machine that has no NVIDIA GPU.
 - **Codename check.** A release codename cannot repeat an earlier build in this repository (`python tools/codenames.py`).
 - **Roadmap and documentation site.** [ROADMAP.md](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/blob/main/ROADMAP.md) is public. The [documentation site](https://mitroshenkov87.github.io/voxprint-audiobook-builder/) includes a command reference generated from the program, an architecture map, and pages built from the code's docstrings.
