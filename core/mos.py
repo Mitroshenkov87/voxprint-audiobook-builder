@@ -31,6 +31,7 @@ class DnsMos:
     """``DnsMos(path).score(audio, sr) -> {"ovrl", "sig", "bak"}``; ``session`` is injectable for tests."""
 
     def __init__(self, model_path: Optional[Path] = None, session=None, threads: int = 1) -> None:
+        """Open the DNSMOS session from ``model_path``, or use an injected ``session``."""
         if session is None:
             import onnxruntime as ort
 

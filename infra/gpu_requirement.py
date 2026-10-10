@@ -58,6 +58,7 @@ class GpuDevice:
 
     @property
     def compute_text(self) -> str:
+        """``major.minor`` text for this device, for example ``8.9``."""
         return f"{self.major}.{self.minor}"
 
 
@@ -73,6 +74,7 @@ class GpuReport:
     overridden: bool
 
     def to_dict(self) -> dict:
+        """The requirement block printed by ``status``."""
         return {
             "ok": self.ok,
             "min_compute": MIN_COMPUTE_TEXT,
@@ -90,6 +92,7 @@ def allow_without_gpu(environ: Optional[dict] = None) -> bool:
 
 
 def meets(major: int, minor: int) -> bool:
+    """True when ``major.minor`` is at least 8.9."""
     return (int(major), int(minor)) >= MIN_COMPUTE
 
 

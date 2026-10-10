@@ -630,10 +630,12 @@ class ModelLock:
     """
 
     def __init__(self, path: Path) -> None:
+        """Remember the lock-file path. The file is created on acquire."""
         self.path = path
         self._fh: Any = None
 
     def try_acquire(self) -> bool:
+        """Take the lock without waiting. False when another process already holds it."""
         for _ in range(5):
             self.path.parent.mkdir(parents=True, exist_ok=True)
             try:
@@ -705,6 +707,7 @@ class ModelLock:
                 pass
 
     def acquire(self, on_wait: Callable[[float], None], poll: float = 0.5) -> None:
+        """Wait until the lock is free. ``on_wait`` is called with the seconds already spent."""
         t0 = time.monotonic()
         waited = False
         while not self.try_acquire():

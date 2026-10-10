@@ -29,6 +29,7 @@ class DryRunFailure(Exception):
     """A dry-run check failed with a documented exit code."""
 
     def __init__(self, code: int, message: str, *, hint: str = "") -> None:
+        """Store the exit code, the message and the suggested fix."""
         super().__init__(message)
         self.code = int(code)
         self.message = message

@@ -15,6 +15,7 @@ class DatasetMakerError(Exception):
     kind = "error"
 
     def __init__(self, user_message: str, *, details: str = "") -> None:
+        """Store the user-facing message and the technical detail."""
         super().__init__(user_message)
         self.user_message = user_message
         self.details = details
@@ -25,6 +26,7 @@ class CancelledByUser(DatasetMakerError):
     kind = "cancelled"
 
     def __init__(self, user_message: str = "") -> None:
+        """Use ``user_message``, or the standard cancelled sentence when it is empty."""
         super().__init__(user_message or tr("err.cancelled"))
 
 
@@ -55,6 +57,7 @@ class ModelDownloadError(DatasetMakerError):
     kind = "download"
 
     def __init__(self, user_message: str, *, url: str = "", details: str = "") -> None:
+        """Store the user-facing message, the model page ``url`` and the technical detail."""
         super().__init__(user_message, details=details)
         self.url = url
 
@@ -68,6 +71,7 @@ class OutOfMemoryError_(DatasetMakerError):
     kind = "oom"
 
     def __init__(self, user_message: str = "", *, details: str = "") -> None:
+        """Use ``user_message``, or the standard out-of-memory sentence when it is empty."""
         super().__init__(user_message or tr("err.oom"), details=details)
 
 
@@ -119,5 +123,6 @@ class BackupError(DatasetMakerError):
     kind = "backup"
 
     def __init__(self, user_message: str, *, code: str = "io", details: str = "") -> None:
+        """Store the user-facing message, the stable ``code`` and the technical detail."""
         super().__init__(user_message, details=details)
         self.code = code

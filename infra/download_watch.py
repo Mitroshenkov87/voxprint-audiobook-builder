@@ -36,6 +36,7 @@ class Stalled(OSError):
     ``progressed`` tells whether the abandoned attempt had received data before it stalled (worth resuming the same source)."""
 
     def __init__(self, *args: Any, progressed: bool = False) -> None:
+        """Store the OS error and whether any bytes had arrived before the stall."""
         super().__init__(*args)
         self.progressed = progressed
 
@@ -186,6 +187,7 @@ class Meter:
     ETA_AFTER = 6.0
 
     def __init__(self, source: str, total: Optional[Callable[[], int]] = None, clock: Callable[[], float] = time.monotonic) -> None:
+        """Watch one download. ``total`` reports the expected size when it is not fixed yet."""
         self.source = source
         self.total_fn = total
         self.clock = clock
@@ -207,6 +209,7 @@ class Meter:
             self._fixed_total = int(total)
 
     def sample(self, done: int) -> None:
+        """Record that ``done`` bytes are on disk and update the speed."""
         now = self.clock()
         done = max(self.done, int(done))                    # monotonic
         if self._t_first is None:
@@ -223,6 +226,7 @@ class Meter:
 
     @property
     def total(self) -> int:
+        """The expected size in bytes, or 0 when it is not known yet."""
         if self._fixed_total:
             return self._fixed_total
         if self.total_fn is None:

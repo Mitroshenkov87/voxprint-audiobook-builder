@@ -69,13 +69,16 @@ class AsrReport:
     dropped: Dict[str, int] = field(default_factory=dict)
 
     def drop(self, reason: str) -> None:
+        """Count one dropped clip under ``reason``."""
         self.dropped[reason] = self.dropped.get(reason, 0) + 1
 
     @property
     def share_kept(self) -> float:
+        """Share of the audio that was kept, or 0 when nothing was timed."""
         return self.seconds_kept / self.seconds_total if self.seconds_total else 0.0
 
     def as_dict(self) -> dict:
+        """A plain dict of the counts, seconds and drop reasons."""
         return {"files": self.files, "files_failed": self.files_failed, "clips": self.clips, "kept": self.kept,
                 "seconds_total": round(self.seconds_total, 1), "seconds_kept": round(self.seconds_kept, 1),
                 "share_kept": round(self.share_kept, 3), "dropped": dict(self.dropped)}

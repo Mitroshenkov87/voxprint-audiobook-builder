@@ -62,7 +62,7 @@ jobs:
       - name: Unit tests with the installed environment
         run: |
           V=~/.local/share/voxprint/venv
-          $V/bin/uv pip install --python $V/bin/python -r requirements-dev.txt
+          $V/bin/uv pip install --python $V/bin/python -r requirements-dev.txt -r requirements-docs.txt
           $V/bin/python -m pytest -q -p no:cacheprovider
 
       - name: Smoke tests of the installed program

@@ -1,0 +1,3 @@
+# `tools.codenames`
+
+::: tools.codenames

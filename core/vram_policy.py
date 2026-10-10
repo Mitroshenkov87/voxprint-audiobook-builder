@@ -49,6 +49,8 @@ def reserve_gb(total_gb: float) -> float:
 
 @dataclass(frozen=True)
 class VramPlan:
+    """The narration batch that fits in the free video memory, and the numbers behind it."""
+
     batch: int
     budget_gb: float
     free_gb: float
@@ -57,6 +59,7 @@ class VramPlan:
     reserve_gb: float
 
     def describe(self) -> str:
+        """One line naming the batch, the budget, the free memory and the reserve."""
         cap = f", cap {self.fraction:.0%}" if self.fraction else ""
         return (f"batch {self.batch} (budget {self.budget_gb:.1f} GB of {self.free_gb:.1f} GB free / "
                 f"{self.total_gb:.1f} GB total, reserve {self.reserve_gb:.1f} GB{cap})")

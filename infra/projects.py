@@ -132,6 +132,7 @@ def in_onedrive(folder: Path) -> bool:
 
 # ------------------------------------------------------------------------------------------------ the shortcut
 def shortcut_path(docs: Optional[Path] = None) -> Path:
+    """Path of the Documents shortcut that opens the projects folder."""
     docs = docs or documents_dir()
     return docs / (SHORTCUT_NAME + (".lnk" if sys.platform == "win32" else ""))
 

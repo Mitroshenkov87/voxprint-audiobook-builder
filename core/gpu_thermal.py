@@ -60,6 +60,7 @@ class Monitor:
     def __init__(self, started: float, now: Callable[[], float] = time.monotonic,
                  read_temp: Optional[Callable[[], Optional[float]]] = None,
                  sleep: Callable[[float], None] = time.sleep, gpu_index: int = 0) -> None:
+        """Remember the job start time, the clock and the temperature reader."""
         self.started = float(started)
         self.now = now
         self.sleep = sleep
@@ -82,6 +83,7 @@ class Monitor:
         return self
 
     def stop(self) -> None:
+        """Stop the sampler thread and wait for it to finish."""
         self._stop.set()
         thread = self._thread
         self._thread = None

@@ -106,12 +106,14 @@ class FakeVoiceConverter:
     key = "fake"
 
     def __init__(self) -> None:
+        """Start with an empty call log."""
         self.calls: list = []
         self.unloaded = False
 
     def convert(self, source: np.ndarray, source_sr: int, reference: np.ndarray, reference_sr: int,
                 cancel: Optional[CancelToken] = None, progress: Optional[Callable[[float], None]] = None
                 ) -> Tuple[np.ndarray, int]:
+        """Record the call and return a quieter copy of ``source``. No model runs."""
         if cancel is not None:
             cancel.check()
         self.calls.append((int(len(source)), int(source_sr), int(len(reference)), int(reference_sr)))
@@ -120,4 +122,5 @@ class FakeVoiceConverter:
         return np.clip(np.asarray(source, dtype=np.float32) * 0.5, -1.0, 1.0), int(source_sr)
 
     def unload(self) -> None:
+        """Mark the fake converter as unloaded."""
         self.unloaded = True

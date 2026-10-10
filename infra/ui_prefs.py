@@ -26,6 +26,7 @@ def transparency() -> str:
 
 
 def set_transparency(level: str) -> None:
+    """Save the window transparency ``level``."""
     if level not in TRANSPARENCY_LEVELS:
         raise ValueError(level)
     f = _file()

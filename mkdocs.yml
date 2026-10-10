@@ -1,0 +1,271 @@
+site_name: Voxprint AI Audiobook Builder
+site_description: Train a voice from a short recording and narrate books offline.
+site_url: https://mitroshenkov87.github.io/voxprint-audiobook-builder/
+repo_url: https://github.com/Mitroshenkov87/voxprint-audiobook-builder
+repo_name: Mitroshenkov87/voxprint-audiobook-builder
+edit_uri: edit/main/docs/
+docs_dir: docs
+
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - search.suggest
+    - toc.follow
+
+extra_css:
+  - stylesheets/extra.css
+
+hooks:
+  - tools/mkdocs_hooks.py
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["."]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: false
+            members_order: source
+            show_if_no_docstring: false
+            filters: ["!^_"]
+            heading_level: 2
+
+# Existing pages link to repository files that sit next to docs/ (LICENSE, the root
+# AGENTS.md, screenshots). Those targets are not pages of this site, so a missing
+# in-site target is reported as info. --strict still fails the build on a real error
+# and on a markdown file left out of the nav.
+validation:
+  omitted_files: warn
+  absolute_links: ignore
+  unrecognized_links: info
+  not_found: info
+  anchors: info
+
+nav:
+  - Home: index.md
+  - Roadmap: generated/roadmap.md
+  - Using the app:
+      - User guide: USER-GUIDE.md
+      - How it works: HOW-IT-WORKS.md
+      - Features: FEATURES.md
+      - FAQ: FAQ.md
+      - Voices: VOICES.md
+      - Translation: TRANSLATION.md
+      - Re-voice: REVOICE.md
+      - Soundscape: SOUNDSCAPE.md
+      - Ordinals: ORDINALS.md
+      - AAC and M4B: AAC-M4B.md
+      - Voice quality: VOICE-QUALITY.md
+      - Privacy: PRIVACY.md
+  - Reference:
+      - Command reference: generated/cli.md
+      - Command-line guide: CLI.md
+      - Driving the app: AGENTS.md
+      - Architecture: ARCHITECTURE.md
+      - Models: MODELS.md
+      - Downloads: DOWNLOADS.md
+      - Runtime: RUNTIME.md
+      - Linux: LINUX.md
+      - Thin installer: THIN-INSTALLER.md
+      - Licences: LICENSES.md
+  - Building:
+      - Building: BUILDING.md
+      - Development: DEVELOPMENT.md
+      - Testing: TESTING.md
+      - Audit: AUDIT.md
+      - Releasing: RELEASING.md
+      - Linux test checklist: LINUX-TEST-CHECKLIST.md
+      - Recording scripts: recording-scripts/README.md
+  - Manuals:
+      - English: manual/src/manual_en.md
+      - Deutsch: manual/src/manual_de.md
+      - Russian: manual/src/manual_ru.md
+  - Legal:
+      - Audiobook Builder: legal/EULA-audiobook-builder.md
+      - Movie Dubber draft: legal/EULA-movie-dubber-DRAFT.md
+      - Template: legal/EULA-TEMPLATE.md
+  - Release notes:
+      - Template: RELEASE-NOTES-TEMPLATE.md
+      - 1.0.0 Chazak: RELEASE-NOTES-1000-CHAZAK.md
+      - 704 Achim: RELEASE-NOTES-704-ACHIM.md
+      - 703 Toledot: RELEASE-NOTES-703-TOLEDOT.md
+      - 702 Shelishi: RELEASE-NOTES-702-SHELISHI.md
+      - 701 Shalem: RELEASE-NOTES-701-SHALEM.md
+      - 700 Kaporet: RELEASE-NOTES-700-KAPORET.md
+  - Older roadmap link: ROADMAP.md
+  # BEGIN GENERATED API NAV
+  - API reference:
+      - Overview: api/index.md
+      - core:
+          - core: api/core.md
+          - adapter_strength: api/core.adapter_strength.md
+          - ai_disclosure: api/core.ai_disclosure.md
+          - aligner: api/core.aligner.md
+          - appinfo: api/core.appinfo.md
+          - asr: api/core.asr.md
+          - asr_dataset: api/core.asr_dataset.md
+          - audio_utils: api/core.audio_utils.md
+          - audiobook_export: api/core.audiobook_export.md
+          - bench: api/core.bench.md
+          - book_parsers: api/core.book_parsers.md
+          - book_prep: api/core.book_prep.md
+          - build_stamp: api/core.build_stamp.md
+          - checkpoint_pick: api/core.checkpoint_pick.md
+          - chunk_check: api/core.chunk_check.md
+          - chunker: api/core.chunker.md
+          - cli: api/core.cli.md
+          - clip_check: api/core.clip_check.md
+          - consent: api/core.consent.md
+          - cpu_budget: api/core.cpu_budget.md
+          - dataset_builder: api/core.dataset_builder.md
+          - denoise: api/core.denoise.md
+          - dry_run: api/core.dry_run.md
+          - errors: api/core.errors.md
+          - events: api/core.events.md
+          - fast_decode: api/core.fast_decode.md
+          - gpu_lock: api/core.gpu_lock.md
+          - gpu_thermal: api/core.gpu_thermal.md
+          - i18n: api/core.i18n.md
+          - languages: api/core.languages.md
+          - llm_text: api/core.llm_text.md
+          - lora_trainer: api/core.lora_trainer.md
+          - model_cache: api/core.model_cache.md
+          - model_export: api/core.model_export.md
+          - model_locator: api/core.model_locator.md
+          - mos: api/core.mos.md
+          - narration: api/core.narration.md
+          - normalizer: api/core.normalizer.md
+          - num_words: api/core.num_words.md
+          - ordinal_rules: api/core.ordinal_rules.md
+          - ordinals: api/core.ordinals.md
+          - pace: api/core.pace.md
+          - pauses: api/core.pauses.md
+          - play_queue: api/core.play_queue.md
+          - quality: api/core.quality.md
+          - revoice: api/core.revoice.md
+          - script_match: api/core.script_match.md
+          - slicer: api/core.slicer.md
+          - soundscape: api/core.soundscape.md
+          - speaker_centroid: api/core.speaker_centroid.md
+          - speakers: api/core.speakers.md
+          - spoken_date: api/core.spoken_date.md
+          - sysmem_spill: api/core.sysmem_spill.md
+          - teacher_forcing: api/core.teacher_forcing.md
+          - text_cleanup: api/core.text_cleanup.md
+          - text_prep: api/core.text_prep.md
+          - text_utils: api/core.text_utils.md
+          - train_presets: api/core.train_presets.md
+          - translate: api/core.translate.md
+          - tts_engine: api/core.tts_engine.md
+          - types: api/core.types.md
+          - vc_openvoice: api/core.vc_openvoice.md
+          - voice_check: api/core.voice_check.md
+          - voice_convert: api/core.voice_convert.md
+          - voice_info: api/core.voice_info.md
+          - voice_library: api/core.voice_library.md
+          - voice_type: api/core.voice_type.md
+          - vram_policy: api/core.vram_policy.md
+          - vxbook: api/core.vxbook.md
+          - workspace: api/core.workspace.md
+          - yo: api/core.yo.md
+      - infra:
+          - infra: api/infra.md
+          - asr_choice: api/infra.asr_choice.md
+          - assets: api/infra.assets.md
+          - auto_repair: api/infra.auto_repair.md
+          - auto_steps: api/infra.auto_steps.md
+          - backup: api/infra.backup.md
+          - bundled_voices: api/infra.bundled_voices.md
+          - cuda12_libs: api/infra.cuda12_libs.md
+          - denoise_tool: api/infra.denoise_tool.md
+          - diagnostics: api/infra.diagnostics.md
+          - download_watch: api/infra.download_watch.md
+          - env_probe: api/infra.env_probe.md
+          - existing_models: api/infra.existing_models.md
+          - external_models: api/infra.external_models.md
+          - features: api/infra.features.md
+          - gpu_prefs: api/infra.gpu_prefs.md
+          - gpu_requirement: api/infra.gpu_requirement.md
+          - hard_exit: api/infra.hard_exit.md
+          - install_state: api/infra.install_state.md
+          - keep_awake: api/infra.keep_awake.md
+          - llm_tool: api/infra.llm_tool.md
+          - model_downloader: api/infra.model_downloader.md
+          - model_mirrors: api/infra.model_mirrors.md
+          - model_release: api/infra.model_release.md
+          - models_users: api/infra.models_users.md
+          - modelscope_mirror: api/infra.modelscope_mirror.md
+          - modules: api/infra.modules.md
+          - net: api/infra.net.md
+          - netroute: api/infra.netroute.md
+          - parallel_download: api/infra.parallel_download.md
+          - paths: api/infra.paths.md
+          - platform_win: api/infra.platform_win.md
+          - portable: api/infra.portable.md
+          - preload: api/infra.preload.md
+          - projects: api/infra.projects.md
+          - quality_models: api/infra.quality_models.md
+          - runtime_reuse: api/infra.runtime_reuse.md
+          - setup_mode: api/infra.setup_mode.md
+          - soundscape_model: api/infra.soundscape_model.md
+          - stdio_guard: api/infra.stdio_guard.md
+          - suite_settings: api/infra.suite_settings.md
+          - sysinfo: api/infra.sysinfo.md
+          - text_models: api/infra.text_models.md
+          - ui_prefs: api/infra.ui_prefs.md
+          - updater: api/infra.updater.md
+          - vc_model: api/infra.vc_model.md
+          - verified_manifest: api/infra.verified_manifest.md
+          - version_manager: api/infra.version_manager.md
+          - voice_catalog: api/infra.voice_catalog.md
+          - voice_repository: api/infra.voice_repository.md
+          - vram_optimizer: api/infra.vram_optimizer.md
+      - cli: api/cli.md
+      - main: api/main.md
+      - ui:
+          - ui: api/ui.md
+          - studio: api/ui.studio.md
+          - main_window: api/ui.main_window.md
+          - narrate_window: api/ui.narrate_window.md
+          - voices_window: api/ui.voices_window.md
+          - settings_dialog: api/ui.settings_dialog.md
+          - revoice_window: api/ui.revoice_window.md
+          - suite_icons: api/ui.suite_icons.md
+      - tools:
+          - codenames: api/tools.codenames.md
+  # END GENERATED API NAV

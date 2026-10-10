@@ -545,12 +545,14 @@ class SettingsDialog(GlassDialog):
         self.btn_projects_default.setEnabled(projects.configured_projects_dir() is not None)
 
     def open_projects_folder(self) -> None:
+        """Open the projects folder in the file manager."""
         from infra import projects
         from ui.main_window import open_folder  # local: circular at load time
 
         open_folder(projects.projects_dir())
 
     def choose_projects_folder(self) -> None:
+        """Ask for a folder and use it for new projects."""
         folder = self.pick_folder(tr("projects.choose"))
         if folder:
             self.set_projects_folder(Path(folder))

@@ -1,0 +1,3 @@
+# `infra.netroute`
+
+::: infra.netroute

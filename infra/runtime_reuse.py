@@ -53,6 +53,8 @@ OK_MARK = "VXTORCH OK"
 # ------------------------------------------------------------------------------------------------ what was found
 @dataclass
 class ExternalTorch:
+    """A PyTorch install found in another program's site-packages."""
+
     site: str                  # the site-packages folder that holds torch (and torchaudio)
     torch: str                 # '2.11.0+cu128'
     torchaudio: str            # '' when missing
@@ -61,6 +63,7 @@ class ExternalTorch:
     flavor: str                # 'cu128' / 'cpu' / 'unknown'
 
     def key(self) -> Tuple[Version, str]:
+        """A sort key of the torch version and the site-packages path."""
         try:
             return (Version(self.torch.split("+")[0]), self.site)
         except InvalidVersion:
@@ -100,6 +103,7 @@ def flavor_of(version: str) -> str:
 
 
 def inspect_site(site: Path) -> Optional[ExternalTorch]:
+    """Read torch and torchaudio from ``site``, or None when torch is not there."""
     t = _read_dist(site, "torch")
     if t is None:
         return None
@@ -348,10 +352,12 @@ def probe_torch_main() -> int:
 
 # ------------------------------------------------------------------------------------------------ remembered choice
 def state_path() -> Path:
+    """Path of the file that remembers a reused runtime."""
     return paths.app_home() / "runtime" / STATE_NAME
 
 
 def load_state() -> Dict[str, Dict]:
+    """The remembered runtimes, or an empty dict when the file is missing."""
     try:
         d = json.loads(state_path().read_text(encoding="utf-8"))
         return d if isinstance(d, dict) else {}
@@ -360,6 +366,7 @@ def load_state() -> Dict[str, Dict]:
 
 
 def save_choice(group: str, ext: ExternalTorch) -> None:
+    """Remember ``ext`` as the chosen copy for ``group``."""
     st = load_state()
     st[group] = dict(asdict(ext), verified=datetime.datetime.now().isoformat(timespec="seconds"))
     p = state_path()
@@ -370,6 +377,7 @@ def save_choice(group: str, ext: ExternalTorch) -> None:
 
 
 def forget(group: str = "torch") -> None:
+    """Forget the remembered copy for ``group``."""
     st = load_state()
     if st.pop(group, None) is not None:
         p = state_path()

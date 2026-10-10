@@ -1,0 +1,3 @@
+# `core.yo`
+
+::: core.yo

@@ -71,6 +71,7 @@ def normalize_language(value: object) -> Optional[str]:
 
 
 def default_language() -> str:
+    """The language to use when the shared file has none: the system language, else English."""
     from core.i18n import DEFAULT_LANG, system_language
 
     return system_language() or DEFAULT_LANG
@@ -104,10 +105,12 @@ def normalize_models_dir(value: object) -> Optional[Path]:
 
 # ------------------------------------------------------------------------------------------------- reading
 def ui_language() -> str:
+    """The shared interface language."""
     return normalize_language(read_raw().get("ui_language")) or default_language()
 
 
 def theme() -> str:
+    """The shared theme name."""
     return normalize_theme(read_raw().get("theme"))
 
 
@@ -118,6 +121,7 @@ def models_dir() -> Optional[Path]:
 
 
 def gpu() -> str:
+    """The shared GPU preference."""
     return normalize_gpu(read_raw().get("gpu")) or DEFAULT_GPU
 
 

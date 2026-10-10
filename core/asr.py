@@ -54,10 +54,12 @@ class Qwen3ASR(BaseASR):
     """Qwen3-ASR through the ``qwen_asr`` package (the same package the aligner uses)."""
 
     def __init__(self, model_path: str = ASR_REPO, device: str = "auto") -> None:
+        """Remember the model path and the device. The weights load on the first transcription."""
         self.model_path, self.device = model_path, device
         self._m: Any = None
 
     def load(self) -> None:
+        """Load Qwen3-ASR, reusing a copy already sitting in RAM when one is there."""
         import torch
         from qwen_asr import Qwen3ASRModel
 
@@ -77,6 +79,7 @@ class Qwen3ASR(BaseASR):
                  time.monotonic() - t0, cuda_memory())
 
     def unload(self) -> None:
+        """Drop the recogniser and return its video memory."""
         self._m = None
         try:
             import gc
@@ -90,6 +93,7 @@ class Qwen3ASR(BaseASR):
             pass
 
     def transcribe(self, audio: np.ndarray, sr: int, language: Optional[str] = None) -> AsrResult:
+        """Turn ``audio`` at ``sr`` into text. ``language`` is a hint; the model may still detect it."""
         import soundfile as sf
 
         from core import audio_utils as au
@@ -108,9 +112,11 @@ class FakeASR(BaseASR):
     """Test double: returns ``texts[i]`` for the i-th call (or a function of the clip)."""
 
     def __init__(self, texts) -> None:
+        """Remember the scripted answers (one string or result per call, or a callable)."""
         self.texts, self.calls = texts, 0
 
     def transcribe(self, audio: np.ndarray, sr: int, language: Optional[str] = None) -> AsrResult:
+        """Return the next scripted answer and count the call."""
         t = self.texts(audio, sr) if callable(self.texts) else self.texts[min(self.calls, len(self.texts) - 1)]
         self.calls += 1
         return t if isinstance(t, AsrResult) else AsrResult(t)

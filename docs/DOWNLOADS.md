@@ -1,6 +1,6 @@
 # Downloads and verification
 
-The current pre-release is **[v0.1.3-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.3-beta)** (build 667 "Menuchah", marked *pre-release*). Planned installer channels are listed in the [Roadmap](ROADMAP.md).
+The current pre-release is **[v0.1.3-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.1.3-beta)** (build 667 "Menuchah", marked *pre-release*). Planned installer channels are listed in the [Roadmap](generated/roadmap.md).
 
 **Right now only the small online installer is offered** (`Voxprint-Setup-online.exe`, 35,235,971 bytes). A full offline installer may return later. The Linux version is temporarily unavailable (see the end).
 

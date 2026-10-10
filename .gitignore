@@ -16,3 +16,6 @@ dataset/
 # audit (tools/audit.py)
 audit-report.txt
 .coverage
+
+# mkdocs output
+site/

@@ -75,6 +75,7 @@ class ChunkChecker:
 
     def __init__(self, asr_factory: Callable[[], object], language: Optional[str] = None,
                  options: Optional[ChunkCheckOptions] = None, normalize: Optional[Callable[[str], str]] = None) -> None:
+        """Store the recogniser factory, the language and the check options."""
         self.asr_factory, self.language, self.normalize = asr_factory, language, normalize
         self.options = options or ChunkCheckOptions()
         self.options.retries = max(0, min(MAX_RETRIES, int(self.options.retries)))

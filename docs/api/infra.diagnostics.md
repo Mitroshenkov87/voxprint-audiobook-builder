@@ -1,0 +1,3 @@
+# `infra.diagnostics`
+
+::: infra.diagnostics

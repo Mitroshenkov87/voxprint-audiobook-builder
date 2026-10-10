@@ -64,6 +64,7 @@ class Route:
     proxy: bool = True
 
     def label(self) -> str:
+        """A label for the interface: the name, or the name plus the address."""
         if not self.ip:
             return self.name
         return f"{self.name} ({self.ip})" if self.name != self.ip else self.ip
@@ -299,6 +300,7 @@ def remembered() -> Optional[Route]:
 
 
 def remember(route: Route) -> None:
+    """Remember ``route`` as the interface that won the last speed probe."""
     global _remembered, _loaded
     _remembered, _loaded = route, True
     try:
@@ -311,6 +313,7 @@ def remember(route: Route) -> None:
 
 
 def forget() -> None:
+    """Forget the remembered interface."""
     global _remembered, _loaded
     _remembered, _loaded = None, True
     try:

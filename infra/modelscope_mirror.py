@@ -55,6 +55,7 @@ def hf_verdict() -> Optional[bool]:
 
 
 def reset_verdict() -> None:
+    """Forget the cached ModelScope reachability verdict."""
     global _verdict
     _verdict = (None, 0.0)
 

@@ -277,7 +277,7 @@ jobs:
           python -m venv .venv
           python tools\make_runtime_lock.py --test-requirements | Out-File -Encoding ascii build-req.txt
           Get-Content build-req.txt
-          .venv\Scripts\python.exe -m pip install --quiet -r build-req.txt pyinstaller pytest
+          .venv\Scripts\python.exe -m pip install --quiet -r build-req.txt -r requirements-docs.txt pyinstaller pytest
       - name: Tests that need no PyTorch
         if: ${{ !inputs.skip_tests }}
         shell: pwsh

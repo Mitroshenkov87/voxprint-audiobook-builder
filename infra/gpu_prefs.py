@@ -93,6 +93,7 @@ def set_vram_fraction(value: object) -> Optional[float]:
 
 
 def fast_decode() -> str:
+    """The fast-decode mode from the environment or the saved setting (``off`` when it is unknown)."""
     for raw in (os.environ.get(ENV_FAST_DECODE, ""), _read().get("fast_decode", "off")):
         if str(raw).strip():
             try:
@@ -104,6 +105,7 @@ def fast_decode() -> str:
 
 
 def set_fast_decode(value: object) -> str:
+    """Save ``value`` as the fast-decode mode and return the stored name."""
     mode = normalize_mode(value)
     _write("fast_decode", mode)
     return mode

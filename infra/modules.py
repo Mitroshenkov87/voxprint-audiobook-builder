@@ -37,11 +37,13 @@ class ModulesError(Exception):
 
 
 class Cancelled(ModulesError):
-    pass
+    """The user cancelled a module download."""
 
 
 @dataclass
 class Module:
+    """One runtime module: its id, download size and whether it is already installed."""
+
     id: str
     title: str
     required: bool
@@ -55,6 +57,7 @@ class Module:
 
 # ------------------------------------------------------------------------------------------------ configuration
 def config_path() -> Optional[Path]:
+    """The ``modules.json`` path, or None when this build has no module manifest."""
     env = os.environ.get("VOXPRINT_MODULES_CONFIG", "").strip()
     cands = [Path(env)] if env else []
     cands.append(paths.resource_dir() / CONFIG_NAME)
@@ -66,6 +69,7 @@ def config_path() -> Optional[Path]:
 
 
 def load_config() -> Optional[Dict[str, Any]]:
+    """The parsed module manifest, or None when it is missing or has no URL."""
     p = config_path()
     if p is None:
         return None
@@ -102,6 +106,7 @@ def prefer_latest() -> bool:
 
 
 def set_prefer_latest(on: bool) -> None:
+    """Remember whether module downloads follow the pinned set or the latest manifest."""
     d = _channel_state()
     d["prefer"] = "latest" if on else "pinned"
     _save_channel_state(d)
@@ -120,6 +125,7 @@ def runtime_dir() -> Path:
 
 
 def cache_dir() -> Path:
+    """The folder that caches downloaded module archives."""
     p = paths.app_home() / "setup-cache"
     p.mkdir(parents=True, exist_ok=True)
     return p

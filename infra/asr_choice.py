@@ -80,6 +80,7 @@ def download_repos(choice: Optional[str] = None, gpu=None) -> List[str]:
 
 
 def other(repo: str) -> str:
+    """The other speech-recognition size: the small repo when ``repo`` is the large one, and the reverse."""
     return SMALL if repo == LARGE else LARGE
 
 

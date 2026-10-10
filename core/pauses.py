@@ -71,6 +71,7 @@ class PauseLengths:
     chapter: int = DEFAULT_LENGTHS_MS["chapter"]
 
     def __post_init__(self) -> None:
+        """Clamp every stored pause length into the allowed range."""
         for key, default in DEFAULT_LENGTHS_MS.items():
             setattr(self, key, _clamp_ms(getattr(self, key), default))
 
@@ -89,10 +90,12 @@ class PauseLengths:
         return self.sentence
 
     def to_dict(self) -> Dict[str, int]:
+        """The pause lengths in milliseconds, keyed by the pause name."""
         return {k: int(getattr(self, k)) for k in DEFAULT_LENGTHS_MS}
 
     @classmethod
     def from_dict(cls, data: object) -> "PauseLengths":
+        """Build lengths from a dict, using the defaults for anything missing or invalid."""
         d = data if isinstance(data, dict) else {}
         return cls(**{k: _clamp_ms(d.get(k, v), v) for k, v in DEFAULT_LENGTHS_MS.items()})
 
@@ -131,6 +134,7 @@ class PauseProfile:
     lengths: Optional[PauseLengths] = None     # None = the built-in BASE_MS
 
     def __post_init__(self) -> None:
+        """Clamp the pause level after the dataclass is built."""
         self.level = clamp_level(self.level)
 
     def ms(self, kind: str) -> int:

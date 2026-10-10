@@ -28,6 +28,7 @@ _job = None            # keeps the Windows job handle alive for the lifetime of 
 
 
 def armed() -> bool:
+    """True after :func:`arm` has enabled the hard exit."""
     return _armed
 
 
@@ -132,6 +133,7 @@ def fire(code: int = 0) -> None:
 
 
 def exit_now(code: int = 0) -> None:
+    """End child processes, flush the logs and exit the process with ``code``."""
     try:
         killed = kill_descendants()
         log.info("window closed - ended %d helper process(es), exiting", len(killed))

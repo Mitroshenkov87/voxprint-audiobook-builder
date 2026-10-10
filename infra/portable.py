@@ -66,6 +66,7 @@ def default_folder() -> Path:
 
 
 def state_file() -> Path:
+    """Path of the small file that remembers the offline setup folder."""
     from infra import paths
 
     return paths.state_dir() / STATE_FILE
@@ -121,6 +122,7 @@ def find_folder(extra: Iterable[Path] = ()) -> Optional[Path]:
 
 
 def read_manifest(folder: Path) -> dict:
+    """Read ``manifest.json`` from a setup folder."""
     try:
         return json.loads((Path(folder) / MANIFEST).read_text(encoding="utf-8-sig"))
     except (OSError, ValueError) as exc:
@@ -128,6 +130,7 @@ def read_manifest(folder: Path) -> dict:
 
 
 def read_index(folder: Path) -> dict:
+    """Read ``index.json`` from a setup folder, or an empty index when it is missing."""
     try:
         return json.loads((Path(folder) / INDEX).read_text(encoding="utf-8-sig"))
     except (OSError, ValueError):
@@ -210,6 +213,7 @@ def component_path(folder: Path, comp: dict) -> Path:
 
 
 def sha256_file(path: Path) -> str:
+    """The SHA-256 hex digest of ``path``."""
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for b in iter(lambda: f.read(1 << 22), b""):
@@ -219,15 +223,19 @@ def sha256_file(path: Path) -> str:
 
 @dataclass
 class Report:
+    """Names that verified, and the names that were missing or the wrong size."""
+
     ok: List[str] = field(default_factory=list)
     missing: List[str] = field(default_factory=list)
     damaged: List[str] = field(default_factory=list)
 
     @property
     def complete(self) -> bool:
+        """True when nothing was missing or damaged."""
         return not self.missing and not self.damaged
 
     def text(self) -> str:
+        """A short sentence listing up to five missing or damaged files."""
         bad = self.missing + self.damaged
         return f"{len(bad)} file(s) missing or damaged: " + ", ".join(bad[:5]) + (" ..." if len(bad) > 5 else "") if bad else "complete"
 
@@ -263,9 +271,11 @@ class Diff:
 
     @property
     def newer(self) -> bool:
+        """True when the new manifest is not the same set of files as the old one."""
         return bool(self.changed or self.added or self.removed) or self.old_version != self.new_version
 
     def text(self) -> str:
+        """A sentence saying the folder is current, or how much a newer one would fetch."""
         n = len(self.changed) + len(self.added)
         if not self.newer:
             return "The setup folder is up to date"
@@ -274,6 +284,7 @@ class Diff:
 
 
 def diff(old: dict, new: dict, flavor: str = "all", folder: Optional[Path] = None) -> Diff:
+    """What changed between two setup manifests for ``flavor``."""
     o = {c["id"]: c for c in old.get("components", [])}
     changed, added = [], []
     need = 0
@@ -312,6 +323,7 @@ def prune(folder: Path, man: dict, flavor: str = "all") -> List[str]:
 
 # ------------------------------------------------------------------------------------------------ models
 def model_dir(folder: Path, repo: str) -> Path:
+    """The models folder inside a setup folder for one Hugging Face repo id."""
     return Path(folder) / "models" / repo.replace("/", "--")
 
 
