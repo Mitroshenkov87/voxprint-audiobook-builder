@@ -799,6 +799,7 @@
  "train.checks_options": "Prüfungen und Clip-Optionen",
  "splash.loading_ui": "Oberfläche wird geladen…",
  "splash.checking": "Komponenten werden geprüft…",
+ "easter_egg.caption": "Кури ушную серу!",
  "modules.try_latest": "Neueste Komponentenversionen versuchen (bei einem Fehler zurück zu den geprüften)",
  "modules.updates": "Updates verfügbar: {names} (etwa {size}; Version {old} → {new}).",
  "modules.offer_all": "Schnelle Installation: Es wurde noch nichts heruntergeladen. Klicken Sie auf Herunterladen, um alle Komponenten und Modelle zu laden, auch die optionalen (insgesamt ca. {size}). Ohne diesen Klick startet nichts.",

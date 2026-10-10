@@ -40,7 +40,7 @@ Uninstall 668, then install 700. On the 668 uninstall question "Also delete the 
 ## Hardware requirements
 | | Minimum | Recommended |
 |---|---|---|
-| OS | Windows 11 24H2 (build 26100) x64 (Linux: experimental, Ubuntu 24.04 or newer, x86-64) | Windows 11 26H2 |
+| OS | Windows 11 24H2 (build 26100) x64 (Linux: experimental, distributions released from 2025, x86-64) | Windows 11 26H2 |
 | GPU | NVIDIA with ~6 GB VRAM (0.6B model, 8-bit Adam) | NVIDIA with 16 GB VRAM (1.7B model); a 4090 peaked at 6.1 GB whole-GPU usage for a 170 s recording |
 | Without NVIDIA | dataset only; training on the CPU is possible but very slow | - |
 | Disk | ~32 GB (all models ~25 GB, components ~3 GB, program) + ~4.2 GB for the optional universal model | SSD |

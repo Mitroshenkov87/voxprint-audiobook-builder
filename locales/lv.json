@@ -799,6 +799,7 @@
  "train.checks_options": "Pārbaudes un klipu opcijas",
  "splash.loading_ui": "Ielādē saskarni…",
  "splash.checking": "Pārbauda komponentus…",
+ "easter_egg.caption": "Кури ушную серу!",
  "modules.try_latest": "Mēģināt jaunākās komponentu versijas (ja lejupielāde neizdodas, atgriežas pie pārbaudītajām)",
  "modules.updates": "Pieejami atjauninājumi: {names} (apmēram {size}; versija {old} → {new}).",
  "modules.offer_all": "Ātrā instalēšana: vēl nekas nav lejupielādēts. Nospiediet “Lejupielādēt”, lai iegūtu visus komponentus un modeļus, arī papildu (kopā aptuveni {size}). Bez šī klikšķa nekas nesāksies.",
