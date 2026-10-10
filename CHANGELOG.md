@@ -5,6 +5,12 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Fixed
+- **Speaker marks shifted by one paragraph.** A reply with one tag per paragraph was kept even when the tags had slid onto the next line (on test dialogue 4 that was 11 of 19). Each mark is now checked against its paragraph: a line that opens with a dialogue dash is a character, and the name has to be the one that paragraph or the preceding narration gives; a line with no dash and no quotation marks is the narrator. A block that fails is asked again, one paragraph at a time. The check is logged as `[validate]` in `.debug/speakers-raw.txt`.
+
+### Changed
+- **Letter yo in the prepositional case.** `чем`, `нем` and `всем` are written `чём`, `нём` and `всём` after `о`, `об`, `обо`, `в`, `во`, `на` or `при`. `всем` as a dative plural or an instrumental (`по всем`, `ко всем`, `со всем`) stays. On test dialogue 4 this is 15 of 19 yo. `узнаёт`, `берёт` and `звёзды` stay homographs: `узнает` is also the perfective future, `берет` is also the hat, and `звезды` is also the genitive singular. Their safe relatives (`берёшь`, `звёздам`, reflexive `узнаёшься`) were already in the dictionary.
+
 ## [0.2.4-beta] - 2026-10-09 - build 704 "Achim"
 
 Codename *Achim* (Biblical Hebrew *achim*, brothers; Genesis 13:8, "for we are brothers"): Voxprint AI Audiobook Builder and Voxprint AI Movie Dubber now live side by side as sibling programs that share models, settings and one Start menu folder. Build-installer run 50 failed in the Windows tests that need no PyTorch (a test used `torch.cuda` from the stand-in module) and published nothing, so the `BUILD.json` offset is **653** and run 51 stamps build 704. Full installer. Upgrade: install over 703; models, voices and settings stay.
