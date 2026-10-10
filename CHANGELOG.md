@@ -5,6 +5,10 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+## [1.0.0-rc] - 2026-10-10 - build 999 "Nachon"
+
+Codename *Nachon* (Biblical Hebrew *nachon*, established, ready; Genesis 41:32). The version is **1.0.0-rc**. The release tag for this build is `v1.0.0-rc`. People see `1.0.0 RC · build 999 "Nachon"`. `BUILD.json` offset is **947**: build-installer run 52 stamps build 999 (52 + 947 = 999). If any *build-installer* run happens before this change is merged, recompute the offset as 999 minus the next run number. The Unreleased heading above this one had no entries to move.
+
 ## [0.2.4-beta] - 2026-10-09 - build 704 "Achim"
 
 Codename *Achim* (Biblical Hebrew *achim*, brothers; Genesis 13:8, "for we are brothers"): Voxprint AI Audiobook Builder and Voxprint AI Movie Dubber now live side by side as sibling programs that share models, settings and one Start menu folder. Build-installer run 50 failed in the Windows tests that need no PyTorch (a test used `torch.cuda` from the stand-in module) and published nothing, so the `BUILD.json` offset is **653** and run 51 stamps build 704. Full installer. Upgrade: install over 703; models, voices and settings stay.

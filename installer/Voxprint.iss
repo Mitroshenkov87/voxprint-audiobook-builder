@@ -40,7 +40,9 @@
 #define AppName "Voxprint"
 ; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
 #define AppDisplayName "Voxprint AI Audiobook Builder"
-#define AppVersion "0.2.4"
+#define AppVersion "1.0.0-rc"
+; Windows version resources are four numbers. The pre-release suffix stays in AppVersion.
+#define AppVersionInfo "1.0.0"
 #define AppExe "Voxprint.exe"
 ; CI build number and codename (tools/build_number.py; build_online.ps1 passes /DAppBuild= /DAppCodename=); 0 = local build
 #ifndef AppBuild
@@ -65,8 +67,8 @@
 AppId={{6F1D2B7A-3C54-4E0B-9A41-7B5E0C9D2F18}
 AppName={#AppDisplayName}
 AppVersion={#AppVersion}
-VersionInfoVersion={#AppVersion}.{#AppBuild}
-VersionInfoProductVersion={#AppVersion}.{#AppBuild}
+VersionInfoVersion={#AppVersionInfo}.{#AppBuild}
+VersionInfoProductVersion={#AppVersionInfo}.{#AppBuild}
 #if AppBuild != "0"
 AppVerName={#AppDisplayName} {#AppVersion} build {#AppBuild} {#AppCodename}
 #endif
