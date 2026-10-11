@@ -6,7 +6,7 @@ The file you can hand to an agent is [AGENTS.md](AGENTS.md) (what the program is
 
 ```
 python main.py narrate|prepare|translate|speakers|train|voices|settings|bench|check|status|models|revoice|diag|backup|restore ...
-Voxprint.exe narrate|prepare|translate|speakers|train|voices|settings|bench|check|status|models|revoice|diag|backup|restore ...    # packaged Windows build
+voxprint-cli.exe narrate|prepare|translate|speakers|train|voices|settings|bench|check|status|models|revoice|diag|backup|restore ...    # packaged Windows build (console; the exit code is the command's code)
 voxprint ...                                                         # Linux launcher, when installed
 ```
 
@@ -26,7 +26,9 @@ Maintenance flags (`--selftest`, `--auto-repair`, `--modules-status`, `--install
 
 `--json`, `--yes` and `--dry-run` may sit before the command or after it. `--version` exits before the command runs.
 
-A packaged `Voxprint.exe` is a windowed program. Stdout reaches a caller that redirects it (a pipe or a file). Every line is flushed. When nothing is attached, or the handle is invalid (Windows error 22, which PowerShell can leave on a windowed exe), the write is skipped and the process still exits with the command's code. It does not open a traceback window.
+A packaged `Voxprint.exe` is a windowed program, so a script that starts it does not receive the process exit code. `voxprint-cli.exe` is the same program built for the console and is placed on PATH by the installer. Scripts and agents should call that. Stdout reaches a caller that redirects it (a pipe or a file). Every line is flushed. When nothing is attached, or the handle is invalid (Windows error 22, which PowerShell can leave on a windowed exe), the write is skipped and the process still exits with the command's code. It does not open a traceback window.
+
+With `--json`, stdout is only JSON lines. Library banners and warnings, including the flash-attn note, go to stderr.
 
 `status` and `capabilities` always print one JSON object, even without `--json`.
 
@@ -381,8 +383,10 @@ Progress:
 Result:
 
 ```json
-{"type":"result","ok":true,"command":"narrate","exit_code":0,"outputs":["book.mp3"],"warnings":[],"duration_s":12.5,"error":null,"hint":null}
+{"type":"result","ok":true,"command":"narrate","exit_code":0,"outputs":["book.mp3"],"warnings":[],"duration_s":12.5,"error":null,"hint":null,"out_dir":"C:\\Audiobooks\\Book","durations":{"audio_s":732.4}}
 ```
+
+`narrate` always ends with that `type: result` line when `--json` is set, including a dry-run. `duration_s` is how long the command ran. `durations.audio_s` is the length of the narration in seconds, or `null` in a dry-run (nothing was synthesized). `outputs` lists the files that were written; a dry-run leaves it `[]`.
 
 `percent` is 0–100 for the whole narrate or train job, and for the current download or transcription. Lines are flushed as they are printed.
 
@@ -423,7 +427,7 @@ A successful command adds:
 
 | Command | Extra fields |
 |---|---|
-| `narrate` | `input` (`path`, `format`), `output` (the folder), `voice`, `formats` |
+| `narrate` | `input` (`path`, `format`), `output` (the folder), `voice`, `formats`, `durations` (`audio_s` is `null`) |
 | `speakers` | `input`, `paragraphs` (count), `planned_output` |
 | `prepare` | `input`, `planned_output`, `language`, `steps` |
 | `translate` | `input`, `source`, `target`, `planned_output` |

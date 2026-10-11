@@ -100,7 +100,8 @@ def test_first_run_restores_models_voices_and_tools_into_the_normal_folders(usb)
     got = md.ensure_model(REPO, snapshot_download=no_download, revision=SHA)
     assert got == paths.default_models_dir() / "Org--Tiny-1.7B" and md.verify_local_model(got)
     assert (paths.voices_dir() / VOICE / "voice.json").is_file()
-    assert (paths.app_home() / "tools" / "ffmpeg" / "ffmpeg.exe").is_file()
+    from infra import assets
+    assert (assets.tools_dir() / "ffmpeg" / "ffmpeg.exe").is_file()
     assert snapshot(usb) == before                                 # the backup is only read
     assert paths.configured_models_dir() is None                   # the live folder is the default
     assert not em.restore_pending() and not em.pending([REPO])

@@ -8,6 +8,8 @@ Part of the Voxprint AI Media Suite (with [Voxprint AI Movie Dubber](https://git
 
 > **1.0.0 RC3 (build 1001 "Tamim", tag v1.0.0-rc.3).** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs an **NVIDIA GeForce RTX 40-series or newer** GPU, and **Windows 11 24H2+** or a **Linux release from 2025+**. There is no CPU-only mode. 16 GB of VRAM is recommended. Details: [tests and caveats](docs/TESTING.md).
 
+<p align="center"><img src="docs/screenshots/rc2/abb-03-narrate.png" alt="Narrate window: a Russian book ready to read with the Levi voice, MP3 per chapter and one M4B file selected" width="720"></p>
+
 System requirements: an NVIDIA RTX 40-series or newer GPU (compute capability 8.9 or higher). Windows 11 24H2 or newer, or a Linux distribution released from 2025. Older systems are not supported. There is no CPU-only mode.
 
 <p align="center"><img src="docs/screenshots/en-667/01-main-window.png" alt="Voxprint Studio" width="420"> <img src="docs/screenshots/en-667/04-voice-library-boaz-tirzah.png" alt="My voices: build 667 screenshot. Tirzah and Gideon are the bundled voices; the picture also shows Boaz, which is retired" width="420"></p>
@@ -42,7 +44,9 @@ More: [all features and screenshots](docs/FEATURES.md) · [how it works](docs/HO
 |---|---|---|
 | **Online installer (Windows 11 x64, NVIDIA GPU)** | [`Voxprint-Setup-online.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.2.4-beta/Voxprint-Setup-online.exe) | 35,409,166 bytes (about 34 MB, build 704 "Achim"; downloads the libraries from PyTorch/PyPI during setup) |
 
-SHA-256: `c7dd024b4917ba128b064c12d8373182b76f9c10e77fb49f6c06fc8fac0e636d` - release page: [v0.2.4-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.2.4-beta) (pre-release, the latest ready build). Setup type **Full** (default) downloads all models (about 28 GB with the components) on the first start; **Quick** installs only the program and offers the same download in the Components window.
+SHA-256: `c7dd024b4917ba128b064c12d8373182b76f9c10e77fb49f6c06fc8fac0e636d` - release page: [v0.2.4-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.2.4-beta) (pre-release, the latest ready build). Setup installs the Python runtime, PyTorch, ffmpeg and the required models into `%LOCALAPPDATA%\Voxprint\shared\` while it runs, including a silent install. Optional models are offered in the Components window and are not all started at once. Scripts should call `voxprint-cli.exe`.
+
+<p align="center"><img src="docs/screenshots/rc2/abb-01-main-components-first-run.png" alt="Components window on first start: program components and models, with sizes shown and free space checked before a download" width="720"></p>
 A full offline installer may return later; the Linux version is temporarily unavailable.
 
 ### Windows security warnings

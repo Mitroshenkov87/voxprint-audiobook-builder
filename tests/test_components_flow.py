@@ -152,7 +152,7 @@ def _module(installed=False):
     return mods.Module("torch", "PyTorch", True, 3 * 1024 ** 3, 4 * 1024 ** 3, ["a"], installed)
 
 
-def test_first_start_runs_components_sage_and_models_without_a_click(app, monkeypatch):     # noqa: F811
+def test_first_start_installs_essentials_and_waits_to_add_optional_models(app, monkeypatch):     # noqa: F811
     from ui.modules_dialog import ModulesDialog
 
     i18n.set_language("en")
@@ -183,10 +183,15 @@ def test_first_start_runs_components_sage_and_models_without_a_click(app, monkey
         return w
 
     d = ModulesDialog(manifest_fn=lambda: {"modules": []}, install_fn=install_fn, extras_fn=extras_fn,
-                      extras_bytes_fn=lambda: (365 << 20) if sage["missing"] else 0, models_start=models_start, autostart=True)
+                      extras_bytes_fn=lambda: (365 << 20) if sage["missing"] else 0, models_start=models_start,
+                      autostart=True, free_bytes_fn=lambda: 80 << 30)
     d.refresh()
-    assert wait_for(lambda: workers, 10)                                   # no button was pressed
-    assert order == [("modules", ["torch"]), ("sage",), ("models",)]
+    assert wait_for(lambda: order == [("modules", ["torch"])] and not d.busy, 10)
+    assert workers == [] and not d.chk_optional.isChecked()
+    assert "Essentials" in d.lbl_status.text() and "Free space" in d.lbl_status.text()
+    d.chk_optional.setChecked(True)
+    d.on_download_clicked()
+    assert wait_for(lambda: workers, 10)
     assert "models" in d.lbl_overall.text() and "Step 2 of 2" in d.lbl_overall.text()
     w = workers[0]
     w.progress.emit(40, "Downloading: Qwen3-TTS-12Hz-1.7B-Base — 40% · 1.8 GB of 4.5 GB · 35 MB/s · from Hugging Face")
@@ -197,6 +202,20 @@ def test_first_start_runs_components_sage_and_models_without_a_click(app, monkey
     w.done.emit(["Qwen/Qwen3-TTS-12Hz-1.7B-Base"])
     assert d.lbl_status.text().startswith("Everything is ready") and d.bar.isHidden()
     assert not d.btn_download.isEnabled()
+    d.shutdown()
+
+
+def test_autostart_does_not_download_when_disk_space_is_short(app, monkeypatch):  # noqa: F811
+    from ui.modules_dialog import ModulesDialog
+
+    i18n.set_language("en")
+    monkeypatch.setattr(mods, "modules", lambda man: [_module()])
+    called = []
+    d = ModulesDialog(manifest_fn=lambda: {"modules": []}, install_fn=lambda *a: called.append(1),
+                      autostart=True, free_bytes_fn=lambda: 100, essentials_bytes=5 << 30)
+    d.refresh()
+    assert wait_for(lambda: not d.busy and "Not enough free disk space" in d.lbl_status.text(), 10)
+    assert called == [] and not d.chk_optional.isChecked()
     d.shutdown()
 
 
@@ -219,9 +238,14 @@ def test_a_failed_sage_does_not_stop_the_models_and_a_model_error_can_be_retried
         return w
 
     d = ModulesDialog(manifest_fn=lambda: {"modules": []}, install_fn=lambda *a: 0, extras_fn=extras_fn,
-                      extras_bytes_fn=lambda: 365 << 20, models_start=models_start, autostart=True)
+                      extras_bytes_fn=lambda: 365 << 20, models_start=models_start, autostart=True,
+                      free_bytes_fn=lambda: 80 << 30)
     d.refresh()
-    assert wait_for(lambda: workers, 10)                       # SAGE failed, the models still start (they list SAGE again)
+    assert wait_for(lambda: not d.busy, 10)
+    assert workers == []                                          # essentials are already installed; optional models wait
+    d.chk_optional.setChecked(True)
+    d.on_download_clicked()
+    assert wait_for(lambda: workers, 10)                          # SAGE failed, the models still start
     workers[0].failed.emit("No internet connection.", "")
     assert "No internet connection." in d.lbl_status.text() and d.lbl_status.property("state") == "error"
     assert d.btn_download.isEnabled() and d.btn_download.text() == "Retry"

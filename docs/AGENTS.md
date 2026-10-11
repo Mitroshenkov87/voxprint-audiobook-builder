@@ -10,7 +10,7 @@ The command reference with the same flags is [CLI.md](CLI.md).
 
 Substitute this executable for `voxprint` in every recipe below.
 
-**Windows (default install).** `C:\Program Files\Voxprint\Voxprint.exe`
+**Windows (default install).** `C:\Program Files\Voxprint\voxprint-cli.exe` for scripts (console; the exit code is the command's code). `C:\Program Files\Voxprint\Voxprint.exe` is the windowed program. The installer adds that folder to the user PATH.
 
 The installer uses that folder unless the person picked another one. The Start menu entry is "Voxprint AI Audiobook Builder". There is no desktop shortcut. If the file is not there:
 
@@ -248,7 +248,7 @@ Extra fields by command:
 |---|---|
 | `version` | `name`, `version`, `build` (integer), `codename` |
 | `status`, `capabilities` | see below. Always JSON, one object, no progress lines |
-| `narrate` | `out_dir`. `outputs` includes `.debug/speakers.txt` when speaker marks were applied. `warnings` holds the mismatch sentence when the narrator read the whole book |
+| `narrate` | `out_dir`, `durations.audio_s` (seconds of audio, or `null` in a dry-run). `outputs` includes `.debug/speakers.txt` when speaker marks were applied. `warnings` holds the mismatch sentence when the narrator read the whole book |
 | `speakers` | `paragraphs` (integer). The marks file is `outputs[0]` |
 | `prepare` | `report`: `{input, output, language, rules, rule_counts, rules_skipped, neural, typo_model, llm}`. `outputs` is the text, then the report file |
 | `translate` | `source`, `target`, `chapters` (integer), `model` |
@@ -316,7 +316,7 @@ By default a voice trained with this CLI is marked consent method `none` and sco
 | Exit 3, voice not found | `voxprint voices list --json` and pass `id` |
 | Exit 2 | `voxprint <command> --help` |
 | Exit 1 | `voxprint diag --out report.zip --json` |
-| `voxprint` is not on PATH (Windows) | `"C:\Program Files\Voxprint\Voxprint.exe"`, or `where.exe Voxprint` |
+| `voxprint` is not on PATH (Windows) | `"C:\Program Files\Voxprint\voxprint-cli.exe"`, or `where.exe voxprint-cli` |
 | Linux launcher missing | The Linux package is temporarily unavailable. Use a source checkout: `python main.py …` |
 | Translation model missing | `voxprint models download translate --json` or one id such as `opus-big-en-ru` |
 | Re-voice says the recogniser is missing | `voxprint models download asr --json` |

@@ -127,7 +127,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $setup = "build\online-release\Voxprint-Setup-online.exe"
           Write-Host ("setup size: {0:N0} bytes" -f (Get-Item $setup).Length)
-          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke1.log" -Wait -PassThru
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke1.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxsmoke1.log -Tail 60; throw "install exit code $($p.ExitCode)" }
           foreach ($f in Get-ChildItem dist\Voxprint -Recurse -File) {
             $rel = $f.FullName.Substring((Resolve-Path dist\Voxprint).Path.Length + 1)
@@ -142,13 +142,13 @@ jobs:
           if (-not (Select-String -Path $users -Pattern '"audiobook-builder": true' -SimpleMatch -Quiet)) { throw "models users file has no audiobook-builder key" }
           '{"movie-dubber": true}' | Set-Content -Encoding ascii $users
           # second run: everything is reused (no component is downloaded again)
-          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke2.log" -Wait -PassThru
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke2.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxsmoke2.log -Tail 60; throw "second install exit code $($p.ExitCode)" }
           $text = Get-Content -Raw $users
           Write-Host "users file after the second install: $text"
           if (-not ($text.Contains('"audiobook-builder": true') -and $text.Contains('"movie-dubber": true'))) { throw "the other program's key was not kept" }
           # an unreachable manifest must fail the setup (and leave a message, not a crash)
-          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/DIR=C:\vxsmoke-bad","/Manifest=http://127.0.0.1:9/manifest.json","/LOG=C:\vxsmoke3.log" -Wait -PassThru
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxsmoke-bad","/Manifest=http://127.0.0.1:9/manifest.json","/LOG=C:\vxsmoke3.log" -Wait -PassThru
           Write-Host "unreachable manifest -> exit code $($p.ExitCode)"
           if ($p.ExitCode -eq 0) { throw "the setup reported success for an unreachable manifest" }
           # uninstall removes the downloaded files
@@ -223,7 +223,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $p = Start-Process build\online-release\Voxprint-Setup-thin.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/DIR=C:\vxthin","/LOG=C:\vxthin.log" -Wait -PassThru
+          $p = Start-Process build\online-release\Voxprint-Setup-thin.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxthin","/LOG=C:\vxthin.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxthin.log -Tail 60; throw "install exit code $($p.ExitCode)" }
           if (-not (Test-Path C:\vxthin\Voxprint.exe)) { throw "the shell is missing" }
           if (-not (Test-Path C:\vxthin\_internal\modules.json)) { throw "modules.json is missing" }
@@ -277,13 +277,16 @@ jobs:
           python -m venv .venv
           python tools\make_runtime_lock.py --test-requirements | Out-File -Encoding ascii build-req.txt
           Get-Content build-req.txt
-          .venv\Scripts\python.exe -m pip install --quiet -r build-req.txt -r requirements-docs.txt pyinstaller pytest
+          .venv\Scripts\python.exe -m pip install --quiet -r build-req.txt -r requirements-docs.txt pyinstaller pytest pytest-timeout
       - name: Tests that need no PyTorch
         if: ${{ !inputs.skip_tests }}
+        timeout-minutes: 25
+        env:
+          VOXPRINT_TEST_TRACEBACK_S: "150"
         shell: pwsh
         run: |
           $recorded = $null
-          & .venv\Scripts\python.exe -m pytest -q -p faulthandler --deselect tests/test_ui.py::test_selftest_imports_reports_and_writes_log --deselect tests/test_frozen_install.py --deselect tests/test_linux_package.py::test_text_selftest_passes_without_models 2>&1 | ForEach-Object {
+          & .venv\Scripts\python.exe -m pytest -q -p faulthandler --timeout=180 --timeout-method=thread --deselect tests/test_ui.py::test_selftest_imports_reports_and_writes_log --deselect tests/test_frozen_install.py --deselect tests/test_linux_package.py::test_text_selftest_passes_without_models 2>&1 | ForEach-Object {
             $line = "$_"
             Write-Host $line
             if ($line -match 'VOXPRINT_PYTEST_RC=(\d+)') { $script:recorded = [int]$Matches[1] }

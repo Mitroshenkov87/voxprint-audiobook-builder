@@ -27,7 +27,7 @@ def test_lock_file_is_atomic_json_and_removed_afterwards(tmp_path):
     path = tmp_path / "voxprint-gpu.lock"
     with gpu_lock.hold("My Book", path=path) as held:
         data = json.loads(path.read_text(encoding="utf-8"))
-        assert list(data) == ["owner", "pid", "job", "started", "eta"]
+        assert list(data) == ["owner", "pid", "job", "started", "eta", "stage", "heartbeat"]
         assert data["owner"] == "audiobook-builder" and data["pid"] == os.getpid() and data["job"] == "My Book"
         for key in ("started", "eta"):
             parsed = datetime.fromisoformat(data[key])
@@ -211,3 +211,46 @@ def test_two_threads_in_one_process_share_the_lock(tmp_path):
     assert errors == []
     assert not path.exists()
     assert gpu_lock._depth == 0
+
+
+def test_waiter_rereads_the_stage_on_every_poll(tmp_path):
+    path = tmp_path / "voxprint-gpu.lock"
+    _foreign(path, job="dubbing:separation")
+    seen = []
+    state = {"alive": True, "calls": 0}
+
+    def sleep(_seconds):
+        state["calls"] += 1
+        if state["calls"] == 1:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["stage"] = "tts"
+            data["heartbeat"] = gpu_lock._iso(datetime.now(timezone.utc))
+            path.write_text(json.dumps(data), encoding="utf-8")
+        else:
+            state["alive"] = False
+
+    with gpu_lock.hold("Book", on_busy=lambda owner, job: seen.append((owner, job)), path=path,
+                       poll_s=0, sleep=sleep, pid_alive_fn=lambda pid: pid == os.getpid() or state["alive"]):
+        assert json.loads(path.read_text(encoding="utf-8"))["pid"] == os.getpid()
+    assert ("movie-dubber", "dubbing:separation") in seen
+    assert any(label.endswith("tts") or label == "tts" for _owner, label in seen)
+
+
+def test_a_stale_heartbeat_is_ignored_and_a_missing_one_is_not(tmp_path):
+    path = tmp_path / "voxprint-gpu.lock"
+    now = datetime.now(timezone.utc)
+    payload = {
+        "owner": "movie-dubber", "pid": 424242, "job": "Film", "stage": "separation",
+        "started": gpu_lock._iso(now - timedelta(minutes=5)),
+        "eta": gpu_lock._iso(now + timedelta(hours=1)),
+        "heartbeat": gpu_lock._iso(now - timedelta(seconds=120)),
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    assert gpu_lock.is_stale(payload, now, alive=lambda _pid: True)
+    with gpu_lock.hold("Book", path=path, sleep=lambda _s: (_ for _ in ()).throw(AssertionError("stale")),
+                       pid_alive_fn=lambda pid: True):
+        assert json.loads(path.read_text(encoding="utf-8"))["pid"] == os.getpid()
+
+    fresh = dict(payload)
+    del fresh["heartbeat"]
+    assert gpu_lock.is_stale(fresh, now, alive=lambda _pid: True) is False

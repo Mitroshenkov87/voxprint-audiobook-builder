@@ -119,6 +119,31 @@ def test_best_gpu_wins_when_one_card_is_old(gate):
     assert report.ok and report.detected == "NVIDIA GeForce RTX 4090"
 
 
+def test_a_driver_older_than_the_cuda_wheels_is_refused_with_a_download_link(gate, capsys):
+    old = gate.check_gpu(
+        torch_module=_no_torch(),
+        run=_smi("NVIDIA GeForce RTX 4090, 8.9, 535.98"),
+        which=lambda name: "nvidia-smi",
+    )
+    assert old.ok and old.best.driver.startswith("535")
+    text = gate.driver_too_old(old)
+    assert "535.98" in text and "https://www.nvidia.com/Download/index.aspx" in text
+    code = gate.enforce(
+        gui=False,
+        torch_module=_no_torch(),
+        run=_smi("NVIDIA GeForce RTX 4090, 8.9, 535.98"),
+        which=lambda name: "nvidia-smi",
+    )
+    assert code == 7 and "nvidia.com" in capsys.readouterr().err
+    fresh = gate.enforce(
+        gui=False,
+        torch_module=_Torch([("NVIDIA GeForce RTX 4090", (8, 9))]),
+        run=lambda args: (_ for _ in ()).throw(AssertionError("nvidia-smi must not run")),
+        which=lambda name: None,
+    )
+    assert fresh == 0 and capsys.readouterr().err == ""
+
+
 def test_cpu_torch_falls_back_to_nvidia_smi(gate):
     report = gate.check_gpu(
         torch_module=_no_torch(),

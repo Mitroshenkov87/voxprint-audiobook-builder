@@ -20,6 +20,7 @@ the functions that talk to the network (``manifest_fn`` / ``install_fn`` / ``ext
 from __future__ import annotations
 
 import logging
+import shutil
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -46,6 +47,17 @@ from workers.backup_worker import BackupWorker
 log = logging.getLogger("voxprint.ui.modules")
 
 Progress = Callable[[float, str], None]
+#: Extra free space required on top of the selected download, so a full disk is not filled to the last byte.
+DISK_MARGIN = 2 * 1024 ** 3
+
+
+def disk_free() -> int:
+    """Free bytes on the volume that holds the shared suite folder."""
+    from infra import paths
+
+    folder = paths.shared_root()
+    probe = folder if folder.exists() else Path(folder.anchor or ".")
+    return int(shutil.disk_usage(probe).free)
 
 
 def default_extras(progress: Progress) -> List[str]:
@@ -149,7 +161,9 @@ class ModulesDialog(GlassDialog):
                  extras_fn: Optional[Callable[[Progress], Any]] = None,
                  extras_bytes_fn: Optional[Callable[[], int]] = None,
                  models_start: Optional[Callable[[Callable[[Any], None]], Any]] = None,
-                 autostart: bool = False, offer_size: int = 0) -> None:
+                 autostart: bool = False, offer_size: int = 0,
+                 essentials_bytes: int = 0, optional_bytes: int = 0,
+                 free_bytes_fn: Optional[Callable[[], int]] = None) -> None:
         """``extras_fn`` / ``extras_bytes_fn``: step 1 extras (:func:`default_extras`); ``models_start(hook)``: starts the step 2
         model download and returns its worker (signals ``progress(int, str)``, ``done(list)``, ``failed(str, str)``) or None;
         ``hook(worker)`` is called BEFORE the worker starts, so no signal is missed.  ``autostart``: first start, no clicks (Full setup).  Without it (Quick setup) the window only offers the download: the
@@ -163,7 +177,10 @@ class ModulesDialog(GlassDialog):
         self.extras_fn = extras_fn
         self.extras_bytes_fn = extras_bytes_fn or ((lambda: 0) if extras_fn is None else default_extras_bytes)
         self.models_start, self.autostart, self.offer_size = models_start, autostart, int(offer_size)
-        self._go = autostart             # the model step may start: autostart, or the user pressed Download
+        self.essentials_bytes, self.optional_bytes = max(0, int(essentials_bytes)), max(0, int(optional_bytes))
+        self.free_bytes_fn = free_bytes_fn or disk_free
+        self._go = autostart             # Quick setup (_go false) only offers the download; a click sets this true
+        self._user_requested = False     # the model step starts after a click, not together with the first module pass
         self.modules: List[mods.Module] = []
         self._versions = ("", "")        # (installed, available) runtime versions of the last listing
         self.worker: Optional[ModulesWorker] = None
@@ -213,8 +230,11 @@ class ModulesDialog(GlassDialog):
         self.chk_latest.toggled.connect(mods.set_prefer_latest)
         self.row_latest, self.lbl_latest = screen_fit.wrapped_check(self.chk_latest)   # a long text wraps at 150 %
         self.row_latest.setVisible(bool(mods.latest_url()))
-        for w in (self.lbl_title, self.lbl_hint, self.lbl_status, self.bar, self.lbl_overall, self.row_latest,
-                  self.chk_link, self.lbl_link_warn):
+        self.chk_optional = QCheckBox()
+        self.chk_optional.setChecked(False)
+        self.row_optional, self.lbl_optional = screen_fit.wrapped_check(self.chk_optional)
+        for w in (self.lbl_title, self.lbl_hint, self.lbl_status, self.bar, self.lbl_overall, self.row_optional,
+                  self.row_latest, self.chk_link, self.lbl_link_warn):
             lay.addWidget(w)
         brow = QHBoxLayout()
         brow.addStretch(1)
@@ -245,6 +265,7 @@ class ModulesDialog(GlassDialog):
         self.chk_link.setText(tr("backup.link_models"))
         self.lbl_link_warn.setText(tr("backup.link_warn"))
         self.lbl_latest.setText(tr("modules.try_latest"))
+        self.lbl_optional.setText(tr("modules.optional", size=_gb(self._optional_bytes())))
         self._render()
 
     @property
@@ -289,6 +310,49 @@ class ModulesDialog(GlassDialog):
         except Exception:  # noqa: BLE001 - an unreadable models folder must not break the window
             return False
 
+    def include_optional(self) -> bool:
+        """True when the user asked for the optional models as well as the essentials."""
+        return bool(self.chk_optional.isChecked())
+
+    def _optional_bytes(self) -> int:
+        extra = 0
+        if self.extras_fn is not None:
+            try:
+                extra = max(0, int(self.extras_bytes_fn()))
+            except Exception:  # noqa: BLE001
+                extra = 0
+        return self.optional_bytes + extra
+
+    def _essentials_bytes(self) -> int:
+        modules_bytes = sum(m.size for m in self.missing() if not m.update)
+        models = self.essentials_bytes if self.models_start is not None and self._models_state != "done" else 0
+        return modules_bytes + models
+
+    def _selected_bytes(self) -> int:
+        total = self._essentials_bytes()
+        if self.include_optional():
+            total += self._optional_bytes()
+        return total
+
+    def _free_bytes(self) -> int:
+        try:
+            return max(0, int(self.free_bytes_fn()))
+        except Exception:  # noqa: BLE001 - a missing volume must not crash the window
+            return 0
+
+    def _plan_line(self) -> str:
+        return tr("modules.plan", essentials=_gb(self._essentials_bytes()), optional=_gb(self._optional_bytes()),
+                  free=_gb(self._free_bytes()))
+
+    def _space_ok(self, need: Optional[int] = None) -> bool:
+        """False when free space is below the selected download plus :data:`DISK_MARGIN`. The live line says so."""
+        required = self._selected_bytes() if need is None else max(0, int(need))
+        free = self._free_bytes()
+        if free >= required + DISK_MARGIN:
+            return True
+        self._set_line(tr("modules.disk_short", need=_gb(required + DISK_MARGIN), free=_gb(free)), error=True)
+        return False
+
     def _set_line(self, text: str, error: bool = False) -> None:
         """The live line; an error is shown on the same line in the error colour."""
         self.lbl_status.setText(text)
@@ -323,6 +387,8 @@ class ModulesDialog(GlassDialog):
         self.btn_close.setEnabled(not self.busy)
         self.chk_latest.setEnabled(not working)
         self.lbl_latest.setEnabled(not working)
+        self.chk_optional.setEnabled(not working)
+        self.lbl_optional.setEnabled(not working)
         fit_height(self)                                      # wrapped texts at 150 % never get cut off
 
     # ---------------------------------------------------------------- list
@@ -371,9 +437,12 @@ class ModulesDialog(GlassDialog):
         self.modules = list(res)
         # first start: what is MISSING is fetched without a click; an update is only offered and waits for Download
         absent = [m for m in self.missing() if not m.update]
-        if (absent or self.extras_missing()) and self.autostart and not self._auto_tried:
+        if absent and self.autostart and not self._auto_tried:
             self._auto_tried = True
-            self.start_install(updates=False)
+            if not self._space_ok(sum(m.size for m in absent)):
+                self._render()
+                return
+            self.start_install(updates=False, include_extras=False)
             return
         # Enable Download before the status text. Setting the label can re-enter the event loop, and a test
         # (or a paint) would otherwise see "press Download" while the button is still off.
@@ -382,13 +451,15 @@ class ModulesDialog(GlassDialog):
             self._set_line(self._note, error=self._note_error)
         elif self._offer_pending():
             self._set_line(self._summary())
+        elif self.models_start is not None and self._models_state == "" and not self._user_requested:
+            self._set_line(self._plan_line())
         elif not self.missing():
             self._set_line(tr("modules.all_ready"))
         else:
             self._set_line(self._summary())
         if self.modules and not any(m.required and not (m.installed or m.update) for m in self.modules):
             self.ready.emit()
-            if self._go:
+            if self._user_requested:
                 self._start_models()
 
     # ---------------------------------------------------------------- step 1: install
@@ -398,32 +469,42 @@ class ModulesDialog(GlassDialog):
 
     def on_download_clicked(self) -> None:
         self._go = True
-        if self.missing() or self.extras_missing():
-            self.start_install()
+        self._user_requested = True
+        if not self._space_ok():
+            self._render()
+            return
+        want_extras = self.include_optional() and self.extras_missing()
+        if self.missing() or want_extras:
+            self.start_install(include_extras=want_extras)
         elif self.models_start is not None and self._models_state in ("", "failed"):
             self._models_state = ""
             self._start_models()
         elif self._list_failed:
             self._note = ""
+            self._user_requested = False
             self.refresh()
 
-    def start_install(self, updates: bool = True) -> bool:
-        """Download the missing modules (and, after a click, ``updates=True``, the updates too) plus the extras."""
+    def start_install(self, updates: bool = True, include_extras: Optional[bool] = None) -> bool:
+        """Download the missing modules (and, after a click, ``updates=True``, the updates too).
+
+        Optional extras are included only when ``include_extras`` is true (the checkbox). The first start leaves them off.
+        """
         chosen = [m for m in self.missing() if updates or not m.update]
-        if self.busy or not (chosen or self.extras_missing()):
+        extras = self.extras_fn if (include_extras if include_extras is not None else self.include_optional()) else None
+        if self.busy or not (chosen or (extras is not None and self.extras_missing())):
             return False
         self._note = ""
         self._step = 1
         ids = [m.id for m in chosen]
         mod_bytes = sum(m.size for m in chosen)
         extra_bytes = 0
-        if self.extras_fn is not None:
+        if extras is not None:
             try:
                 extra_bytes = max(0, int(self.extras_bytes_fn()))
             except Exception:  # noqa: BLE001
                 extra_bytes = 0
         share = mod_bytes / float(mod_bytes + extra_bytes) if mod_bytes + extra_bytes > 0 else (1.0 if ids else 0.0)
-        w = ModulesWorker("install", self.manifest_fn, self.install_fn, ids, parent=self, extras_fn=self.extras_fn, share=share)
+        w = ModulesWorker("install", self.manifest_fn, self.install_fn, ids, parent=self, extras_fn=extras, share=share)
         w.progress.connect(self._on_progress)
         w.done.connect(self._on_done)
         w.failed.connect(self._on_failed)
@@ -538,8 +619,12 @@ class ModulesDialog(GlassDialog):
 
     # ---------------------------------------------------------------- step 2: models
     def _start_models(self) -> None:
-        """Right after the components: the download of ALL heavy models, without asking (first start only)."""
+        """The model step. Essentials unless the optional box is ticked. Not started together with the module pass."""
         if self.models_start is None or self._models_state in ("running", "done"):
+            return
+        if not self._space_ok():
+            self._models_state = ""
+            self._render()
             return
         self._step = 2
         self._models_state = "running"

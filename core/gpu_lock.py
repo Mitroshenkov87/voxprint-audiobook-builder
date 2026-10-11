@@ -10,10 +10,13 @@ elsewhere). The holder writes this JSON, atomically (a temp file in the same dir
 ``started`` and ``eta`` are ISO 8601 in UTC. The lock is held for the whole narration job and removed in ``finally``.
 The same process may enter again (a nested job does not wait and does not delete the file early).
 
-Another live process: wait and poll, and report ``GPU busy: <owner> <job>``. The file is stale, and may be taken, when
-its pid is not running, or when ``eta`` is more than two hours in the past (a crashed holder whose pid was reused).
-While this process holds the lock, ``eta`` is refreshed and kept at least two hours ahead, so a long batch is not
-treated as abandoned.
+Another live process: wait and poll, and report ``GPU busy: <owner> <job>``. Each poll reads the file again, so a
+holder that updates ``stage`` (and ``heartbeat``) is shown as it is now, not as it was when the wait started.
+The file is stale, and may be taken, when its pid is not running, when ``eta`` is more than two hours in the past
+(a crashed holder whose pid was reused), or when ``heartbeat`` is present and older than
+:data:`HEARTBEAT_STALE`. A lock that has no ``heartbeat`` (Movie Dubber today) keeps the pid and eta rules.
+While this process holds the lock, ``eta`` and ``heartbeat`` are refreshed. ``eta`` stays at least two hours ahead,
+so a long batch is not treated as abandoned.
 """
 from __future__ import annotations
 
@@ -37,6 +40,8 @@ OWNER = "audiobook-builder"
 LOCK_NAME = "voxprint-gpu.lock"
 #: A lock whose eta is this far in the past belongs to a job that is no longer running.
 STALE_AFTER = timedelta(hours=2)
+#: A heartbeat older than this, when the field is present, belongs to a holder that stopped updating.
+HEARTBEAT_STALE = timedelta(seconds=90)
 #: Refreshed eta never sits closer than this, so a batch with no progress events is not stolen mid-flight.
 ETA_FLOOR = timedelta(hours=2)
 POLL_S = 2.0
@@ -111,18 +116,37 @@ def _atomic_write(path: Path, payload: dict) -> None:
     os.replace(tmp, path)
 
 
-def _payload(job: str, started: str, eta: datetime) -> dict:
-    return {"owner": OWNER, "pid": os.getpid(), "job": job, "started": started, "eta": _iso(eta)}
+def _payload(job: str, started: str, eta: datetime, stage: str = "", heartbeat: Optional[datetime] = None) -> dict:
+    return {
+        "owner": OWNER, "pid": os.getpid(), "job": job, "started": started, "eta": _iso(eta),
+        "stage": stage, "heartbeat": _iso(heartbeat or eta),
+    }
+
+
+def _holder_label(info: dict) -> tuple:
+    """``(owner, label)`` from the current file. ``stage`` wins over a stale job name when both are set."""
+    owner = str(info.get("owner", "")).strip()
+    job = str(info.get("job", "")).strip()
+    stage = str(info.get("stage", "")).strip()
+    if stage and job and stage != job:
+        label = f"{job} — {stage}"
+    else:
+        label = stage or job
+    return owner, label
 
 
 def is_stale(info: dict, now: datetime, alive: Callable[[int], bool] = pid_alive) -> bool:
-    """True when the holder is gone, or its eta is more than two hours ago."""
+    """True when the holder is gone, its heartbeat (if present) is old, or its eta is more than two hours ago."""
     try:
         pid = int(info.get("pid", 0))
     except (TypeError, ValueError):
         return True
     if not alive(pid):
         return True
+    if "heartbeat" in info:
+        beat = _parse_eta(info.get("heartbeat"))
+        if beat is None or now - beat > HEARTBEAT_STALE:
+            return True
     eta = _parse_eta(info.get("eta"))
     if eta is None:
         return False
@@ -144,10 +168,15 @@ class HeldLock:
         self.job = job
         self.started = started
         self.eta = eta
+        self.stage = ""
         self._now = now
 
-    def note(self, seconds_left: Optional[float] = None) -> None:
-        """Move ``eta`` to the estimated finish, and never closer than :data:`ETA_FLOOR`."""
+    def note(self, seconds_left: Optional[float] = None, stage: Optional[str] = None) -> None:
+        """Move ``eta`` to the estimated finish, and never closer than :data:`ETA_FLOOR`.
+
+        ``stage`` is the step the job is on now (synthesis, export, ...). It is written with a fresh
+        ``heartbeat`` so a waiter that re-reads the file shows this step, not the one from acquire.
+        """
         try:
             seconds = float(seconds_left) if seconds_left is not None else 0.0
         except (TypeError, ValueError):
@@ -155,6 +184,8 @@ class HeldLock:
         if seconds != seconds:  # NaN
             seconds = 0.0
         when = self._now() + max(ETA_FLOOR, timedelta(seconds=max(0.0, seconds)))
+        if stage is not None:
+            self.stage = _job_name(stage)[:80]
         current = _read(self.path)
         try:
             owner_pid = int(current.get("pid", -1)) if current else -1
@@ -164,7 +195,8 @@ class HeldLock:
             return
         self.eta = when
         try:
-            _atomic_write(self.path, _payload(self.job, self.started, when))
+            moment = self._now()
+            _atomic_write(self.path, _payload(self.job, self.started, when, self.stage, moment))
         except OSError:
             log.warning("could not refresh the GPU lock", exc_info=True)
 
@@ -214,7 +246,7 @@ def _acquire(path: Path, job: str, on_busy: Optional[Callable[[str, str], None]]
             started = _iso(moment)
             eta = moment + ETA_FLOOR
             try:
-                _atomic_write(path, _payload(job, started, eta))
+                _atomic_write(path, _payload(job, started, eta, "", moment))
             except OSError:
                 log.warning("could not write the GPU lock", exc_info=True)
                 _sleep_poll(poll_s, cancel, sleep)
@@ -225,10 +257,11 @@ def _acquire(path: Path, job: str, on_busy: Optional[Callable[[str, str], None]]
             except (TypeError, ValueError):
                 got_pid = -1
             if got_pid == os.getpid():
-                return HeldLock(path, job, str((got or {}).get("started") or started), eta, now)
+                held = HeldLock(path, job, str((got or {}).get("started") or started), eta, now)
+                held.stage = str((got or {}).get("stage") or "")
+                return held
             continue
-        owner = str(info.get("owner", "")).strip()
-        other = str(info.get("job", "")).strip()
+        owner, other = _holder_label(info)
         key = (owner, other)
         if key != announced:
             log.info("GPU busy: %s %s", owner, other)

@@ -117,11 +117,24 @@ def latest_url() -> str:
     return str((load_config() or {}).get("latest_manifest_url", ""))
 
 
+def _runtime_populated(folder: Path) -> bool:
+    """True when this folder holds an unpacked runtime, not only the users bookkeeping file."""
+    if not folder.is_dir():
+        return False
+    return (folder / "torch").exists() or (folder / "voxprint-components.json").is_file()
+
+
 def runtime_dir() -> Path:
-    """Where the modules are unpacked: ``<app home>/runtime`` (created on demand)."""
-    p = paths.app_home() / "runtime"
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    """Where the modules are unpacked: ``<app home>/shared/runtime``.
+
+    An older install that already unpacked into ``<app home>/runtime`` keeps that folder until the shared one is filled.
+    """
+    shared = paths.shared_root() / "runtime"
+    legacy = paths.app_home() / "runtime"
+    if _runtime_populated(legacy) and not _runtime_populated(shared):
+        return legacy
+    shared.mkdir(parents=True, exist_ok=True)
+    return shared
 
 
 def cache_dir() -> Path:
@@ -472,7 +485,7 @@ def _reuse_first(man: Dict[str, Any], chosen: List[Module], progress: Optional[P
 
 def activate() -> Optional[Path]:
     """Put the runtime folder on ``sys.path`` (after the updater's ``packages`` overlay).  Safe to call repeatedly."""
-    rd = paths.app_home() / "runtime"
+    rd = runtime_dir()
     try:
         # reuse.json and .users.json are bookkeeping. A users file alone must not put this folder on the import path.
         if rd.is_dir() and any(p.name not in ("reuse.json", ".users.json") for p in rd.iterdir()):
@@ -499,4 +512,4 @@ def activate() -> Optional[Path]:
         prepare_cuda12()
     except Exception:  # noqa: BLE001
         pass
-    return rd if rd.is_dir() else None
+    return rd if _runtime_populated(rd) else None

@@ -242,17 +242,29 @@ class PrefetchWorker(QThread):
     done = Signal(list)
     failed = Signal(str, str)
 
-    def __init__(self, prefetch_fn: Optional[Callable[..., Any]] = None, parent=None) -> None:
-        """``prefetch_fn`` is injectable (default: :func:`workers.pipeline_runner.prefetch_models`)."""
+    def __init__(self, prefetch_fn: Optional[Callable[..., Any]] = None, parent=None,
+                 everything: Optional[bool] = None) -> None:
+        """``prefetch_fn`` is injectable (default: :func:`workers.pipeline_runner.prefetch_models`).
+
+        ``everything=False`` downloads the required models only. ``None`` leaves the choice to the prefetch function.
+        """
         super().__init__(parent)
         from workers.pipeline_runner import prefetch_models
 
         self.prefetch_fn = prefetch_fn or prefetch_models
+        self.everything = everything
 
     def run(self) -> None:
         """Thread body: prefetch and emit ``done`` or ``failed``."""
         try:
-            got = self.prefetch_fn(lambda s, f, m: self.progress.emit(int(f * 100), m))
+            report = lambda s, f, m: self.progress.emit(int(f * 100), m)  # noqa: E731
+            if self.everything is None:
+                got = self.prefetch_fn(report)
+            else:
+                try:
+                    got = self.prefetch_fn(report, everything=self.everything)
+                except TypeError:
+                    got = self.prefetch_fn(report)
             self.done.emit(list(got))
         except BaseException as exc:  # noqa: BLE001
             log.exception("prefetch failed")

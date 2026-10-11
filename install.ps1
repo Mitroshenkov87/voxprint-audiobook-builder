@@ -114,6 +114,7 @@ function Install-Checked {
         if ($null -eq $proc.ExitCode -or $proc.ExitCode -ne 0) {
             throw "The installer exited with code $($proc.ExitCode)."
         }
+        Write-Host "Setup finished. Scripts should call voxprint-cli.exe so the exit code is the command's code. Voxprint.exe is the windowed program."
     } finally {
         Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
     }

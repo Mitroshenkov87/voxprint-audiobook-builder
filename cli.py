@@ -39,6 +39,7 @@ import json
 import logging
 import os
 import time
+import warnings
 from pathlib import Path
 from typing import Any, Callable, Iterable, Optional, Sequence, Set, cast
 
@@ -251,6 +252,58 @@ def version_line(info: Optional[dict] = None) -> str:
     return line
 
 
+_json_stdout = None
+_saved_showwarning = None
+
+
+def begin_json_stdout() -> None:
+    """Send library prints, warnings and logging that target stdout to stderr.
+
+    ``--json`` keeps the real stdout for JSON lines only. Call :func:`end_json_stdout` when the command returns.
+    """
+    global _json_stdout, _saved_showwarning
+    if _json_stdout is not None:
+        return
+    real = sys.stdout
+    _json_stdout = real
+    _saved_showwarning = warnings.showwarning
+    sys.stdout = sys.stderr
+
+    def _show(message, category, filename, lineno, file=None, line=None):
+        text = warnings.formatwarning(message, category, filename, lineno, line)
+        _write_stream(sys.stderr, text.rstrip("\n"))
+
+    warnings.showwarning = _show
+    loggers = [logging.getLogger()]
+    for obj in logging.Logger.manager.loggerDict.values():
+        if isinstance(obj, logging.Logger):
+            loggers.append(obj)
+    for logger in loggers:
+        for handler in list(logger.handlers):
+            if getattr(handler, "stream", None) is real:
+                if hasattr(handler, "setStream"):
+                    handler.setStream(sys.stderr)
+                else:
+                    handler.stream = sys.stderr
+
+
+def end_json_stdout() -> None:
+    """Put stdout and ``warnings.showwarning`` back after a ``--json`` command."""
+    global _json_stdout, _saved_showwarning
+    if _json_stdout is None:
+        return
+    sys.stdout = _json_stdout
+    if _saved_showwarning is not None:
+        warnings.showwarning = _saved_showwarning
+    _json_stdout = None
+    _saved_showwarning = None
+
+
+def _json_out():
+    """The stdout JSON lines are written to (stderr while :func:`begin_json_stdout` is active)."""
+    return _json_stdout if _json_stdout is not None else sys.stdout
+
+
 def _write_stream(stream, text: str) -> None:
     """Write one line and flush it.
 
@@ -275,7 +328,7 @@ def _emit_progress(stage: str, percent: float, message: str, **extra) -> None:
     for key, value in extra.items():
         if value is not None:
             payload[key] = value
-    _write_stream(sys.stdout, json.dumps(payload, ensure_ascii=False))
+    _write_stream(_json_out(), json.dumps(payload, ensure_ascii=False))
 
 
 def _emit_result(*, ok: bool, command: str, exit_code: int, outputs, warnings, duration_s: float,
@@ -295,7 +348,7 @@ def _emit_result(*, ok: bool, command: str, exit_code: int, outputs, warnings, d
         payload["details"] = details
     if extra:
         payload.update(extra)
-    _write_stream(sys.stdout, json.dumps(payload, ensure_ascii=False))
+    _write_stream(_json_out(), json.dumps(payload, ensure_ascii=False))
 
 
 def _error(exc: CliError, *, json_mode: bool, command: str, started: float) -> int:
@@ -972,9 +1025,14 @@ def cmd_narrate(args: argparse.Namespace, *,
                 files.append(marks)
         warnings = speaker_warning_lines(getattr(result, "speaker_warning", ""))
         human = [f"Done: {done}"] + [f"  {f}" for f in files] + [f"  ! {w}" for w in warnings]
+        audio_s = getattr(result, "seconds", None)
+        try:
+            audio_value = None if audio_s is None else round(float(audio_s), 3)
+        except (TypeError, ValueError):
+            audio_value = None
         return _ok(
             json_mode, "narrate", started, outputs=files, warnings=warnings,
-            human=human, extra={"out_dir": str(done)},
+            human=human, extra={"out_dir": str(done), "durations": {"audio_s": audio_value}},
         )
 
     return _run("narrate", args, body)
@@ -2487,7 +2545,7 @@ def _finish_dry(args: argparse.Namespace, payload: dict, *, extra_keys=(), human
         )
     json_mode = bool(getattr(args, "json_output", False)) or payload["command"] in ("status", "capabilities")
     if json_mode:
-        _write_stream(sys.stdout, json.dumps(payload, ensure_ascii=False))
+        _write_stream(_json_out(), json.dumps(payload, ensure_ascii=False))
     elif human:
         for line in human:
             _write_stream(sys.stdout, line)
@@ -2545,8 +2603,9 @@ def _dry_body(args: argparse.Namespace, handler: str):
             "output": output,
             "voice": args.voice,
             "formats": formats,
+            "durations": {"audio_s": None},
         }
-        return extra, ("input", "output", "voice", "formats"), [_DRY_MODEL_WARNING], [
+        return extra, ("input", "output", "voice", "formats", "durations"), [_DRY_MODEL_WARNING], [
             f"dry-run narrate {fmt}: {args.book} -> {output}",
         ]
     if handler == "speakers":
@@ -2708,6 +2767,7 @@ def main(argv: Optional[Sequence[str]] = None, *,
                          transcribe_fn=transcribe_fn, download_fn=download_fn, installed_fn=installed_fn,
                          plan_fn=plan_fn, repair_fn=repair_fn)
     finally:
+        end_json_stdout()
         # A frozen windowed exe keeps the hook so a late exception does not open a traceback window.
         # Tests and a developer ``python`` put the previous hook back.
         if not getattr(sys, "frozen", False):
@@ -2717,6 +2777,8 @@ def main(argv: Optional[Sequence[str]] = None, *,
 def _dispatch(argv: Optional[Sequence[str]], *, run_narration_fn, run_task_fn, library, transcribe_fn, download_fn,
               installed_fn, plan_fn, repair_fn) -> int:
     raw = list(sys.argv[1:] if argv is None else argv)
+    if "--json" in raw:
+        begin_json_stdout()
     try:
         reconfigure = getattr(sys.stdout, "reconfigure", None)
         if reconfigure is not None:

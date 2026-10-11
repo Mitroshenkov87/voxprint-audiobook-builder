@@ -865,7 +865,7 @@ def narrate_book(book: Book, engine_factory: Callable[[], TTSEngine], engine_tag
         thermal.start()
 
         def report(item: NarrationProgress) -> None:
-            held.note(item.eta)
+            held.note(item.eta, stage=item.phase)
             progress_cb(item)
 
         try:

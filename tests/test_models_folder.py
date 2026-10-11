@@ -16,7 +16,7 @@ def make_model(folder):
 
 def test_default_without_a_choice():
     assert paths.configured_models_dir() is None
-    assert paths.models_dir() == paths.default_models_dir() == paths.app_home() / "models"
+    assert paths.models_dir() == paths.default_models_dir() == paths.shared_root() / "models"
 
 
 def test_chosen_folder_is_read_created_and_forgotten(tmp_path):
