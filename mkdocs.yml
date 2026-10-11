@@ -229,6 +229,7 @@ nav:
           - install_state: api/infra.install_state.md
           - keep_awake: api/infra.keep_awake.md
           - llm_tool: api/infra.llm_tool.md
+          - mdl_gate: api/infra.mdl_gate.md
           - model_downloader: api/infra.model_downloader.md
           - model_mirrors: api/infra.model_mirrors.md
           - model_release: api/infra.model_release.md

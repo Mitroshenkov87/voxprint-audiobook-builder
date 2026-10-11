@@ -102,6 +102,7 @@ Do not edit the module pages by hand.
 - [`infra.install_state`](infra.install_state.md)
 - [`infra.keep_awake`](infra.keep_awake.md)
 - [`infra.llm_tool`](infra.llm_tool.md)
+- [`infra.mdl_gate`](infra.mdl_gate.md)
 - [`infra.model_downloader`](infra.model_downloader.md)
 - [`infra.model_mirrors`](infra.model_mirrors.md)
 - [`infra.model_release`](infra.model_release.md)
