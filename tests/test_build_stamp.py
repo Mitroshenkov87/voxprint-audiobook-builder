@@ -63,11 +63,14 @@ def test_embed_tool_stamps_the_module_and_the_exe_then_restores(tmp_path, monkey
     assert emb.main(["--restore-module", str(src)]) == 0
     assert src.read_text(encoding="utf-8") == original
     assert (ROOT / "core" / "build_stamp.py").read_text(encoding="utf-8") == original
-    monkeypatch.delenv("VOXPRINT_BUILD")
+    monkeypatch.setenv("VOXPRINT_BUILD", "0")
     monkeypatch.delenv("VOXPRINT_CODENAME")
     before = exe.read_bytes()
     assert emb.main(["--exe", str(exe), "--credits", str(credits)]) == 0
     assert exe.read_bytes() == before
+    monkeypatch.delenv("VOXPRINT_BUILD")
+    assert emb.main(["--exe", str(exe), "--credits", str(credits)]) == 0
+    assert build_stamp.read_trailer(exe) == (1002, "Tamim")
 
 
 def test_build_thin_runs_the_stamp_script_as_a_file(tmp_path):

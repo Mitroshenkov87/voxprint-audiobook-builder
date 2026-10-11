@@ -1,8 +1,8 @@
-"""Write the CI build number into ``core/build_stamp.py`` and onto ``Voxprint.exe``.
+"""Write the build number into ``core/build_stamp.py`` and onto ``Voxprint.exe``.
 
-Called from ``build_thin.bat``. The number comes from ``VOXPRINT_BUILD`` / ``VOXPRINT_CODENAME``, or from a
-``credits.json`` that ``tools/build_number.py --stamp`` already filled. A local build with no number is left alone.
-``BUILD.json`` is not read and not written.
+Called from ``build_thin.bat``. ``VOXPRINT_BUILD`` / ``VOXPRINT_CODENAME`` win. Otherwise the number is the
+release tag or the explicit ``build`` field in ``BUILD.json`` (``tools/build_number.py``), and the codename
+is the one in that file. ``VOXPRINT_BUILD=0`` leaves the executable unstamped. ``BUILD.json`` is not written.
 """
 from __future__ import annotations
 
@@ -19,23 +19,28 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core.build_stamp import write_trailer  # noqa: E402
+from tools.build_number import build_number, info as build_info  # noqa: E402
 MODULE = ROOT / "core" / "build_stamp.py"
 _BUILD_RE = re.compile(r"^BUILD = \d+[ \t]*$", re.MULTILINE)
 _NAME_RE = re.compile(r'^CODENAME = "[^"]*"[ \t]*$', re.MULTILINE)
 
 
 def resolve_stamp(credits: Path) -> tuple:
-    """``(build, codename)`` from the environment, then from ``credits``."""
+    """``(build, codename)`` from the environment, then the tag or ``BUILD.json``, then ``credits``."""
     env_build = os.environ.get("VOXPRINT_BUILD", "").strip()
     env_name = os.environ.get("VOXPRINT_CODENAME", "").strip()
-    build = int(env_build) if env_build.isdigit() else 0
-    codename = env_name
-    if build <= 0 or not codename:
+    pinned = env_build.isdigit()
+    build = int(env_build) if pinned else int(build_number())
+    try:
+        codename = env_name or str(build_info().get("codename") or "")
+    except (OSError, ValueError, TypeError):
+        codename = env_name
+    if (not pinned and build <= 0) or not codename:
         try:
             app = json.loads(credits.read_text(encoding="utf-8")).get("app") or {}
         except (OSError, ValueError, AttributeError):
             app = {}
-        if build <= 0:
+        if not pinned and build <= 0:
             raw = str(app.get("build", "0") or "0")
             build = int(raw) if raw.isdigit() else 0
         if not codename:

@@ -298,7 +298,7 @@ jobs:
           if ($null -ne $script:recorded) { $rc = $script:recorded }
           Write-Host "pytest process exit $LASTEXITCODE, recorded status $script:recorded -> $rc"
           exit $rc
-      - name: Build number (GITHUB_RUN_NUMBER + BUILD.json offset; first numbered build = 665) and codename into credits.json
+      - name: Build number (BUILD.json build field, or the release tag; a failed run does not consume a number) and codename into credits.json
         shell: pwsh
         run: |
           $n = python tools\build_number.py --stamp

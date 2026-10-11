@@ -40,6 +40,15 @@ def test_build_script_uses_it_and_ships_the_lock_for_the_frozen_check():
     assert "runtime_lock.json" in main and "_md.version(dist)" in main
 
 
+def test_workflows_stamp_the_explicit_build_and_ignore_the_run_number():
+    inst = (ROOT / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")
+    linux = (ROOT / ".github" / "workflows" / "build-linux.yml").read_text(encoding="utf-8")
+    assert "GITHUB_RUN_NUMBER +" not in inst and "GITHUB_RUN_NUMBER +" not in linux
+    assert "tools\\build_number.py --stamp" in inst
+    assert "tools/build_number.py --stamp" in linux
+    assert linux.index("build_number.py --stamp") < linux.index("make_linux_package.py")
+
+
 def test_the_heavy_full_build_cannot_run_any_more():
     wf = (ROOT / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")
     assert "\n  build:\n" not in wf and "build_full" not in wf and "tags:" not in wf

@@ -202,7 +202,7 @@ def _coerce(exc: BaseException, command: str) -> CliError:
 
 
 def _read_build_json() -> dict:
-    """``BUILD.json`` next to the program (codename, offset).  Empty when the file is absent."""
+    """``BUILD.json`` next to the program (``build``, codename; ``offset`` is history).  Empty when the file is absent."""
     candidates = [Path(__file__).resolve().parent / "BUILD.json", app_paths.resource_dir() / "BUILD.json"]
     seen: set[str] = set()
     for path in candidates:

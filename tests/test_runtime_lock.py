@@ -84,5 +84,18 @@ def test_wheel_selection(fn, ok):
     assert (mk.wheel_score(fn, "cp311") is not None) is ok
 
 
+def test_suite_installer_pins_huggingface_hub_and_transformers():
+    """The shared runtime lock is what --install-suite downloads. These pins arrived with main (#47)."""
+    versions = {w["dist"]: w["version"] for w in LOCK["wheels"]}
+    assert versions["huggingface-hub"] == "1.32.0"
+    assert versions["transformers"] == "5.16.1"
+    req = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+    verified = (ROOT / "requirements-verified.txt").read_text(encoding="utf-8")
+    assert "huggingface_hub>=1.32.0,<2" in req
+    assert "transformers>=5.16.1,<5.17" in req
+    assert "huggingface_hub==1.32.0" in verified
+    assert "transformers==5.16.1" in verified
+
+
 def test_the_platform_specific_wheel_wins_over_a_generic_one():
     assert mk.wheel_score("a-1-cp311-cp311-win_amd64.whl", "cp311") > mk.wheel_score("a-1-py3-none-any.whl", "cp311")
