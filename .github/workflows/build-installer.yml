@@ -202,12 +202,15 @@ jobs:
           $ErrorActionPreference = "Stop"
           $old = "C:\Program Files\Voxprint"
           $oldSuite = "C:\Program Files\Voxprint AI Suite\Audiobook Builder"
-          $dest = "C:\Program Files\voxprint-ai-suite\audiobook-builder"
-          New-Item -ItemType Directory -Force $old, $oldSuite | Out-Null
+          $kebab = "C:\Program Files\voxprint-ai-suite\audiobook-builder"
+          $dest = "C:\Program Files\VOXPrint AI Suite\Audiobook Builder"
+          New-Item -ItemType Directory -Force $old, $oldSuite, $kebab | Out-Null
           Copy-Item C:\vxver.exe "$old\Voxprint.exe"
           Copy-Item C:\vxver.exe "$old\voxprint-cli.exe"
           Copy-Item C:\vxver.exe "$oldSuite\Voxprint AI Audiobook Builder.exe"
           "suite-marker" | Set-Content -Encoding utf8 "$oldSuite\suite-marker.txt"
+          Copy-Item C:\vxver.exe "$kebab\voxprint-audiobook-builder.exe"
+          "kebab-marker" | Set-Content -Encoding utf8 "$kebab\kebab-marker.txt"
           $shell = New-Object -ComObject WScript.Shell
           foreach ($menu in @(
             "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Voxprint",
@@ -226,7 +229,7 @@ jobs:
           $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
           $segments = @()
           if ($userPath) { $segments = @($userPath -split ";" | Where-Object { $_.Trim() -ne "" }) }
-          foreach ($extra in @($old, $oldSuite)) {
+          foreach ($extra in @($old, $oldSuite, $kebab)) {
             $have = @($segments | Where-Object { $_.Trim().TrimEnd("\") -eq $extra })
             if ($have.Count -eq 0) { $segments += $extra }
           }
@@ -250,15 +253,18 @@ jobs:
           $pf = "C:\Program Files"
           $flat = @(Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name.Equals("Voxprint", [StringComparison]::Ordinal) })
           if ($flat.Count -ne 0) { throw "the old program folder is still there" }
-          $mixed = @(Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name.Equals("Voxprint AI Suite", [StringComparison]::OrdinalIgnoreCase) })
-          if ($mixed.Count -ne 0) { throw "the mixed-case suite folder is still there: $($mixed.Name -join ', ')" }
-          if (Test-Path -LiteralPath (Join-Path $oldSuite "suite-marker.txt")) { throw "the old suite install was kept" }
-          $suiteName = @(Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name.Equals("voxprint-ai-suite", [StringComparison]::Ordinal) })
+          $kebabName = @(Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name.Equals("voxprint-ai-suite", [StringComparison]::Ordinal) })
+          if ($kebabName.Count -ne 0) { throw "the lower-case suite folder is still there" }
+          if (Test-Path -LiteralPath (Join-Path $kebab "kebab-marker.txt")) { throw "the kebab install was kept" }
+          if (-not (Test-Path -LiteralPath (Join-Path $dest "suite-marker.txt"))) { throw "the existing install folder was wiped" }
+          $oldExe = Join-Path $dest "Voxprint AI Audiobook Builder.exe"
+          if (Test-Path -LiteralPath $oldExe) { throw "the old program file is still in the install folder" }
+          $suiteName = @(Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name.Equals("VOXPrint AI Suite", [StringComparison]::Ordinal) })
           if ($suiteName.Count -ne 1) {
-            $seen = (Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name -like "*voxprint*" } | ForEach-Object { $_.Name }) -join ", "
+            $seen = (Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name -like "*oxprint*" } | ForEach-Object { $_.Name }) -join ", "
             throw "install folder name is wrong: $seen"
           }
-          $appName = @(Get-ChildItem -LiteralPath (Join-Path $pf "voxprint-ai-suite") -Force | Where-Object { $_.Name.Equals("audiobook-builder", [StringComparison]::Ordinal) })
+          $appName = @(Get-ChildItem -LiteralPath (Join-Path $pf "VOXPrint AI Suite") -Force | Where-Object { $_.Name.Equals("Audiobook Builder", [StringComparison]::Ordinal) })
           if ($appName.Count -ne 1) { throw "app folder name is wrong" }
           $exeName = @(Get-ChildItem -LiteralPath $dest -Force -File | Where-Object { $_.Name.Equals("voxprint-audiobook-builder.exe", [StringComparison]::Ordinal) })
           if ($exeName.Count -ne 1) {
@@ -285,6 +291,8 @@ jobs:
           if ($cased.Count -lt 1) { throw "PATH does not have the new folder casing: $pathNow" }
           $wrongCase = @($parts | Where-Object { $_.Equals($oldSuite, [StringComparison]::Ordinal) })
           if ($wrongCase.Count -gt 0) { throw "PATH still has the old suite casing: $pathNow" }
+          $kebabLeft = @($parts | Where-Object { $_.Equals($kebab, [StringComparison]::OrdinalIgnoreCase) })
+          if ($kebabLeft.Count -gt 0) { throw "PATH still has the kebab folder: $pathNow" }
           if ((Get-Content -Raw (Join-Path $data "migration-marker.txt")) -notmatch "keep-me") { throw "user data was not kept" }
           if (-not (Test-Path -LiteralPath (Join-Path $data "voices\narrator.txt"))) { throw "voices were not kept" }
           $gui = Join-Path $dest "voxprint-audiobook-builder.exe"
@@ -297,8 +305,8 @@ jobs:
           $shortcut = Join-Path $menuParent "VOXPrint AI Suite\VOXPrint AI Audiobook Builder.lnk"
           if (-not (Test-Path -LiteralPath $shortcut)) { throw "Start menu shortcut is missing: $shortcut" }
           $reg = Get-ItemProperty "HKLM:\Software\voxprint\Apps\audiobook-builder"
-          if ($reg.InstallPath -ne $dest) { throw "discovery InstallPath is $($reg.InstallPath)" }
-          if ($reg.CliPath -ne $cli) { throw "discovery CliPath is $($reg.CliPath)" }
+          if (-not [string]$reg.InstallPath.TrimEnd("\").Equals($dest, [StringComparison]::Ordinal)) { throw "discovery InstallPath is $($reg.InstallPath)" }
+          if (-not [string]$reg.CliPath.Equals($cli, [StringComparison]::Ordinal)) { throw "discovery CliPath is $($reg.CliPath)" }
           $un = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F1D2B7A-3C54-4E0B-9A41-7B5E0C9D2F18}_is1"
           $loc = (Get-ItemProperty $un).InstallLocation
           if ($loc.TrimEnd("\") -eq $old) { throw "the uninstall key still points at the old folder" }

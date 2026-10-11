@@ -10,7 +10,7 @@ The command reference with the same flags is [CLI.md](CLI.md).
 
 Substitute this executable for `voxprint` in every recipe below.
 
-**Windows (default install).** `C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe` for scripts (console; the exit code is the command's code). `C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-builder.exe` is the windowed program. The installer adds that folder to the user PATH.
+**Windows (default install).** `C:\Program Files\VOXPrint AI Suite\Audiobook Builder\voxprint-audiobook-cli.exe` for scripts (console; the exit code is the command's code). `C:\Program Files\VOXPrint AI Suite\Audiobook Builder\voxprint-audiobook-builder.exe` is the windowed program. The installer adds that folder to the user PATH.
 
 The installer uses that folder unless the person picked another one. The Start menu folder is "VOXPrint AI Suite", shortcut "VOXPrint AI Audiobook Builder". There is no desktop shortcut. If the file is not there, read the suite manifest or the registry (see [CLI.md](CLI.md), "Calling from other apps"), then:
 
@@ -316,7 +316,7 @@ By default a voice trained with this CLI is marked consent method `none` and sco
 | Exit 3, voice not found | `voxprint voices list --json` and pass `id` |
 | Exit 2 | `voxprint <command> --help` |
 | Exit 1 | `voxprint diag --out report.zip --json` |
-| `voxprint` is not on PATH (Windows) | `"C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe"`, or `where.exe voxprint-audiobook-cli` |
+| `voxprint` is not on PATH (Windows) | `"C:\Program Files\VOXPrint AI Suite\Audiobook Builder\voxprint-audiobook-cli.exe"`, or `where.exe voxprint-audiobook-cli` |
 | Linux launcher missing | The Linux package is temporarily unavailable. Use a source checkout: `python main.py …` |
 | Translation model missing | `voxprint models download translate --json` or one id such as `opus-big-en-ru` |
 | Re-voice says the recogniser is missing | `voxprint models download asr --json` |

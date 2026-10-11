@@ -1,12 +1,12 @@
 """Where this program is installed, and how another VOXPrint app finds it.
 
-Windows installs under ``C:\\Program Files\\voxprint-ai-suite\\audiobook-builder``.
+Windows installs under ``C:\\Program Files\\VOXPrint AI Suite\\Audiobook Builder``.
 The windowed file is ``voxprint-audiobook-builder.exe``. Scripts call
 ``voxprint-audiobook-cli.exe``. The Start menu folder is ``VOXPrint AI Suite`` and the
-shortcut is ``VOXPrint AI Audiobook Builder`` (display names only). Linux installs the
-package at ``/opt/voxprint-ai-suite/audiobook-builder`` and puts
-``voxprint-audiobook-cli`` on ``PATH``. Voices and settings stay in
-``%LOCALAPPDATA%\\Voxprint`` and ``~/.local/share/voxprint``.
+shortcut is ``VOXPrint AI Audiobook Builder``. Linux installs the package at
+``/opt/voxprint-ai-suite/audiobook-builder`` and puts ``voxprint-audiobook-cli`` on
+``PATH``. Voices and settings stay in ``%LOCALAPPDATA%\\Voxprint`` and
+``~/.local/share/voxprint``.
 
 Peers read the shared manifest key ``installs`` (not ``apps``, which counted
 resources), then the Windows registry ``Software\\voxprint\\Apps\\audiobook-builder``,
@@ -35,8 +35,8 @@ from infra import platform_win, suite_shared
 
 log = logging.getLogger("voxprint.install")
 
-SUITE_DIR = "voxprint-ai-suite"
-APP_FOLDER = "audiobook-builder"
+SUITE_DIR = "VOXPrint AI Suite"
+APP_FOLDER = "Audiobook Builder"
 GUI_EXE = "voxprint-audiobook-builder.exe"
 CLI_EXE = "voxprint-audiobook-cli.exe"
 LINUX_CLI = "voxprint-audiobook-cli"
@@ -49,9 +49,9 @@ OLD_LINUX_APP = "~/.local/share/voxprint/app"
 LEGACY_DIR = "Voxprint"
 LEGACY_GUI = "Voxprint.exe"
 LEGACY_CLI = "voxprint-cli.exe"
-#: Earlier suite folders. On Windows the two spellings are one directory, and neither is the kebab-case folder.
-LEGACY_SUITE_DIRS = ("Voxprint AI Suite", "VOXPrint AI Suite")
-LEGACY_APP_FOLDER = "Audiobook Builder"
+#: Intermediate install folder. A different directory from the display-case folder, so upgrade deletes it.
+KEBAB_SUITE_DIR = "voxprint-ai-suite"
+KEBAB_APP_FOLDER = "audiobook-builder"
 LEGACY_SUITE_GUI = "VOXPrint AI Audiobook Builder.exe"
 START_MENU = "VOXPrint AI Suite"
 SHORTCUT = "VOXPrint AI Audiobook Builder"
@@ -63,7 +63,7 @@ USER_DATA_DIR_NAME = "Voxprint"
 
 
 def windows_install_dir(program_files: str = r"C:\Program Files") -> str:
-    """Default Windows install directory ({autopf}\\voxprint-ai-suite\\audiobook-builder)."""
+    """Default Windows install directory ({autopf}\\VOXPrint AI Suite\\Audiobook Builder)."""
     return str(PureWindowsPath(program_files) / SUITE_DIR / APP_FOLDER)
 
 
@@ -82,31 +82,41 @@ def user_data_dir(local_app_data: str) -> str:
     return str(PureWindowsPath(local_app_data) / USER_DATA_DIR_NAME)
 
 
-def legacy_suite_app_dirs(program_files: str = r"C:\Program Files") -> list[str]:
-    """Earlier suite install folders (``Voxprint AI Suite`` and ``VOXPrint AI Suite``)."""
-    return [str(PureWindowsPath(program_files) / name / LEGACY_APP_FOLDER) for name in LEGACY_SUITE_DIRS]
+def kebab_install_dir(program_files: str = r"C:\Program Files") -> str:
+    """Intermediate install folder (``C:\\Program Files\\voxprint-ai-suite\\audiobook-builder``)."""
+    return str(PureWindowsPath(program_files) / KEBAB_SUITE_DIR / KEBAB_APP_FOLDER)
+
+
+def _windows_key(path: str) -> str:
+    return PureWindowsPath(path).as_posix().casefold()
 
 
 def migration_removes_program_dir(path: str, program_files: str = r"C:\Program Files") -> bool:
-    """True when silent migration may delete ``path`` (an old program folder only)."""
+    """True when silent migration may delete ``path`` (an old program folder only).
+
+    The display-case install folder is kept and renamed when only its case differs.
+    ``C:\\Program Files\\Voxprint`` and the lower-case ``voxprint-ai-suite\\audiobook-builder``
+    folder are different directories and are removed. User data is never removed.
+    """
     candidate = PureWindowsPath(path)
-    roots = [PureWindowsPath(legacy_program_dir(program_files))]
-    roots.extend(PureWindowsPath(item) for item in legacy_suite_app_dirs(program_files))
+    key = _windows_key(str(candidate))
+    install_key = _windows_key(windows_install_dir(program_files))
+    if key == install_key or key.startswith(install_key + "/"):
+        return False
+    roots = (
+        PureWindowsPath(legacy_program_dir(program_files)),
+        PureWindowsPath(kebab_install_dir(program_files)),
+    )
     return any(candidate == root or root in candidate.parents for root in roots)
 
 
 def case_only_rename(actual: str, wanted: str) -> bool:
     """True when ``actual`` and ``wanted`` are the same name apart from case.
 
-    The Start menu folder ``Voxprint AI Suite`` is renamed to ``VOXPrint AI Suite``.
-    The program folder ``voxprint-ai-suite`` is a different directory, so it is not a case rename.
+    ``Voxprint AI Suite`` is renamed to ``VOXPrint AI Suite``. The folder
+    ``voxprint-ai-suite`` is a different directory, so upgrade deletes it.
     """
     return actual.casefold() == wanted.casefold() and actual != wanted
-
-
-def legacy_suite_dir(program_files: str = r"C:\Program Files") -> str:
-    """The earlier suite install folder (``Audiobook Builder`` under the mixed-case suite name)."""
-    return legacy_suite_app_dirs(program_files)[0]
 
 
 def default_install_dir() -> Path:

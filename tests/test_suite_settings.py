@@ -160,7 +160,8 @@ def test_installer_one_start_menu_folder_and_old_one_removed():
     t = iss()
     assert re.search(r"^DefaultGroupName=\{#StartMenu\}\r?$", t, re.M) and re.search(r"^UsePreviousGroup=no\r?$", t, re.M)
     assert '#define StartMenu "VOXPrint AI Suite"' in t
-    assert '#define SuiteDir "voxprint-ai-suite"' in t
+    assert '#define SuiteDir "VOXPrint AI Suite"' in t
+    assert '#define AppFolder "Audiobook Builder"' in t
     assert '{commonprograms}\\{#AppDisplayName}\\{#AppDisplayName}.lnk' in t and 'dirifempty; Name: "{commonprograms}\\{#AppDisplayName}"' in t
 
 

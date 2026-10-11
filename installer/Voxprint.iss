@@ -40,10 +40,10 @@
 
 #define AppName "Voxprint"
 ; AppName stays the data-folder name (%LOCALAPPDATA%\Voxprint). It is not the install folder.
-; The program installs under {autopf}\voxprint-ai-suite\audiobook-builder.
-; Start menu folder and shortcut are display names (VOXPrint AI Suite / VOXPrint AI Audiobook Builder).
-#define SuiteDir "voxprint-ai-suite"
-#define AppFolder "audiobook-builder"
+; The program installs under {autopf}\VOXPrint AI Suite\Audiobook Builder.
+; Start menu folder and shortcut use the same display names.
+#define SuiteDir "VOXPrint AI Suite"
+#define AppFolder "Audiobook Builder"
 #define StartMenu "VOXPrint AI Suite"
 #define AppDisplayName "VOXPrint AI Audiobook Builder"
 #define AppVersion "1.0.0-rc.5"
@@ -63,6 +63,9 @@
 #define LegacySuiteGui "VOXPrint AI Audiobook Builder.exe"
 #define LegacySuiteGuiOld "Voxprint AI Audiobook Builder.exe"
 #define LegacyDisplayName "Voxprint AI Audiobook Builder"
+; Intermediate layout. A different directory from the display-case folder, so upgrade deletes it.
+#define LegacyKebabSuite "voxprint-ai-suite"
+#define LegacyKebabApp "audiobook-builder"
 ; CI build number and codename (tools/build_number.py; build_online.ps1 passes /DAppBuild= /DAppCodename=); 0 = local build
 #ifndef AppBuild
 #define AppBuild "0"
@@ -94,7 +97,7 @@ AppVerName={#AppDisplayName} {#AppVersion} build {#AppBuild} {#AppCodename}
 AppPublisher=VOXPrint
 UninstallDisplayName={#AppDisplayName}
 DefaultDirName={autopf}\{#SuiteDir}\{#AppFolder}
-; An upgrade must not stay in C:\Program Files\Voxprint. /DIR= still wins.
+; An upgrade must not stay in C:\Program Files\Voxprint or in voxprint-ai-suite. /DIR= still wins.
 UsePreviousAppDir=no
 ; Start menu folder "VOXPrint AI Suite", shortcut "VOXPrint AI Audiobook Builder". No desktop shortcut.
 ; UsePreviousGroup=no moves an older "Voxprint" or "VOXPrint AI Audiobook Builder" folder. [InstallDelete] removes the old shortcut.
@@ -995,9 +998,10 @@ begin
 #endif
 end;
 
-{ Old install: C:\Program Files\Voxprint with Voxprint.exe or voxprint-cli.exe.
-  Removed on upgrade: that folder, its shortcuts, its user PATH entry, and the uninstall key when it still
-  points there. Never run that uninstaller (it would drop model and runtime refcounts). Never delete
+{ Old installs: C:\Program Files\Voxprint with Voxprint.exe or voxprint-cli.exe, and the
+  lower-case folder voxprint-ai-suite\audiobook-builder. Both are removed on upgrade, with their
+  PATH entries. A folder that differs only by case (Voxprint AI Suite) is renamed, not deleted.
+  Never run the old uninstaller (it would drop model and runtime refcounts). Never delete
   the per-user Voxprint data folder. }
 function LegacyInstallDir(): String;
 begin
@@ -1055,6 +1059,17 @@ procedure FixStartMenuCasing();
 begin
   RenameChildCase(ExpandConstant('{commonprograms}'), '{#StartMenu}');
   RenameChildCase(ExpandConstant('{userprograms}'), '{#StartMenu}');
+end;
+
+{ The install folder keeps the display spelling. Windows will not change only the case in one step. }
+procedure FixInstallFolderCasing();
+var
+  SuiteParent: String;
+begin
+  RenameChildCase(ExpandConstant('{autopf}'), '{#SuiteDir}');
+  SuiteParent := AddBackslash(ExpandConstant('{autopf}')) + '{#SuiteDir}';
+  if DirExists(SuiteParent) then
+    RenameChildCase(SuiteParent, '{#AppFolder}');
 end;
 
 function IsLegacyProgramDir(const Dir: String): Boolean;
@@ -1120,6 +1135,11 @@ begin
   Result := RemoveBackslash(AddBackslash(ExpandConstant('{autopf}')) + SuiteName + '\{#LegacyAppFolder}');
 end;
 
+function LegacyKebabAppDir(): String;
+begin
+  Result := RemoveBackslash(AddBackslash(ExpandConstant('{autopf}')) + '{#LegacyKebabSuite}\{#LegacyKebabApp}');
+end;
+
 function DirHasOurProgram(const Dir: String): Boolean;
 begin
   Result := FileExists(AddBackslash(Dir) + '{#LegacyGui}')
@@ -1144,7 +1164,7 @@ begin
   end;
   RemoveDirFromUserPath(Dir);
   if DirExists(ExtractFileDir(RemoveBackslash(Dir))) then
-    RmDir(ExtractFileDir(RemoveBackslash(Dir)));
+    RemoveDir(ExtractFileDir(RemoveBackslash(Dir)));
 end;
 
 procedure RemoveLegacyInstall();
@@ -1164,6 +1184,16 @@ begin
   end;
   RemoveAppDirIfOurs(LegacySuiteAppDir('{#LegacySuiteDir}'));
   RemoveAppDirIfOurs(LegacySuiteAppDir('{#LegacySuiteDirDisplay}'));
+  RemoveAppDirIfOurs(LegacyKebabAppDir());
+end;
+
+{ Old program files left in the install folder. The folder itself stays. }
+procedure RemoveOldExeNames();
+begin
+  DeleteFile(ExpandConstant('{app}\{#LegacyGui}'));
+  DeleteFile(ExpandConstant('{app}\{#LegacyCli}'));
+  DeleteFile(ExpandConstant('{app}\{#LegacySuiteGui}'));
+  DeleteFile(ExpandConstant('{app}\{#LegacySuiteGuiOld}'));
 end;
 
 procedure RegisterSuiteDiscovery();
@@ -1588,17 +1618,54 @@ end;
 { Append the program folder to the user PATH once, keeping REG_EXPAND_SZ so %SystemRoot% stays unexpanded. }
 procedure AddAppToUserPath();
 var
-  OldPath, NewPath, AppDir: String;
+  OldPath, NewPath, AppDir, Piece, Rest: String;
+  P: Integer;
+  Seen: Boolean;
 begin
   AppDir := RemoveBackslash(ExpandConstant('{app}'));
   if not RegQueryStringValue(HKCU, 'Environment', 'Path', OldPath) then
     OldPath := '';
-  if Pos(';' + Uppercase(AppDir) + ';', ';' + Uppercase(OldPath) + ';') > 0 then
-    Exit;
-  if OldPath = '' then
-    NewPath := AppDir
-  else
-    NewPath := OldPath + ';' + AppDir;
+  NewPath := '';
+  Rest := OldPath;
+  Seen := False;
+  while Rest <> '' do
+  begin
+    P := Pos(';', Rest);
+    if P = 0 then
+    begin
+      Piece := Rest;
+      Rest := '';
+    end
+    else
+    begin
+      Piece := Copy(Rest, 1, P - 1);
+      Rest := Copy(Rest, P + 1, Length(Rest));
+    end;
+    if CompareText(RemoveBackslash(Trim(Piece)), AppDir) = 0 then
+    begin
+      if Seen then
+        Piece := ''
+      else
+      begin
+        Piece := AppDir;
+        Seen := True;
+      end;
+    end;
+    if Piece <> '' then
+    begin
+      if NewPath = '' then
+        NewPath := Piece
+      else
+        NewPath := NewPath + ';' + Piece;
+    end;
+  end;
+  if not Seen then
+  begin
+    if NewPath = '' then
+      NewPath := AppDir
+    else
+      NewPath := NewPath + ';' + AppDir;
+  end;
   if not RegWriteExpandStringValue(HKCU, 'Environment', 'Path', NewPath) then
     Log('could not add the program folder to PATH');
 end;
@@ -1709,6 +1776,8 @@ begin
     end;
     RunSuiteInstall();
     RemoveLegacyInstall();
+    RemoveOldExeNames();
+    FixInstallFolderCasing();
     FixStartMenuCasing();
     RegisterSuiteDiscovery();
     AddAppToUserPath();
@@ -1827,6 +1896,8 @@ begin
   if CurUninstallStep = usPostUninstall then
     DeleteProgramFolder;
 #endif
+  if CurUninstallStep = usPostUninstall then
+    RemoveDir(ExtractFileDir(RemoveBackslash(ExpandConstant('{app}'))));
   if CurUninstallStep = usPostUninstall then
     if (OtherModelUsers = 0) and (SharedModelsDir <> '') and DirExists(SharedModelsDir) and
        (CompareText(SharedModelsDir, DefaultModelsDir()) = 0) then

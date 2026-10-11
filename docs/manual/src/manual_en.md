@@ -555,7 +555,7 @@ Everything in this chapter is optional: the windows do all of it. The command li
 
 ## Where the program is and the rules
 
-Scripts call `C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe` (another folder if you chose one; `where.exe voxprint-audiobook-cli` finds it). The window is `voxprint-audiobook-builder.exe` in that folder; the Start menu shortcut is VOXPrint AI Audiobook Builder. In a source checkout use `python main.py`. Below, `voxprint` stands for the console program or `python main.py`.
+Scripts call `C:\Program Files\VOXPrint AI Suite\Audiobook Builder\voxprint-audiobook-cli.exe` (another folder if you chose one; `where.exe voxprint-audiobook-cli` finds it). The window is `voxprint-audiobook-builder.exe` in that folder; the Start menu shortcut is VOXPrint AI Audiobook Builder. In a source checkout use `python main.py`. Below, `voxprint` stands for the console program or `python main.py`.
 
 * Nothing prompts; `--yes` is accepted by every command.
 * `--json` prints progress as JSON lines and ends with one result object (`type: result`, `ok`, `exit_code`, `outputs`, `warnings`, `error`, `hint`).

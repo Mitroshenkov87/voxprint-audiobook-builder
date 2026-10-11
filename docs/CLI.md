@@ -460,8 +460,8 @@ The manifest is `%LOCALAPPDATA%\Voxprint\shared\manifest.json` (Linux: `~/.local
 ```json
 "installs": {
   "audiobook-builder": {
-    "install_path": "C:\\Program Files\\voxprint-ai-suite\\audiobook-builder",
-    "cli_path": "C:\\Program Files\\voxprint-ai-suite\\audiobook-builder\\voxprint-audiobook-cli.exe"
+    "install_path": "C:\\Program Files\\VOXPrint AI Suite\\Audiobook Builder",
+    "cli_path": "C:\\Program Files\\VOXPrint AI Suite\\Audiobook Builder\\voxprint-audiobook-cli.exe"
   }
 }
 ```
@@ -470,6 +470,6 @@ The manifest is `%LOCALAPPDATA%\Voxprint\shared\manifest.json` (Linux: `~/.local
 
 On Windows the same two paths are also under `HKCU\Software\voxprint\Apps\audiobook-builder` and `HKLM\Software\voxprint\Apps\audiobook-builder` (`InstallPath`, `CliPath`). The installer writes both. A frozen copy writes the current-user key when it starts.
 
-If neither record exists, use the default path above. On Linux the launcher is `/usr/local/bin/voxprint-audiobook-cli` (`voxprint` starts the same program). The program files stay in `/opt/voxprint-ai-suite/audiobook-builder`. An older copy under `~/.local/share/voxprint/app` is removed on install; voices and settings in `~/.local/share/voxprint` stay.
+If neither record exists, use the default path above. On Linux the launcher is `/usr/local/bin/voxprint-audiobook-cli` (`voxprint` starts the same program). The program files stay in `/opt/voxprint-ai-suite/audiobook-builder`. An older copy under `~/.local/share/voxprint/app` is removed on install; voices and settings in `~/.local/share/voxprint` stay. On Windows an older `C:\Program Files\Voxprint` folder and an intermediate `C:\Program Files\voxprint-ai-suite\audiobook-builder` folder are removed. A folder spelled `Voxprint AI Suite` is renamed to `VOXPrint AI Suite`.
 
 voxprint-common 0.1.1 has no install registry. This record is an extra key on the shared manifest, kept beside `components`. Call `voxprint-audiobook-cli.exe` (or `voxprint-audiobook-cli` on Linux), not the windowed exe and not the old `voxprint-cli.exe`.

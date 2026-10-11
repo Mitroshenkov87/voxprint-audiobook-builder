@@ -66,7 +66,7 @@ if ($BinOpt) {
     if (-not (Test-Path -LiteralPath $env:VOXPRINT_BIN)) { Die-Usage "voxprint was not found (set --bin or VOXPRINT_BIN)" }
     $Vox = @($env:VOXPRINT_BIN)
 } else {
-    $known = Join-Path $env:ProgramFiles "voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe"
+    $known = Join-Path $env:ProgramFiles "VOXPrint AI Suite\Audiobook Builder\voxprint-audiobook-cli.exe"
     if (Test-Path -LiteralPath $known) { $Vox = @($known) }
     else {
     foreach ($name in @("voxprint-audiobook-cli", "voxprint-cli", "voxprint")) {

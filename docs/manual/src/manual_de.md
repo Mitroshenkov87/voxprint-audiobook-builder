@@ -620,7 +620,7 @@ Alles in diesem Kapitel ist optional: Die Fenster können dasselbe. Die Kommando
 
 ## Wo das Programm liegt und die Regeln
 
-Skripte rufen `C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe` auf (ein anderer Ordner, wenn Sie einen gewählt haben; `where.exe voxprint-audiobook-cli` findet es). Das Fenster ist `voxprint-audiobook-builder.exe` in demselben Ordner; die Verknüpfung im Startmenü heißt VOXPrint AI Audiobook Builder. In einem Quellcode-Checkout verwenden Sie `python main.py`. Unten steht `voxprint` für das Konsolenprogramm oder `python main.py`.
+Skripte rufen `C:\Program Files\VOXPrint AI Suite\Audiobook Builder\voxprint-audiobook-cli.exe` auf (ein anderer Ordner, wenn Sie einen gewählt haben; `where.exe voxprint-audiobook-cli` findet es). Das Fenster ist `voxprint-audiobook-builder.exe` in demselben Ordner; die Verknüpfung im Startmenü heißt VOXPrint AI Audiobook Builder. In einem Quellcode-Checkout verwenden Sie `python main.py`. Unten steht `voxprint` für das Konsolenprogramm oder `python main.py`.
 
 * Nichts fragt nach; `--yes` wird von jedem Befehl akzeptiert.
 * `--json` gibt den Fortschritt als JSON-Zeilen aus und endet mit einem Ergebnisobjekt (`type: result`, `ok`, `exit_code`, `outputs`, `warnings`, `error`, `hint`).

@@ -622,7 +622,7 @@
 
 ## Где программа и общие правила
 
-Скрипты вызывают `C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe` (или другую папку, если вы её выбрали; найти можно командой `where.exe voxprint-audiobook-cli`). Окно — `voxprint-audiobook-builder.exe` в той же папке; ярлык в меню «Пуск» называется VOXPrint AI Audiobook Builder. В исходном коде используйте `python main.py`. Ниже `voxprint` означает консольную программу или `python main.py`.
+Скрипты вызывают `C:\Program Files\VOXPrint AI Suite\Audiobook Builder\voxprint-audiobook-cli.exe` (или другую папку, если вы её выбрали; найти можно командой `where.exe voxprint-audiobook-cli`). Окно — `voxprint-audiobook-builder.exe` в той же папке; ярлык в меню «Пуск» называется VOXPrint AI Audiobook Builder. В исходном коде используйте `python main.py`. Ниже `voxprint` означает консольную программу или `python main.py`.
 
 * Ничего не спрашивается; `--yes` принимает любая команда.
 * `--json` выводит ход работы строками JSON и заканчивает одним объектом результата (`type: result`, `ok`, `exit_code`, `outputs`, `warnings`, `error`, `hint`).
