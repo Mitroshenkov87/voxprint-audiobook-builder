@@ -1,13 +1,18 @@
 name: build-installer
 
-# Manual runs only (workflow_dispatch).  Job "build-thin" builds the ONLINE installer Voxprint-Setup-online.exe: our small shell
-# (Qt + program) and a manifest that points to the libraries at their upstream sites (docs/THIN-INSTALLER.md).  The quick jobs
-# "online-smoke" and "thin-smoke" test the installer chain with a fake program folder in a few minutes (smoke_only=true).
-# The former heavy job "build" (full installer + multi-GB payload parts, also run on every "v*" tag push) was REMOVED on purpose: those
-# assets were deleted from the release and must never be recreated.  Releases are built only by a manual run of "build-thin".
-# The audit job runs first. The installer jobs do not start when ruff, mypy, bandit (high), gitleaks, or an
-# un-allowlisted pip-audit high/critical finding fails that job. Vulture and radon do not fail it.
+# workflow_dispatch builds the installer. Pull requests run only the cheap jobs (install-script, online-smoke,
+# thin-smoke) so a smoke assertion cannot stay red until a release dispatch. Job "build-thin" builds the ONLINE
+# installer Voxprint-Setup-online.exe: our small shell (Qt + program) and a manifest that points to the libraries at
+# their upstream sites (docs/THIN-INSTALLER.md). The quick jobs "online-smoke" and "thin-smoke" test the installer
+# chain with a fake program folder in a few minutes (smoke_only=true). The former heavy job "build" (full installer
+# + multi-GB payload parts, also run on every "v*" tag push) was REMOVED on purpose: those assets were deleted from
+# the release and must never be recreated. Releases are built only by a manual run of "build-thin".
+# On a manual run the audit job runs first. The installer jobs do not start when ruff, mypy, bandit (high), gitleaks, or an
+# un-allowlisted pip-audit high/critical finding fails that job. Vulture and radon do not fail it. Pull requests already
+# run audit.yml, so this workflow does not repeat it.
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       release_tag:
@@ -30,9 +35,11 @@ permissions:
 
 jobs:
   audit:
+    if: github.event_name != 'pull_request'
     uses: ./.github/workflows/audit.yml
   install-script:
     needs: audit
+    if: always() && !cancelled() && (github.event_name == 'pull_request' || needs.audit.result == 'success')
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
@@ -89,6 +96,7 @@ jobs:
           exit 0
   online-smoke:
     needs: audit
+    if: always() && !cancelled() && (github.event_name == 'pull_request' || needs.audit.result == 'success')
     runs-on: windows-latest
     timeout-minutes: 15
     env:
@@ -137,13 +145,20 @@ jobs:
           }
           Get-Content C:\vxsmoke\voxprint-components.json
           if (Test-Path C:\vxsmoke\unins000.exe) { "uninstaller present" } else { throw "no uninstaller" }
-          # shared models folder: setup registers this program in models\.users.json (infra/models_users.py)
-          $users = "$env:LOCALAPPDATA\Voxprint\models\.users.json"
+          # Shared models folder (infra/paths.py default_models_dir): setup registers this program in
+          # %LOCALAPPDATA%\Voxprint\shared\models\.users.json. The legacy models\.users.json path is not used.
+          $sharedModels = Join-Path $env:LOCALAPPDATA "Voxprint\shared\models"
+          $users = Join-Path $sharedModels ".users.json"
+          if (-not (Test-Path $users)) { throw "shared models users file was not created: $users" }
+          if (Test-Path (Join-Path $env:LOCALAPPDATA "Voxprint\models\.users.json")) { throw "setup still wrote the legacy models users file" }
           if (-not (Select-String -Path $users -Pattern '"audiobook-builder": true' -SimpleMatch -Quiet)) { throw "models users file has no audiobook-builder key" }
           '{"movie-dubber": true}' | Set-Content -Encoding ascii $users
-          # second run: everything is reused (no component is downloaded again)
+          $blob = "C:\vxsmoke\_internal\lib\blob0.bin"
+          $written = (Get-Item $blob).LastWriteTimeUtc
+          # second run: the payload is already on disk (reuse) and the other program's key stays
           $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke2.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxsmoke2.log -Tail 60; throw "second install exit code $($p.ExitCode)" }
+          if ((Get-Item $blob).LastWriteTimeUtc -ne $written) { throw "the second install rewrote a component that was already installed" }
           $text = Get-Content -Raw $users
           Write-Host "users file after the second install: $text"
           if (-not ($text.Contains('"audiobook-builder": true') -and $text.Contains('"movie-dubber": true'))) { throw "the other program's key was not kept" }
@@ -157,7 +172,9 @@ jobs:
           for ($i = 0; $i -lt 60 -and (Test-Path C:\vxsmoke\Voxprint.exe); $i++) { Start-Sleep 2 }
           Get-Process | Where-Object { $_.ProcessName -like "unins*" -or $_.ProcessName -like "*vxsmoke*" } | Format-Table Id, ProcessName
           if (Test-Path C:\vxsmoke\Voxprint.exe) { if (Test-Path C:\vxsmoke-un.log) { Get-Content C:\vxsmoke-un.log -Tail 30 }; throw "files left after the uninstall" }
-          if (-not (Test-Path $users)) { throw "the uninstall deleted the shared models folder" }
+          if (-not (Test-Path $users)) { throw "the uninstall deleted the shared models folder another program still uses" }
+          $left = Get-Content -Raw $users
+          if (-not $left.Contains('"movie-dubber"')) { throw "uninstall dropped the other program from the shared models refcount" }
           "uninstalled"
       - name: Logs
         if: always()
@@ -169,6 +186,7 @@ jobs:
   # shell -> the app's module manager downloads the runtime modules.  Also checks the Windows adapter enumeration of netroute.
   thin-smoke:
     needs: audit
+    if: always() && !cancelled() && (github.event_name == 'pull_request' || needs.audit.result == 'success')
     runs-on: windows-latest
     timeout-minutes: 20
     env:
@@ -219,7 +237,7 @@ jobs:
           ./installer/build_online.ps1 -Thin -RuntimeSite build\fake-site -Tag v0.0.0-beta -BaseUrl http://127.0.0.1:8098 -ManifestUrl http://127.0.0.1:8098/manifest-beta.json -LimitMib 1 -Python python
           Start-Process python -ArgumentList "-m","http.server","8098","--bind","127.0.0.1","--directory","build\online-release" -WindowStyle Hidden
           Start-Sleep 3
-      - name: Silent install puts only the shell on the disk; the module manager downloads the rest
+      - name: Silent install leaves the shell without PyTorch; the module manager unpacks it into the shared runtime
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -227,13 +245,15 @@ jobs:
           if ($p.ExitCode -ne 0) { Get-Content C:\vxthin.log -Tail 60; throw "install exit code $($p.ExitCode)" }
           if (-not (Test-Path C:\vxthin\Voxprint.exe)) { throw "the shell is missing" }
           if (-not (Test-Path C:\vxthin\_internal\modules.json)) { throw "modules.json is missing" }
-          if (Test-Path C:\vxthin\_internal\torch) { throw "the thin installer installed a runtime module" }
+          if (Test-Path C:\vxthin\_internal\torch) { throw "the thin installer installed a runtime module into the shell" }
           $env:VOXPRINT_MODULES_CONFIG = "C:\vxthin\_internal\modules.json"
           $env:VOXPRINT_HOME = "C:\vxhome"
           python main.py --modules-status
           python main.py --install-modules
           if ($LASTEXITCODE -ne 0) { throw "--install-modules failed" }
-          if (-not (Test-Path C:\vxhome\runtime\torch\lib\big.dll)) { throw "the torch module was not unpacked into the runtime folder" }
+          $shared = "C:\vxhome\shared\runtime\torch\lib\big.dll"
+          if (-not (Test-Path $shared)) { throw "the torch module was not unpacked into the shared runtime ($shared)" }
+          if (Test-Path C:\vxhome\runtime\torch) { throw "torch landed in the legacy runtime folder" }
           python main.py --modules-status
       - name: Setup log
         if: always()
@@ -378,10 +398,19 @@ jobs:
           VOXPRINT_HOME: C:\vxhome2
         run: |
           $ErrorActionPreference = "Stop"
-          # "another program": a project venv in the user's profile that holds the torch wheels we downloaded in the previous step
-          New-Item -ItemType Directory -Force $env:USERPROFILE\my-ai-app\.venv\Lib\site-packages | Out-Null
-          Get-ChildItem C:\vxhome1\runtime -Directory | Where-Object { $_.Name -like "torch*" } | ForEach-Object { Copy-Item $_.FullName $env:USERPROFILE\my-ai-app\.venv\Lib\site-packages\ -Recurse }
-          Get-ChildItem $env:USERPROFILE\my-ai-app\.venv\Lib\site-packages | Select-Object -ExpandProperty Name
+          # The first install unpacked the wheels into <VOXPRINT_HOME>\shared\runtime (flat site-packages).
+          # Another Voxprint program keeps the same tree at %LOCALAPPDATA%\Voxprint\shared\runtime. This home is
+          # C:\vxhome2, so that default shared folder is a foreign copy and must be reused, not downloaded again.
+          $src = "C:\vxhome1\shared\runtime"
+          if (-not (Test-Path $src)) {
+            Get-ChildItem C:\vxhome1 -Recurse -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+            throw "the first install did not unpack into the shared runtime ($src)"
+          }
+          Get-ChildItem $src | Select-Object -ExpandProperty Name
+          $other = Join-Path $env:LOCALAPPDATA "Voxprint\shared\runtime"
+          New-Item -ItemType Directory -Force $other | Out-Null
+          Get-ChildItem $src -Directory | Where-Object { $_.Name -like "torch*" } | ForEach-Object { Copy-Item $_.FullName (Join-Path $other $_.Name) -Recurse -Force }
+          Get-ChildItem $other | Select-Object -ExpandProperty Name
           $env:VOXPRINT_MODULES_CONFIG = "C:\vx-modules.json"
           $exe = (Resolve-Path dist\thin\Voxprint\Voxprint.exe).Path
           $p = Start-Process $exe -ArgumentList "--install-modules" -Wait -PassThru
@@ -390,7 +419,7 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "--install-modules failed" }
           $line = Get-Content C:\vxhome2\logs\modules.txt | Select-String "^torch" | Select-Object -First 1
           if ($line -notmatch "reused") { throw "PyTorch was not reused: $line" }
-          if (Test-Path C:\vxhome2\runtime\torch) { throw "PyTorch was downloaded although it is on the PC" }
+          if (Test-Path C:\vxhome2\shared\runtime\torch) { throw "PyTorch was downloaded into this home although the shared copy is on the PC" }
           $p = Start-Process $exe -ArgumentList "--probe-torch" -Wait -PassThru
           Get-Content C:\vxhome2\logs\probe_torch.txt
           if ($p.ExitCode -ne 0) { throw "the reused PyTorch does not work" }

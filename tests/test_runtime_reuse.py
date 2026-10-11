@@ -72,6 +72,28 @@ def test_movie_dubber_runtime_and_shared_cu130_are_found(tmp_path):
     assert ext is not None and ext.site == str(dubber)
 
 
+def test_wheels_unpacked_straight_into_the_shared_runtime_are_found(tmp_path, monkeypatch):
+    """modules.install writes torch into <home>/shared/runtime, not into Lib/site-packages."""
+    local = tmp_path / "Local"
+    app = tmp_path / "this-app"
+    app.mkdir()
+    monkeypatch.setenv("VOXPRINT_HOME", str(app))
+    flat = local / "Voxprint" / "shared" / "runtime"
+    fake_site(flat, torch="2.11.0+cu130", audio="2.11.0+cu130")
+    env = {"LOCALAPPDATA": str(local), "USERPROFILE": str(tmp_path), "HOME": str(tmp_path), "VOXPRINT_HOME": str(app)}
+    found = rr.find_torch(rr.candidate_prefixes(environ=env, home=tmp_path))
+    match = [item for item in found if Path(item.site) == flat]
+    assert match and match[0].flavor == "cu130" and match[0].torch == "2.11.0+cu130"
+
+
+def test_this_installs_own_shared_runtime_is_not_reported_as_foreign(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    monkeypatch.setenv("VOXPRINT_HOME", str(home))
+    own = home / "shared" / "runtime"
+    fake_site(own, torch="2.11.0+cu130", audio="2.11.0+cu130")
+    assert rr.find_torch([own]) == []
+
+
 def test_a_free_threaded_wheel_tag_does_not_match_this_interpreter(tmp_path):
     site = fake_site(tmp_path / "s", torch="2.11.0+cu130", audio="2.11.0+cu130")
     wheel = next(site.glob("torch-*.dist-info")) / "WHEEL"

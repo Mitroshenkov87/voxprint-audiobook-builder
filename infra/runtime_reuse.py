@@ -311,25 +311,64 @@ def candidate_prefixes(environ: Optional[Dict[str, str]] = None, home: Optional[
     return pre
 
 
-def find_torch(prefixes: Optional[Iterable[Path]] = None, own_runtime: Optional[Path] = None) -> List[ExternalTorch]:
-    """All foreign ``torch`` installations found (newest first).  Only file names / small text files are read."""
-    seen, found = set(), []
-    rt = None
+def _looks_like_site(folder: Path) -> bool:
+    """True when ``folder`` itself is a site-packages tree (``torch`` unpacked directly into it).
+
+    ``modules.install`` writes wheels into ``<home>/shared/runtime`` that way. A venv still has them under
+    ``Lib/site-packages``, which :func:`_site_dirs_of` already covers.
+    """
     try:
-        rt = (own_runtime or (paths.app_home() / "runtime")).resolve()
+        if (folder / "torch").is_dir():
+            return True
+        return any(folder.glob("torch-*.dist-info"))
     except OSError:
-        pass
+        return False
+
+
+def _candidate_sites(prefix: Path) -> List[Path]:
+    """Site-packages folders under ``prefix``, plus ``prefix`` when the wheels were unpacked straight into it."""
+    sites = _site_dirs_of(prefix)
+    if (prefix / "site-packages").is_dir():
+        sites.append(prefix / "site-packages")
+    if _looks_like_site(prefix):
+        sites.append(prefix)
+    return sites
+
+
+def _own_runtime_dirs(own_runtime: Optional[Path] = None) -> set:
+    """This install's runtime folders. A copy there is ours, not another program's."""
+    folders = [own_runtime] if own_runtime is not None else []
+    if own_runtime is None:
+        folders.append(paths.app_home() / "runtime")
+        shared = os.environ.get("VOXPRINT_SHARED", "").strip()
+        folders.append((Path(shared) / "runtime") if shared else (paths.app_home() / "shared" / "runtime"))
+    found = set()
+    for folder in folders:
+        if folder is None:
+            continue
+        try:
+            found.add(Path(folder).resolve())
+        except OSError:
+            continue
+    return found
+
+
+def find_torch(prefixes: Optional[Iterable[Path]] = None, own_runtime: Optional[Path] = None) -> List[ExternalTorch]:
+    """All foreign ``torch`` installations found (newest first).  Only file names / small text files are read.
+
+    A prefix may be a venv (``Lib/site-packages``) or the shared runtime folder itself (wheels unpacked into
+    ``<Voxprint>/shared/runtime``). This install's own runtime folders are skipped.
+    """
+    seen, found = set(), []
+    own = _own_runtime_dirs(own_runtime)
     n = 0
     for pre in (prefixes if prefixes is not None else candidate_prefixes()):
-        sites = _site_dirs_of(pre)
-        if (pre / "site-packages").is_dir():
-            sites.append(pre / "site-packages")
-        for site in sites:
+        for site in _candidate_sites(pre):
             try:
                 key = site.resolve()
             except OSError:
                 continue
-            if key in seen or key == rt:
+            if key in seen or key in own:
                 continue
             seen.add(key)
             n += 1

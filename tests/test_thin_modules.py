@@ -14,6 +14,7 @@ import pytest
 
 from infra import modules as mods
 from tests.test_online_installer import Server
+from ui import screen_fit
 from tests.test_studio import app, lib, make_studio, wait_for  # noqa: F401  (fixtures)
 from tools import make_online_payload as mk
 from tools import make_runtime_modules as rt
@@ -335,18 +336,22 @@ def test_a_newer_pinned_set_is_offered_as_an_update_in_the_components_window(thi
     st = mods.runtime_dir() / of.STATE_FILE
     d = json.loads(st.read_text(encoding="utf-8"))
     cid = next(c for c in d["components"] if c.startswith("rt-audio-"))
-    d["components"][cid], d["app_version"] = "f" * 64, "0.0.9"          # as if it came from an older release
+    d["components"][cid], d["app_version"], d["build"] = "f" * 64, "0.0.9", "900"   # an older release, build kept
     st.write_text(json.dumps(d), encoding="utf-8")
     man = mods.load_manifest()
     audio = next(m for m in mods.modules(man) if m.id == "audio")
     assert audio.update and not audio.installed and audio in mods.pending(mods.modules(man))
-    assert mods.versions(man) == ("0.0.9", mods.label(man["app_version"], man.get("build", "")))
+    old = mods.label("0.0.9", "900")
+    new = mods.label(str(man.get("app_version", "")), man.get("build", ""))
+    assert mods.versions(man) == (old, new)
     dlg = ModulesDialog()
     dlg.refresh()
     assert wait_for(lambda: dlg.modules and not dlg.busy, 20)
     dlg.modules = [m for m in dlg.modules if m.id == "audio"]          # only the update is pending
     dlg._on_listed(dlg.modules)
-    assert dlg.updates() and dlg.lbl_status.text().startswith("Updates available: ") and "0.0.9 \u2192" in dlg.lbl_status.text()
+    text = dlg.lbl_status.text()
+    assert dlg.updates() and text.startswith("Updates available: ")
+    assert screen_fit.nobreak(old) in text and "\u2192" in text and screen_fit.nobreak(new) in text
     assert dlg.btn_download.isEnabled()
     dlg.shutdown()
     # the update removes the files the new version no longer has (recorded ones only, inside the runtime folder)
