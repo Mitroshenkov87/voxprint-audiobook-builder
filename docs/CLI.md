@@ -42,7 +42,7 @@ Pipeline errors that come from the UI catalogs follow `VOXPRINT_LANG` (default f
 | 1 | internal | Unexpected failure. Save `voxprint diag` |
 | 2 | bad args | Missing or unknown arguments, unknown format, unknown module id |
 | 3 | input | Book, audio, transcript or voice is missing or unreadable |
-| 4 | missing | A model or component is not installed, or its download failed |
+| 4 | missing | A model or component is not installed, or its download failed. When the required set is missing, the hint is `voxprint-mdl download --app audiobook-builder --json` |
 | 5 | gpu | Out of GPU memory |
 | 6 | cancelled | The job stopped on the cancel token. Run the same `narrate` command again to resume cached chunks |
 | 7 | gpu required | No NVIDIA GPU, or the best compute capability is below 8.9 (RTX 40-series). `--version`, `help`, `status`, `diag` and `--dry-run` still run |

@@ -74,6 +74,8 @@ pyinstaller --onedir --console --noconfirm --name voxprint-audiobook-cli --distp
   %META% %EXCL% main.py
 if errorlevel 1 (echo [ERROR] Console PyInstaller failed. & exit /b 1)
 copy /Y "dist\thin\voxprint-audiobook-cli\voxprint-audiobook-cli.exe" "dist\thin\voxprint-audiobook-builder\voxprint-audiobook-cli.exe" || (echo [ERROR] voxprint-audiobook-cli.exe was not copied. & exit /b 1)
+copy /Y "voxprint-app-models.json" "dist\thin\voxprint-audiobook-builder\voxprint-app-models.json" || exit /b 1
+copy /Y "installer\voxprint-mdl.cmd" "dist\thin\voxprint-audiobook-builder\voxprint-mdl.cmd" || exit /b 1
 python tools\embed_build_stamp.py --exe "%CD%\dist\thin\voxprint-audiobook-builder\voxprint-audiobook-cli.exe" || (echo [ERROR] cli exe stamp. & exit /b 1)
 rmdir /s /q "dist\thin\voxprint-audiobook-cli"
 echo Thin shell: dist\thin\voxprint-audiobook-builder  ^(the packaging step adds _internal\modules.json^)

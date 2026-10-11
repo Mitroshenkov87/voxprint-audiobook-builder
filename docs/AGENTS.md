@@ -282,7 +282,7 @@ Extra fields by command:
 | 1 | internal | `voxprint diag --out voxprint-diagnostics.zip --json` and read `error` |
 | 2 | bad args | `voxprint <command> --help`. Unknown module: `voxprint models list --json` |
 | 3 | input | The path or voice id is wrong. `voxprint voices list --json` for voices. Books are TXT, Markdown, FB2, `.fb2.zip`, EPUB, `.vxbook`. A `.vxbook` cast voice that is not installed is also 3 |
-| 4 | missing | `voxprint models download <id> --json`. The `hint` names the id when it can |
+| 4 | missing | Required models: `voxprint-mdl download --app audiobook-builder --json`. One optional model: `voxprint models download <id> --json`. The `hint` names which |
 | 5 | gpu | Free video memory and run the same command again. Check `voxprint status --json` |
 | 6 | cancelled | Run the same `narrate` again. Finished chunks are kept |
 | 7 | gpu required | This PC has no NVIDIA GeForce RTX 40-series or newer GPU (compute capability 8.9 or higher). `status` and `diag` still run and report `gpu.requirement`. `--dry-run` also runs: it checks arguments, files and the output path and does not load a model. Details: [CLI.md](CLI.md#dry-run) |

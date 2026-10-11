@@ -39,7 +39,7 @@ FETCH_NAME = "voxprint-fetch.py"
 SUMS_NAME = "SHA256SUMS-linux.txt"
 DEFAULT_REPO = "Mitroshenkov87/voxprint-audiobook-builder"
 
-TOP_FILES = ["main.py", "credits.json", "requirements.txt", "requirements-verified.txt", "requirements-nodeps.txt",
+TOP_FILES = ["main.py", "credits.json", "voxprint-app-models.json", "requirements.txt", "requirements-verified.txt", "requirements-nodeps.txt",
              "requirements-torch.txt", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"]
 TOP_DIRS = ["core", "infra", "ui", "workers", "locales", "prompts", "licenses", "third_party"]
 EXTRA = ["assets/voxprint.png", "assets/voxprint.ico", "assets/check.png", "assets/splash.jpg",
@@ -48,6 +48,7 @@ EXTRA = ["assets/voxprint.png", "assets/voxprint.ico", "assets/check.png", "asse
          "assets/icons/save.svg", "assets/icons/save-as.svg", "assets/icons/save-copy.svg",
          "assets/icons/export.svg", "assets/icons/download.svg", "assets/icons/LICENSE.txt",
          "installer/linux/voxprint-audiobook-builder.desktop", "installer/linux/voxprint-256.png", "installer/linux/" + SCRIPT_NAME,
+         "installer/linux/voxprint-mdl",
          "docs/LINUX-TEST-CHECKLIST.md"]
 
 

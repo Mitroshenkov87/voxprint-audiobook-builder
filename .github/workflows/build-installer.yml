@@ -496,7 +496,8 @@ jobs:
       - name: Online installer = shell zip + manifest (libraries stay upstream) + voxprint-audiobook-builder-setup-win-x64.exe
         shell: pwsh
         run: |
-          $tag = if ($env:REL_TAG) { $env:REL_TAG } else { "v0.0.0-dev" }
+          if (-not $env:REL_TAG) { throw "REL_TAG is required; refusing to bake a manifest for a tag that does not exist" }
+          $tag = $env:REL_TAG
           ./installer/build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag $tag -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
           Get-ChildItem build\online-release | Format-Table Name, Length
       - name: End to end with the frozen shell - download the runtime from upstream (CPU PyTorch, internal CI only) and import it
@@ -508,7 +509,8 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           # the few files we ship ourselves (the shell, wheels built from sdists) are not on the release yet: serve them from localhost
-          $tag = if ($env:REL_TAG) { $env:REL_TAG } else { "v0.0.0-dev" }
+          if (-not $env:REL_TAG) { throw "REL_TAG is required; refusing to bake a manifest for a tag that does not exist" }
+          $tag = $env:REL_TAG
           $src = (Resolve-Path build\online-release\manifest-thin-*.json).Path
           $man = "C:\vx-manifest.json"
           (Get-Content $src -Raw).Replace("https://github.com/${{ github.repository }}/releases/download/$tag", "http://127.0.0.1:8099") | Out-File -Encoding ascii $man

@@ -303,6 +303,8 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\credits.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\voxprint-app-models.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "voxprint-mdl.cmd"; DestDir: "{app}"; Flags: ignoreversion
 ; Optional: put vc_redist.x64.exe into installer\redist and it will be installed silently (PyTorch needs it).
 #ifexist "redist\vc_redist.x64.exe"
 Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -314,7 +316,7 @@ Name: "{group}\{#AppDisplayName}"; Filename: "{app}\{#AppExe}"
 
 [Run]
 ; (the Visual C++ runtime is installed from [Code]: InstallVcRedist)
-Filename: "{app}\{#AppExe}"; Parameters: "--prefetch"; Description: "{cm:RunPrefetch,{#AppDisplayName}}"; Flags: nowait postinstall skipifsilent
+; Models are downloaded by RunSuiteInstall (voxprint-mdl), which waits and aborts on failure.
 
 [Code]
 var
@@ -1510,19 +1512,32 @@ begin
   Result := ParamSwitch('SKIPSUITE') or (V = '1') or (V = 'YES') or (V = 'TRUE');
 end;
 
-{ After the program files are in place: install the shared runtime, ffmpeg and required models.
-  A progress form stays visible under /VERYSILENT (wizard pages are hidden). The status file is four lines
-  (state, permille, message, heartbeat). No status within 15 s means the helper is not our program (smoke);
-  a heartbeat that stops for 120 s is a stall. The process handle from ewNoWait is not closed here. }
+{ After the program files are in place: install the shared runtime and ffmpeg, then download the
+  required models. Both steps run as the installing user (so files land in that user's profile)
+  and setup waits for each process. A non-zero exit, including a silent install, aborts setup.
+  /SkipSuite skips both (CI smoke). There is no status file. }
+function RunChecked(const FileName, Params: String; Show: Integer): Boolean;
+var
+  Rc: Integer;
+begin
+  Result := False;
+  if not ExecAsOriginalUser(FileName, Params, ExpandConstant('{app}'), Show, ewWaitUntilTerminated, Rc) then
+  begin
+    Log('could not start ' + FileName + ': ' + SysErrorMessage(Rc));
+    Exit;
+  end;
+  if Rc <> 0 then
+  begin
+    Log(FileName + ' exited ' + IntToStr(Rc));
+    Exit;
+  end;
+  Result := True;
+end;
+
 procedure RunSuiteInstall();
 var
-  Exe, StatusFile, Params, State, Msg, Beat, LastBeat: String;
-  Pm, Rc: Integer;
-  Form: TSetupForm;
-  Bar: TNewProgressBar;
-  Lbl: TNewStaticText;
-  LastChange, Started: Cardinal;
-  Finished, SawStatus: Boolean;
+  Exe, Mdl, Params: String;
+  Show: Integer;
 begin
   if SkipSuiteInstall() then
   begin
@@ -1532,85 +1547,34 @@ begin
   Exe := ProgramExe();
   if not FileExists(Exe) then
   begin
-    Log('Suite install skipped: no program executable');
-    Exit;
+    Log('Suite install failed: no program executable');
+    SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['program']), mbError, MB_OK, IDOK);
+    Abort;
   end;
-  StatusFile := ExpandConstant('{tmp}\suite-status.txt');
-  DeleteFile(StatusFile);
-  Params := '--install-suite --status ' + AddQuotes(StatusFile);
-  { Inno Setup 6.6+: width and height are arguments; ClientWidth is read-only afterwards. }
-  Form := CreateCustomForm(ScaleX(460), ScaleY(100), False, False);
-  try
-    Form.Caption := '{#AppDisplayName}';
-    Form.BorderStyle := bsDialog;
-    Form.Position := poScreenCenter;
-    Lbl := TNewStaticText.Create(Form);
-    Lbl.Parent := Form;
-    Lbl.Left := ScaleX(16);
-    Lbl.Top := ScaleY(14);
-    Lbl.Width := Form.ClientWidth - ScaleX(32);
-    Lbl.Height := ScaleY(36);
-    Lbl.AutoSize := False;
-    Lbl.Caption := CustomMessage('SuiteStatus');
-    Bar := TNewProgressBar.Create(Form);
-    Bar.Parent := Form;
-    Bar.Left := ScaleX(16);
-    Bar.Top := ScaleY(60);
-    Bar.Width := Form.ClientWidth - ScaleX(32);
-    Bar.Height := ScaleY(18);
-    Bar.Min := 0;
-    Bar.Max := 1000;
-    Bar.Position := 0;
-    Form.Show;
-    if not ExecAsOriginalUser(Exe, Params, ExpandConstant('{app}'), SW_HIDE, ewNoWait, Rc) then
-    begin
-      Log('suite install could not start: ' + SysErrorMessage(Rc));
-      Exit;
-    end;
-    Finished := False;
-    SawStatus := False;
-    LastBeat := '';
-    Started := VxTick();
-    LastChange := Started;
-    while not Finished do
-    begin
-      Sleep(300);
-      if ReadFetchStatus(StatusFile, State, Pm, Msg, Beat) then
-      begin
-        SawStatus := True;
-        Lbl.Caption := Msg;
-        Bar.Position := Pm;
-        WizardForm.StatusLabel.Caption := Msg;
-        WizardForm.ProgressGauge.Position := Pm;
-        if Beat <> LastBeat then
-        begin
-          LastBeat := Beat;
-          LastChange := VxTick();
-        end;
-        if State = 'done' then
-          Finished := True
-        else if State = 'error' then
-        begin
-          SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), [Msg]), mbError, MB_OK, IDOK);
-          Abort;
-        end;
-      end;
-      if not Finished then
-      begin
-        if (not SawStatus) and ((VxTick() - Started) > 15000) then
-        begin
-          Log('Suite install wrote no status; continuing');
-          Finished := True;
-        end
-        else if SawStatus and ((VxTick() - LastChange) > 120000) then
-        begin
-          SuppressibleMsgBox(CustomMessage('SuiteStalled'), mbError, MB_OK, IDOK);
-          Abort;
-        end;
-      end;
-    end;
-  finally
-    Form.Hide;
+  if not RunChecked(Exe, '--install-suite', SW_HIDE) then
+  begin
+    SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['runtime']), mbError, MB_OK, IDOK);
+    Abort;
+  end;
+  Mdl := ExpandConstant('{app}\voxprint-mdl.cmd');
+  if not FileExists(Mdl) then
+  begin
+    Log('Suite install failed: voxprint-mdl.cmd is missing');
+    SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['voxprint-mdl']), mbError, MB_OK, IDOK);
+    Abort;
+  end;
+  Params := '/d /c ' + AddQuotes(Mdl) + ' download --app audiobook-builder --manifest '
+    + AddQuotes(ExpandConstant('{app}\voxprint-app-models.json')) + ' --json';
+  Show := SW_HIDE;
+  if not WizardSilent() then
+  begin
+    Params := Params + ' --gui';
+    Show := SW_SHOWNORMAL;
+  end;
+  if not RunChecked(ExpandConstant('{cmd}'), Params, Show) then
+  begin
+    SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['models']), mbError, MB_OK, IDOK);
+    Abort;
   end;
 end;
 

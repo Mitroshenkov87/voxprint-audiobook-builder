@@ -1,6 +1,6 @@
 """Voxprint entry point (Windows 11; the code also runs on Linux for development and tests).
 
-Flags: ``--prefetch`` (force-download the models; used by the installer), ``--selftest`` (start and quit),
+Flags: ``--run-mdl`` (forward the rest of the arguments to ``voxprint-mdl``), ``--selftest`` (start and quit),
 ``--selftest-imports`` (import every heavy library - checks that a PyInstaller build is complete),
 ``--selftest-speech`` (model-free TTS / ASR / aligner smoke),
 ``--selftest-narrate [voice]`` (narrate two sentences headless; writes logs/selftest_narrate.txt),
@@ -274,6 +274,11 @@ def main(argv=None) -> int:
 
     guard_stdio()
     argv = list(sys.argv if argv is None else argv)
+    if "--run-mdl" in argv:
+        from voxprint_common.mdl.cli import main as mdl_main
+
+        index = argv.index("--run-mdl")
+        return int(mdl_main(argv[index + 1:]))
     # RTX 40-series (compute >= 8.9) before any heavy import. --version, help, status and diagnostics stay usable.
     if startup_requires_gpu(argv):
         blocked = enforce(gui=startup_is_gui(argv))
@@ -472,15 +477,7 @@ def main(argv=None) -> int:
             app.setWindowIcon(QIcon(str(ico)))
     except Exception:  # noqa: BLE001 - the icon is optional
         pass
-    from infra import modules as _mods
-    from workers.pipeline_runner import models_missing
-
     splash.checking()
-    thin_wait = False        # thin build, runtime modules missing: the model download waits until they are installed
-    try:
-        thin_wait = (not selftest) and _mods.is_thin() and not _mods.installed_without_network()
-    except Exception:  # noqa: BLE001
-        thin_wait = False
     if not selftest:
         try:   # a "models folder" that is really a Voxprint backup becomes a restore source (never the live folder)
             from infra import existing_models as _existing
@@ -488,40 +485,16 @@ def main(argv=None) -> int:
             _existing.adopt_backup_choice()
         except Exception:  # noqa: BLE001 - never get in the way of starting up
             pass
-    first_run = False
-    if not selftest:
-        try:
-            first_run = bool(models_missing())
-        except Exception:  # noqa: BLE001 - never get in the way of starting up
-            first_run = False
-    importing = False
-    if not selftest:
-        try:   # an "existing models folder" (installer page / Settings) is imported on the first run
-            from infra import existing_models
-            from workers.pipeline_runner import required_model_repos
+        from infra import mdl_gate
+        # Qt stays out of --version and the headless CLI, so this dialog is imported here.
+        from ui.mdl_dialog import prompt as mdl_prompt
 
-            importing = existing_models.pending(required_model_repos())
-        except Exception:  # noqa: BLE001 - never get in the way of starting up
-            importing = False
-    want_prefetch = first_run or importing or "--prefetch" in argv
-    from infra import setup_mode
-
-    setup = "" if selftest else setup_mode.mode()       # Full / Quick setup type chosen in the installer
-    complete_set = False
-    if setup and not selftest:
-        try:   # both setup types aim at the complete set: the Components window stays the place to get it
-            from workers.pipeline_runner import everything_missing
-
-            complete_set = _mods.is_thin() and (thin_wait or everything_missing())
-        except Exception:  # noqa: BLE001 - never get in the way of starting up
-            complete_set = False
-    if complete_set:
-        thin_wait, want_prefetch = True, True
-    if thin_wait:
-        # the check above ran without PyTorch (GPU unknown, so possibly the wrong TTS size): after the components the
-        # prefetch looks again and simply finds nothing to do when every model is already there
-        want_prefetch = True
-    win = StudioWindow(autocheck=not selftest and not thin_wait, prefetch=want_prefetch and not thin_wait)
+        if not mdl_gate.models_ready():
+            splash.finish(None)
+            if not mdl_prompt():
+                return 4
+        mdl_gate.materialize()
+    win = StudioWindow(autocheck=not selftest, prefetch=False)
     app.aboutToQuit.connect(win.shutdown)
     if not selftest:
         from infra import hard_exit
@@ -533,8 +506,6 @@ def main(argv=None) -> int:
         from infra import projects
 
         threading.Thread(target=projects.ensure_shortcut, name="projects-shortcut", daemon=True).start()
-    if thin_wait:
-        _offer_components(win, app, want_prefetch, autostart=setup_mode.auto_download())
     if selftest:
         QTimer.singleShot(300, app.quit)
     return app.exec()

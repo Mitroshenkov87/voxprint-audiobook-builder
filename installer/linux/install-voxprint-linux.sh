@@ -323,6 +323,11 @@ say "Installing PyTorch $TORCH (torch 2.11.0, torchaudio 2.11.0)"
 say "Installing the other Python packages (this takes a few minutes)"
 "$UV" pip install --python "$VPY" -r "$APP/requirements.txt" -r "$APP/requirements-verified.txt" || die "installing requirements.txt failed"
 "$UV" pip install --python "$VPY" --no-deps -r "$APP/requirements-nodeps.txt" || die "installing requirements-nodeps.txt failed"
+if [ "${VOXPRINT_SKIP_SUITE:-}" != "1" ]; then
+  say "Downloading the required models (voxprint-mdl)"
+  "$VPY" "$APP/main.py" --run-mdl download --app audiobook-builder --manifest "$APP/voxprint-app-models.json" --json \
+    || die "model download failed"
+fi
 
 # ----------------------------------------------------------------------------------------------- launcher, menu entry
 say "Creating the launcher $LAUNCHER"
@@ -365,5 +370,5 @@ echo
 if [ "$RC" = 0 ]; then say "VOXPrint is installed."; else warn "VOXPrint is installed, but a self-test failed - see docs/LINUX-TEST-CHECKLIST.md"; fi
 echo "Start it from the application menu or with:  voxprint-audiobook-cli"
 case ":$PATH:" in *":$BIN_DIR:"*) ;; *) warn "$BIN_DIR is not in PATH - run: $LAUNCHER" ;; esac
-echo "Models are downloaded on the first run into $DATA/models.  Update: run this script again.  Remove: install-voxprint-linux.sh --uninstall"
+echo "Required models are downloaded by voxprint-mdl into $DATA/models.  Update: run this script again.  Remove: install-voxprint-linux.sh --uninstall"
 exit "$RC"

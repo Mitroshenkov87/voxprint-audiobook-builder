@@ -18,9 +18,9 @@ def test_voxprint_common_is_pinned_by_the_released_wheel_and_its_sha256():
     lock = json.loads((ROOT / "infra" / "runtime_lock.json").read_text(encoding="utf-8"))
     suite = lock["suite"]
     assert suite == mrl.suite_record()
-    assert suite["version"] == "0.1.1"
-    assert suite["sha256"] == "c9361d5d00913faf39497fc55124e682ba15b2098c775068c49582c0520cd4d1"
-    assert suite["size"] == 53842
+    assert suite["version"] == "0.2.1"
+    assert suite["sha256"] == "7a5a41284a74fc8eb2ad724647c05575d16c42881d30dba461fddf15b96a3d2f"
+    assert suite["size"] == 125199
     pin = mrl.suite_requirement(suite)
     assert pin in req
     assert "git+" not in req

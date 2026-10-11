@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from infra import download_watch, install_layout, model_downloader, parallel_download, suite_install, suite_shared
+from infra import download_watch, install_layout, model_downloader, parallel_download, suite_shared
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -188,17 +188,27 @@ def test_download_retries_a_transient_error_and_keeps_the_partial(tmp_path, monk
         parallel_download.download_with_retry(dest, ["https://example.invalid/a"], sha256="b" * 64, download=full, tries=5)
 
 
-def test_suite_status_is_utf8_with_a_bom_on_windows(tmp_path, monkeypatch):
-    path = tmp_path / "suite-status.txt"
-    monkeypatch.setattr(suite_install.sys, "platform", "win32")
-    suite_install.write_status(path, "done", 1000, "Готово", 2)
-    raw = path.read_bytes()
-    assert raw.startswith(b"\xef\xbb\xbf")
-    assert raw.decode("utf-8-sig").splitlines()[2] == "Готово"
-    monkeypatch.setattr(suite_install.sys, "platform", "linux")
-    suite_install.write_status(path, "done", 1000, "ok", 3)
-    assert not path.read_bytes().startswith(b"\xef\xbb\xbf")
-    assert path.read_text(encoding="utf-8").splitlines()[0] == "done"
+def test_json_stdout_is_utf8_and_keeps_cyrillic(monkeypatch):
+    import io
+
+    import cli
+
+    buf = io.BytesIO()
+    wrapper = io.TextIOWrapper(buf, encoding="cp1252", newline="\n")
+    monkeypatch.setattr(cli.sys, "stdout", wrapper)
+    monkeypatch.setattr(cli.sys, "stderr", io.StringIO())
+    cli._json_stdout = None
+    cli.begin_json_stdout()
+    cli._emit_result(
+        ok=True, command="status", exit_code=0, outputs=[], warnings=[], duration_s=0.0,
+        error=None, hint=None, extra={"message": "Готово"},
+    )
+    wrapper.flush()
+    raw = buf.getvalue()
+    text = raw.decode("utf-8")
+    assert "Готово" in text
+    assert "\\u0413" not in text
+    cli.end_json_stdout()
 
 
 def test_faster_hugging_face_is_tried_before_modelscope(tmp_path, monkeypatch):

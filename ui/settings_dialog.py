@@ -57,7 +57,6 @@ from infra import (
     sysinfo,
     ui_prefs,
 )
-from infra import modules as runtime_modules
 from ui import screen_fit
 from ui.glass import GlassDialog
 from workers import backup_runner
@@ -262,11 +261,14 @@ class SettingsDialog(GlassDialog):
         self.btn_data = QPushButton()
         self.btn_about = QPushButton()
         self.btn_components = QPushButton()          # thin build only: the runtime modules (infra/modules.py)
+        self.btn_mdl = QPushButton()                 # VOXPrint MDL: on-demand models (voxprint-mdl download --gui)
         self.btn_diag = QPushButton()                # logs + system information as one zip (infra/diagnostics.py)
-        for b in (self.btn_update, self.btn_models, self.btn_data, self.btn_diag, self.btn_components):
+        for b in (self.btn_update, self.btn_models, self.btn_data, self.btn_diag, self.btn_mdl, self.btn_components):
             left.addWidget(b)
         self.btn_diag.clicked.connect(self.save_diagnostics)
-        self.btn_components.setVisible(runtime_modules.is_thin())
+        self.btn_mdl.clicked.connect(self.open_model_manager)
+        # Models are VOXPrint MDL. The Components window is no longer opened from Settings.
+        self.btn_components.setVisible(False)
         self.btn_components.clicked.connect(self.open_components)
 
         # (No "Maximum quality (auto)" button any more: every recommended option is pre-selected and the first start downloads
@@ -474,6 +476,7 @@ class SettingsDialog(GlassDialog):
         self._fill_net()
         self.btn_update.setText(tr("ui.btn_update"))
         self.btn_components.setText(tr("modules.title"))
+        self.btn_mdl.setText(tr("mdl.manage"))
         self.btn_models.setText(tr("ui.settings_models_folder"))
         self.btn_data.setText(tr("ui.settings_data_folder"))
         self.btn_diag.setText(tr("diag.button"))
@@ -653,6 +656,12 @@ class SettingsDialog(GlassDialog):
         self.refresh_asr()
 
     # ------------------------------------------------------------------ runtime modules (thin build)
+    def open_model_manager(self) -> None:
+        """Open VOXPrint MDL so the user can download on-demand models."""
+        from infra import mdl_gate
+
+        mdl_gate.launch_manage()
+
     def open_components(self) -> None:
         """Show the Components window (download / check the runtime modules)."""
         from ui.modules_dialog import ModulesDialog, default_extras

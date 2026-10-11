@@ -1,17 +1,15 @@
 """Install and repair the shared suite resources during setup and on later launches.
 
 ``--install-suite`` (the installer runs this, including ``/VERYSILENT``) installs the Python
-runtime modules, the torch/CUDA wheels, ffmpeg and the required base models into
-:mod:`infra.suite_shared`, with progress. A later launch and ``--selftest`` re-check the same
-tree and repair what is missing or empty. ``VOXPRINT_SKIP_SUITE=1`` (tests) only reports.
+runtime modules, the torch/CUDA wheels and ffmpeg into :mod:`infra.suite_shared`. Required
+models are a later step: the installer runs ``voxprint-mdl download`` and exits non-zero
+when that step fails. A later launch and ``--selftest`` re-check the runtime tree and repair
+what is missing or empty. ``VOXPRINT_SKIP_SUITE=1`` (tests) only reports.
 
 The NVIDIA driver is the one part this cannot install. A driver older than the cu130 wheels
 need is reported with a download link and the install stops.
 
-    python main.py --install-suite --status C:\\status.txt
-
-The status file is four lines (state, permille, message, heartbeat), the same shape the
-installer already reads for the shell download.
+    python main.py --install-suite
 """
 from __future__ import annotations
 
@@ -24,9 +22,8 @@ from typing import Callable, List, Optional, Sequence
 from core.i18n import tr
 from infra import assets, modules, suite_shared
 from infra.gpu_requirement import NVIDIA_DRIVER_URL, check_gpu, driver_too_old
-from workers.pipeline_runner import prefetch_models, required_model_repos
 
-APP_RESOURCES = ("runtime", "models", "tools")
+APP_RESOURCES = ("runtime", "tools")
 DISK_MARGIN = 2 * 1024 ** 3
 SKIP_ENV = "VOXPRINT_SKIP_SUITE"
 
@@ -93,24 +90,17 @@ def _default_ffmpeg(progress: Callable[[float, str], None]) -> None:
                               root=suite_shared.resource_dir("tools"))
 
 
-def _default_models(progress: Callable[[float, str], None]) -> None:
-    def report(_stage: object, fraction: float, message: str = "") -> None:
-        progress(float(fraction), message or "Models")
-
-    prefetch_models(report, repos=required_model_repos(), everything=False)
-
-
 def install_suite(progress: Callable[[float, str], None] = lambda _f, _m: None, *,
                   modules_fn: Optional[Callable[[Callable[[float, str], None]], None]] = None,
                   ffmpeg_fn: Optional[Callable[[Callable[[float, str], None]], None]] = None,
-                  models_fn: Optional[Callable[[Callable[[float, str], None]], None]] = None,
                   driver_fn: Optional[Callable[[], str]] = None,
                   free_fn: Optional[Callable[[Path], int]] = None,
                   need_bytes: int = 0,
                   force: bool = False) -> dict:
-    """Install whatever of the shared runtime, ffmpeg and required models is still missing.
+    """Install whatever of the shared runtime and ffmpeg is still missing.
 
-    Returns ``{ok, exit_code, message, missing}``. ``exit_code`` 7 is a driver that is too old.
+    Required models are not downloaded here. Returns ``{ok, exit_code, message, missing}``.
+    ``exit_code`` 7 is a driver that is too old.
     """
     if skipped() and not force:
         progress(1.0, tr("suite.skip"))
@@ -131,9 +121,8 @@ def install_suite(progress: Callable[[float, str], None] = lambda _f, _m: None, 
         progress(0.0, message)
         return {"ok": False, "exit_code": 1, "message": message, "missing": list(APP_RESOURCES)}
     steps = (
-        (0.0, 0.5, tr("suite.runtime"), modules_fn or _default_modules),
-        (0.5, 0.6, tr("suite.ffmpeg"), ffmpeg_fn or _default_ffmpeg),
-        (0.6, 1.0, tr("suite.models"), models_fn or _default_models),
+        (0.0, 0.8, tr("suite.runtime"), modules_fn or _default_modules),
+        (0.8, 1.0, tr("suite.ffmpeg"), ffmpeg_fn or _default_ffmpeg),
     )
     for start, end, label, fn in steps:
         span = end - start
@@ -162,49 +151,25 @@ def launch_check(progress: Callable[[float, str], None] = lambda _f, _m: None, *
     return report
 
 
-def status_encoding() -> str:
-    """UTF-8. Windows gets a BOM so Inno Setup (and Notepad) read non-ASCII status lines."""
-    return "utf-8-sig" if sys.platform == "win32" else "utf-8"
-
-
-def write_status(path: Path, state: str, permille: int, message: str, beat: int) -> None:
-    """Four lines the installer polls: state, permille, message, heartbeat."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    text = f"{state}\n{int(permille)}\n{message}\n{int(beat)}\n"
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(text, encoding=status_encoding())
-    os.replace(tmp, path)
-
-
 def cli(argv: Sequence[str]) -> int:
-    """``--install-suite [--status FILE]`` or ``--unregister-suite``. Prints a line on stderr when it fails."""
+    """``--install-suite`` or ``--unregister-suite``. Prints a line on stderr when it fails.
+
+    There is no status file. The installer waits for this process and uses its exit code.
+    """
     args = list(argv)
     if "--unregister-suite" in args:
         unused = suite_shared.unregister(suite_shared.APP_ID)
         suite_shared.delete_resources(unused)
         return 0
-    status: Optional[Path] = None
-    if "--status" in args:
-        index = args.index("--status")
-        if index + 1 < len(args):
-            status = Path(args[index + 1])
-    beat = {"n": 0}
 
     def progress(fraction: float, message: str) -> None:
-        beat["n"] += 1
-        if status is not None:
-            write_status(status, "running", int(max(0.0, min(1.0, fraction)) * 1000), message, beat["n"])
+        del fraction, message
 
-    if status is not None:
-        progress(0.0, tr("suite.checking"))
     try:
         result = install_suite(progress, force="--force" in args)
     except Exception as exc:  # noqa: BLE001 - the installer shows this string
         result = {"ok": False, "exit_code": 1, "message": str(exc)}
     code = int(result.get("exit_code", 1 if not result.get("ok") else 0))
-    if status is not None:
-        state = "done" if code == 0 else "error"
-        write_status(status, state, 1000 if code == 0 else 0, str(result.get("message") or ""), beat["n"] + 1)
     if code != 0:
         print(str(result.get("message") or "suite install failed"), file=sys.stderr, flush=True)
     return code
