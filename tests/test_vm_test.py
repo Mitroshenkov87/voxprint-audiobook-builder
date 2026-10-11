@@ -1,4 +1,9 @@
-"""scripts/vm_test.sh with stand-in nvidia-smi and voxprint. No GPU."""
+"""scripts/vm_test.sh with stand-in nvidia-smi and voxprint. No GPU.
+
+The bash script is what the Linux VM runs. Git Bash on the Windows CI runner does not have a
+usable Python (the Store alias answers ``python3``), so the process tests run on Linux only.
+``scripts/vm_test.ps1`` is the Windows twin and is checked as text on every platform.
+"""
 from __future__ import annotations
 
 import json
@@ -9,7 +14,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from core.vxbook import load_vxbook
+
+needs_bash = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="Git Bash on the Windows runner has no usable Python; vm_test.ps1 is the Windows twin",
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "vm_test.sh"
@@ -132,6 +144,7 @@ def test_scripts_are_noninteractive_and_share_the_contract():
     assert "/workspace/vm-results/audiobook-builder/" in sh
 
 
+@needs_bash
 def test_smoke_json_then_resume_skips(tmp_path):
     layout = _layout(tmp_path)
     proc = _run(layout, "--smoke", "--json", "--tag", "v1.0.0-rc.3",
@@ -156,6 +169,7 @@ def test_smoke_json_then_resume_skips(tmp_path):
     assert saved["tag"] == "v1.0.0-rc.3" and saved["peak_vram_mib"] == 2048
 
 
+@needs_bash
 def test_full_writes_a_soundscape_book_yo_and_labelled_mp3s(tmp_path):
     layout = _layout(tmp_path)
     results = tmp_path / "full"
@@ -173,6 +187,7 @@ def test_full_writes_a_soundscape_book_yo_and_labelled_mp3s(tmp_path):
     assert (layout["home"] / ".done" / "mp3-labels").is_file()
 
 
+@needs_bash
 def test_narration_failure_is_exit_1_and_leaves_no_marker(tmp_path):
     layout = _layout(tmp_path)
     proc = _run(layout, "--smoke", "--json", "--tag", "vtest", "--results", str(tmp_path / "out"),
@@ -184,6 +199,7 @@ def test_narration_failure_is_exit_1_and_leaves_no_marker(tmp_path):
     assert (layout["home"] / ".done" / "dry-run").is_file()
 
 
+@needs_bash
 def test_missing_gpu_is_exit_3_and_missing_program_is_exit_2(tmp_path):
     layout = _layout(tmp_path)
     (tmp_path / "bin" / "nvidia-smi").unlink()
