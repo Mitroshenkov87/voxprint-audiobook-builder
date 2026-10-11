@@ -5,6 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Security
+- **huggingface_hub 1.32.0 and transformers 5.16.1.** The previous pins (hub 0.36.2, transformers 4.57.6) had high advisories: unsafe deserialization and path traversal in the hub (fixed in 1.32.0 and 1.26.0) and CVE-2026-9856 in transformers (fixed in 5.10.1). Official qwen-tts 0.1.1 cannot import on transformers 5, so speech synthesis now uses qwen-tts-hf 0.1.1.post1 (same `qwen_tts` import). qwen-asr 0.0.6 stays, with an import shim (`infra/qwen_tf_compat.py`). Optional CUDA Graphs move to faster-qwen3-tts 0.5.4. The hub client is httpx; connect and read timeouts are unchanged. The old transformers allowlist entries are removed. This set has not been run on a GPU. It is for the next release candidate, not the published 1.0.0-rc.3 build.
+
 ## [1.0.0-rc.3] - 2026-10-10 - build 1001 "Tamim"
 
 Codename *Tamim* (whole and complete): a build ready to be tested end to end. The version is **1.0.0-rc.3**. The release tag for this build is `v1.0.0-rc.3` (a pre-release). People see `1.0.0 RC3 · build 1001 "Tamim"`; the Windows file version is `1.0.0.1001`. The `BUILD.json` offset stays **945**: build-installer run 56 stamps build 1001 (56 + 945 = 1001). Release notes: [docs/RELEASE-NOTES-1001-TAMIM.md](docs/RELEASE-NOTES-1001-TAMIM.md).

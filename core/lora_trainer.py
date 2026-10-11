@@ -29,6 +29,7 @@ Russian, and loading the adapter in Alexandria with a newer peft (Alexandria pin
 from __future__ import annotations
 
 from core.i18n import tr
+from infra.qwen_tf_compat import install as install_qwen_tf
 import gc
 import json
 import logging
@@ -130,6 +131,8 @@ def speaker_embedding_from_ref(model: Any, ref_wav_path: str, device: Any, dtype
 def speaker_embedding_of(model: Any, wav: Any, device: Any, dtype: Any):
     """Speaker embedding ``[1, D]`` of 24 kHz samples ``wav`` with the model's speaker encoder."""
     import torch
+
+    install_qwen_tf()
     from qwen_tts.core.models.modeling_qwen3_tts import mel_spectrogram
 
     with torch.no_grad():
@@ -491,6 +494,7 @@ def _train_once(dataset_dir: Path, output_dir: Path, plan: TrainPlan, progress: 
     data = load_training_rows(dataset_dir)
     models = md.ensure_tts_models(plan.base_model, lambda s, f, m: progress(Stage.TRAIN, 0.0, m))
     cancel.check()
+    install_qwen_tf()
     from qwen_tts import Qwen3TTSModel
 
     dtype = torch.bfloat16 if plan.dtype == "bfloat16" else torch.float32

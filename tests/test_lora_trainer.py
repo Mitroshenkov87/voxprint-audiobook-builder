@@ -12,10 +12,12 @@ pytest.importorskip("safetensors")
 import core.audio_utils as au
 from core.errors import OutOfMemoryError_
 from core.events import CancelToken, Stage
+from infra.qwen_tf_compat import install as install_qwen_tf
 from infra.vram_optimizer import GpuInfo, plan_training
 
 
 def tiny_model():
+    install_qwen_tf()
     qt = pytest.importorskip("qwen_tts")
     from qwen_tts.core.models import Qwen3TTSConfig, Qwen3TTSForConditionalGeneration
     cp = dict(hidden_size=32, intermediate_size=64, num_hidden_layers=2, num_attention_heads=2,

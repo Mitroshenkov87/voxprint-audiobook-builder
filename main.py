@@ -21,6 +21,7 @@ import sys
 from typing import Sequence
 
 from infra.gpu_requirement import enforce, startup_is_gui, startup_requires_gpu
+from infra.qwen_tf_compat import install as install_qwen_tf
 
 
 def _setup_logging() -> None:
@@ -62,6 +63,7 @@ def _selftest_imports(argv=()) -> int:
     except Exception as exc:  # noqa: BLE001
         bad += 1
         lines.append(f"FAIL  ctranslate2: {type(exc).__name__}: {exc}")
+    install_qwen_tf()
     for name in ("requests", "urllib3", "tqdm", "yaml", "tokenizers", "torch", "torchaudio", "transformers", "peft", "accelerate", "safetensors", "qwen_tts", "qwen_asr",
                  "bitsandbytes", "soundfile", "librosa", "scipy.signal", "imageio_ffmpeg", "onnxruntime", "huggingface_hub",
                  "certifi", "PySide6.QtWidgets", "http.cookies", "email.mime.text", "xml.dom.minidom", "logging.config"):

@@ -40,7 +40,7 @@ def test_install_rope_compat_patches_both_places(monkeypatch):
     monkeypatch.setitem(sys.modules, "transformers.modeling_rope_utils", mru)
     monkeypatch.setitem(sys.modules, "qwen_tts", types.ModuleType("qwen_tts"))
     monkeypatch.setitem(sys.modules, "qwen_tts._transformers_compat", compat)
-    assert fd.install_rope_compat() == ["transformers.ROPE_INIT_FUNCTIONS", "qwen_tts._transformers_compat"]
+    assert fd.install_rope_compat() == ["qwen_tts._transformers_compat", "transformers.ROPE_INIT_FUNCTIONS"]
     fd.install_rope_compat()
     table["default"](Cfg())
     compat._default_rope_parameters(Cfg())
@@ -49,28 +49,40 @@ def test_install_rope_compat_patches_both_places(monkeypatch):
 
 def test_install_rope_compat_is_harmless_with_the_real_transformers():
     pytest.importorskip("transformers")
+    pytest.importorskip("torch")
     from transformers import modeling_rope_utils as mru
 
-    before = mru.ROPE_INIT_FUNCTIONS["default"]
+    had_default = "default" in mru.ROPE_INIT_FUNCTIONS
+    before = mru.ROPE_INIT_FUNCTIONS.get("default")
     try:
-        assert "transformers.ROPE_INIT_FUNCTIONS" in fd.install_rope_compat()
+        installed = fd.install_rope_compat()
+        # transformers 5.16 ships no "default" entry. qwen-tts-hf inserts one when its package loads.
+        if "default" not in mru.ROPE_INIT_FUNCTIONS:
+            assert "transformers.ROPE_INIT_FUNCTIONS" not in installed
+            return
         f = mru.ROPE_INIT_FUNCTIONS["default"]
-        assert f.__wrapped__ is before
+        assert getattr(f, "_voxprint_tolerant", False)
+        assert "transformers.ROPE_INIT_FUNCTIONS" in installed
+        if before is not None and not getattr(before, "_voxprint_tolerant", False):
+            assert f.__wrapped__ is before
         cfg = types.SimpleNamespace(rope_theta=10000.0, hidden_size=64, num_attention_heads=4, partial_rotary_factor=1.0,
                                     head_dim=16)
         inv, scale = f(cfg, None)
-        assert tuple(inv.shape) == (8,) and scale == 1.0
+        assert tuple(getattr(inv, "shape", ())) == (8,) and scale == 1.0
         del cfg.rope_theta                                          # like MimiConfig under transformers >= 5.18
         inv2, _ = f(cfg, None)
-        assert np.allclose(inv.numpy(), inv2.numpy())
+        assert np.allclose(np.asarray(inv), np.asarray(inv2))
     finally:
-        mru.ROPE_INIT_FUNCTIONS["default"] = before
+        if had_default:
+            mru.ROPE_INIT_FUNCTIONS["default"] = before
+        else:
+            mru.ROPE_INIT_FUNCTIONS.pop("default", None)
 
 
 def test_check_reports_why_it_cannot_run(monkeypatch):
     monkeypatch.setattr(fd, "installed_version", lambda: None)
     assert fd.check() == (False, "faster-qwen3-tts is not installed")
-    monkeypatch.setattr(fd, "installed_version", lambda: "0.5.4")   # needs qwen-tts-hf + transformers 5: not for our pins
+    monkeypatch.setattr(fd, "installed_version", lambda: "0.3.2")   # the transformers 4 line: not this pin
     ok, why = fd.check()
     assert not ok and "not supported" in why
 

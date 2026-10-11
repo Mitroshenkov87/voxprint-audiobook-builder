@@ -15,27 +15,21 @@ _SPEC.loader.exec_module(audit)
 
 def test_allowlist_file_loads_and_every_entry_has_a_reason():
     rows = audit.load_allowlist(ROOT / "tools" / "audit-allowlist.toml")
-    assert rows
     assert all(row.id and row.reason for row in rows)
 
 
-def test_transformers_advisories_are_allowlisted_for_that_package():
-    """4.57.6 stays because qwen-tts and qwen-asr pin the 4.57 line. The fixes are on 5.x."""
+def test_transformers_highs_are_not_allowlisted():
+    """5.16.1 contains the published fixes, so the old 4.57.6 exceptions are gone."""
     rows = audit.load_allowlist(ROOT / "tools" / "audit-allowlist.toml")
-    by_id = {row.id: row for row in rows}
-    expected = {
+    ids = {row.id for row in rows}
+    retired = {
         "GHSA-29pf-2h5f-8g72",
         "GHSA-fgcw-684q-jj6r",
         "GHSA-x9r9-c232-4q39",
         "GHSA-xrqw-3rrv-vx5w",
         "PYSEC-2025-217",
     }
-    assert expected <= set(by_id)
-    for ident in expected:
-        row = by_id[ident]
-        assert row.package == "transformers"
-        assert "4.57" in row.reason
-        assert "qwen-tts" in row.reason and "qwen-asr" in row.reason
+    assert not ids & retired
 
 
 def test_allowlist_rejects_an_entry_without_a_reason(tmp_path):

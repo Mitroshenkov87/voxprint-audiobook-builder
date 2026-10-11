@@ -33,6 +33,7 @@ from core.errors import ExportError
 from core.events import CancelToken, ProgressCallback, Stage, noop_progress
 from core.i18n import tr
 from infra import model_downloader as md
+from infra.qwen_tf_compat import install as install_qwen_tf
 
 log = logging.getLogger("voxprint.export")
 
@@ -178,6 +179,7 @@ def export_merged_model(adapter_dir, out_dir, base_dir=None, progress: ProgressC
     progress(Stage.MODEL, 0.9, tr("progress.model_loading"))
     if load_model is None:
         def load_model(d: Path):  # noqa: F811
+            install_qwen_tf()
             from qwen_tts import Qwen3TTSModel
 
             return Qwen3TTSModel.from_pretrained(str(d), dtype=torch.bfloat16, attn_implementation="eager").model

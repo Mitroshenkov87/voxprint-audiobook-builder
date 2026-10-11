@@ -256,24 +256,29 @@ def test_prepare_hf_does_nothing_with_a_proxy_or_the_default_preference(two_ifac
     assert nr.prepare_hf(force=True) == "" and not probes and installed == [""]
 
 
+def _hub_local_address(client):
+    pool = client._transport._pool
+    return getattr(pool, "_local_address", None)
+
+
 def test_hub_session_binds_the_source_address(monkeypatch):
     pytest.importorskip("huggingface_hub")
-    from huggingface_hub import configure_http_backend
     from huggingface_hub.utils import get_session
+    from huggingface_hub.utils._http import default_client_factory, set_client_factory
 
     monkeypatch.delenv("HF_HUB_DISABLE_XET", raising=False)
     try:
         nr._install_hf_adapter("10.8.0.2")
-        pool = get_session().get_adapter("https://huggingface.co").poolmanager
-        assert pool.connection_pool_kw["source_address"] == ("10.8.0.2", 0)
+        assert _hub_local_address(get_session()) == "10.8.0.2"
         assert __import__("os").environ["HF_HUB_DISABLE_XET"] == "1"          # the Rust downloader cannot bind
     finally:
         __import__("os").environ.pop("HF_HUB_DISABLE_XET", None)
         from huggingface_hub import constants
 
         constants.HF_HUB_DISABLE_XET = False
-        configure_http_backend()
-    assert "source_address" not in get_session().get_adapter("https://huggingface.co").poolmanager.connection_pool_kw
+        set_client_factory(default_client_factory)
+        nr.reset_memory()
+    assert not _hub_local_address(get_session())
 
 
 def test_ensure_model_prepares_the_route_only_for_the_real_hub(monkeypatch):
