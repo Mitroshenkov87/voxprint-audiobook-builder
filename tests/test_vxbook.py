@@ -102,6 +102,43 @@ def test_sound_sample_maps_marks_cast_and_paragraphs():
     assert chunks[3].pause_ms == 1500
 
 
+def test_digit_leading_chapter_ids_and_ch01(tmp_path):
+    """Plotweaver emits chapter ids ``1`` and ``2``. A letter id such as ``ch01`` still opens."""
+    digit = """<!-- vx:chapter id="1" -->
+# One
+
+Hello there friend.
+
+<!-- vx:chapter id="2" -->
+# Two
+
+<!-- vx:speaker id="2" -->
+She said one short line.
+"""
+    speakers = {
+        "format_version": "1.0",
+        "speakers": [
+            {"id": "narrator", "role": "narrator", "name": "Narrator", "gender": "unspecified"},
+            {"id": "2", "role": "character", "name": "Two", "gender": "female"},
+        ],
+    }
+    raw = digit.encode("utf-8")
+    chapters = [
+        {"id": "1", "title": "One", "anchor": "1", "offset": raw.find(b'<!-- vx:chapter id="1" -->')},
+        {"id": "2", "title": "Two", "anchor": "2", "offset": raw.find(b'<!-- vx:chapter id="2" -->')},
+    ]
+    path = tmp_path / "digits.vxbook"
+    _pack(path, digit, speakers=speakers, chapters=chapters)
+    book = load_book(path)
+    assert book.chapter_ids == ("1", "2")
+    assert book.speaker_marks[1][0] == "female"
+
+    letter = tmp_path / "letters.vxbook"
+    _pack(letter)
+    opened = load_book(letter)
+    assert opened.chapter_ids == ("ch01",)
+
+
 def test_explicit_yo_is_not_restored_from_the_dictionary(tmp_path):
     book_md = BOOK_V1.replace("Hello there friend.", "He said еще once.")
     path = tmp_path / "yo.vxbook"
