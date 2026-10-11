@@ -1512,7 +1512,8 @@ end;
 { After the program files are in place: install the shared runtime and ffmpeg, then download the
   required models. Both steps run as the installing user (so files land in that user's profile)
   and setup waits for each process. A non-zero exit, including a silent install, aborts setup.
-  /SkipSuite skips both (CI smoke). There is no status file. }
+  /SkipSuite skips both (CI smoke). Otherwise the download always runs: voxprint-common 0.2.1
+  mdl.ready() can trust a status file, and download is idempotent and refills gaps. }
 function RunChecked(const FileName, Params: String; Show: Integer): Boolean;
 var
   Rc: Integer;

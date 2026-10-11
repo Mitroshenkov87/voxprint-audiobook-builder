@@ -324,6 +324,7 @@ say "Installing the other Python packages (this takes a few minutes)"
 "$UV" pip install --python "$VPY" -r "$APP/requirements.txt" -r "$APP/requirements-verified.txt" || die "installing requirements.txt failed"
 "$UV" pip install --python "$VPY" --no-deps -r "$APP/requirements-nodeps.txt" || die "installing requirements-nodeps.txt failed"
 if [ "${VOXPRINT_SKIP_SUITE:-}" != "1" ]; then
+  # Always, even when a status file says ready. Download is idempotent and refills gaps.
   say "Downloading the required models (voxprint-mdl)"
   "$VPY" "$APP/main.py" --run-mdl download --app audiobook-builder --manifest "$APP/voxprint-app-models.json" --json \
     || { "$VPY" "$APP/main.py" --unregister-suite || true; die "model download failed"; }

@@ -33,6 +33,127 @@ def test_app_manifest_lists_required_models_and_leaves_the_rest_on_demand():
     assert "core/data" not in blob
 
 
+def _file(name: str, digest: str) -> dict:
+    return {
+        "path": name,
+        "size": 4,
+        "sha256": digest,
+        "mirrors": [{"source": "url", "url": "https://example.invalid/file.bin"}],
+    }
+
+
+def _model(model_id: str, files: list[dict], *, tier: str = "any", on_demand: bool = False) -> dict:
+    return {
+        "id": model_id,
+        "version": "1",
+        "vram_tier": tier,
+        "on_demand": on_demand,
+        "files": files,
+    }
+
+
+def _write_manifest(folder: Path, models: list[dict]) -> Path:
+    path = folder / "voxprint-app-models.json"
+    path.write_text(json.dumps({"schema": 1, "app": "audiobook-builder", "models": models}), encoding="utf-8")
+    return path
+
+
+def _plant(root: Path, digest: str, payload: bytes = b"data") -> None:
+    blob = root / "blobs" / digest
+    blob.parent.mkdir(parents=True, exist_ok=True)
+    blob.write_bytes(payload)
+
+
+def _arm(tmp_path, monkeypatch, models: list[dict]):
+    monkeypatch.delenv("VOXPRINT_SKIP_SUITE", raising=False)
+    monkeypatch.setattr(mdl_gate, "ready", lambda: True)
+    store = tmp_path / "models"
+    monkeypatch.setattr(mdl_gate, "suite_models_dir", lambda: store)
+    monkeypatch.setattr(paths, "models_dir", lambda: store)
+    torch = tmp_path / "runtime" / "torch"
+    torch.mkdir(parents=True)
+    monkeypatch.setattr("infra.suite_shared.torch_dir", lambda: torch.parent)
+    manifest = _write_manifest(tmp_path, models)
+    monkeypatch.setattr(mdl_gate, "manifest_path", lambda: manifest)
+    return store
+
+
+def test_a_ready_status_with_a_missing_file_is_not_ready(tmp_path, monkeypatch):
+    digest = "a" * 64
+    _arm(tmp_path, monkeypatch, [_model("voice-levi", [_file("voices/levi.zip", digest)])])
+    assert mdl_gate.models_ready() is False
+
+
+def test_an_empty_required_file_is_not_ready(tmp_path, monkeypatch):
+    digest = "b" * 64
+    store = _arm(tmp_path, monkeypatch, [_model("voice-levi", [_file("voices/levi.zip", digest)])])
+    _plant(store, digest, b"")
+    assert mdl_gate.models_ready() is False
+
+
+def test_one_vram_tier_plus_torch_is_ready_and_on_demand_can_be_missing(tmp_path, monkeypatch):
+    small = "c" * 64
+    large = "d" * 64
+    voice = "e" * 64
+    optional = "f" * 64
+    store = _arm(tmp_path, monkeypatch, [
+        _model("qwen3-tts", [_file("Qwen--small/model.safetensors", small)], tier="8gb"),
+        _model("qwen3-tts", [_file("Qwen--large/model.safetensors", large)], tier="16gb"),
+        _model("voice-levi", [_file("voices/levi.zip", voice)]),
+        _model("gemma-4-12b", [_file("llm/model.safetensors", optional)], on_demand=True),
+    ])
+    _plant(store, small)
+    _plant(store, voice)
+    assert mdl_gate.models_ready() is True
+
+
+def test_a_named_path_counts_when_the_blob_is_absent(tmp_path, monkeypatch):
+    digest = "1" * 64
+    store = _arm(tmp_path, monkeypatch, [_model("voice-levi", [_file("voices/levi.zip", digest)])])
+    named = store / "voices" / "levi.zip"
+    named.parent.mkdir(parents=True)
+    named.write_bytes(b"zip")
+    assert mdl_gate.models_ready() is True
+
+
+def test_missing_torch_is_not_ready(tmp_path, monkeypatch):
+    digest = "2" * 64
+    store = _arm(tmp_path, monkeypatch, [_model("voice-levi", [_file("voices/levi.zip", digest)])])
+    _plant(store, digest)
+    monkeypatch.setattr("infra.suite_shared.torch_dir", lambda: tmp_path / "no-torch")
+    assert mdl_gate.models_ready() is False
+
+
+def test_narrate_exits_4_when_the_status_file_says_ready_but_a_file_is_missing(tmp_path, monkeypatch):
+    digest = "3" * 64
+    _arm(tmp_path, monkeypatch, [_model("voice-levi", [_file("voices/levi.zip", digest)])])
+    book = tmp_path / "book.txt"
+    book.write_text("Hello\n", encoding="utf-8")
+    out = tmp_path / "out"
+    out.mkdir()
+    code = cli.main(["narrate", str(book), "--voice", "levi", "--out", str(out), "--json"])
+    assert code == cli.EXIT_MISSING
+
+
+def test_skip_suite_does_not_require_the_files(tmp_path, monkeypatch):
+    monkeypatch.setenv("VOXPRINT_SKIP_SUITE", "1")
+    monkeypatch.setattr(mdl_gate, "ready", lambda: True)
+    monkeypatch.setattr(mdl_gate, "manifest_path", lambda: tmp_path / "missing.json")
+    assert mdl_gate.models_ready() is True
+
+
+def test_installers_download_without_asking_ready():
+    iss = (ROOT / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
+    body = iss[iss.index("procedure RunSuiteInstall"):iss.index("procedure AddAppToUserPath")]
+    assert "SkipSuiteInstall()" in body
+    assert body.index("SkipSuiteInstall()") < body.index("download --app audiobook-builder")
+    assert "--json" in body and "ready()" not in body and "mdl.ready" not in body
+    linux = (ROOT / "installer" / "linux" / "install-voxprint-linux.sh").read_text(encoding="utf-8")
+    block = linux[linux.index("Downloading the required models"):linux.index("Creating the launcher")]
+    assert "download --app audiobook-builder" in block and "--json" in block
+    assert "ready" not in block
+
+
 def test_narrate_exits_4_when_models_are_not_ready(tmp_path, monkeypatch):
     monkeypatch.delenv("VOXPRINT_SKIP_SUITE", raising=False)
     monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "home"))
