@@ -1,6 +1,6 @@
 # FAQ
 
-## What is Voxprint?
+## What is VOXPrint?
 *Train a voice, narrate books.* (Short name and technical identifier: **Voxprint** - the package, the executable and the data folder keep that name.)
 
 **Your voice from a recording in one click - and then whole books in that voice.** Give Voxprint a 5-15 minute recording of a voice (yours, or of a person who has given permission) and
@@ -23,8 +23,8 @@ Full table: [Downloads and requirements](DOWNLOADS.md#hardware-requirements).
 > and many settings are defaults that may change. Expect rough edges; back up your recordings and voices ([Backup](MODELS.md#backup-restore-and-existing-models)); report problems as issues.
 > Voices are personal data - read [Voice owner's consent](USER-GUIDE.md#voice-owners-consent-and-usage-scope) and the licence notes before sharing anything.
 
-## Who is behind it? Is it connected to other "Voxprint" products?
-> **Independent project.** Voxprint AI Audiobook Builder is an independent, non-commercial open-source project by Aleksandr Mitroshenkov. It is **not affiliated with, endorsed by or connected to** any other product, service, company or project that has a similar name (for example web transcription services or voice-identity tools called "VoxPrint"/"Voxprint", or printing companies). All product names mentioned belong to their owners.
+## Who is behind it? Is it connected to other "VOXPrint" products?
+> **Independent project.** VOXPrint AI Audiobook Builder is an independent, non-commercial open-source project by Aleksandr Mitroshenkov. It is **not affiliated with, endorsed by or connected to** any other product, service, company or project that has a similar name (for example web transcription services or voice-identity tools called "VoxPrint"/"Voxprint", or printing companies). All product names mentioned belong to their owners.
 
 ## Is my data sent anywhere?
 No telemetry, no account; recordings, text and voices stay on your computer. The complete list of network connections is in [PRIVACY.md](PRIVACY.md).

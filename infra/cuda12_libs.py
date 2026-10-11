@@ -12,7 +12,7 @@ Example::
 
 Dependencies: the two NVIDIA wheels (and ``ctranslate2`` when it is imported).
 Licence: Apache-2.0.
-Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
+Credit: VOXPrint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
 """
 from __future__ import annotations
 

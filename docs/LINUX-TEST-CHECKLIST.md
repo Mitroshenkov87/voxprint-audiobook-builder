@@ -1,4 +1,4 @@
-# Voxprint for Linux (experimental) - test checklist
+# VOXPrint for Linux (experimental) - test checklist
 
 Short manual test for a real Linux laptop (Ubuntu / Debian / AnduinOS). The CI already checks the install, the unit tests
 and a headless start on a clean Ubuntu 24.04 runner; this list covers what CI cannot: the real desktop, audio and the GPU.

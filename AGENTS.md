@@ -1,6 +1,6 @@
 # AGENTS.md - notes for AI coding agents and new contributors
 
-**Project:** Voxprint AI Audiobook Builder - an offline desktop app (PySide6) that trains a voice (LoRA on Qwen3-TTS) from a short recording and narrates TXT/FB2/EPUB books in it; optional offline translation (Opus-MT). Beta. Apache-2.0.
+**Project:** VOXPrint AI Audiobook Builder - an offline desktop app (PySide6) that trains a voice (LoRA on Qwen3-TTS) from a short recording and narrates TXT/FB2/EPUB books in it; optional offline translation (Opus-MT). Beta. Apache-2.0.
 
 Driving the installed program (commands, JSON, exit codes, where the executable lives): [docs/AGENTS.md](docs/AGENTS.md). This file is for agents that change the source.
 
@@ -24,5 +24,5 @@ Windows (Inno Setup, online/full/thin) and the Linux package: see [docs/BUILDING
 * **No secrets** in the repo, logs or commits (tokens, keys, personal paths); downloads are hash-checked (SHA-256) - keep it that way.
 * **Offline and private**: no telemetry, no account; network only as listed in [docs/PRIVACY.md](docs/PRIVACY.md).
 * **Keep the README short** (about one screen per section); put details into `docs/` and link them. English in code, comments and docs.
-* **Reusable parts** are only a few large pieces (the yo normaliser, speaker marking, the resumable model downloader; the exe-patch applier when that file exists). Each stays the one file it already lives in. The module docstring is short: what it does, a usage example, dependencies, licence, and `Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder`. Do not add a folder, a wrapper, or a behaviour change to make a piece reusable. Yo data lives in `core/data/` only. List the files in the README. Never do this for a small helper.
+* **Reusable parts** are only a few large pieces (the yo normaliser, speaker marking, the resumable model downloader; the exe-patch applier when that file exists). Each stays the one file it already lives in. The module docstring is short: what it does, a usage example, dependencies, licence, and `Credit: VOXPrint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder`. Do not add a folder, a wrapper, or a behaviour change to make a piece reusable. Yo data lives in `core/data/` only. List the files in the README. Never do this for a small helper.
 * Git: `git pull --rebase` before every push; commit only your own files; never rewrite published history.

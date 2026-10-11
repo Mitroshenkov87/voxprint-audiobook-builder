@@ -1,6 +1,6 @@
 # Voices index
 
-`index.json` is the default voices index of Voxprint (schema 1). Published packages are **release assets** of the tag `voices-v1`
+`index.json` is the default voices index of VOXPrint (schema 1). Published packages are **release assets** of the tag `voices-v1`
 (`open-universal.zip`, `tirzah.zip`, `gideon.zip`, `asher.zip`, `noa.zip`, `eitan.zip`) and `voices-v2` (`levi.zip`, `natan.zip`, `shimon.zip`, `miriam.zip`, `rivka.zip`); the index carries their URL, size and SHA-256. Rebuild a package and its entry with
 `tools/make_voice_package.py`.
 

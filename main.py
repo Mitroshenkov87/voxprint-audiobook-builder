@@ -529,7 +529,7 @@ def main(argv=None) -> int:
         hard_exit.arm()          # closing the main window kills every helper process at once (docs/BUILDING.md)
     win.show_studio()
     splash.finish(win)                    # closes once the Studio window is on screen
-    if not selftest:   # "Voxprint Projects" shortcut in the real Documents folder (infra/projects.py); never blocks the start
+    if not selftest:   # "VOXPrint Projects" shortcut in the real Documents folder (infra/projects.py); never blocks the start
         from infra import projects
 
         threading.Thread(target=projects.ensure_shortcut, name="projects-shortcut", daemon=True).start()

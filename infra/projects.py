@@ -7,7 +7,7 @@ Best practice for big, re-creatable data on Windows: a local folder that is NOT 
   ``Voices/<voice>_Voxprint/``, ``Re-voice/``;
 * the user can choose another folder in Settings (remembered in ``state/projects_folder.txt``); a folder inside OneDrive
   gets a warning (hundreds of GB would be uploaded);
-* a "Voxprint Projects" shortcut is put into the user's real Documents folder, found through the Known Folder API
+* a "VOXPrint Projects" shortcut is put into the user's real Documents folder, found through the Known Folder API
   (``SHGetKnownFolderPath(FOLDERID_Documents)``), so it also works when Documents is redirected to OneDrive.  The
   shortcut is a small ``.lnk`` file (Windows) or a symlink (Linux): the data itself never goes to OneDrive.
 
@@ -25,7 +25,7 @@ from typing import Callable, Optional
 log = logging.getLogger("voxprint.projects")
 
 STATE_FILE = "projects_folder.txt"
-SHORTCUT_NAME = "Voxprint Projects"
+SHORTCUT_NAME = "VOXPrint Projects"
 AUDIOBOOKS, VOICES, REVOICE = "Audiobooks", "Voices", "Re-voice"
 
 
@@ -139,7 +139,7 @@ def shortcut_path(docs: Optional[Path] = None) -> Path:
 
 def ensure_shortcut(target: Optional[Path] = None, docs: Optional[Path] = None,
                     make_link: Optional[Callable[[Path, Path], None]] = None) -> Optional[Path]:
-    """Put (or update) the "Voxprint Projects" shortcut into Documents; returns its path or None.  Never raises."""
+    """Put (or update) the "VOXPrint Projects" shortcut into Documents; returns its path or None.  Never raises."""
     target = target or projects_dir()
     try:
         link = shortcut_path(docs)

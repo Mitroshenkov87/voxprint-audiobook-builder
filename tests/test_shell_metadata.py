@@ -60,9 +60,9 @@ def test_thin_job_publishes_an_exe_patch():
     """build-thin uploads the GUI exe plus patch.json, and attaches the same three files to a release."""
     wf = (ROOT / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")
     assert "name: Voxprint-patch\n" in wf
-    assert "dist/thin/Voxprint AI Audiobook Builder/Voxprint AI Audiobook Builder.exe\n" in wf
-    assert "dist/thin/Voxprint AI Audiobook Builder/Voxprint AI Audiobook Builder.exe.sha256\n" in wf
-    assert "dist/thin/Voxprint AI Audiobook Builder/patch.json\n" in wf
+    assert "dist/thin/VOXPrint AI Audiobook Builder/VOXPrint AI Audiobook Builder.exe\n" in wf
+    assert "dist/thin/VOXPrint AI Audiobook Builder/VOXPrint AI Audiobook Builder.exe.sha256\n" in wf
+    assert "dist/thin/VOXPrint AI Audiobook Builder/patch.json\n" in wf
     patch = wf.split("name: Voxprint-patch", 1)[1][:500]
     assert "retention-days: 14" in patch
     assert "runtime_lock_sha256" in wf and "VOXPRINT_BUILD" in wf

@@ -10,11 +10,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_windows_default_layout_names():
-    assert install_layout.windows_install_dir() == r"C:\Program Files\Voxprint AI Suite\Audiobook Builder"
+    assert install_layout.windows_install_dir() == r"C:\Program Files\VOXPrint AI Suite\Audiobook Builder"
     assert install_layout.windows_cli_path().endswith(r"Audiobook Builder\voxprint-audiobook-cli.exe")
-    assert install_layout.GUI_EXE == "Voxprint AI Audiobook Builder.exe"
+    assert install_layout.GUI_EXE == "VOXPrint AI Audiobook Builder.exe"
     assert install_layout.CLI_EXE == "voxprint-audiobook-cli.exe"
-    assert install_layout.START_MENU == "Voxprint AI Suite"
+    assert install_layout.START_MENU == "VOXPrint AI Suite"
     assert install_layout.SHORTCUT == "Audiobook Builder"
     assert install_layout.legacy_program_dir() == r"C:\Program Files\Voxprint"
 
@@ -23,17 +23,39 @@ def test_migration_removes_the_old_program_and_keeps_user_data():
     old = r"C:\Program Files\Voxprint\Voxprint.exe"
     data = r"C:\Users\me\AppData\Local\Voxprint\voices\narrator.txt"
     shared = r"C:\Users\me\AppData\Local\Voxprint\shared\manifest.json"
+    suite = install_layout.legacy_suite_dir()
+    assert suite == r"C:\Program Files\Voxprint AI Suite\Audiobook Builder"
     assert install_layout.migration_removes_program_dir(old)
     assert not install_layout.migration_removes_program_dir(data)
     assert not install_layout.migration_removes_program_dir(shared)
+    assert not install_layout.migration_removes_program_dir(suite)
+    assert not install_layout.migration_removes_program_dir(suite + r"\Voxprint AI Audiobook Builder.exe")
     assert install_layout.user_data_dir(r"C:\Users\me\AppData\Local").endswith(r"\Voxprint")
+
+
+def test_old_suite_spelling_is_renamed_in_place():
+    assert install_layout.case_only_rename("Voxprint AI Suite", install_layout.SUITE_DIR)
+    assert install_layout.case_only_rename(install_layout.LEGACY_SUITE_GUI, install_layout.GUI_EXE)
+    assert not install_layout.case_only_rename("Voxprint", install_layout.SUITE_DIR)
+    assert not install_layout.case_only_rename(install_layout.SUITE_DIR, install_layout.SUITE_DIR)
+    iss = (ROOT / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
+    assert '#define LegacySuiteDir "Voxprint AI Suite"' in iss
+    assert '#define LegacyDisplayName "Voxprint AI Audiobook Builder"' in iss
+    assert "procedure FixBrandCasing" in iss
+    assert "procedure RenameChildCase" in iss
+    post = iss.split("RunSuiteInstall();", 1)[1].split("RegisterSuiteDiscovery();", 1)[0]
+    assert "RemoveLegacyInstall();" in post and "FixBrandCasing();" in post
+    assert post.index("RemoveLegacyInstall();") < post.index("FixBrandCasing();")
+    body = iss.split("procedure RemoveLegacyInstall", 1)[1].split("procedure ", 1)[0]
+    assert "LegacySuite" not in body
+    assert "DelTree(Legacy, True, True, True)" in body
 
 
 def test_installer_script_migrates_without_the_old_uninstaller():
     iss = (ROOT / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
     assert r"DefaultDirName={autopf}\{#SuiteDir}\{#AppFolder}" in iss
     assert "UsePreviousAppDir=no" in iss
-    assert '#define AppExe "Voxprint AI Audiobook Builder.exe"' in iss
+    assert '#define AppExe "VOXPrint AI Audiobook Builder.exe"' in iss
     assert '#define CliExe "voxprint-audiobook-cli.exe"' in iss
     assert r"{group}\{#AppFolder}" in iss
     assert "procedure RemoveLegacyInstall" in iss
@@ -69,6 +91,10 @@ def test_discovery_record_keeps_components_and_falls_back_to_the_default_path(tm
 def test_ci_smoke_installs_the_old_layout_then_the_new_one():
     wf = (ROOT / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")
     assert r"C:\Program Files\Voxprint" in wf
+    assert r"C:\Program Files\Voxprint AI Suite\Audiobook Builder" in wf
+    assert "Voxprint AI Audiobook Builder.exe" in wf
+    assert "suite-marker.txt" in wf
+    assert "StringComparison]::Ordinal" in wf
     assert "voxprint-audiobook-cli.exe" in wf
     assert "--version" in wf
     assert "migration-marker.txt" in wf

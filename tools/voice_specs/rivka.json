@@ -4,17 +4,17 @@
   "language": "ru",
   "author": "Irina Grinberg (LibriVox) - public domain",
   "speaker": "Irina Grinberg",
-  "prepared_by": "Voxprint",
+  "prepared_by": "VOXPrint",
   "project_url": "https://archive.org/details/woe_from_wit_ig_librivox",
   "gender": "female",
   "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
   "license": "CC0-1.0",
   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
-  "description": "Russian female voice for Voxprint. Trained only from the public-domain LibriVox recording 'Gore ot uma (Woe from Wit)' by Alexander Griboyedov, read by Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Rivka is Voxprint's own and does not imply the reader's endorsement.",
+  "description": "Russian female voice for VOXPrint. Trained only from the public-domain LibriVox recording 'Gore ot uma (Woe from Wit)' by Alexander Griboyedov, read by Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Rivka is VOXPrint's own and does not imply the reader's endorsement.",
   "descriptions": {
-    "en": "Russian female voice for Voxprint. Trained only from the public-domain LibriVox recording 'Gore ot uma (Woe from Wit)' by Alexander Griboyedov, read by Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Rivka is Voxprint's own and does not imply the reader's endorsement.",
-    "ru": "Русский женский голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: «Горе от ума» Александра Грибоедова, читает Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Rivka дано Voxprint и не означает одобрения чтеца.",
-    "de": "Russische weibliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Gore ot uma (Verstand schafft Leiden)' von Alexander Gribojedow trainiert, gelesen von Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Rivka stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+    "en": "Russian female voice for VOXPrint. Trained only from the public-domain LibriVox recording 'Gore ot uma (Woe from Wit)' by Alexander Griboyedov, read by Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Rivka is VOXPrint's own and does not imply the reader's endorsement.",
+    "ru": "Русский женский голос для VOXPrint. Обучен только на записи LibriVox из общественного достояния: «Горе от ума» Александра Грибоедова, читает Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Rivka дано VOXPrint и не означает одобрения чтеца.",
+    "de": "Russische weibliche Stimme für VOXPrint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Gore ot uma (Verstand schafft Leiden)' von Alexander Gribojedow trainiert, gelesen von Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Rivka stammt von VOXPrint und bedeutet keine Billigung durch den Sprecher."
   },
   "consent": {
     "scope": "commercial",

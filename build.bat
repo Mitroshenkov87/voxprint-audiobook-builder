@@ -1,8 +1,8 @@
 @echo off
 rem ==========================================================================
-rem  Voxprint - build "Voxprint AI Audiobook Builder.exe" (PyInstaller) and the installer (Inno Setup).
-rem  Usage:    build.bat            -> dist\Voxprint AI Audiobook Builder.exe and dist\voxprint-audiobook-cli.exe
-rem            build.bat onedir     -> folder dist\Voxprint AI Audiobook Builder\   (--onedir, starts faster; recommended
+rem  Voxprint - build "VOXPrint AI Audiobook Builder.exe" (PyInstaller) and the installer (Inno Setup).
+rem  Usage:    build.bat            -> dist\VOXPrint AI Audiobook Builder.exe and dist\voxprint-audiobook-cli.exe
+rem            build.bat onedir     -> folder dist\VOXPrint AI Audiobook Builder\   (--onedir, starts faster; recommended
 rem                                    if --onefile with PyTorch gets too big/slow)
 rem  Requires Windows 11 x64 and Python 3.14 (py launcher). The models are NOT part of the exe: they are downloaded on first start.
 rem
@@ -59,7 +59,7 @@ set MODE=--onefile
 if /I "%~1"=="onedir" set MODE=--onedir
 
 echo === Build (%MODE%) ===
-pyinstaller %MODE% --windowed --noconfirm --clean --name "Voxprint AI Audiobook Builder" ^
+pyinstaller %MODE% --windowed --noconfirm --clean --name "VOXPrint AI Audiobook Builder" ^
   --icon "assets\voxprint.ico" --add-data "assets\voxprint.ico;assets" --add-data "assets\check.png;assets" --add-data "assets\splash.jpg;assets" --add-data "assets\easter-egg.jpg;assets" ^
   --add-data "assets\icons;assets\icons" ^
   --paths . --paths third_party ^
@@ -146,7 +146,7 @@ pyinstaller %MODE% --console --noconfirm --clean --name voxprint-audiobook-cli -
   main.py
 if errorlevel 1 (echo [ERROR] Console PyInstaller failed. & exit /b 1)
 if /I "%~1"=="onedir" (
-    copy /Y "dist\voxprint-audiobook-cli\voxprint-audiobook-cli.exe" "dist\Voxprint AI Audiobook Builder\voxprint-audiobook-cli.exe" || exit /b 1
+    copy /Y "dist\voxprint-audiobook-cli\voxprint-audiobook-cli.exe" "dist\VOXPrint AI Audiobook Builder\voxprint-audiobook-cli.exe" || exit /b 1
     rmdir /s /q "dist\voxprint-audiobook-cli"
 )
 
@@ -158,7 +158,7 @@ if exist "%ISCC%" (
     if /I "%~1"=="onedir" ( "%ISCC%" /DONEDIR installer\Voxprint.iss ) else ( "%ISCC%" installer\Voxprint.iss )
     echo Installer: installer\Output\Voxprint-Setup.exe
 ) else (
-    echo [i] Inno Setup 6 not found - the installer was not built. Exe: dist\Voxprint AI Audiobook Builder.exe
+    echo [i] Inno Setup 6 not found - the installer was not built. Exe: dist\VOXPrint AI Audiobook Builder.exe
 )
 :finish
 endlocal

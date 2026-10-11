@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Voxprint AI Audiobook Builder - Linux installer (EXPERIMENTAL).
+# VOXPrint AI Audiobook Builder - Linux installer (EXPERIMENTAL).
 #
 #   curl -fsSL https://github.com/@REPO@/releases/download/@TAG@/install-voxprint-linux.sh | bash
 #   or, from the unpacked Voxprint-linux-experimental.tar.gz:   ./install-voxprint-linux.sh
@@ -50,7 +50,7 @@ require_gpu() {
   best_maj=-1
   best_min=-1
   if ! command -v nvidia-smi >/dev/null 2>&1; then
-    die "Voxprint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: none."
+    die "VOXPrint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: none."
   fi
   while IFS= read -r line; do
     [ -n "$line" ] || continue
@@ -79,18 +79,18 @@ require_gpu() {
 $(nvidia-smi --query-gpu=name,compute_cap,driver_version --format=csv,noheader 2>/dev/null || true)
 EOF
   if [ -z "$best_name" ]; then
-    die "Voxprint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: none."
+    die "VOXPrint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: none."
   fi
   if [ "$best_maj" -gt 8 ] || { [ "$best_maj" -eq 8 ] && [ "$best_min" -ge 9 ]; }; then
     echo "NVIDIA GPU: $best_name (compute ${best_maj}.${best_min})"
     return 0
   fi
-  die "Voxprint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: ${best_name}."
+  die "VOXPrint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: ${best_name}."
 }
 
 usage() {
   cat <<USAGE
-Voxprint for Linux (experimental) - installer
+VOXPrint for Linux (experimental) - installer
 
   install-voxprint-linux.sh [options]
     --check            only report what is missing (system libraries, Python), change nothing
@@ -131,7 +131,7 @@ done
 
 # ----------------------------------------------------------------------------------------------- uninstall
 if [ "$MODE" = uninstall ]; then
-  say "Removing Voxprint (program, environment, launcher, menu entry)"
+  say "Removing VOXPrint (program, environment, launcher, menu entry)"
   rm -rf "$APP" "$APP.old" "$APP.new" "$VENV" "$DATA/install.json"
   rm -f "$LAUNCHER" "$LAUNCHER_COMPAT" "$APPS_DIR/voxprint-audiobook.desktop" "$APPS_DIR/voxprint.desktop" "$ICON_DIR/voxprint.png"
   command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
@@ -188,7 +188,7 @@ warn_if_old_distro
 require_gpu
 
 # ----------------------------------------------------------------------------------------------- system checks
-say "Voxprint for Linux (EXPERIMENTAL) - checking the system"
+say "VOXPrint for Linux (EXPERIMENTAL) - checking the system"
 PY="${VOXPRINT_PYTHON:-python3}"
 command -v "$PY" >/dev/null 2>&1 || die "python3 not found. Debian/Ubuntu: sudo apt install python3 python3-venv"
 if ! "$PY" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 14) else 1)'; then
@@ -282,7 +282,7 @@ UV="$VENV/bin/uv"
 export UV_LINK_MODE=copy UV_CACHE_DIR="${UV_CACHE_DIR:-$CACHE/uv}"
 
 if [ "$TORCH" = cpu ] && [ "$SKIP_GPU" != 1 ]; then
-  die "Voxprint has no CPU-only install. An NVIDIA GeForce RTX 40-series or newer GPU is required."
+  die "VOXPrint has no CPU-only install. An NVIDIA GeForce RTX 40-series or newer GPU is required."
 fi
 say "Installing PyTorch $TORCH (torch 2.11.0, torchaudio 2.11.0)"
 "$UV" pip install --python "$VPY" "torch==2.11.0" "torchaudio==2.11.0" --index-url "https://download.pytorch.org/whl/$TORCH" || die "PyTorch ($TORCH) could not be installed"
@@ -327,7 +327,7 @@ if [ "$SKIP_CHECK" = 0 ]; then
 fi
 
 echo
-if [ "$RC" = 0 ]; then say "Voxprint is installed."; else warn "Voxprint is installed, but a self-test failed - see docs/LINUX-TEST-CHECKLIST.md"; fi
+if [ "$RC" = 0 ]; then say "VOXPrint is installed."; else warn "VOXPrint is installed, but a self-test failed - see docs/LINUX-TEST-CHECKLIST.md"; fi
 echo "Start it from the application menu or with:  voxprint-audiobook-cli"
 case ":$PATH:" in *":$BIN_DIR:"*) ;; *) warn "$BIN_DIR is not in PATH - log out and in again, or run: $LAUNCHER" ;; esac
 echo "Models are downloaded on the first run into $DATA/models.  Update: run this script again.  Remove: install-voxprint-linux.sh --uninstall"

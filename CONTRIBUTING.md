@@ -1,4 +1,4 @@
-# Contributing to Voxprint
+# Contributing to VOXPrint
 
 Thanks for helping! Small, focused pull requests are the easiest to review.
 

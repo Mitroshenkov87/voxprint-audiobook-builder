@@ -4,17 +4,17 @@
   "language": "ru",
   "author": "Victor Seremet (LibriVox) - public domain",
   "speaker": "Victor Seremet",
-  "prepared_by": "Voxprint",
+  "prepared_by": "VOXPrint",
   "project_url": "https://archive.org/details/childhood_2312_librivox",
   "gender": "male",
   "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
   "license": "CC0-1.0",
   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
-  "description": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording 'Detstvo (Childhood)' by Leo Tolstoy, version 2, read by Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Natan is Voxprint's own and does not imply the reader's endorsement.",
+  "description": "Russian male voice for VOXPrint. Trained only from the public-domain LibriVox recording 'Detstvo (Childhood)' by Leo Tolstoy, version 2, read by Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Natan is VOXPrint's own and does not imply the reader's endorsement.",
   "descriptions": {
-    "en": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording 'Detstvo (Childhood)' by Leo Tolstoy, version 2, read by Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Natan is Voxprint's own and does not imply the reader's endorsement.",
-    "ru": "Русский мужской голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: «Детство» Льва Толстого (версия 2), читает Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Natan дано Voxprint и не означает одобрения чтеца.",
-    "de": "Russische männliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Detstvo (Kindheit)' von Lew Tolstoi, Version 2 trainiert, gelesen von Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Natan stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+    "en": "Russian male voice for VOXPrint. Trained only from the public-domain LibriVox recording 'Detstvo (Childhood)' by Leo Tolstoy, version 2, read by Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Natan is VOXPrint's own and does not imply the reader's endorsement.",
+    "ru": "Русский мужской голос для VOXPrint. Обучен только на записи LibriVox из общественного достояния: «Детство» Льва Толстого (версия 2), читает Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Natan дано VOXPrint и не означает одобрения чтеца.",
+    "de": "Russische männliche Stimme für VOXPrint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Detstvo (Kindheit)' von Lew Tolstoi, Version 2 trainiert, gelesen von Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Natan stammt von VOXPrint und bedeutet keine Billigung durch den Sprecher."
   },
   "consent": {
     "scope": "commercial",

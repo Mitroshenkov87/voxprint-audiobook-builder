@@ -40,6 +40,6 @@ These ye spellings are homographs, so they are not added as safe forms. Dialogue
 
 The source lists are MIT, Copyright (c) 2026 Denis Seleznev, https://github.com/e2yo/eyo-kernel. eyo-kernel says the lists were first taken from https://github.com/rin-nas/php-yoficator, which publishes no licence file, and are maintained under MIT. The build script and `core/yo.py` are Apache-2.0.
 
-Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
+Credit: VOXPrint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
 
 Nothing in this folder is published to Hugging Face from the repository. The gzipped JSONL is the form to release later.

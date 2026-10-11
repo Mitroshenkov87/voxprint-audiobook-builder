@@ -2,7 +2,7 @@
 
 Resumable and hash-checked. Depends on the app path and mirror tables in this package. Licence: Apache-2.0.
 
-Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
+Credit: VOXPrint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
 
 
 A download goes into ``<name>.partial``; only after verification is the folder renamed, so a partially downloaded

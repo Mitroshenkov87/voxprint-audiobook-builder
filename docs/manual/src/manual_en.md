@@ -1,6 +1,6 @@
-# What Voxprint does
+# What VOXPrint does
 
-**Voxprint AI Audiobook Builder** ({{studio.tagline}}) is a Windows 11 application that does two things, entirely on your own computer:
+**VOXPrint AI Audiobook Builder** ({{studio.tagline}}) is a Windows 11 application that does two things, entirely on your own computer:
 
 1. **It teaches a computer voice to sound like a particular person.** You give it a recording of a voice (yours, or of a person who has given you permission) – ideally 5 to 15 minutes – and, if you have it, the text that was read. Voxprint aligns text and sound, cuts the recording into clean pieces and trains a small voice add-on (an *adapter*, technically LoRA) for the speech model **Qwen3-TTS**.
 2. **It reads whole books aloud with that voice.** You pick a book (TXT, Markdown, FB2, EPUB or a Voxprint book `.vxbook`) and a voice from your library, and get a finished audiobook with chapters – one Opus file, one MP3 per chapter, and so on.
@@ -33,7 +33,7 @@ Supported systems: current and previous year OS releases (Windows 11 24H2 and ne
 
 > **Use voices responsibly.** A voice is personal data and a personality right of its owner. Use a voice only with the explicit permission of the person it belongs to and within the licence of that voice. See chapter 12.
 
-# Installing Voxprint
+# Installing VOXPrint
 
 ## The installer
 
@@ -58,7 +58,7 @@ When it is done, the status shows *{{ui.prefetch_done}}* A privacy notice is sho
 | What | Where |
 |---|---|
 | Program data, models, logs, voice library | `%LOCALAPPDATA%\Voxprint\` (`models\`, `logs\`, `voices\`, `state\`) |
-| Projects: audiobooks, voice trainings, Re-voice | the projects folder `%LOCALAPPDATA%\Voxprint\Projects` with `Audiobooks\<book>`, `Voices\<voice name>_Voxprint` and `Re-voice`; a *Voxprint Projects* shortcut is in Documents. Change it under **{{projects.title}}** in {{ui.settings_title}}. |
+| Projects: audiobooks, voice trainings, Re-voice | the projects folder `%LOCALAPPDATA%\Voxprint\Projects` with `Audiobooks\<book>`, `Voices\<voice name>_Voxprint` and `Re-voice`; a *VOXPrint Projects* shortcut is in Documents. Change it under **{{projects.title}}** in {{ui.settings_title}}. |
 | Training results | `Projects\Voices\<voice name>_Voxprint`: the `dataset` and the adapter in `output\<voice name>` |
 
 You can open the model folder and the data/log folder with buttons in {{ui.settings_title}}.
@@ -77,7 +77,7 @@ The Studio is the first window. It has no settings of its own – it is a menu o
 
 | Element | What it does and when to use it |
 |---|---|
-| Title and tagline | "Voxprint AI Audiobook Builder – {{studio.tagline}}". Only informational. |
+| Title and tagline | "VOXPrint AI Audiobook Builder – {{studio.tagline}}". Only informational. |
 | **{{studio.narrate_title}}** card | {{studio.narrate_desc}} Opens the narration window. This is the main card. If the library is empty, the card says *{{studio.narrate_no_voice}}* While a book is being narrated it shows *{{studio.narrate_running}}* |
 | **{{studio.train_title}}** card | {{studio.train_desc}} Opens the training window. While training runs it shows *{{studio.train_running}}* |
 | **{{studio.voices_title}}** card | {{studio.voices_desc}} At the bottom of the card a counter shows how many voices you have (for example "1 voice(s) in your library" – the bundled voice). |
@@ -97,7 +97,7 @@ Open this window from the **{{studio.narrate_title}}** card. {{narr.intro}}
 
 | Control | What it does |
 |---|---|
-| **{{narr.choose_book}}** | Opens a file dialog. Supported: `.txt` (UTF-8 or cp1251; headings such as "Chapter 1" or "Глава 2" become chapters), `.md`, `.fb2` and `.fb2.zip`, `.epub`, and `.vxbook` (a Voxprint book, for example from Voxprint AI Plotweaver, with its roles and cast already set). Title, author and cover are read when present. |
+| **{{narr.choose_book}}** | Opens a file dialog. Supported: `.txt` (UTF-8 or cp1251; headings such as "Chapter 1" or "Глава 2" become chapters), `.md`, `.fb2` and `.fb2.zip`, `.epub`, and `.vxbook` (a Voxprint book, for example from VOXPrint AI Plotweaver, with its roles and cast already set). Title, author and cover are read when present. |
 | File name and info line | After choosing, Voxprint shows the title and "3 chapters · about 7 min of audio" – the number of chapters and the expected length. Before a choice it says *{{narr.no_book}}* |
 
 If the file cannot be opened you get a message such as *{{err.book_unsupported}}* or *{{err.book_empty}}* (see the troubleshooting chapter).
@@ -367,7 +367,7 @@ The third card in the picture above, the *Open universal voice*, is such an onli
 
 **{{voices.import}}** offers two ways: **{{voices.import_folder}}** (an adapter folder) and **{{voices.import_zip}}** (a voice package). Archives are checked for unsafe paths and size limits. A voice that arrives without a declared licence is treated as *personal use only*.
 
-## Licences and the voice that Voxprint offers
+## Licences and the voice that VOXPrint offers
 
 | Licence | Commercial use |
 |---|---|
@@ -415,7 +415,7 @@ Open **{{ui.settings_title}}** with the gear button (top right of the Studio and
 | **{{autorepair.title}}** – **{{autorepair.button}}** | {{autorepair.desc}} See section 8.2. |
 | **{{ui.about}}** | Version, the idea, how it works, open-source components with their licences, a link to the GitHub repository and third-party notices. |
 
-The bottom line shows the version, for example *Voxprint AI Audiobook Builder 0.1.3-beta · build 667 "Menuchah"*.
+The bottom line shows the version, for example *VOXPrint AI Audiobook Builder 0.1.3-beta · build 667 "Menuchah"*.
 
 If the program notices a damaged installation, a banner offers the repair (*{{ui.repair_offer_plain}}*). If **{{autorepair.button}}** does not help, run the Voxprint installer again – voices and models are kept.
 
@@ -632,6 +632,6 @@ voxprint diag --out report.zip         # diagnostic report
 
 > **This manual and the licence badges are information, not legal advice.** The consent card records what a speaker said; it does not replace the law of your country.
 
-*Voxprint AI Audiobook Builder 0.1.3 (beta), build 667 “Menuchah”. Manual of 9 October 2026.*
+*VOXPrint AI Audiobook Builder 0.1.3 (beta), build 667 “Menuchah”. Manual of 9 October 2026.*
 
-*Voxprint AI Audiobook Builder is an independent project and is not affiliated with other products or services with similar names.*
+*VOXPrint AI Audiobook Builder is an independent project and is not affiliated with other products or services with similar names.*

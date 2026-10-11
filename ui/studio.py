@@ -1,4 +1,4 @@
-"""Studio: the first window of Voxprint AI Audiobook Builder - three big cards and a gear button.
+"""Studio: the first window of VOXPrint AI Audiobook Builder - three big cards and a gear button.
 
 * **Narrate a book** (primary) -> :class:`ui.narrate_window.NarrateWindow`
 * **Train your voice**         -> the training window (:class:`ui.main_window.MainWindow`, unchanged workflow)

@@ -20,7 +20,7 @@ deletes the component when the list is empty. ``VOXPRINT_SHARED`` overrides the 
     left = unregister("audiobook-builder")
 
 Licence: Apache-2.0
-Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
+Credit: VOXPrint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
 """
 from __future__ import annotations
 

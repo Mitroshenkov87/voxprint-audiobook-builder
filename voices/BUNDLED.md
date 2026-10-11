@@ -1,12 +1,12 @@
 # Bundled voices
 
-Two open Russian voices come with Voxprint: **Levi** (male) and **Miriam** (female). They are part of the standard model download
+Two open Russian voices come with VOXPrint: **Levi** (male) and **Miriam** (female). They are part of the standard model download
 (Full setup: upfront; Quick setup: with the first-launch download), are checked by SHA-256 and imported into the voices library
 **read-only** (they cannot be edited or deleted; the licence is shown on the voice card). The weights are not in git: each voice is
 one zip on the [`voices-v2`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/voices-v2) release. Pinned in
 `infra/bundled_voices.py` and listed in `index.json`.
 
-The names *Levi* and *Miriam* are Voxprint's own; they do not imply any endorsement by the readers.
+The names *Levi* and *Miriam* are VOXPrint's own; they do not imply any endorsement by the readers.
 
 **Default cast for multi-voice narration** (`infra/bundled_voices.py: DEFAULT_CAST`): narrator Levi, male roles Natan and
 Shimon, female role Miriam. Natan and Shimon are catalog voices (one click in the Voices window, or `voxprint voices download

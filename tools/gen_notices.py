@@ -21,7 +21,7 @@ OUT_DEFAULT = ROOT / "THIRD_PARTY_NOTICES.md"
 
 GROUPS = [
     ("model", "Models (downloaded on first start; not part of the installer)"),
-    ("library", "Libraries and programs shipped with Voxprint"),
+    ("library", "Libraries and programs shipped with VOXPrint"),
     ("asset", "Assets"),
     ("tool", "Build tools (not shipped, except the PyInstaller bootloader and the Inno Setup installer runtime)"),
 ]
@@ -30,7 +30,7 @@ SHIP = {"bundled": "bundled", "optional": "optional, not bundled", "download": "
 
 HEADER = """# Third-party notices
 
-Voxprint AI Audiobook Builder (c) {author}, built with AI assistance. Version {version}.
+VOXPrint AI Audiobook Builder (c) {author}, built with AI assistance. Version {version}.
 
 Voxprint stands on the open-source projects and models listed below. Every component keeps its own licence;
 the full licence texts are in the `licenses/` folder next to this file. This file is generated from

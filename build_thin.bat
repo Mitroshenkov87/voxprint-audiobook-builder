@@ -1,10 +1,10 @@
 @echo off
 rem  THIN shell of Voxprint (see docs\THIN-INSTALLER.md).  Same environment as build.bat (run build.bat once, or at least its venv
 rem  and "uv pip install" steps, first): this script only runs PyInstaller with the heavy libraries EXCLUDED, so the folder
-rem  dist\thin\Voxprint AI Audiobook Builder contains Qt, numpy, soundfile and the program (about 150-250 MB) - nothing else.  The libraries it leaves
+rem  dist\thin\VOXPrint AI Audiobook Builder contains Qt, numpy, soundfile and the program (about 150-250 MB) - nothing else.  The libraries it leaves
 rem  out are packed as runtime modules by installer\build_online.ps1 -Thin and downloaded by the app (infra\modules.py).
 rem  pydub and audioop-lts (the audioop module on Python 3.13+) stay in the audio module, not in this shell.
-rem  Usage:  build_thin.bat   then   powershell installer\build_online.ps1 -Dist "dist\thin\Voxprint AI Audiobook Builder" -Tag v0.1.0-beta -Thin
+rem  Usage:  build_thin.bat   then   powershell installer\build_online.ps1 -Dist "dist\thin\VOXPrint AI Audiobook Builder" -Tag v0.1.0-beta -Thin
 setlocal
 chcp 65001 >nul
 cd /d "%~dp0"
@@ -32,7 +32,7 @@ rem  Bake the CI build number into core\build_stamp.py so the frozen code knows 
 python tools\embed_build_stamp.py --write-module || (echo [ERROR] build stamp. & exit /b 1)
 
 echo === Build thin shell ===
-pyinstaller --onedir --windowed --noconfirm --clean --name "Voxprint AI Audiobook Builder" --distpath dist\thin --workpath build\thin-work --specpath build\thin-work ^
+pyinstaller --onedir --windowed --noconfirm --clean --name "VOXPrint AI Audiobook Builder" --distpath dist\thin --workpath build\thin-work --specpath build\thin-work ^
   --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" --add-data "%CD%\assets\splash.jpg;assets" --add-data "%CD%\assets\easter-egg.jpg;assets" ^
   --add-data "%CD%\assets\icons;assets\icons" ^
   --paths "%CD%" --paths "%CD%\infra" --paths "%CD%\third_party" --paths "%CD%\build\stdlib_bundle" --hidden-import _vx_stdlib ^
@@ -51,7 +51,7 @@ set PYI_ERR=%ERRORLEVEL%
 python tools\embed_build_stamp.py --restore-module
 if not "%PYI_ERR%"=="0" (echo [ERROR] PyInstaller failed. & exit /b 1)
 rem  The bootloader ignores a trailer. Swapping only this exe updates the build status reports.
-python tools\embed_build_stamp.py --exe "%CD%\dist\thin\Voxprint AI Audiobook Builder\Voxprint AI Audiobook Builder.exe" || (echo [ERROR] exe stamp. & exit /b 1)
+python tools\embed_build_stamp.py --exe "%CD%\dist\thin\VOXPrint AI Audiobook Builder\VOXPrint AI Audiobook Builder.exe" || (echo [ERROR] exe stamp. & exit /b 1)
 
 rem  Console companion: same code, console subsystem, so a script gets this process's exit code.
 rem  This second PyInstaller stays AFTER the windowed exe stamp (tests/test_shell_metadata.py).
@@ -73,8 +73,8 @@ pyinstaller --onedir --console --noconfirm --name voxprint-audiobook-cli --distp
   --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
   %META% %EXCL% main.py
 if errorlevel 1 (echo [ERROR] Console PyInstaller failed. & exit /b 1)
-copy /Y "dist\thin\voxprint-audiobook-cli\voxprint-audiobook-cli.exe" "dist\thin\Voxprint AI Audiobook Builder\voxprint-audiobook-cli.exe" || (echo [ERROR] voxprint-audiobook-cli.exe was not copied. & exit /b 1)
-python tools\embed_build_stamp.py --exe "%CD%\dist\thin\Voxprint AI Audiobook Builder\voxprint-audiobook-cli.exe" || (echo [ERROR] cli exe stamp. & exit /b 1)
+copy /Y "dist\thin\voxprint-audiobook-cli\voxprint-audiobook-cli.exe" "dist\thin\VOXPrint AI Audiobook Builder\voxprint-audiobook-cli.exe" || (echo [ERROR] voxprint-audiobook-cli.exe was not copied. & exit /b 1)
+python tools\embed_build_stamp.py --exe "%CD%\dist\thin\VOXPrint AI Audiobook Builder\voxprint-audiobook-cli.exe" || (echo [ERROR] cli exe stamp. & exit /b 1)
 rmdir /s /q "dist\thin\voxprint-audiobook-cli"
-echo Thin shell: dist\thin\Voxprint AI Audiobook Builder  ^(the packaging step adds _internal\modules.json^)
+echo Thin shell: dist\thin\VOXPrint AI Audiobook Builder  ^(the packaging step adds _internal\modules.json^)
 endlocal

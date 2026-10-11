@@ -2,7 +2,7 @@
 
 `BUILD.json` codename is Toledot. The offset stays 654, so build-installer run 49 stamps build 703. The body below is the GitHub release text. Keep the Windows section.
 
-**Voxprint 0.2.3-beta · build 703 "Toledot"** (Biblical Hebrew *toledot*, תּוֹלְדֹת, generations; Genesis 5:1, *zeh sefer toledot adam*, "this is the book of the generations of man"). A new generation of voices: Levi and Miriam now come with Voxprint, and multi-voice narration starts with a cast chosen for calm, low, unhurried reading.
+**VOXPrint 0.2.3-beta · build 703 "Toledot"** (Biblical Hebrew *toledot*, תּוֹלְדֹת, generations; Genesis 5:1, *zeh sefer toledot adam*, "this is the book of the generations of man"). A new generation of voices: Levi and Miriam now come with VOXPrint, and multi-voice narration starts with a cast chosen for calm, low, unhurried reading.
 
 Install: download `Voxprint-Setup-online.exe` from this release only. Check its SHA-256 against the `.sha256` file, then run it. Or read [install.ps1](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/blob/main/install.ps1) and, in an Administrator PowerShell:
 
@@ -28,9 +28,9 @@ Code signing is being applied for (SignPath Foundation). The warning will go awa
 
 New:
 
-- **Levi and Miriam are the bundled voices.** Levi (male, the default narrator; LibriVox reader Виталий, Chekhov's short stories) and Miriam (female; LibriVox reader Maya S, Ehrenburg's *Portraits of Russian Poets*) are part of the standard download, replacing Gideon and Tirzah. CC0-1.0, free for any use, also commercial. The names are Voxprint's own and do not imply the readers' endorsement.
+- **Levi and Miriam are the bundled voices.** Levi (male, the default narrator; LibriVox reader Виталий, Chekhov's short stories) and Miriam (female; LibriVox reader Maya S, Ehrenburg's *Portraits of Russian Poets*) are part of the standard download, replacing Gideon and Tirzah. CC0-1.0, free for any use, also commercial. The names are VOXPrint's own and do not imply the readers' endorsement.
 - **Default cast for multi-voice narration.** Natan and Shimon read the men, Miriam the women, when they are installed (Natan, Shimon and Rivka are one click away: Voices -> Download voices, or `voxprint voices download natan`). A missing voice falls back to the first library voice of that gender. `voxprint narrate --speakers` without voice flags uses the same cast.
-- **Shared models folder with Voxprint AI Movie Dubber.** Both programs keep their models in one folder and note themselves in `models\.users.json`. Uninstalling Audiobook Builder removes only its own entry; the models are offered for deletion only when no other Voxprint program uses them, and the default answer is to keep them.
+- **Shared models folder with VOXPrint AI Movie Dubber.** Both programs keep their models in one folder and note themselves in `models\.users.json`. Uninstalling Audiobook Builder removes only its own entry; the models are offered for deletion only when no other VOXPrint program uses them, and the default answer is to keep them.
 
 Fixed:
 

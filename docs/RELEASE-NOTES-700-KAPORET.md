@@ -2,7 +2,7 @@
 
 Not released. `BUILD.json` codename is Kaporet. The offset is 655, so run 45 stamps build 700. Paste the body below into the GitHub release when that build exists. Keep the Windows section.
 
-**Voxprint 0.2.0-beta · build 700 "Kaporet"** (Biblical Hebrew *kaporet*, כַּפֹּרֶת, the Ark cover; gematria 700; Numbers 7:89, the Voice spoke from above the kaporet). Everything since build 668 "Kolot".
+**VOXPrint 0.2.0-beta · build 700 "Kaporet"** (Biblical Hebrew *kaporet*, כַּפֹּרֶת, the Ark cover; gematria 700; Numbers 7:89, the Voice spoke from above the kaporet). Everything since build 668 "Kolot".
 
 Install: download `Voxprint-Setup-online.exe` from this release only. Check its SHA-256 against the `.sha256` file, then run it. Or read [install.ps1](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/blob/main/install.ps1) and, in an Administrator PowerShell:
 

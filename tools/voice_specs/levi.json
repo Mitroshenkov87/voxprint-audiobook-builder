@@ -4,18 +4,18 @@
   "language": "ru",
   "author": "Виталий (LibriVox) - public domain",
   "speaker": "Виталий",
-  "prepared_by": "Voxprint",
+  "prepared_by": "VOXPrint",
   "project_url": "https://archive.org/details/mlswc037_2502_librivox",
   "gender": "male",
   "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
   "license": "CC0-1.0",
   "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
   "bundled": true,
-  "description": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording Anton Chekhov's short stories 'Kapitanskiy mundir', 'Liberal' and 'Radost'' (Multilingual Short Works Collection 037), read by Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Levi is Voxprint's own and does not imply the reader's endorsement.",
+  "description": "Russian male voice for VOXPrint. Trained only from the public-domain LibriVox recording Anton Chekhov's short stories 'Kapitanskiy mundir', 'Liberal' and 'Radost'' (Multilingual Short Works Collection 037), read by Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Levi is VOXPrint's own and does not imply the reader's endorsement.",
   "descriptions": {
-    "en": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording Anton Chekhov's short stories 'Kapitanskiy mundir', 'Liberal' and 'Radost'' (Multilingual Short Works Collection 037), read by Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Levi is Voxprint's own and does not imply the reader's endorsement.",
-    "ru": "Русский мужской голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: рассказы Антона Чехова «Капитанский мундир», «Либерал» и «Радость» (сборник Multilingual Short Works Collection 037), читает Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Levi дано Voxprint и не означает одобрения чтеца.",
-    "de": "Russische männliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme Anton Tschechows Erzählungen 'Kapitanski mundir', 'Liberal' und 'Radost'' (Multilingual Short Works Collection 037) trainiert, gelesen von Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Levi stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+    "en": "Russian male voice for VOXPrint. Trained only from the public-domain LibriVox recording Anton Chekhov's short stories 'Kapitanskiy mundir', 'Liberal' and 'Radost'' (Multilingual Short Works Collection 037), read by Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Levi is VOXPrint's own and does not imply the reader's endorsement.",
+    "ru": "Русский мужской голос для VOXPrint. Обучен только на записи LibriVox из общественного достояния: рассказы Антона Чехова «Капитанский мундир», «Либерал» и «Радость» (сборник Multilingual Short Works Collection 037), читает Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Levi дано VOXPrint и не означает одобрения чтеца.",
+    "de": "Russische männliche Stimme für VOXPrint. Nur mit der gemeinfreien LibriVox-Aufnahme Anton Tschechows Erzählungen 'Kapitanski mundir', 'Liberal' und 'Radost'' (Multilingual Short Works Collection 037) trainiert, gelesen von Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Levi stammt von VOXPrint und bedeutet keine Billigung durch den Sprecher."
   },
   "consent": {
     "scope": "commercial",

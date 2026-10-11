@@ -17,7 +17,7 @@ from core import build_stamp
 from infra.paths import resource_dir
 
 REPO_PLACEHOLDER_MARK = "OWNER"
-_FALLBACK = {"app": {"name": "Voxprint", "display_name": "Voxprint AI Audiobook Builder", "version": "0.1.0", "author": "Aleksandr Mitroshenkov"},
+_FALLBACK = {"app": {"name": "Voxprint", "display_name": "VOXPrint AI Audiobook Builder", "version": "0.1.0", "author": "Aleksandr Mitroshenkov"},
              "repo_url": "https://github.com/OWNER/voxprint", "components": []}
 
 
@@ -37,7 +37,7 @@ def _app() -> Dict[str, str]:
 
 APP_NAME: str = _app().get("name", "Voxprint")      # technical name (folders, exe, logs) - never localized
 #: Product name shown to people (window titles, About, installer).  A brand: the same in every UI language.
-APP_DISPLAY_NAME: str = _app().get("display_name", "Voxprint AI Audiobook Builder")
+APP_DISPLAY_NAME: str = _app().get("display_name", "VOXPrint AI Audiobook Builder")
 APP_VERSION: str = _app().get("version", "0.1.0")
 APP_AUTHOR: str = _app().get("author", "Aleksandr Mitroshenkov")
 #: CI build number (``tools/build_number.py`` stamps it into credits.json; 0 = a local / developer build) and its commit.

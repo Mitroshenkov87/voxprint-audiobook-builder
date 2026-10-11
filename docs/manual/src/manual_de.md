@@ -1,6 +1,6 @@
-# Was Voxprint macht
+# Was VOXPrint macht
 
-**Voxprint AI Audiobook Builder** ({{studio.tagline}}) ist eine Windows-11-Anwendung, die zwei Dinge vollständig auf Ihrem eigenen Computer erledigt:
+**VOXPrint AI Audiobook Builder** ({{studio.tagline}}) ist eine Windows-11-Anwendung, die zwei Dinge vollständig auf Ihrem eigenen Computer erledigt:
 
 1. **Sie bringt einer Computerstimme bei, wie eine bestimmte Person zu klingen.** Sie geben eine Aufnahme einer Stimme (Ihrer eigenen oder der einer Person, die zugestimmt hat) – am besten 5 bis 15 Minuten – und, falls vorhanden, den gelesenen Text. Voxprint richtet Text und Ton aufeinander aus, schneidet die Aufnahme in saubere Stücke und trainiert ein kleines Stimm-Add-on (einen *Adapter*, technisch LoRA) für das Sprachmodell **Qwen3-TTS**.
 2. **Sie liest ganze Bücher mit dieser Stimme vor.** Sie wählen ein Buch (TXT, FB2 oder EPUB) und eine Stimme aus Ihrer Bibliothek und erhalten ein fertiges Hörbuch mit Kapiteln – eine Opus-Datei, eine MP3 pro Kapitel und so weiter.
@@ -134,7 +134,7 @@ Ist alles fertig, zeigt die Statuszeile „{{ui.prefetch_done}}“ Beim ersten S
 | Was | Wo |
 |---|---|
 | Programmdaten, Modelle, Protokolle, Stimmenbibliothek | `%LOCALAPPDATA%\Voxprint\` (`models\`, `logs\`, `voices\`, `state\`) |
-| Projekte: Hörbücher, Stimmtrainings, Neu vertonen | der Projektordner `%LOCALAPPDATA%\Voxprint\Projects` mit `Audiobooks\<Buch>`, `Voices\<Stimmenname>_Voxprint` und `Re-voice`; eine Verknüpfung *Voxprint Projects* liegt in „Dokumente“. Änderbar unter **{{projects.title}}** in „{{ui.settings_title}}“. |
+| Projekte: Hörbücher, Stimmtrainings, Neu vertonen | der Projektordner `%LOCALAPPDATA%\Voxprint\Projects` mit `Audiobooks\<Buch>`, `Voices\<Stimmenname>_Voxprint` und `Re-voice`; eine Verknüpfung *VOXPrint Projects* liegt in „Dokumente“. Änderbar unter **{{projects.title}}** in „{{ui.settings_title}}“. |
 | Trainingsergebnisse | `Projects\Voices\<Stimmenname>_Voxprint`: der `dataset` und der Adapter in `output\<Stimmenname>` |
 
 Den Modellordner und den Daten- und Protokollordner öffnen Sie mit Schaltflächen unter „{{ui.settings_title}}“.
@@ -153,7 +153,7 @@ Das Studio ist das erste Fenster. Es hat keine eigenen Einstellungen – es ist 
 
 | Element | Was es tut und wann Sie es benutzen |
 |---|---|
-| Titel und Untertitel | „Voxprint AI Audiobook Builder – {{studio.tagline}}“. Nur zur Information. |
+| Titel und Untertitel | „VOXPrint AI Audiobook Builder – {{studio.tagline}}“. Nur zur Information. |
 | Karte **{{studio.narrate_title}}** | {{studio.narrate_desc}} Öffnet das Vertonungsfenster. Das ist die Hauptkarte. Ist die Bibliothek leer, steht auf der Karte: „{{studio.narrate_no_voice}}“ Während ein Buch vertont wird, steht dort „{{studio.narrate_running}}“ |
 | Karte **{{studio.train_title}}** | {{studio.train_desc}} Öffnet das Trainingsfenster. Während des Trainings steht dort „{{studio.train_running}}“ |
 | Karte **{{studio.voices_title}}** | {{studio.voices_desc}} Unten auf der Karte zeigt ein Zähler, wie viele Stimmen Sie haben (zum Beispiel „Stimmen in der Bibliothek: 1“ – die mitgelieferte Stimme). |
@@ -432,7 +432,7 @@ Die dritte Karte im Bild oben, die *Offene Universalstimme*, ist so eine Online-
 
 **{{voices.import}}** bietet zwei Wege: **{{voices.import_folder}}** (ein Adapterordner) und **{{voices.import_zip}}** (ein Stimmpaket). Archive werden auf unsichere Pfade und Größenlimits geprüft. Eine Stimme ohne angegebene Lizenz gilt als „nur persönliche Nutzung“.
 
-## Lizenzen und die Stimme, die Voxprint anbietet
+## Lizenzen und die Stimme, die VOXPrint anbietet
 
 | Lizenz | Kommerzielle Nutzung |
 |---|---|
@@ -480,7 +480,7 @@ Das Badge ist eine Information, keine Rechtsberatung. Die Lizenz gilt nur für d
 | **{{autorepair.title}}** – **{{autorepair.button}}** | {{autorepair.desc}} Siehe Abschnitt 8.2. |
 | **{{ui.about}}** | Version, die Idee, Funktionsweise, Open-Source-Komponenten mit ihren Lizenzen, ein Link zum GitHub-Repository und Hinweise zu Drittsoftware. |
 
-Die unterste Zeile zeigt die Version, zum Beispiel *Voxprint AI Audiobook Builder 0.1.3-beta · build 667 "Menuchah"*.
+Die unterste Zeile zeigt die Version, zum Beispiel *VOXPrint AI Audiobook Builder 0.1.3-beta · build 667 "Menuchah"*.
 
 Bemerkt das Programm eine beschädigte Installation, bietet ein Banner die Reparatur an („{{ui.repair_offer_plain}}“). Hilft **{{autorepair.button}}** nicht, starten Sie das Voxprint-Installationsprogramm erneut – Stimmen und Modelle bleiben erhalten.
 
@@ -697,6 +697,6 @@ voxprint diag --out report.zip         # Diagnosebericht
 
 > **Dieses Handbuch und die Lizenz-Badges sind Informationen, keine Rechtsberatung.** Die Einverständniskarte hält fest, was eine sprechende Person gesagt hat; sie ersetzt nicht das Recht Ihres Landes.
 
-*Voxprint AI Audiobook Builder 0.1.3 (Beta), Build 667 „Menuchah“. Handbuch vom 9. Oktober 2026.*
+*VOXPrint AI Audiobook Builder 0.1.3 (Beta), Build 667 „Menuchah“. Handbuch vom 9. Oktober 2026.*
 
-*Voxprint AI Audiobook Builder ist ein unabhängiges Projekt und steht in keiner Verbindung zu anderen Produkten oder Diensten mit ähnlichen Namen.*
+*VOXPrint AI Audiobook Builder ist ein unabhängiges Projekt und steht in keiner Verbindung zu anderen Produkten oder Diensten mit ähnlichen Namen.*

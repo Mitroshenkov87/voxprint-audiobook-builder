@@ -2,7 +2,7 @@
 
 Copy this into the GitHub release. Replace the version line and the New / Fixed lists. Keep the Windows section as written. The same wording is in the README under Download.
 
-**Voxprint VERSION · build N "CODENAME"** - one sentence on what changed.
+**VOXPrint VERSION · build N "CODENAME"** - one sentence on what changed.
 
 Install: download `Voxprint-Setup-online.exe` from this release only. Check its SHA-256 against the `.sha256` file, then run it.
 

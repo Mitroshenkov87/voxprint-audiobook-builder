@@ -452,7 +452,7 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[parent],
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=(
-            "Voxprint AI Audiobook Builder - headless CLI for scripts and agents. "
+            "VOXPrint AI Audiobook Builder - headless CLI for scripts and agents. "
             "Every command is non-interactive. Guide: docs/AGENTS.md."
         ),
         epilog=(

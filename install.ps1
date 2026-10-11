@@ -114,7 +114,7 @@ function Install-Checked {
         if ($null -eq $proc.ExitCode -or $proc.ExitCode -ne 0) {
             throw "The installer exited with code $($proc.ExitCode)."
         }
-        Write-Host "Setup finished. Scripts should call voxprint-audiobook-cli.exe so the exit code is the command's code. The windowed program is Voxprint AI Audiobook Builder.exe, under Voxprint AI Suite\Audiobook Builder."
+        Write-Host "Setup finished. Scripts should call voxprint-audiobook-cli.exe so the exit code is the command's code. The windowed program is VOXPrint AI Audiobook Builder.exe, under VOXPrint AI Suite\Audiobook Builder."
     } finally {
         Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
     }

@@ -1,8 +1,8 @@
-# Voxprint AI Audiobook Builder
+# VOXPrint AI Audiobook Builder
 
 **Train a voice from a short recording, then narrate whole books in it - offline, on your own computer.**
 
-Part of the Voxprint AI Media Suite (with [Voxprint AI Movie Dubber](https://github.com/Mitroshenkov87/voxprint-movie-dubber), coming soon).
+Part of the VOXPrint AI Media Suite (with [VOXPrint AI Movie Dubber](https://github.com/Mitroshenkov87/voxprint-movie-dubber), coming soon).
 
 ![status: beta](https://img.shields.io/badge/status-beta%20%2F%20experimental-orange) ![licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue) ![platform: Windows 11 + RTX 40+](https://img.shields.io/badge/platform-Windows%2011%20%2B%20RTX%2040%2B-lightgrey)
 
@@ -12,7 +12,7 @@ Part of the Voxprint AI Media Suite (with [Voxprint AI Movie Dubber](https://git
 
 System requirements: an NVIDIA RTX 40-series or newer GPU (compute capability 8.9 or higher). Windows 11 24H2 or newer, or a Linux distribution released from 2025. Older systems are not supported. There is no CPU-only mode.
 
-<p align="center"><img src="docs/screenshots/en-667/01-main-window.png" alt="Voxprint Studio" width="420"> <img src="docs/screenshots/en-667/04-voice-library-boaz-tirzah.png" alt="My voices: build 667 screenshot. Tirzah and Gideon are the bundled voices; the picture also shows Boaz, which is retired" width="420"></p>
+<p align="center"><img src="docs/screenshots/en-667/01-main-window.png" alt="VOXPrint Studio" width="420"> <img src="docs/screenshots/en-667/04-voice-library-boaz-tirzah.png" alt="My voices: build 667 screenshot. Tirzah and Gideon are the bundled voices; the picture also shows Boaz, which is retired" width="420"></p>
 <p align="center"><img src="docs/screenshots/en-667/02-narrate-book-top.png" alt="Narrate a book" width="420"> <img src="docs/screenshots/en-667/07-settings-pauses-speed-repair.png" alt="Settings: pauses and reading speed" width="300"></p>
 
 ## 🎙 Train your own voice: read one of these scripts
@@ -44,7 +44,7 @@ More: [all features and screenshots](docs/FEATURES.md) · [how it works](docs/HO
 |---|---|---|
 | **Online installer (Windows 11 x64, NVIDIA GPU)** | [`Voxprint-Setup-online.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.2.4-beta/Voxprint-Setup-online.exe) | 35,409,166 bytes (about 34 MB, build 704 "Achim"; downloads the libraries from PyTorch/PyPI during setup) |
 
-SHA-256: `c7dd024b4917ba128b064c12d8373182b76f9c10e77fb49f6c06fc8fac0e636d` - release page: [v0.2.4-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.2.4-beta) (pre-release, the latest ready build). Setup installs the Python runtime, PyTorch, ffmpeg and the required models into `%LOCALAPPDATA%\Voxprint\shared\` while it runs, including a silent install. Optional models are offered in the Components window and are not all started at once. Scripts should call `voxprint-audiobook-cli.exe` (installed under `Voxprint AI Suite\Audiobook Builder`).
+SHA-256: `c7dd024b4917ba128b064c12d8373182b76f9c10e77fb49f6c06fc8fac0e636d` - release page: [v0.2.4-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.2.4-beta) (pre-release, the latest ready build). Setup installs the Python runtime, PyTorch, ffmpeg and the required models into `%LOCALAPPDATA%\Voxprint\shared\` while it runs, including a silent install. Optional models are offered in the Components window and are not all started at once. Scripts should call `voxprint-audiobook-cli.exe` (installed under `VOXPrint AI Suite\Audiobook Builder`).
 
 <p align="center"><img src="docs/screenshots/rc2/abb-01-main-components-first-run.png" alt="Components window on first start: program components and models, with sizes shown and free space checked before a download" width="720"></p>
 A full offline installer may return later; the Linux version is temporarily unavailable.
@@ -73,10 +73,10 @@ irm https://raw.githubusercontent.com/Mitroshenkov87/voxprint-audiobook-builder/
 ## Quick start
 1. Install and start Voxprint - the **Studio** opens. Under *Train your voice* choose your recording and the text you read, press **Create voice (LoRA)**.
 2. Open *Narrate a book*, choose a TXT / FB2 / EPUB / `.vxbook` file and your voice (optionally tick *Translate the book*).
-3. Press **Start narration** and listen while the rest is being made. The audiobook lands in the projects folder (`%LOCALAPPDATA%\Voxprint\Projects\Audiobooks`, shortcut *Voxprint Projects* in Documents).
+3. Press **Start narration** and listen while the rest is being made. The audiobook lands in the projects folder (`%LOCALAPPDATA%\Voxprint\Projects\Audiobooks`, shortcut *VOXPrint Projects* in Documents).
 
 ## Soundscape (optional)
-A `.vxbook` book with sound markup (`sound/1`, written by Voxprint AI Plotweaver) can get quiet background music and transition accents, generated locally and ducked under the narration.
+A `.vxbook` book with sound markup (`sound/1`, written by VOXPrint AI Plotweaver) can get quiet background music and transition accents, generated locally and ducked under the narration.
 * **Off by default.** Turn it on in *Settings -> Narration: pauses and speed -> Play a soundscape under narration when the book asks for one*.
 * **Downloaded only when you turn it on:** the **ACE-Step 1.5** model (about 10 GB; code and weights MIT, generated music usable commercially). The full download never includes it.
 * **Only `.vxbook` books with sound markup.** TXT, Markdown, FB2, EPUB and a `.vxbook` without `sound/1` are never given music.

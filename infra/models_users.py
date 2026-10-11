@@ -1,6 +1,6 @@
 """Which Voxprint programs use the shared models folder: ``<models>/.users.json``.
 
-Voxprint AI Audiobook Builder and Voxprint AI Movie Dubber keep their models (Qwen3-TTS, Qwen3-ASR, Opus-MT ...) in ONE folder
+VOXPrint AI Audiobook Builder and VOXPrint AI Movie Dubber keep their models (Qwen3-TTS, Qwen3-ASR, Opus-MT ...) in ONE folder
 (:func:`infra.paths.models_dir`, by default ``%LOCALAPPDATA%\\Voxprint\\models``), so a model is downloaded once.  This small file
 records which programs rely on it, so uninstalling one never deletes models the other still needs.  The format was agreed
 with the Movie Dubber (its ``dubber/infra/model_store.py`` reads and writes the same file):

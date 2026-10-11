@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import time
+from dataclasses import replace
 
 from PySide6.QtCore import QRect, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QPainter, QPixmap
@@ -64,7 +65,10 @@ def build_info():
         payload["codename"] = appinfo.APP_CODENAME
     if appinfo.APP_BUILD:
         payload["build"] = appinfo.APP_BUILD
-    return parse(payload, app="audiobook-builder", env=env)
+    info = parse(payload, app="audiobook-builder", env=env)
+    # voxprint-common 0.1.1 draws the id audiobook-builder as "Voxprint AI Audiobook Builder".
+    # A name it does not know is drawn as written, so the splash uses the product name.
+    return replace(info, app=appinfo.APP_DISPLAY_NAME)
 
 
 class _Egg(QWidget):

@@ -1,7 +1,7 @@
 """Where this program is installed, and how another Voxprint app finds it.
 
-Windows installs under ``C:\\Program Files\\Voxprint AI Suite\\Audiobook Builder``.
-The windowed program is ``Voxprint AI Audiobook Builder.exe``. Scripts call
+Windows installs under ``C:\\Program Files\\VOXPrint AI Suite\\Audiobook Builder``.
+The windowed program is ``VOXPrint AI Audiobook Builder.exe``. Scripts call
 ``voxprint-audiobook-cli.exe``. Linux keeps ``~/.local/share/voxprint/app`` and
 puts ``voxprint-audiobook-cli`` on ``PATH`` (``voxprint`` remains a compatibility name).
 
@@ -32,16 +32,19 @@ from infra import platform_win, suite_shared
 
 log = logging.getLogger("voxprint.install")
 
-SUITE_DIR = "Voxprint AI Suite"
+SUITE_DIR = "VOXPrint AI Suite"
 APP_FOLDER = "Audiobook Builder"
-GUI_EXE = "Voxprint AI Audiobook Builder.exe"
+GUI_EXE = "VOXPrint AI Audiobook Builder.exe"
 CLI_EXE = "voxprint-audiobook-cli.exe"
 LINUX_CLI = "voxprint-audiobook-cli"
 LINUX_CLI_COMPAT = "voxprint"
 LEGACY_DIR = "Voxprint"
 LEGACY_GUI = "Voxprint.exe"
 LEGACY_CLI = "voxprint-cli.exe"
-START_MENU = "Voxprint AI Suite"
+#: The suite folder as first spelled. On Windows it is the same directory; only the case changes.
+LEGACY_SUITE_DIR = "Voxprint AI Suite"
+LEGACY_SUITE_GUI = "Voxprint AI Audiobook Builder.exe"
+START_MENU = "VOXPrint AI Suite"
 SHORTCUT = "Audiobook Builder"
 INSTALLS_KEY = "installs"
 APP_ID = suite_shared.APP_ID
@@ -51,7 +54,7 @@ USER_DATA_DIR_NAME = "Voxprint"
 
 
 def windows_install_dir(program_files: str = r"C:\Program Files") -> str:
-    """Default Windows install directory ({autopf}\\Voxprint AI Suite\\Audiobook Builder)."""
+    """Default Windows install directory ({autopf}\\VOXPrint AI Suite\\Audiobook Builder)."""
     return str(PureWindowsPath(program_files) / SUITE_DIR / APP_FOLDER)
 
 
@@ -75,6 +78,20 @@ def migration_removes_program_dir(path: str, program_files: str = r"C:\Program F
     legacy = PureWindowsPath(legacy_program_dir(program_files))
     candidate = PureWindowsPath(path)
     return candidate == legacy or legacy in candidate.parents
+
+
+def case_only_rename(actual: str, wanted: str) -> bool:
+    """True when ``actual`` and ``wanted`` are the same name apart from case.
+
+    ``C:\\Program Files\\Voxprint`` is a different folder from the suite directory, so it is not
+    a case-only rename. The suite folder spelled ``Voxprint AI Suite`` is.
+    """
+    return actual.casefold() == wanted.casefold() and actual != wanted
+
+
+def legacy_suite_dir(program_files: str = r"C:\Program Files") -> str:
+    """The suite folder with the previous spelling (same directory as :func:`windows_install_dir`)."""
+    return str(PureWindowsPath(program_files) / LEGACY_SUITE_DIR / APP_FOLDER)
 
 
 def default_install_dir() -> Path:

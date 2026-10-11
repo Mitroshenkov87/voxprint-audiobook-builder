@@ -2,7 +2,7 @@
 
 `BUILD.json` codename is Tamim. The offset stays 945 and build-installer run 56 stamps build 1001 (56 + 945 = 1001). The release tag is `v1.0.0-rc.3`, published as a pre-release (not latest). The Windows file version is `1.0.0.1001`. The body below is the GitHub release text. Keep the Windows section.
 
-**Voxprint 1.0.0 RC3 · build 1001 "Tamim"** (whole and complete): a build ready to be tested end to end. The Save button and the related actions use new icons, other programs can check a command without a GPU, and the documentation adds a public roadmap and a generated site.
+**VOXPrint 1.0.0 RC3 · build 1001 "Tamim"** (whole and complete): a build ready to be tested end to end. The Save button and the related actions use new icons, other programs can check a command without a GPU, and the documentation adds a public roadmap and a generated site.
 
 Install: download `Voxprint-Setup-online.exe` from this release only. Check its SHA-256 against the `.sha256` file, then run it. Or read [install.ps1](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/blob/main/install.ps1) and, in an Administrator PowerShell:
 
