@@ -1247,11 +1247,10 @@ begin
   StatusFile := ExpandConstant('{tmp}\suite-status.txt');
   DeleteFile(StatusFile);
   Params := '--install-suite --status ' + AddQuotes(StatusFile);
-  Form := CreateCustomForm();
+  { Inno Setup 6.6+: width and height are arguments; ClientWidth is read-only afterwards. }
+  Form := CreateCustomForm(ScaleX(460), ScaleY(100), False, False);
   try
     Form.Caption := 'Voxprint';
-    Form.ClientWidth := ScaleX(460);
-    Form.ClientHeight := ScaleY(100);
     Form.BorderStyle := bsDialog;
     Form.Position := poScreenCenter;
     Lbl := TNewStaticText.Create(Form);

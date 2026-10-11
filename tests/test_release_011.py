@@ -138,16 +138,17 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     # run 50 failed before publishing; offset 653: run 51 stamps 704 (Achim).
     # Run 52 failed before publishing; offset 946: run 53 stamped 999 (Nachon, 1.0.0-rc).
     # Run 54 failed before publishing; offset 945: run 55 stamped 1000 (Chazak, 1.0.0-rc.2).
-    # The offset stays 945: run 56 stamps 1001 (Tamim, 1.0.0-rc.3).
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "56"}) == 1001 and bn.build_number({}) == 0
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "55"}) == 1000
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "54"}) == 999
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "52"}) == 997
+    # Run 56 failed before publishing; offset 944: run 57 stamps 1001 (Tamim, 1.0.0-rc.3).
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "57"}) == 1001 and bn.build_number({}) == 0
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "56"}) == 1000
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "55"}) == 999
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "54"}) == 998
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "52"}) == 996
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34"}) == 700
-    assert bn.info()["offset"] == 945
+    assert bn.info()["offset"] == 944
     note = bn.info()["offset_note"]
     assert "946" in note and "run 53" in note and "Nachon" in note and "run 55 + 945 = 1000" in note and "Chazak" in note
-    assert "run 56 + 945 = 1001" in note and "Tamim" in note
+    assert "run 56 + 945 = 1001" in note and "run 57 + 944 = 1001" in note and "Tamim" in note
     name = bn.info()["codename"]
     assert name == "Tamim" and name.isascii() and name.isalpha()
     from pathlib import Path
