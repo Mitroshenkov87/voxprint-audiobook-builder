@@ -69,32 +69,30 @@ def test_hub_requests_always_have_connect_and_read_timeouts(monkeypatch):
     assert nr.hub_timeout(None) == (nr.HUB_CONNECT_TIMEOUT, nr.HUB_READ_TIMEOUT)
     assert nr.hub_timeout(30) == (nr.HUB_CONNECT_TIMEOUT, 30.0) and nr.hub_timeout((1, 2)) == (1, 2)
     pytest.importorskip("huggingface_hub")
-    from huggingface_hub import configure_http_backend, constants
+    import httpx
+    from huggingface_hub import constants
     from huggingface_hub.utils import get_session
-    from requests.adapters import HTTPAdapter
-
-    import requests
+    from huggingface_hub.utils._http import default_client_factory, set_client_factory
 
     seen = []
 
-    def send(self, req, stream=False, timeout=None, *a, **k):
-        seen.append(timeout)
-        r = requests.Response()
-        r.status_code, r.url = 200, req.url
-        return r
+    def request(self, method, url, **kwargs):
+        seen.append(kwargs.get("timeout"))
+        return httpx.Response(200, request=httpx.Request(method, url))
 
-    monkeypatch.setattr(HTTPAdapter, "send", send)
+    monkeypatch.setattr(httpx.Client, "request", request)
     monkeypatch.delenv("HF_HUB_DOWNLOAD_TIMEOUT", raising=False)
     monkeypatch.delenv("HF_HUB_ETAG_TIMEOUT", raising=False)
     old = (constants.HF_HUB_DOWNLOAD_TIMEOUT, constants.HF_HUB_ETAG_TIMEOUT)
     try:
         nr.ensure_hub_session()
-        get_session().get("https://huggingface.co/api/whoami")               # no timeout given: the adapter adds one
-        assert seen == [(nr.HUB_CONNECT_TIMEOUT, nr.HUB_READ_TIMEOUT)]
+        get_session().get("https://huggingface.co/api/whoami")               # no timeout given: the client adds one
+        assert len(seen) == 1 and isinstance(seen[0], httpx.Timeout)
+        assert seen[0].connect == nr.HUB_CONNECT_TIMEOUT and seen[0].read == nr.HUB_READ_TIMEOUT
         assert constants.HF_HUB_DOWNLOAD_TIMEOUT == int(nr.HUB_READ_TIMEOUT)
     finally:
         constants.HF_HUB_DOWNLOAD_TIMEOUT, constants.HF_HUB_ETAG_TIMEOUT = old
-        configure_http_backend()
+        set_client_factory(default_client_factory)
         nr.reset_memory()
 
 

@@ -20,6 +20,8 @@ from typing import Any, List, Optional
 
 import numpy as np
 
+from infra.qwen_tf_compat import install as install_qwen_tf
+
 log = logging.getLogger("voxprint.asr")
 
 ASR_REPO = "Qwen/Qwen3-ASR-0.6B"
@@ -61,6 +63,8 @@ class Qwen3ASR(BaseASR):
     def load(self) -> None:
         """Load Qwen3-ASR, reusing a copy already sitting in RAM when one is there."""
         import torch
+
+        install_qwen_tf()
         from qwen_asr import Qwen3ASRModel
 
         from core import model_cache

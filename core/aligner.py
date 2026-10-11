@@ -31,6 +31,7 @@ from core import audio_utils as au
 from core.errors import AlignmentError, AudioTextMismatchError, OutOfMemoryError_
 from core.text_utils import clean_token, count_clean_chars, split_clauses
 from core.types import WordTiming
+from infra.qwen_tf_compat import install as install_qwen_tf
 
 log = logging.getLogger("voxprint.aligner")
 
@@ -77,6 +78,8 @@ class Qwen3Aligner(BaseAligner):
             return
         try:
             import torch
+
+            install_qwen_tf()
             from qwen_asr import Qwen3ForcedAligner
         except ImportError as exc:
             raise AlignmentError(

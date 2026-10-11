@@ -25,6 +25,7 @@ from core.i18n import tr
 from core.languages import AUTO, qwen_language
 from core.voice_library import VoiceRecord
 from infra import gpu_prefs
+from infra.qwen_tf_compat import install as install_qwen_tf
 
 log = logging.getLogger("voxprint.tts")
 
@@ -165,6 +166,8 @@ class Qwen3AdapterEngine:
         only with a merged adapter on a GPU, :mod:`core.fast_decode`)."""
         import torch
         from peft import PeftModel
+
+        install_qwen_tf()
         from qwen_tts import Qwen3TTSModel
 
         self.adapter_scale = voice.adapter_scale if adapter_scale is None else adapter_strength.clamp(adapter_scale, 1.0)

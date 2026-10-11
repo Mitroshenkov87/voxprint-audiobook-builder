@@ -33,11 +33,21 @@ python tools/audit.py --python <interpreter that has the app dependencies>
 The installer workflow (`.github/workflows/build-installer.yml`) calls `.github/workflows/audit.yml` as its first job.
 `install-script`, `online-smoke`, `thin-smoke`, and `build-thin` do not start when that job fails.
 CodeQL (Python, weekly and manual) is `.github/workflows/codeql.yml`. Dependabot opens weekly pull requests for pip
-and monthly ones for GitHub Actions. `torch`, `torchaudio`, `transformers`, `qwen-tts`, and `qwen-asr` are ignored
-there on purpose.
+and monthly ones for GitHub Actions. `torch`, `torchaudio`, `transformers`, `huggingface_hub`, `qwen-tts`,
+`qwen-tts-hf`, and `qwen-asr` are ignored there on purpose.
 
 ## Fixed in this pass
 
+- **transformers 5.16.1 and huggingface_hub 1.32.0.** The high advisories that were allowlisted for transformers 4.57.6
+  (PYSEC-2025-217 / CVE-2025-14929, GHSA-29pf-2h5f-8g72 / CVE-2026-4372, GHSA-fgcw-684q-jj6r / CVE-2026-5241,
+  GHSA-xrqw-3rrv-vx5w / CVE-2026-9856, GHSA-x9r9-c232-4q39 / CVE-2026-80047) are fixed on this pin, so they are no longer
+  in `tools/audit-allowlist.toml`. huggingface_hub 1.32.0 includes the fixes for the unsafe-deserialization and
+  path-traversal highs on 0.36.2 (AIKIDO-2026-285573, fixed in 1.32.0; CVE-2026-15717, fixed in 1.26.0). Hub 2.x is not
+  used: it is a different HTTP client, and faster-qwen3-tts requires `huggingface-hub<2`. transformers stays below 5.17
+  because 5.17 sends Mimi's default RoPE through `ROPE_INIT_FUNCTIONS["default"]`, which reads `rope_theta` and breaks
+  `MimiConfig`. Official qwen-tts 0.1.1 cannot import on transformers 5; the TTS distribution is qwen-tts-hf 0.1.1.post1.
+  qwen-asr 0.0.6 still declares `transformers==4.57.6` and is installed with `--no-deps`; `infra/qwen_tf_compat.py`
+  patches the two import breaks. This stack has not been run on a GPU.
 - `tools/pin_hf_hashes.py`: SHA-1 is the git blob id used to check a small file against the Hugging Face listing.
   Marked `usedforsecurity=False` (bandit B324, high).
 - mypy, under `mypy.ini`, reported errors in annotated code (optional values, JSON `object` values passed to `int`,
@@ -54,8 +64,7 @@ there on purpose.
 | Tool | Item | Why it stays |
 | --- | --- | --- |
 | bandit B310 | `urllib.request.urlopen` in `tools/pin_hf_hashes.py` and `tools/audit.py` | Medium. The calls go to `https://huggingface.co` and `https://api.osv.dev`, hosts the tool builds, not to a `file:` URL taken from a user. |
-| pip-audit | `transformers==4.57.6` high advisories, allowlisted in `tools/audit-allowlist.toml`: PYSEC-2025-217 / CVE-2025-14929 (X-CLIP conversion; last affected 5.0.0rc0), GHSA-29pf-2h5f-8g72 / CVE-2026-4372 (fix 5.3.0), GHSA-fgcw-684q-jj6r / CVE-2026-5241 (fix 5.5.0), GHSA-xrqw-3rrv-vx5w / CVE-2026-9856 (fix 5.10.0), GHSA-x9r9-c232-4q39 / CVE-2026-80047 (affected through 5.8.1) | The published fixes are on the 5.x line. There is no 4.57.x fix. qwen-asr 0.0.6 and qwen-tts 0.1.1 pin transformers 4.57.x (their METADATA says `==4.57.6` and `==4.57.3`), and transformers 5.x breaks them. `requirements-verified.txt` pins 4.57.6 for that stack. |
-| pip-audit | `transformers==4.57.6` — PYSEC-2026-2288 / GHSA-69w3-r845-3855 (`Trainer` arbitrary code execution). GitHub rates it moderate. The fix is transformers 5.0.0. | Moderate does not block a release and is not on the allowlist. The same 4.57 pin applies. |
+| pip-audit | `transformers` — PYSEC-2026-2288 / GHSA-69w3-r845-3855 (`Trainer` arbitrary code execution). GitHub rates it moderate. The fix is transformers 5.0.0, which this pin includes. | Moderate does not block a release and is not on the allowlist. |
 | vulture | `ui/std_buttons.py` `ButtonTranslator.translate` argument `disambiguation` (100% confidence) | The name is part of Qt's `QTranslator.translate` signature. The override has to accept it. The method does not use the value; returning `None` means "not my string." |
 | radon | 55 functions at rank D or worse. Rank F: `online_fetch.run`, `model_downloader._ensure_model`, `main.main`, `narration.narrate_book`, `text_cleanup.validate`, `book_parsers.parse_fb2`, `dataset_builder.run`, `runtime_reuse.candidate_prefixes`, `book_parsers.parse_epub`, `backup.collect_items`. Rank E and D are in the audit report. | Report only. These are the long pipeline, download, UI, and tool functions. Splitting them is not part of this pass. |
 | ruff E501 / UP | Style and `pyupgrade` rewrites | The tree uses long lines and the existing typing style. Selecting those rules would bury the real errors. |

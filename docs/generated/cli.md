@@ -381,4 +381,4 @@ Narrate a fixed Russian text (12 phrases) once per mode with the same voice and 
 - `--voice` — Voice id or name (default: Levi) (default: Levi)
 - `--modes` — Comma-separated: batched, graphs (default: batched,graphs)
 - `--out` — Also save bench-<mode>.wav here to listen
-- `--install-graphs` — First download faster-qwen3-tts 0.3.2 (MIT, 43 KB, SHA-256 checked) into the packages folder
+- `--install-graphs` — First download faster-qwen3-tts 0.5.4 (MIT, 43 KB, SHA-256 checked) into the packages folder

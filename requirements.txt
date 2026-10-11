@@ -2,7 +2,7 @@
 # Installation order on Windows (done by build.bat):
 #   1) uv pip install torch==2.11.0 torchaudio==2.11.0 --torch-backend=cu130    (fallback: requirements-torch.txt)
 #   2) uv pip install -r requirements.txt -r requirements-verified.txt   (this file + the verified versions)
-#   3) uv pip install --no-deps -r requirements-nodeps.txt     (qwen-asr, qwen-tts - see the comment below)
+#   3) uv pip install --no-deps -r requirements-nodeps.txt     (qwen-asr, qwen-tts-hf - see the comment below)
 # Do not use "uv run" without --no-sync (it replaces CUDA torch with the CPU build). flash-attn is not needed on Windows.
 
 PySide6>=6.11
@@ -18,10 +18,13 @@ safetensors
 certifi                                 # fallback root certificates (a fresh Windows/Server without the needed CAs)
 hf_xet                                  # fast model downloads from HF (on Windows the AMD64 platform marker does not fire in the hub's dependencies)
 
-# transformers: qwen-asr 0.0.6 and qwen-tts 0.1.1 are written for transformers 4.57.x (their METADATA says ==4.57.6 and
-# ==4.57.3 - they conflict with each other), and transformers 5.x breaks them -> stay on 4.x.
-transformers>=4.57.6,<5
-huggingface_hub>=0.34,<1.0              # transformers 4.57 requires huggingface-hub<1.0
+# transformers 5.16.1: CVE-2026-9856 is fixed in 5.10.1. 5.16.1 is the newest 5.x whose Mimi RoPE path matches
+# the one qwen-tts-hf was written for (5.15.1 reads rope_parameters["rope_theta"], not config.rope_theta).
+# 5.17+ goes through ROPE_INIT_FUNCTIONS["default"] and breaks MimiConfig. Stay below 5.17.
+# qwen-asr 0.0.6 still says transformers==4.57.6 in its METADATA. It is installed with --no-deps; infra/qwen_tf_compat.py
+# patches the two import breaks. qwen-tts-hf 0.1.1.post1 (import name qwen_tts) needs transformers>=5.15.1,<6.
+transformers>=5.16.1,<5.17
+huggingface_hub>=1.32.0,<2              # 1.32.0 has the hub deserialization / path-traversal fixes; 2.x is httpx2
 sentencepiece                           # tokenizer of the Opus-MT translation models (MarianTokenizer)
 ctranslate2                             # CTranslate2 wheels are CUDA 12 builds; see infra/cuda12_libs.py
 nvidia-cublas-cu12==12.9.2.10           # CUDA 12 runtime for CTranslate2 (not shipped by torch cu130)
@@ -34,7 +37,7 @@ bitsandbytes>=0.46                      # 8-bit AdamW (wheels exist for Windows)
 ru-normalizr
 rutextnorm
 
-# dependencies of qwen-asr / qwen-tts (the packages themselves are in requirements-nodeps.txt)
+# dependencies of qwen-asr / qwen-tts-hf (the packages themselves are in requirements-nodeps.txt)
 einops
 onnxruntime
 six               # needed by nagisa/qwen-asr (without it the PyInstaller build fails: No module named six)

@@ -4,21 +4,23 @@ Off by default (setting ``gpu.fast_decode``, :mod:`infra.gpu_prefs`) until ``vox
 batched path on a real GPU.  The Movie Dubber measured 0.6x -> 3.0x realtime with it on an RTX 4090 Laptop (one sequence);
 our batched path already reaches ~2-3x realtime with 8-12 chunks per generate call, so which one wins depends on the card.
 
-Package: ``faster-qwen3-tts`` 0.3.x (MIT, Andres Marafioti, https://github.com/andimarafioti/faster-qwen3-tts).  0.3.x is the
-last line written for ``qwen-tts`` 0.1.1 + ``transformers`` 4.57 (our pins); 0.4+ needs ``qwen-tts-hf`` + transformers 5 and
-must not be installed.  Pure Python (``torch.cuda.CUDAGraph``; no Triton, no flash-attn), so it works with torch 2.11 cu130 on
-Windows.  It is an optional module: when it is missing or the graphs cannot be captured, narration silently keeps the batched
-path.
+Package: ``faster-qwen3-tts`` 0.5.x (MIT, Andres Marafioti, https://github.com/andimarafioti/faster-qwen3-tts).  0.5.4 is
+written for ``qwen-tts-hf`` + ``transformers`` >= 5.15.1.  Pure Python (``torch.cuda.CUDAGraph``; no Triton, no flash-attn),
+so it works with torch 2.11 cu130 on Windows.  It is an optional module: when it is missing or the graphs cannot be
+captured, narration silently keeps the batched path.
 
 The LoRA adapter is merged into the talker BEFORE the graphs are built (a graph replays the weights it captured).
 The code predictor graph samples with the model's defaults (top-k 50, temperature 0.9); the per-chunk check's regeneration
 with other sampling settings therefore uses the normal path.
 
-:func:`install_rope_compat` makes the "default" RoPE initialiser tolerant of configs without ``rope_theta`` (the codec's
-``MimiConfig`` under transformers >= 5.18, found by the Movie Dubber).  Harmless on transformers 4.57.
+:func:`install_rope_compat` makes the "default" RoPE initialiser tolerant of configs without ``rope_theta``.  transformers
+5.17+ sends Mimi's default RoPE through that registry entry (the codec's ``MimiConfig`` has no ``rope_theta``).  The pin
+stays on 5.16, where Mimi reads ``rope_parameters["rope_theta"]`` directly; the wrapper is still installed.  qwen-tts-hf
+inserts that entry when the package is imported, so the registry is wrapped after that import.
 """
 from __future__ import annotations
 
+import importlib
 import logging
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Tuple, TypedDict
@@ -28,8 +30,8 @@ import numpy as np
 log = logging.getLogger("voxprint.fast_decode")
 
 PACKAGE = "faster-qwen3-tts"
-#: Versions written for qwen-tts 0.1.1 + transformers 4.x (0.4.0 moved to qwen-tts-hf + transformers 5).
-SUPPORTED = ">=0.3.0,<0.4"
+#: 0.5.4 is the line written for qwen-tts-hf + transformers 5.15/5.16 (0.3.x needed transformers 4).
+SUPPORTED = ">=0.5.4,<0.6"
 #: Static KV cache of the talker graph (prompt = reference codes + texts, plus the generated frames).
 MAX_SEQ_LEN = 3072
 #: Room kept for the prompt when the number of new frames is capped to the static cache.
@@ -78,29 +80,32 @@ def tolerant(fn: Callable[..., Any]) -> Callable[..., Any]:
 
 
 def install_rope_compat() -> List[str]:
-    """Register the tolerant initialiser in ``transformers``' ``ROPE_INIT_FUNCTIONS["default"]`` and in
-    ``qwen_tts._transformers_compat._default_rope_parameters`` (qwen-tts-hf) - before any model is loaded.  Idempotent;
-    returns where it was installed."""
+    """Register the tolerant initialiser in ``qwen_tts._transformers_compat._default_rope_parameters`` and in
+    ``transformers``' ``ROPE_INIT_FUNCTIONS["default"]`` - before any model is loaded.  Idempotent; returns where it
+    was installed.
+
+    The transformers import stays inside the function: this module loads on a machine that has not installed the ML
+    stack yet.  qwen-tts-hf's package import calls ``setdefault("default", ...)`` on that table, so the table is read
+    again after the compat module is imported.
+    """
     done: List[str] = []
     try:
         from transformers import modeling_rope_utils as mru
 
         table = getattr(mru, "ROPE_INIT_FUNCTIONS", None)
-        if isinstance(table, dict) and callable(table.get("default")):
-            table["default"] = tolerant(table["default"])
-            done.append("transformers.ROPE_INIT_FUNCTIONS")
     except Exception:  # noqa: BLE001
-        pass
+        table = None
     try:
-        import importlib
-
         compat = importlib.import_module("qwen_tts._transformers_compat")
         fn = getattr(compat, "_default_rope_parameters", None)
         if callable(fn):
             setattr(compat, "_default_rope_parameters", tolerant(fn))
             done.append("qwen_tts._transformers_compat")
-    except Exception:  # noqa: BLE001 - qwen-tts 0.1.1 has no such module
+    except Exception:  # noqa: BLE001 - the official qwen-tts 0.1.1 wheel has no such module
         pass
+    if isinstance(table, dict) and callable(table.get("default")):
+        table["default"] = tolerant(table["default"])
+        done.append("transformers.ROPE_INIT_FUNCTIONS")
     return done
 
 
@@ -196,12 +201,12 @@ class _WheelSpec(TypedDict):
 
 
 WHEEL: _WheelSpec = {
-    "version": "0.3.2",
-    "file": "faster_qwen3_tts-0.3.2-py3-none-any.whl",
-    "url": "https://files.pythonhosted.org/packages/ea/c7/49525c63af1644d6706d415c61558c8013c675fbd5ef50bc5e4b7c2641dc/"
-           "faster_qwen3_tts-0.3.2-py3-none-any.whl",
-    "sha256": "b17b2839d56cb178f5c382d85214ae62852b5728830bfeda066e6a15c832a364",
-    "size": 42924,
+    "version": "0.5.4",
+    "file": "faster_qwen3_tts-0.5.4-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/b3/e5/074b3ca7bb05f2d3564a456bc7620c24e65edeb1288c118a4b0506d55f11/"
+           "faster_qwen3_tts-0.5.4-py3-none-any.whl",
+    "sha256": "714bfb6d0a70fac177eac48b0a750e04bd597ab9aa86d35c4271aa15d0d1b716",
+    "size": 43858,
 }
 
 

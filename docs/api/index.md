@@ -116,6 +116,7 @@ Do not edit the module pages by hand.
 - [`infra.preload`](infra.preload.md)
 - [`infra.projects`](infra.projects.md)
 - [`infra.quality_models`](infra.quality_models.md)
+- [`infra.qwen_tf_compat`](infra.qwen_tf_compat.md)
 - [`infra.runtime_reuse`](infra.runtime_reuse.md)
 - [`infra.setup_mode`](infra.setup_mode.md)
 - [`infra.soundscape_model`](infra.soundscape_model.md)

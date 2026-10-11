@@ -27,15 +27,19 @@ from packaging.version import InvalidVersion, Version
 log = logging.getLogger("voxprint.versions")
 
 #: Packages we keep up to date, with their compatibility constraints.
-#: transformers < 5: qwen-asr 0.0.6 and qwen-tts 0.1.1 are written for transformers 4.57.x (checked in their METADATA).
+#: transformers 5.16.x: 5.10.1+ fixes CVE-2026-9856. 5.17+ sends Mimi's default RoPE through
+#: ``ROPE_INIT_FUNCTIONS["default"]``, which reads ``rope_theta`` and breaks ``MimiConfig``.
+#: huggingface_hub 1.32+ fixes the unsafe-deserialization and path-traversal highs; 2.x is a
+#: different HTTP stack (httpx2) and faster-qwen3-tts requires ``<2``.
+#: qwen-tts-hf is the transformers 5 build of qwen-tts (same import name ``qwen_tts``).
 TRACKED_PACKAGES: Dict[str, str] = {
     "qwen-asr": "",
-    "qwen-tts": "",
-    "transformers": ">=4.57.6,<5",
+    "qwen-tts-hf": "",
+    "transformers": ">=5.16.1,<5.17",
     "peft": "",
     "accelerate": "",
     "bitsandbytes": "",
-    "huggingface_hub": "<1.0",  # transformers 4.57.x requires huggingface-hub<1.0
+    "huggingface_hub": ">=1.32.0,<2",
     "ru-normalizr": "",
     "rutextnorm": "",
     "ctc-forced-aligner": "",

@@ -132,7 +132,8 @@ def test_reduce_after_oom_chain():
 # ---------------- the "verified by Voxprint" manifest
 def test_bundled_manifest_is_valid_and_consistent():
     m = load_bundled()
-    assert m.packages["transformers"].startswith("4.57") and m.packages["peft"] == "0.18.1"
+    assert m.packages["transformers"].startswith("5.16") and m.packages["peft"] == "0.18.1"
+    assert m.packages["huggingface_hub"] == "1.32.0" and m.packages["qwen-tts-hf"] == "0.1.1.post1"
     assert set(m.packages) <= set(TRACKED_PACKAGES) and set(m.models) == set(TRACKED_MODELS)
     # requirements-verified.txt and requirements-nodeps.txt are derived from the manifest
     root = Path(__file__).resolve().parent.parent
