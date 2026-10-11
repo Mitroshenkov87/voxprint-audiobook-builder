@@ -149,15 +149,16 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     note = bn.info()["offset_note"]
     assert "946" in note and "run 53" in note and "Nachon" in note and "run 55 + 945 = 1000" in note and "Chazak" in note
     assert "run 56 + 945 = 1001" in note and "run 57 + 944 = 1001" in note and "Tamim" in note
+    assert "1002" in note and "Ometz" in note and "v1.0.0-rc.4" in note
     name = bn.info()["codename"]
-    assert name == "Tamim" and name.isascii() and name.isalpha()
+    assert name == "Ometz" and name.isascii() and name.isalpha()
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     credits = json.loads((root / "credits.json").read_text(encoding="utf-8"))
-    assert credits["app"]["version"] == "1.0.0-rc.3" and credits["app"]["channel"] == "rc"
-    assert credits["app"]["codename"] == "Tamim"
+    assert credits["app"]["version"] == "1.0.0-rc.4" and credits["app"]["channel"] == "rc"
+    assert credits["app"]["codename"] == "Ometz"
     iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8")
-    assert '#define AppVersion "1.0.0-rc.3"' in iss
+    assert '#define AppVersion "1.0.0-rc.4"' in iss
     assert '#define AppVersionInfo "1.0.0"' in iss
     assert "VersionInfoVersion={#AppVersionInfo}.{#AppBuild}" in iss
     log = (root / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -167,6 +168,11 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     assert heading2 in log and log.index("## [Unreleased]") < log.index(heading2) < log.index(heading)
     heading3 = '## [1.0.0-rc.3] - 2026-10-10 - build 1001 "Tamim"'
     assert heading3 in log and log.index("## [Unreleased]") < log.index(heading3) < log.index(heading2)
+    heading4 = '## [1.0.0-rc.4] - 2026-10-11 - build 1002 "Ometz"'
+    assert heading4 in log and log.index("## [Unreleased]") < log.index(heading4) < log.index(heading3)
+    notes = (root / "docs" / "RELEASE-NOTES-1002-OMETZ.md").read_text(encoding="utf-8")
+    assert notes.startswith("**Voxprint 1.0.0 RC4")
+    assert "Ometz" in notes and "v1.0.0-rc.4" in notes and "1002" in notes
     notes = (root / "docs" / "RELEASE-NOTES-1001-TAMIM.md").read_text(encoding="utf-8")
     assert "945" in notes and "run 56" in notes and "Tamim" in notes and "v1.0.0-rc.3" in notes
     notes = (root / "docs" / "RELEASE-NOTES-1000-CHAZAK.md").read_text(encoding="utf-8")
@@ -204,6 +210,11 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.3")
     assert appinfo.release_version() == "1.0.0-rc.3"
     assert appinfo.version_label() == '1.0.0 RC3 \u00b7 build 1001 "Tamim"'
+    monkeypatch.setattr(appinfo, "APP_BUILD", 1002)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Ometz")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.4")
+    assert appinfo.release_version() == "1.0.0-rc.4"
+    assert appinfo.version_label() == '1.0.0 RC4 \u00b7 build 1002 "Ometz"'
     monkeypatch.setattr(appinfo, "APP_BUILD", 665)
     monkeypatch.setattr(appinfo, "APP_CODENAME", "Tikkun")
     monkeypatch.setattr(appinfo, "APP_CHANNEL", "beta")

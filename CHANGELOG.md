@@ -5,8 +5,28 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+## [1.0.0-rc.4] - 2026-10-11 - build 1002 "Ometz"
+
+Codename *Ometz* (courage and resolve): the fixes from a real GPU test. The version is **1.0.0-rc.4**. The release tag for this build is `v1.0.0-rc.4` (a pre-release). People see `1.0.0 RC4 · build 1002 "Ometz"`; the Windows file version is `1.0.0.1002`. The build number is the `build` field in `BUILD.json` (**1002**). `offset` is history only and is not added to the CI run number. Release notes: [docs/RELEASE-NOTES-1002-OMETZ.md](docs/RELEASE-NOTES-1002-OMETZ.md).
+
 ### Security
-- **huggingface_hub 1.32.0 and transformers 5.16.1.** The previous pins (hub 0.36.2, transformers 4.57.6) had high advisories: unsafe deserialization and path traversal in the hub (fixed in 1.32.0 and 1.26.0) and CVE-2026-9856 in transformers (fixed in 5.10.1). Official qwen-tts 0.1.1 cannot import on transformers 5, so speech synthesis now uses qwen-tts-hf 0.1.1.post1 (same `qwen_tts` import). qwen-asr 0.0.6 stays, with an import shim (`infra/qwen_tf_compat.py`). Optional CUDA Graphs move to faster-qwen3-tts 0.5.4. The hub client is httpx; connect and read timeouts are unchanged. The old transformers allowlist entries are removed. This set has not been run on a GPU. It is for the next release candidate, not the published 1.0.0-rc.3 build.
+- **huggingface_hub 1.32.0 and transformers 5.16.1.** The previous pins (hub 0.36.2, transformers 4.57.6) had high advisories: unsafe deserialization and path traversal in the hub (fixed in 1.32.0 and 1.26.0) and CVE-2026-9856 in transformers (fixed in 5.10.1). Official qwen-tts 0.1.1 cannot import on transformers 5, so speech synthesis now uses qwen-tts-hf 0.1.1.post1 (same `qwen_tts` import). qwen-asr 0.0.6 stays, with an import shim (`infra/qwen_tf_compat.py`). Optional CUDA Graphs move to faster-qwen3-tts 0.5.4. The hub client is httpx; connect and read timeouts are unchanged. The old transformers allowlist entries are removed. This set has not been run on a GPU.
+
+### Added
+- **Shared suite install.** Setup, including a silent install, installs the Python runtime, the torch and CUDA wheels, ffmpeg and the required models into `%LOCALAPPDATA%\Voxprint\shared\` (on Linux, `~/.local/share/voxprint/shared/`). A later launch and `--selftest` repair that tree. Optional models stay out of that first download.
+- **Reuse a compatible PyTorch from another Voxprint app.** A compatible PyTorch already installed by Voxprint AI Movie Dubber, or one already in the shared suite folder, is used instead of downloading it again.
+- **Console `voxprint-cli.exe`.** The windowed `Voxprint.exe` does not return an exit code to a script. The installer places `voxprint-cli.exe` on PATH. With `--json`, stdout is only JSON lines, and `narrate --json` ends with one result line (`type: result`). See [docs/CLI.md](docs/CLI.md).
+- **GPU test scripts.** `scripts/vm_test.sh` and `scripts/vm_test.ps1` run the smoke and full checks on a machine with a GPU. See [docs/TESTING.md](docs/TESTING.md).
+- **README screenshots.** The README shows the Narrate window and the first-run Components window from the 1.0.0-rc.2 run.
+
+### Changed
+- **Build number.** The number is the `build` field in `BUILD.json` (1002 for this release), or a release tag that ends in `+N` or `-buildN`. The CI run number is not added to `offset`, so a failed run does not consume a number. `offset` stays as history. See [docs/RELEASING.md](docs/RELEASING.md).
+- **Components window.** A download is refused when free disk space is below the selected size plus a margin. Essentials are downloaded first; the optional models are not all started at once.
+
+### Fixed
+- **GPU-lock holder message.** While narration waits, the message names the program that holds the card and the step that program is on now. A holder that updates its step is shown as it is now, not as it was when the wait started.
+- **`.vxbook` chapter and speaker ids.** An id may start with a digit and may contain a hyphen (`1`, `ch-01`). Directive names still start with a letter.
+- **Windows CI hang.** The Windows tests that need no PyTorch fail the job when a test hangs, instead of waiting until the job is cancelled. A crash after the tests have passed still uses the status recorded before shutdown.
 
 ## [1.0.0-rc.3] - 2026-10-10 - build 1001 "Tamim"
 
