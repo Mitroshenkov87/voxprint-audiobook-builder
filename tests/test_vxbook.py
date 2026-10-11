@@ -102,8 +102,8 @@ def test_sound_sample_maps_marks_cast_and_paragraphs():
     assert chunks[3].pause_ms == 1500
 
 
-def test_digit_leading_chapter_ids_and_ch01(tmp_path):
-    """Plotweaver emits chapter ids ``1`` and ``2``. A letter id such as ``ch01`` still opens."""
+def test_chapter_and_speaker_ids_allow_digits_and_hyphens(tmp_path):
+    """Ids are ``^[a-z0-9][a-z0-9_-]{0,63}$``. ``1``, ``2``, ``ch01`` and ``part-2`` open; 65 characters do not."""
     digit = """<!-- vx:chapter id="1" -->
 # One
 
@@ -137,6 +137,66 @@ She said one short line.
     _pack(letter)
     opened = load_book(letter)
     assert opened.chapter_ids == ("ch01",)
+
+    hyphen = """<!-- vx:chapter id="part-2" -->
+# Part Two
+
+<!-- vx:speaker id="part-2" -->
+She said one short line.
+"""
+    hyphen_speakers = {
+        "format_version": "1.0",
+        "speakers": [
+            {"id": "narrator", "role": "narrator", "name": "Narrator", "gender": "unspecified"},
+            {"id": "part-2", "role": "character", "name": "Part", "gender": "female"},
+        ],
+    }
+    cast = {"cast": {"part-2": {"library": "voxprint", "voice_id": "miriam"}}}
+    raw = hyphen.encode("utf-8")
+    hyphen_chapters = [
+        {"id": "part-2", "title": "Part Two", "anchor": "part-2", "offset": raw.find(b'<!-- vx:chapter id="part-2" -->')},
+    ]
+    hyphen_path = tmp_path / "hyphen.vxbook"
+    _pack(
+        hyphen_path, hyphen, speakers=hyphen_speakers, chapters=hyphen_chapters,
+        extra={"cast.json": json.dumps(cast).encode("utf-8")},
+    )
+    hyphen_book = load_book(hyphen_path)
+    assert hyphen_book.chapter_ids == ("part-2",)
+    assert hyphen_book.speaker_marks[0][0] == "female"
+    assert hyphen_book.voice_cast["Part"] == "miriam"
+
+    exact = "b" * 64
+    bounded = f"""<!-- vx:chapter id="{exact}" -->
+# Bounded
+
+Hello there friend.
+"""
+    bounded_path = tmp_path / "bounded.vxbook"
+    raw = bounded.encode("utf-8")
+    _pack(
+        bounded_path, bounded,
+        chapters=[{"id": exact, "title": "Bounded", "anchor": exact,
+                   "offset": raw.find(f'<!-- vx:chapter id="{exact}" -->'.encode("utf-8"))}],
+    )
+    assert load_book(bounded_path).chapter_ids == (exact,)
+
+    long_id = "a" * 65
+    too_long = f"""<!-- vx:chapter id="{long_id}" -->
+# Too Long
+
+Hello there friend.
+"""
+    too_long_path = tmp_path / "too-long.vxbook"
+    raw = too_long.encode("utf-8")
+    _pack(
+        too_long_path, too_long,
+        chapters=[{"id": long_id, "title": "Too Long", "anchor": long_id,
+                   "offset": raw.find(f'<!-- vx:chapter id="{long_id}" -->'.encode("utf-8"))}],
+    )
+    with pytest.raises(BookParseError) as exc:
+        load_book(too_long_path)
+    assert "chapter id" in (exc.value.details or "")
 
 
 def test_explicit_yo_is_not_restored_from_the_dictionary(tmp_path):
