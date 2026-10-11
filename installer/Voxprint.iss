@@ -1323,7 +1323,7 @@ begin
   end;
 end;
 
-{ Append {app} to the user PATH once, keeping REG_EXPAND_SZ so %SystemRoot% stays unexpanded. }
+{ Append the program folder to the user PATH once, keeping REG_EXPAND_SZ so %SystemRoot% stays unexpanded. }
 procedure AddAppToUserPath();
 var
   OldPath, NewPath, AppDir: String;
