@@ -27,7 +27,7 @@ hf_xet                                  # fast model downloads from HF (on Windo
 # qwen-asr 0.0.6 still says transformers==4.57.6 in its METADATA. It is installed with --no-deps; infra/qwen_tf_compat.py
 # patches the two import breaks. qwen-tts-hf 0.1.1.post1 (import name qwen_tts) needs transformers>=5.15.1,<6.
 transformers>=5.16.1,<5.17
-huggingface_hub>=1.32.0,<2              # 1.32.0 has the hub deserialization / path-traversal fixes; 2.x is httpx2
+huggingface_hub>=1.32.0,<2              # AIKIDO-2026-285573 fixed in 1.32.0; 2.x is httpx2
 sentencepiece                           # tokenizer of the Opus-MT translation models (MarianTokenizer)
 ctranslate2                             # CTranslate2 wheels are CUDA 12 builds; see infra/cuda12_libs.py
 nvidia-cublas-cu12==12.9.2.10           # CUDA 12 runtime for CTranslate2 (not shipped by torch cu130)

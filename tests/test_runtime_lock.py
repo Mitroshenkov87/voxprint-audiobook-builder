@@ -95,10 +95,14 @@ def test_suite_installer_pins_huggingface_hub_and_transformers():
     assert versions["transformers"] == "5.16.1"
     req = (ROOT / "requirements.txt").read_text(encoding="utf-8")
     verified = (ROOT / "requirements-verified.txt").read_text(encoding="utf-8")
-    assert "huggingface_hub>=1.32.0,<2" in req
+    hub = next(line for line in req.splitlines() if line.startswith("huggingface_hub>="))
+    assert hub.startswith("huggingface_hub>=1.32.0,<2") and "AIKIDO-2026-285573" in hub
     assert "transformers>=5.16.1,<5.17" in req
     assert "huggingface_hub==1.32.0" in verified
     assert "transformers==5.16.1" in verified
+    # The Linux package installs this requirements.txt; it has no second dependency list.
+    linux = (ROOT / "installer" / "linux" / "install-voxprint-linux.sh").read_text(encoding="utf-8")
+    assert '-r "$APP/requirements.txt"' in linux
 
 
 def test_the_platform_specific_wheel_wins_over_a_generic_one():
