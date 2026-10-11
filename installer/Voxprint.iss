@@ -508,7 +508,7 @@ end;
 { The default models folder of the app (infra/paths.py: default_models_dir). }
 function DefaultModelsDir(): String;
 begin
-  Result := ExpandConstant('{localappdata}\Voxprint\shared\models');
+  Result := ExpandConstant('{localappdata}\Voxprint\models');
 end;
 
 { One string value of the shared settings file %LOCALAPPDATA%\Voxprint\state\suite.json (infra/suite_settings.py; the Movie

@@ -35,9 +35,14 @@
   "shiboken6": "6.12.0",
   "soundfile": "0.14.0"
  },
- "git": [
-  "voxprint-common @ git+https://github.com/Mitroshenkov87/voxprint-common.git@7bb4f4078839cc7348e2bbe621a220c673ed7eb8"
- ],
+ "suite": {
+  "dist": "voxprint-common",
+  "version": "0.1.1",
+  "file": "voxprint_common-0.1.1-py3-none-any.whl",
+  "url": "https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.1.1/voxprint_common-0.1.1-py3-none-any.whl",
+  "size": 53842,
+  "sha256": "c9361d5d00913faf39497fc55124e682ba15b2098c775068c49582c0520cd4d1"
+ },
  "wheels": [
   {
    "dist": "accelerate",

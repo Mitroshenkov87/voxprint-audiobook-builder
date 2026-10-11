@@ -11,25 +11,32 @@ from infra import model_mirrors, modules, paths, suite_shared
 from tools import make_runtime_lock as mrl
 
 ROOT = Path(__file__).resolve().parents[1]
-PIN = "voxprint-common @ git+https://github.com/Mitroshenkov87/voxprint-common.git@7bb4f4078839cc7348e2bbe621a220c673ed7eb8"
 
 
-def test_voxprint_common_is_pinned_by_commit_in_requirements_and_the_lock():
+def test_voxprint_common_is_pinned_by_the_released_wheel_and_its_sha256():
     req = (ROOT / "requirements.txt").read_text(encoding="utf-8")
-    assert PIN in req
     lock = json.loads((ROOT / "infra" / "runtime_lock.json").read_text(encoding="utf-8"))
-    assert lock["git"] == [PIN]
+    suite = lock["suite"]
+    assert suite == mrl.suite_record()
+    assert suite["version"] == "0.1.1"
+    assert suite["sha256"] == "c9361d5d00913faf39497fc55124e682ba15b2098c775068c49582c0520cd4d1"
+    assert suite["size"] == 53842
+    pin = mrl.suite_requirement(suite)
+    assert pin in req
+    assert "git+" not in req
+    assert "git" not in lock
+    assert all(row["dist"] != "voxprint-common" for row in lock["wheels"])
     assert lock["python"] == "3.14"
-    assert mrl.GIT_PINS == [PIN]
-    assert "7bb4f4078839cc7348e2bbe621a220c673ed7eb8" in mrl.GIT_SHA
-    parsed = Requirement(PIN)
+    parsed = Requirement(pin)
     assert parsed.name == "voxprint-common"
+    assert parsed.url is not None and suite["sha256"] in parsed.url
 
 
-def test_test_requirements_emit_the_git_pin_and_shell_requirements_do_not(capsys):
+def test_test_requirements_emit_the_wheel_pin_and_shell_requirements_do_not(capsys):
+    pin = mrl.suite_requirement()
     assert mrl.main(["--test-requirements"]) == 0
     out = capsys.readouterr().out
-    assert PIN in out and "pyside6==" in out
+    assert pin in out and "pyside6==" in out
     assert mrl.main(["--shell-requirements"]) == 0
     shell = capsys.readouterr().out
     assert "voxprint-common" not in shell and "pyside6==" in shell
@@ -86,7 +93,20 @@ def test_a_runtime_ref_is_deleted_only_when_nobody_else_holds_it(tmp_path, monke
     assert marker.is_dir() and suite_shared.apps_using("runtime") == ["movie-dubber"]
     assert suite_shared.release_runtime("movie-dubber") == ["runtime"]
     assert not suite_shared.torch_dir().exists()
-    assert (suite_shared.root() / "models").is_dir()
+    assert suite_shared.component_dir("models").is_dir()
+
+
+def test_the_models_component_is_an_absolute_path_under_the_suite_models_root(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    monkeypatch.setenv("VOXPRINT_HOME", str(home))
+    monkeypatch.setenv("VOXPRINT_SHARED", str(tmp_path / "shared"))
+    monkeypatch.delenv("VOXPRINT_MODELS_DIR", raising=False)
+    suite_shared.register("audiobook-builder", ["models"])
+    data = json.loads(suite_shared.manifest_path().read_text(encoding="utf-8"))
+    recorded = data["components"]["shared-models"]["path"]
+    assert Path(recorded).is_absolute()
+    assert Path(recorded).resolve() == (home / "models").resolve()
+    assert suite_shared.component_dir("models").resolve() == (home / "models").resolve()
 
 
 def test_another_apps_torch_tree_is_not_where_we_write(tmp_path, monkeypatch):

@@ -21,6 +21,17 @@ from voxprint_common.thermal import FULL_SPEED_S, PAUSE_C, RESUME_C, Action, dec
 
 log = logging.getLogger("voxprint.gpu_thermal")
 
+#: Re-exported so callers share the suite full-speed window (2.5 hours). ``decide`` reads the same value.
+__all__ = [
+    "FULL_SPEED_S",
+    "HOT_C",
+    "MIN_SAMPLES",
+    "Monitor",
+    "SAMPLE_EVERY_S",
+    "WINDOW_S",
+    "query_temperature",
+]
+
 #: Sustained temperature at or above this (degrees C) starts a cooling pause. The suite rule is 83 °C.
 HOT_C = PAUSE_C
 #: Samples older than this are ignored when judging "sustained".

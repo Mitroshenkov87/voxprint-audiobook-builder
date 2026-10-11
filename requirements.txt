@@ -1,5 +1,5 @@
-# Suite library, tag v0.1.0 (commit 7bb4f4078839cc7348e2bbe621a220c673ed7eb8).
-voxprint-common @ git+https://github.com/Mitroshenkov87/voxprint-common.git@7bb4f4078839cc7348e2bbe621a220c673ed7eb8
+# Suite library, release v0.1.1. pip checks the sha256 fragment against the wheel.
+voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.1.1/voxprint_common-0.1.1-py3-none-any.whl#sha256=c9361d5d00913faf39497fc55124e682ba15b2098c775068c49582c0520cd4d1
 
 # Voxprint - dependencies (no hard pins here; only lower bounds and the upper bounds that are needed).
 # Installation order on Windows (done by build.bat):

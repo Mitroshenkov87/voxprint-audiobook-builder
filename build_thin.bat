@@ -33,7 +33,7 @@ python tools\embed_build_stamp.py --write-module || (echo [ERROR] build stamp. &
 
 echo === Build thin shell ===
 pyinstaller --onedir --windowed --noconfirm --clean --name Voxprint --distpath dist\thin --workpath build\thin-work --specpath build\thin-work ^
-  --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" --add-data "%CD%\assets\splash.jpg;assets" ^
+  --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" --add-data "%CD%\assets\splash.jpg;assets" --add-data "%CD%\assets\easter-egg.jpg;assets" ^
   --add-data "%CD%\assets\icons;assets\icons" ^
   --paths "%CD%" --paths "%CD%\infra" --paths "%CD%\third_party" --paths "%CD%\build\stdlib_bundle" --hidden-import _vx_stdlib ^
   --hidden-import openvoice --hidden-import openvoice.models --hidden-import openvoice.modules ^
@@ -58,7 +58,7 @@ rem  This second PyInstaller stays AFTER the windowed exe stamp (tests/test_shel
 rem  Only the exe is copied into the windowed folder; both share that folder's _internal.
 echo === Build console companion ===
 pyinstaller --onedir --console --noconfirm --name voxprint-cli --distpath dist\thin --workpath build\thin-cli-work --specpath build\thin-cli-work ^
-  --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" --add-data "%CD%\assets\splash.jpg;assets" ^
+  --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" --add-data "%CD%\assets\splash.jpg;assets" --add-data "%CD%\assets\easter-egg.jpg;assets" ^
   --add-data "%CD%\assets\icons;assets\icons" ^
   --paths "%CD%" --paths "%CD%\infra" --paths "%CD%\third_party" --paths "%CD%\build\stdlib_bundle" --hidden-import _vx_stdlib ^
   --hidden-import openvoice --hidden-import openvoice.models --hidden-import openvoice.modules ^

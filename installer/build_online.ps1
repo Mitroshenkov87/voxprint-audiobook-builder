@@ -38,9 +38,12 @@ Remove-Item build\online-release\* -Force -ErrorAction SilentlyContinue
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $infraDir = Join-Path $RepoRoot "infra"
 # The fetch exe imports infra modules that use voxprint-common. Smoke jobs install only PyInstaller.
+# The released wheel is pinned in runtime_lock.json; pip checks the sha256 fragment.
 & $Python -c "import voxprint_common" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    & $Python -m pip install --quiet "voxprint-common @ git+https://github.com/Mitroshenkov87/voxprint-common.git@7bb4f4078839cc7348e2bbe621a220c673ed7eb8"
+    $suite = (Get-Content -Raw -Encoding utf8 (Join-Path $RepoRoot "infra\runtime_lock.json") | ConvertFrom-Json).suite
+    if (-not $suite.url -or -not $suite.sha256) { throw "runtime_lock.json has no suite wheel pin" }
+    & $Python -m pip install --quiet "voxprint-common @ $($suite.url)#sha256=$($suite.sha256)"
     Check "voxprint-common"
 }
 & $Python -m PyInstaller --onefile --console --name voxprint-fetch --distpath build\online --workpath build\online-work `

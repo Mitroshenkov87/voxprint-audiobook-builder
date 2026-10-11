@@ -187,6 +187,11 @@ QMenu::item:selected {{{{ background: {menu_sel}; color: #ffffff; }}}}
 QLineEdit {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px;
             padding: 6px 12px; selection-background-color: {strong}; }}}}
 QPushButton#gear {{{{ padding: 6px 12px; font-size: 18px; }}}}
+QPushButton#disclosure {{{{
+    background: transparent; border: none; padding: 4px 2px;
+    font-weight: 600; font-size: 15px;
+}}}}
+QPushButton#disclosure:hover {{{{ color: {soft}; background: transparent; }}}}
 QScrollArea {{{{ background: transparent; border: none; }}}}
 QWidget#content {{{{ background: transparent; }}}}
 QScrollBar:vertical {{{{ background: transparent; width: 10px; margin: 2px; }}}}

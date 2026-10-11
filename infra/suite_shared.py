@@ -7,7 +7,7 @@ One tree, one ``manifest.json`` (schema 1, :mod:`voxprint_common.runtime_manifes
 
     runtime/py314-torch2.11-cu130   torch 2.11.0+cu130 (reused, not downloaded again)
     wheels/audiobook-builder        this app's other wheels (CPU onnxruntime never sits beside torch)
-    models/                         required base models
+    <home>/models                   required base models (the suite models root; an absolute component path)
     tools/                          ffmpeg and other pinned tools
     manifest.json
 
@@ -31,6 +31,7 @@ import shutil
 from pathlib import Path
 from typing import Dict, Iterable, List, NamedTuple
 
+from voxprint_common import paths as suite_paths
 from voxprint_common import runtime_manifest
 from voxprint_common.hashing import sha256_file
 
@@ -62,7 +63,7 @@ class _Spec(NamedTuple):
 
 _SPECS = {
     "runtime": _Spec(TORCH_ID, "runtime", TORCH_VERSION, TORCH_REL, ""),
-    "models": _Spec("shared-models", "model", "1", "models", "shared-models"),
+    "models": _Spec("shared-models", "model", "1", "", "shared-models"),
     "tools": _Spec("ffmpeg-8", "tool", "8", "tools", "ffmpeg-8"),
 }
 
@@ -87,11 +88,50 @@ def wheels_dir() -> Path:
     return root() / WHEELS_REL
 
 
+def _under(folder: Path, base: Path) -> bool:
+    try:
+        folder.resolve().relative_to(base.resolve())
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def model_component_path() -> str:
+    """Absolute path of the models component, under the suite models root or the shared tree.
+
+    The live store (:func:`infra.paths.models_dir`) is recorded when it sits in one of those
+    roots. Otherwise the suite models root itself is recorded.
+    """
+    live = paths.models_dir().absolute()
+    library = suite_paths.models_dir().absolute()
+    if _under(live, library) or _under(live, root()):
+        return live.as_posix()
+    return library.as_posix()
+
+
+def _recorded_path(component_id: str) -> str:
+    if not manifest_path().is_file():
+        return ""
+    try:
+        current = _manifest().components.get(component_id)
+    except (OSError, ValueError, runtime_manifest.ManifestError):
+        return ""
+    if current is None:
+        return ""
+    return str(current.path or "")
+
+
 def component_dir(name: str) -> Path:
     """Directory of a resource. Does not create it."""
     spec = _SPECS.get(name)
     if spec is None:
         raise ValueError(name)
+    if name == "models":
+        recorded = _recorded_path(spec.id)
+        if recorded:
+            path = Path(recorded)
+            return path if path.is_absolute() else root() / path
+        return Path(model_component_path())
     return root() / spec.path
 
 
@@ -141,8 +181,9 @@ def load_manifest() -> Dict:
 
 
 def _add(spec: _Spec, app: str) -> None:
+    path = model_component_path() if spec.kind == "model" else spec.path
     runtime_manifest.add_ref(
-        spec.id, app, kind=spec.kind, version=spec.version, path=spec.path,
+        spec.id, app, kind=spec.kind, version=spec.version, path=path,
         sha256=_sha_of(spec), manifest=manifest_path(),
     )
 

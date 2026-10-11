@@ -75,13 +75,17 @@ def test_skip_env_does_not_download(tmp_path, monkeypatch):
     assert result["exit_code"] == 0 and result["message"] == "skipped"
 
 
-def test_default_models_folder_is_the_shared_one_and_legacy_still_wins_when_it_holds_models(tmp_path, monkeypatch):
+def test_default_models_folder_is_the_suite_root_and_shared_models_still_win_when_they_hold_files(tmp_path, monkeypatch):
     monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "home"))
-    assert paths.default_models_dir() == paths.shared_root() / "models"
-    legacy = paths.legacy_models_dir() / "Org--Model"
-    legacy.mkdir(parents=True)
-    (legacy / "config.json").write_text("{}", encoding="utf-8")
-    assert paths.models_dir() == paths.legacy_models_dir()
+    assert paths.default_models_dir() == paths.app_home() / "models"
+    previous = paths.shared_root() / "models" / "Org--Model"
+    previous.mkdir(parents=True)
+    (previous / "config.json").write_text("{}", encoding="utf-8")
+    assert paths.models_dir() == paths.shared_root() / "models"
+    live = paths.default_models_dir() / "Org--Other"
+    live.mkdir(parents=True)
+    (live / "config.json").write_text("{}", encoding="utf-8")
+    assert paths.models_dir() == paths.default_models_dir()
 
 
 def test_cli_status_file_reports_done(tmp_path, monkeypatch):

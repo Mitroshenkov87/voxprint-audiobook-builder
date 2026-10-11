@@ -251,7 +251,7 @@ jobs:
           python main.py --modules-status
           python main.py --install-modules
           if ($LASTEXITCODE -ne 0) { throw "--install-modules failed" }
-          $shared = "C:\vxhome\shared\runtime\torch\lib\big.dll"
+          $shared = "C:\vxhome\shared\runtime\py314-torch2.11-cu130\torch\lib\big.dll"
           if (-not (Test-Path $shared)) { throw "the torch module was not unpacked into the shared runtime ($shared)" }
           if (Test-Path C:\vxhome\runtime\torch) { throw "torch landed in the legacy runtime folder" }
           python main.py --modules-status
@@ -398,18 +398,19 @@ jobs:
           VOXPRINT_HOME: C:\vxhome2
         run: |
           $ErrorActionPreference = "Stop"
-          # The first install unpacked the wheels into <VOXPRINT_HOME>\shared\runtime (flat site-packages).
-          # Another Voxprint program keeps the same tree at %LOCALAPPDATA%\Voxprint\shared\runtime. This home is
-          # C:\vxhome2, so that default shared folder is a foreign copy and must be reused, not downloaded again.
-          $src = "C:\vxhome1\shared\runtime"
+          # The first install unpacked the wheels into the shared torch component
+          # <VOXPRINT_HOME>\shared\runtime\py314-torch2.11-cu130. Another Voxprint program keeps that tree at
+          # %LOCALAPPDATA%\Voxprint\shared\runtime\py314-torch2.11-cu130. This home is C:\vxhome2, so that
+          # default folder is a foreign copy and must be reused, not downloaded again.
+          $src = "C:\vxhome1\shared\runtime\py314-torch2.11-cu130"
           if (-not (Test-Path $src)) {
             Get-ChildItem C:\vxhome1 -Recurse -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-            throw "the first install did not unpack into the shared runtime ($src)"
+            throw "the first install did not unpack into the shared torch component ($src)"
           }
           Get-ChildItem $src | Select-Object -ExpandProperty Name
-          $other = Join-Path $env:LOCALAPPDATA "Voxprint\shared\runtime"
-          New-Item -ItemType Directory -Force $other | Out-Null
-          Get-ChildItem $src -Directory | Where-Object { $_.Name -like "torch*" } | ForEach-Object { Copy-Item $_.FullName (Join-Path $other $_.Name) -Recurse -Force }
+          $other = Join-Path $env:LOCALAPPDATA "Voxprint\shared\runtime\py314-torch2.11-cu130"
+          New-Item -ItemType Directory -Force (Split-Path $other) | Out-Null
+          Copy-Item $src $other -Recurse -Force
           Get-ChildItem $other | Select-Object -ExpandProperty Name
           $env:VOXPRINT_MODULES_CONFIG = "C:\vx-modules.json"
           $exe = (Resolve-Path dist\thin\Voxprint\Voxprint.exe).Path
@@ -419,7 +420,7 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "--install-modules failed" }
           $line = Get-Content C:\vxhome2\logs\modules.txt | Select-String "^torch" | Select-Object -First 1
           if ($line -notmatch "reused") { throw "PyTorch was not reused: $line" }
-          if (Test-Path C:\vxhome2\shared\runtime\torch) { throw "PyTorch was downloaded into this home although the shared copy is on the PC" }
+          if (Test-Path C:\vxhome2\shared\runtime\py314-torch2.11-cu130\torch) { throw "PyTorch was downloaded into this home although the shared copy is on the PC" }
           $p = Start-Process $exe -ArgumentList "--probe-torch" -Wait -PassThru
           Get-Content C:\vxhome2\logs\probe_torch.txt
           if ($p.ExitCode -ne 0) { throw "the reused PyTorch does not work" }

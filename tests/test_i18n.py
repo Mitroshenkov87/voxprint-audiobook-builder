@@ -36,8 +36,10 @@ def test_languages_and_identical_keys_and_placeholders():
 
 def test_scripts_match_languages():
     en, de = _cat("en"), _cat("de")
+    # The egg caption is the same Russian line in every catalog, including English and German.
+    kept = {"easter_egg.caption"}
     assert not [k for k, v in {**{("en", k): v for k, v in en.items()}, **{("de", k): v for k, v in de.items()}}.items()
-                if CYR.search(v)]
+                if k[1] not in kept and CYR.search(v)]
     c = _cat("ru")
     assert CYR.search(c["ui.btn_lora"]) and CYR.search(c["about.what"])
     assert c["ui.language"] == "Язык"

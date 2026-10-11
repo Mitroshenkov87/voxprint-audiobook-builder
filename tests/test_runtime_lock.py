@@ -61,6 +61,9 @@ def test_sdist_only_packages_are_few_and_known():
 def test_the_lock_covers_requirements_txt():
     # build tooling (setuptools etc.) is pinned in requirements.txt for dev venvs but never shipped
     have = {mk.norm(w["dist"]) for w in LOCK["wheels"]} | set(LOCK["shell"]) | set(mk.TORCH) | mk.SKIP
+    suite = LOCK.get("suite") or {}
+    if suite.get("dist"):
+        have.add(mk.norm(suite["dist"]))
     have |= {mk.norm(Requirement(line).name) for line in LOCK.get("git", [])}
     for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines():
         line = line.split("#")[0].strip()
