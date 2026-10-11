@@ -201,7 +201,7 @@ def _offer_components(win, app, then_prefetch: bool, autostart: bool = True) -> 
 
     from ui.modules_dialog import ModulesDialog, default_extras
 
-    holder = {}
+    holder: dict[str, ModulesDialog] = {}
 
     def models_start(hook):
         # StudioWindow.start_prefetch delegates to the Train window (it owns the status line and the busy lock).  Before

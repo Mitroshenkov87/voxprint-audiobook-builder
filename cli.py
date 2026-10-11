@@ -284,7 +284,7 @@ def begin_json_stdout() -> None:
                 if hasattr(handler, "setStream"):
                     handler.setStream(sys.stderr)
                 else:
-                    handler.stream = sys.stderr
+                    setattr(handler, "stream", sys.stderr)
 
 
 def end_json_stdout() -> None:

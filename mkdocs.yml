@@ -245,7 +245,9 @@ nav:
           - setup_mode: api/infra.setup_mode.md
           - soundscape_model: api/infra.soundscape_model.md
           - stdio_guard: api/infra.stdio_guard.md
+          - suite_install: api/infra.suite_install.md
           - suite_settings: api/infra.suite_settings.md
+          - suite_shared: api/infra.suite_shared.md
           - sysinfo: api/infra.sysinfo.md
           - text_models: api/infra.text_models.md
           - ui_prefs: api/infra.ui_prefs.md

@@ -81,7 +81,11 @@ def _default_modules(progress: Callable[[float, str], None]) -> None:
     if not modules.is_thin():
         progress(1.0, tr("suite.bundled"))
         return
-    modules.install(progress=lambda fraction, message="": progress(float(fraction), message or "Runtime"))
+
+    def report(fraction: float, message: str = "") -> None:
+        progress(float(fraction), message or "Runtime")
+
+    modules.install(progress=report)
 
 
 def _default_ffmpeg(progress: Callable[[float, str], None]) -> None:
@@ -90,8 +94,10 @@ def _default_ffmpeg(progress: Callable[[float, str], None]) -> None:
 
 
 def _default_models(progress: Callable[[float, str], None]) -> None:
-    prefetch_models(lambda _stage, fraction, message="": progress(float(fraction), message or "Models"),
-                    repos=required_model_repos(), everything=False)
+    def report(_stage: object, fraction: float, message: str = "") -> None:
+        progress(float(fraction), message or "Models")
+
+    prefetch_models(report, repos=required_model_repos(), everything=False)
 
 
 def install_suite(progress: Callable[[float, str], None] = lambda _f, _m: None, *,
@@ -132,11 +138,11 @@ def install_suite(progress: Callable[[float, str], None] = lambda _f, _m: None, 
     for start, end, label, fn in steps:
         span = end - start
 
-        def report(fraction: float, message: str = "", s=start, w=span, title=label) -> None:
+        def step_progress(fraction: float, message: str = "", s=start, w=span, title=label) -> None:
             progress(s + w * max(0.0, min(1.0, float(fraction))), message or title)
 
         progress(start, label)
-        fn(report)
+        fn(step_progress)
     suite_shared.register(suite_shared.APP_ID, APP_RESOURCES)
     progress(1.0, tr("suite.done"))
     report = inspect_shared()

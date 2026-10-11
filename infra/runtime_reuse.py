@@ -239,7 +239,7 @@ def candidate_prefixes(environ: Optional[Dict[str, str]] = None, home: Optional[
         except OSError:
             pass
 
-    for folder in _suite_runtime_prefixes(env, home):
+    for folder in _suite_runtime_prefixes(dict(env), home):
         add(folder)
     for var in ("VIRTUAL_ENV", "CONDA_PREFIX", "PYTHONHOME"):
         if env.get(var):
