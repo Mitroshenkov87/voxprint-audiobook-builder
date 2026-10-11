@@ -5,6 +5,11 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Changed
+- **voxprint-common 0.1.1.** Paths, suite settings, the GPU lock, thermal pauses, the mirror download, build labels, file hashes, theme tokens and the splash come from the suite library. The pin is the released wheel `voxprint_common-0.1.1-py3-none-any.whl` with its SHA-256 (`requirements.txt` and `infra/runtime_lock.json`), not a git commit.
+- **Shared runtime schema 1.** Torch 2.11.0+cu130 is one refcounted component under `shared/runtime/py314-torch2.11-cu130`. An existing per-app runtime is moved there on upgrade. A CPU `onnxruntime` is kept out of that tree. Uninstall drops this app's ref and deletes the component only when nothing else still lists it. Required models are recorded as a component under the suite models root (`<home>/models`). `shared/models` is still read when it already holds models and that root does not.
+- **Suite splash.** The start-up window is the shared 960×540 splash. `assets/splash.jpg` is the 16:9 art. The build line is read with `voxprint_common.buildinfo.load`. Six clicks within two seconds call the splash `on_click` hook and show `assets/easter-egg.jpg`. The stylesheet includes `#gear` and `#disclosure`.
+
 ## [1.0.0-rc.4] - 2026-10-11 - build 1002 "Ometz"
 
 Codename *Ometz* (courage and resolve): the fixes from a real GPU test. The version is **1.0.0-rc.4**. The release tag for this build is `v1.0.0-rc.4` (a pre-release). People see `1.0.0 RC4 · build 1002 "Ometz"`; the Windows file version is `1.0.0.1002`. The build number is the `build` field in `BUILD.json` (**1002**). `offset` is history only and is not added to the CI run number. Release notes: [docs/RELEASE-NOTES-1002-OMETZ.md](docs/RELEASE-NOTES-1002-OMETZ.md).

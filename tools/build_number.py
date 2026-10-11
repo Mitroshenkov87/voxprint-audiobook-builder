@@ -19,6 +19,11 @@ import re
 import sys
 from pathlib import Path
 
+try:
+    from voxprint_common.buildinfo import load as _load_build
+except ImportError:  # the release jobs stamp with the runner Python before this library is installed
+    _load_build = None
+
 ROOT = Path(__file__).resolve().parent.parent
 _TAG_BUILD = re.compile(r"(?:\+|-build)(\d+)$", re.IGNORECASE)
 
@@ -60,6 +65,16 @@ def build_number(env=None) -> int:
     tagged = build_from_tag(release_tag(env))
     if tagged > 0:
         return tagged
+    # Tag suffixes (+N / -buildN) are app-specific. When the suite library is installed,
+    # load reads BUILD.json. A run number is not added to offset while the file has an integer build.
+    if _load_build is not None:
+        quiet = {key: value for key, value in env.items() if key != "GITHUB_RUN_NUMBER"}
+        try:
+            parsed = _load_build(ROOT / "BUILD.json", app="audiobook-builder", env=quiet)
+        except (OSError, ValueError):
+            return 0
+        number = 0 if parsed.build is None else int(parsed.build)
+        return number if number > 0 else 0
     raw = info().get("build", 0)
     try:
         number = int(raw)

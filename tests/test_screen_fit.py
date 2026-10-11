@@ -3,7 +3,7 @@ from unittest import mock
 
 import pytest
 from PySide6.QtCore import QRect
-from PySide6.QtGui import QFontInfo
+from PySide6.QtGui import QFontInfo, QGuiApplication
 from PySide6.QtWidgets import QApplication, QWidget
 
 from core import i18n
@@ -78,9 +78,14 @@ def test_splash_shows_a_status_and_closes_with_the_main_window(app):
     s = splash.show()
     s.status("Loading interface\u2026")
     assert s.isVisible() and s.message() == "Loading interface\u2026"
-    assert s.width() <= AVAIL.width() and s.height() <= AVAIL.height() and s.width() == s.height()
+    # 960×540 card plus 28 px of shadow. screen_fit.install (a GUI launch earlier in this process)
+    # clamps Tool windows to the offscreen work area, which is smaller than that card.
+    work = QGuiApplication.primaryScreen().availableGeometry()
+    assert s.width() in (1016, min(1016, work.width()))
+    assert s.height() in (596, min(596, work.height()))
+    assert s.width() <= AVAIL.width() and s.height() <= AVAIL.height()
     s.checking()
-    assert s._fraction == 0.7 and not s.pixmap().isNull() and not s.grab().isNull()     # grab() runs drawContents
+    assert s._fraction == 0.7 and not s.grab().isNull()
     w = QWidget()
     w.show()
     s.finish(w)

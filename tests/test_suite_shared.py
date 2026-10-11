@@ -17,7 +17,7 @@ def test_register_and_unregister_keep_a_resource_another_app_still_uses(tmp_path
     assert unused == ["tools"]
     removed = suite_shared.delete_resources(unused)
     assert removed == ["tools"] and not (suite_shared.root() / "tools").exists()
-    assert (suite_shared.root() / "runtime" / "torch").is_dir()
+    assert (suite_shared.resource_dir("runtime") / "torch").is_dir()
     assert suite_shared.apps_using("runtime") == ["movie-dubber"]
     assert suite_shared.unregister("movie-dubber") == ["models", "runtime"]
 
@@ -43,7 +43,15 @@ def test_install_suite_runs_the_three_steps_and_records_the_app(tmp_path, monkey
     assert result["ok"] and result["exit_code"] == 0
     assert seen == ["runtime", "tools", "models"]
     manifest = json.loads((suite_shared.root() / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["apps"]["audiobook-builder"]["resources"] == ["models", "runtime", "tools"]
+    assert manifest["schema"] == 1
+    refs = {name: manifest["components"][spec.id]["refs"] for name, spec in (
+        ("runtime", suite_shared._SPECS["runtime"]),
+        ("models", suite_shared._SPECS["models"]),
+        ("tools", suite_shared._SPECS["tools"]),
+    )}
+    assert refs["runtime"] == ["audiobook-builder"]
+    assert refs["models"] == ["audiobook-builder"]
+    assert refs["tools"] == ["audiobook-builder"]
 
 
 def test_a_too_old_driver_stops_the_suite_install_with_the_download_link(tmp_path, monkeypatch):
@@ -67,13 +75,17 @@ def test_skip_env_does_not_download(tmp_path, monkeypatch):
     assert result["exit_code"] == 0 and result["message"] == "skipped"
 
 
-def test_default_models_folder_is_the_shared_one_and_legacy_still_wins_when_it_holds_models(tmp_path, monkeypatch):
+def test_default_models_folder_is_the_suite_root_and_shared_models_still_win_when_they_hold_files(tmp_path, monkeypatch):
     monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "home"))
-    assert paths.default_models_dir() == paths.shared_root() / "models"
-    legacy = paths.legacy_models_dir() / "Org--Model"
-    legacy.mkdir(parents=True)
-    (legacy / "config.json").write_text("{}", encoding="utf-8")
-    assert paths.models_dir() == paths.legacy_models_dir()
+    assert paths.default_models_dir() == paths.app_home() / "models"
+    previous = paths.shared_root() / "models" / "Org--Model"
+    previous.mkdir(parents=True)
+    (previous / "config.json").write_text("{}", encoding="utf-8")
+    assert paths.models_dir() == paths.shared_root() / "models"
+    live = paths.default_models_dir() / "Org--Other"
+    live.mkdir(parents=True)
+    (live / "config.json").write_text("{}", encoding="utf-8")
+    assert paths.models_dir() == paths.default_models_dir()
 
 
 def test_cli_status_file_reports_done(tmp_path, monkeypatch):

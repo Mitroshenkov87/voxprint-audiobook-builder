@@ -38,6 +38,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, cast
 
+from voxprint_common.hashing import sha256_file as _sha256_file
+
 from core.errors import BackupError
 from core.events import CancelToken
 from core.i18n import tr
@@ -141,6 +143,8 @@ class Report:
 # ----------------------------------------------------------------------------------------------------- hashing / copying
 def sha256_file(p: Path, cancel: Optional[CancelToken] = None, on_bytes: Optional[Callable[[int], None]] = None) -> str:
     """SHA-256 of a file (read in chunks; ``on_bytes`` gets the chunk sizes, ``cancel`` is checked per chunk)."""
+    if cancel is None and on_bytes is None:
+        return _sha256_file(p)
     h = hashlib.sha256()
     with open(p, "rb") as f:
         while True:

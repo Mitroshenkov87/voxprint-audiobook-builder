@@ -7,13 +7,14 @@ sdist (seconds) and shipped as a small release asset.
 """
 from __future__ import annotations
 
-import hashlib
 import re
 import subprocess
 import sys
 import urllib.request
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
+
+from voxprint_common.hashing import sha256_file
 
 #: Order of the modules in the Components window / the install order: small ones first, PyTorch last.
 ORDER = ("libs", "text", "audio", "cuda12", "torch")
@@ -32,11 +33,7 @@ def marker(w_file: str) -> str:
 
 
 def sha256_of(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for b in iter(lambda: f.read(1 << 20), b""):
-            h.update(b)
-    return h.hexdigest()
+    return sha256_file(path)
 
 
 def _fetch(url: str, dest: Path) -> None:

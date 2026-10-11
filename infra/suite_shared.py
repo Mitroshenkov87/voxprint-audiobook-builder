@@ -1,42 +1,71 @@
 """Shared suite resources for every Voxprint app.
 
-One tree, versioned by the manifest, reused instead of each app keeping its own copy::
+One tree, one ``manifest.json`` (schema 1, :mod:`voxprint_common.runtime_manifest`)::
 
     %LOCALAPPDATA%\\Voxprint\\shared\\          Windows
     ~/.local/share/voxprint/shared/         Linux
 
-    runtime/   Python packages (PyTorch and the rest)
-    models/    required base models
-    tools/     ffmpeg and other pinned tools
+    runtime/py314-torch2.11-cu130   torch 2.11.0+cu130 (reused, not downloaded again)
+    wheels/audiobook-builder        this app's other wheels (CPU onnxruntime never sits beside torch)
+    <home>/models                   required base models (the suite models root; an absolute component path)
+    tools/                          ffmpeg and other pinned tools
     manifest.json
 
-``manifest.json`` lists which app still uses each resource. Uninstalling one app drops only
-that app's references and deletes a resource when no app remains.
+``refs`` lists the apps that still use a component. Uninstalling drops only this app's ref and
+deletes the component when the list is empty. ``VOXPRINT_SHARED`` overrides the folder (tests).
 
     from infra.suite_shared import register, unregister
 
     register("audiobook-builder", ["runtime", "models", "tools"])
     left = unregister("audiobook-builder")
 
-``VOXPRINT_SHARED`` overrides the folder (tests). Depends only on :mod:`infra.paths`.
-
 Licence: Apache-2.0
 Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
 """
 from __future__ import annotations
 
+import hashlib
 import json
-import os
+import logging
 import shutil
 from pathlib import Path
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, NamedTuple
+
+from voxprint_common import paths as suite_paths
+from voxprint_common import runtime_manifest
+from voxprint_common.hashing import sha256_file
 
 from infra import paths
+
+log = logging.getLogger("voxprint.suite")
 
 APP_ID = "audiobook-builder"
 MANIFEST_NAME = "manifest.json"
 SCHEMA = 1
 RESOURCES = ("runtime", "models", "tools")
+TORCH_ID = "torch-2.11.0-cu130"
+TORCH_VERSION = "2.11.0+cu130"
+TORCH_REL = "runtime/py314-torch2.11-cu130"
+WHEELS_ID = "audiobook-wheels"
+WHEELS_REL = "wheels/audiobook-builder"
+_BOOKKEEPING = {".users.json", "reuse.json"}
+
+
+class _Spec(NamedTuple):
+    """One resource name and the component it claims."""
+
+    id: str
+    kind: str
+    version: str
+    path: str
+    sha_label: str
+
+
+_SPECS = {
+    "runtime": _Spec(TORCH_ID, "runtime", TORCH_VERSION, TORCH_REL, ""),
+    "models": _Spec("shared-models", "model", "1", "", "shared-models"),
+    "tools": _Spec("ffmpeg-8", "tool", "8", "tools", "ffmpeg-8"),
+}
 
 
 def root() -> Path:
@@ -44,84 +73,190 @@ def root() -> Path:
     return paths.shared_root()
 
 
-def resource_dir(name: str) -> Path:
-    """``runtime``, ``models`` or ``tools`` under :func:`root` (created on demand)."""
-    if name not in RESOURCES:
+def manifest_path() -> Path:
+    """Path of ``manifest.json`` (created on the first :func:`register`)."""
+    return root() / MANIFEST_NAME
+
+
+def torch_dir() -> Path:
+    """Directory of the shared torch 2.11.0+cu130 component."""
+    return root() / TORCH_REL
+
+
+def wheels_dir() -> Path:
+    """This app's wheels, kept out of the shared torch tree."""
+    return root() / WHEELS_REL
+
+
+def _under(folder: Path, base: Path) -> bool:
+    try:
+        folder.resolve().relative_to(base.resolve())
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def model_component_path() -> str:
+    """Absolute path of the models component, under the suite models root or the shared tree.
+
+    The live store (:func:`infra.paths.models_dir`) is recorded when it sits in one of those
+    roots. Otherwise the suite models root itself is recorded.
+    """
+    live = paths.models_dir().absolute()
+    library = suite_paths.models_dir().absolute()
+    if _under(live, library) or _under(live, root()):
+        return live.as_posix()
+    return library.as_posix()
+
+
+def _recorded_path(component_id: str) -> str:
+    if not manifest_path().is_file():
+        return ""
+    try:
+        current = _manifest().components.get(component_id)
+    except (OSError, ValueError, runtime_manifest.ManifestError):
+        return ""
+    if current is None:
+        return ""
+    return str(current.path or "")
+
+
+def component_dir(name: str) -> Path:
+    """Directory of a resource. Does not create it."""
+    spec = _SPECS.get(name)
+    if spec is None:
         raise ValueError(name)
-    folder = root() / name
+    if name == "models":
+        recorded = _recorded_path(spec.id)
+        if recorded:
+            path = Path(recorded)
+            return path if path.is_absolute() else root() / path
+        return Path(model_component_path())
+    return root() / spec.path
+
+
+def resource_dir(name: str) -> Path:
+    """``runtime``, ``models`` or ``tools`` (created on demand)."""
+    folder = component_dir(name)
     folder.mkdir(parents=True, exist_ok=True)
     return folder
 
 
-def manifest_path() -> Path:
-    """Path of ``manifest.json`` (the file is created on the first :func:`register`)."""
-    return root() / MANIFEST_NAME
+def torch_sha() -> str:
+    """SHA-256 of ``runtime_lock.json``, the archive this torch component was installed from."""
+    lock = Path(__file__).resolve().with_name("runtime_lock.json")
+    if lock.is_file():
+        return sha256_file(lock)
+    return _label_sha(TORCH_VERSION)
+
+
+def _label_sha(label: str) -> str:
+    return hashlib.sha256(label.encode("utf-8")).hexdigest()
+
+
+def _sha_of(spec: _Spec) -> str:
+    return torch_sha() if spec.id == TORCH_ID else _label_sha(spec.sha_label)
+
+
+def _manifest():
+    return runtime_manifest.load(manifest_path())
 
 
 def load_manifest() -> Dict:
-    """The manifest, or an empty schema-1 document when the file is missing or damaged."""
+    """Schema 1 document. A missing file is empty and is not created."""
+    _migrate_apps_manifest()
+    path = manifest_path()
+    if not path.is_file():
+        return {"schema": SCHEMA, "components": {}}
     try:
-        data = json.loads(manifest_path().read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {"schema": SCHEMA, "apps": {}}
+        return {"schema": SCHEMA, "components": {}}
     if not isinstance(data, dict):
-        return {"schema": SCHEMA, "apps": {}}
-    apps = data.get("apps")
-    if not isinstance(apps, dict):
-        data["apps"] = {}
+        return {"schema": SCHEMA, "components": {}}
     data["schema"] = SCHEMA
+    if not isinstance(data.get("components"), dict):
+        data["components"] = {}
     return data
 
 
-def _save(data: Dict) -> None:
-    path = manifest_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(tmp, path)
+def _add(spec: _Spec, app: str) -> None:
+    path = model_component_path() if spec.kind == "model" else spec.path
+    runtime_manifest.add_ref(
+        spec.id, app, kind=spec.kind, version=spec.version, path=path,
+        sha256=_sha_of(spec), manifest=manifest_path(),
+    )
 
 
 def register(app: str, resources: Iterable[str]) -> Dict:
     """Remember that ``app`` uses these resources. Unknown names are ignored."""
-    names = [name for name in resources if name in RESOURCES]
-    data = load_manifest()
-    data["apps"][str(app)] = {"resources": sorted(set(names))}
-    _save(data)
+    _migrate_apps_manifest()
+    names = [name for name in resources if name in _SPECS]
     for name in names:
+        _add(_SPECS[name], str(app))
         resource_dir(name)
-    return data
+    return load_manifest()
 
 
 def apps_using(name: str, data: Dict | None = None) -> List[str]:
-    """App ids that still list ``name``."""
-    data = load_manifest() if data is None else data
-    found = []
-    for app, info in (data.get("apps") or {}).items():
-        if isinstance(info, dict) and name in (info.get("resources") or []):
-            found.append(str(app))
-    return found
+    """App ids that still reference ``name``."""
+    spec = _SPECS.get(name)
+    if spec is None:
+        return []
+    if data is None:
+        current = _manifest().components.get(spec.id)
+        return list(current.refs) if current is not None else []
+    components = data.get("components") if isinstance(data.get("components"), dict) else {}
+    row = components.get(spec.id) if isinstance(components, dict) else None
+    if isinstance(row, dict):
+        return [str(ref) for ref in row.get("refs") or []]
+    return []
 
 
 def unregister(app: str) -> List[str]:
-    """Drop ``app``. Returns resource names that no remaining app still lists."""
-    data = load_manifest()
-    info = (data.get("apps") or {}).pop(str(app), None)
-    _save(data)
-    had = list((info or {}).get("resources") or []) if isinstance(info, dict) else []
-    return [name for name in had if name in RESOURCES and not apps_using(name, data)]
+    """Drop ``app``. Returns resource names whose component was deleted (no refs left)."""
+    _migrate_apps_manifest()
+    gone: List[str] = []
+    for name in sorted(RESOURCES):
+        if runtime_manifest.remove_ref(_SPECS[name].id, str(app), manifest=manifest_path()):
+            gone.append(name)
+    if runtime_manifest.remove_ref(WHEELS_ID, str(app), manifest=manifest_path()):
+        _delete_tree(wheels_dir())
+    return gone
+
+
+def release_runtime(app: str = APP_ID) -> List[str]:
+    """Drop this app's runtime ref and delete the component when nobody else uses it."""
+    return unregister_names(app, ("runtime",))
+
+
+def unregister_names(app: str, names: Iterable[str]) -> List[str]:
+    """Drop ``app`` from the named resources and delete directories that are now unused."""
+    _migrate_apps_manifest()
+    gone: List[str] = []
+    for name in names:
+        if name not in _SPECS:
+            continue
+        if runtime_manifest.remove_ref(_SPECS[name].id, str(app), manifest=manifest_path()):
+            gone.append(name)
+    if "runtime" in names and runtime_manifest.remove_ref(WHEELS_ID, str(app), manifest=manifest_path()):
+        _delete_tree(wheels_dir())
+    delete_resources(gone)
+    return gone
 
 
 def delete_resources(names: Iterable[str]) -> List[str]:
-    """Delete resource directories that no app still lists. Returns the names removed."""
+    """Delete component directories that no app still references."""
     removed = []
-    data = load_manifest()
     for name in names:
-        if name not in RESOURCES or apps_using(name, data):
+        if name not in _SPECS or apps_using(name):
             continue
-        folder = root() / name
-        if folder.is_dir():
-            shutil.rmtree(folder, ignore_errors=True)
+        _delete_tree(component_dir(name))
         removed.append(name)
+        if name == "runtime":
+            current = _manifest().components.get(WHEELS_ID)
+            if current is None or not current.refs:
+                _delete_tree(wheels_dir())
     return removed
 
 
@@ -131,3 +266,183 @@ def populated(folder: Path) -> bool:
         return folder.is_dir() and any(folder.iterdir())
     except OSError:
         return False
+
+
+def foreign_torch_path() -> Path | None:
+    """A torch 2.11.0+cu130 tree another app already refs, or None when we may write our own."""
+    _migrate_apps_manifest()
+    if not manifest_path().is_file():
+        return None
+    current = _manifest().components.get(TORCH_ID)
+    if current is None or current.version != TORCH_VERSION:
+        return None
+    if not any(ref != APP_ID for ref in current.refs):
+        return None
+    folder = root() / current.path
+    if not _has_torch(folder):
+        return None
+    return folder
+
+
+def claim_torch_if_present() -> bool:
+    """Add our ref when the shared torch tree is already on disk.
+
+    A different sha held by another app is left untouched (:class:`runtime_manifest.ManifestConflict`).
+    """
+    folder = torch_dir()
+    if not _has_torch(folder):
+        borrowed = foreign_torch_path()
+        if borrowed is None:
+            return False
+    try:
+        _add(_SPECS["runtime"], APP_ID)
+    except runtime_manifest.ManifestConflict:
+        log.info("shared torch %s is held at a different sha; using it in place", TORCH_ID)
+        return False
+    return True
+
+
+def quarantine_cpu_onnxruntime(folder: Path) -> bool:
+    """Move a CPU ``onnxruntime`` install out of the shared torch tree. The GPU build stays."""
+    if not folder.is_dir():
+        return False
+    moved = False
+    gpu = any(_is_gpu_ort(child.name) for child in folder.iterdir())
+    for child in list(folder.iterdir()):
+        if _keep_in_torch(child.name, gpu_ort=gpu):
+            continue
+        if not _is_cpu_ort(child.name):
+            continue
+        wheels_dir().mkdir(parents=True, exist_ok=True)
+        dest = wheels_dir() / child.name
+        if dest.exists():
+            continue
+        shutil.move(str(child), str(dest))
+        moved = True
+    if moved:
+        try:
+            runtime_manifest.add_ref(
+                WHEELS_ID, APP_ID, kind="wheels", version="1", path=WHEELS_REL,
+                sha256=_label_sha(WHEELS_ID), manifest=manifest_path(),
+            )
+        except runtime_manifest.ManifestConflict:
+            log.info("wheels component is held by another record; CPU onnxruntime stays in %s", wheels_dir())
+    return moved
+
+
+def migrate_installed_runtime() -> None:
+    """Turn an rc.4 apps manifest and a per-app ``runtime/`` into schema 1 components."""
+    _migrate_apps_manifest()
+    dest = torch_dir()
+    legacy = paths.app_home() / "runtime"
+    flat = root() / "runtime"
+    if _has_torch(legacy) and not _has_torch(dest):
+        _split_move(legacy, dest, wheels_dir())
+    if flat.is_dir() and _has_torch(flat) and not _has_torch(dest):
+        _split_move(flat, dest, wheels_dir())
+    if _has_torch(dest):
+        claim_torch_if_present()
+        quarantine_cpu_onnxruntime(dest)
+
+
+def _migrate_apps_manifest() -> None:
+    """Copy an ``apps`` document (rc.4) into components. Components that already exist win."""
+    path = manifest_path()
+    if not path.is_file():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    apps = data.get("apps")
+    if not isinstance(apps, dict):
+        return
+    components = data.get("components")
+    if isinstance(components, dict) and components:
+        return
+    for name in sorted(RESOURCES):
+        holders = []
+        for app, info in apps.items():
+            if isinstance(info, dict) and name in (info.get("resources") or []):
+                holders.append(str(app))
+        for app in holders:
+            try:
+                _add(_SPECS[name], app)
+            except runtime_manifest.ManifestError:
+                log.warning("could not migrate %s for %s", name, app, exc_info=True)
+
+
+def _split_move(src: Path, torch_dest: Path, wheels_dest: Path) -> None:
+    children = []
+    for child in list(src.iterdir()):
+        if child.name in _BOOKKEEPING or _same(child, torch_dest) or _same(child, wheels_dest):
+            continue
+        if _contains(child, torch_dest) or _contains(child, wheels_dest):
+            continue
+        children.append(child)
+    gpu = any(_is_gpu_ort(child.name) for child in children)
+    for child in children:
+        target_root = torch_dest if _keep_in_torch(child.name, gpu_ort=gpu) else wheels_dest
+        target_root.mkdir(parents=True, exist_ok=True)
+        dest = target_root / child.name
+        if dest.exists():
+            continue
+        shutil.move(str(child), str(dest))
+
+
+def _has_torch(folder: Path) -> bool:
+    if not folder.is_dir():
+        return False
+    if (folder / "torch").is_dir() or (folder / "voxprint-components.json").is_file():
+        return True
+    try:
+        return any(folder.glob("torch-*.dist-info")) or (folder / "Lib" / "site-packages" / "torch").is_dir()
+    except OSError:
+        return False
+
+
+def _is_gpu_ort(name: str) -> bool:
+    low = name.lower()
+    return "onnxruntime_gpu" in low or "onnxruntime-gpu" in low
+
+
+def _is_cpu_ort(name: str) -> bool:
+    low = name.lower()
+    if _is_gpu_ort(low):
+        return False
+    return low == "onnxruntime" or low.startswith("onnxruntime-")
+
+
+def _keep_in_torch(name: str, *, gpu_ort: bool) -> bool:
+    low = name.lower()
+    if low in _BOOKKEEPING:
+        return False
+    if low == "torch" or low.startswith("torch-") or low.startswith("torchaudio"):
+        return True
+    if low.startswith("nvidia"):
+        return True
+    if _is_gpu_ort(low):
+        return True
+    if low == "onnxruntime" and gpu_ort:
+        return True
+    return False
+
+
+def _same(child: Path, dest: Path) -> bool:
+    try:
+        return child.resolve() == dest.resolve()
+    except OSError:
+        return False
+
+
+def _contains(child: Path, dest: Path) -> bool:
+    try:
+        dest.resolve().relative_to(child.resolve())
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def _delete_tree(folder: Path) -> None:
+    if folder.is_dir():
+        shutil.rmtree(folder, ignore_errors=True)

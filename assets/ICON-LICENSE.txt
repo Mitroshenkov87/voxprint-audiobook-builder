@@ -16,15 +16,19 @@ the Linux desktop entry.
 
 Splash
 ------
-assets/splash.jpg is the square splash: the same logo in a painterly alpine
-evening (darkening blue sky, golden rye, pale haze, a soft red glow), with
-no houses, no river and no text. ui/splash.py loads this filename.
+assets/splash.jpg is the 16:9 start-up art (1920×1080): the same logo in a
+painterly alpine evening (darkening blue sky, golden rye, pale haze, a soft
+red glow), with no houses, no river and no text. The suite splash loads this
+filename.
 
 Easter egg
 ----------
 assets/easter-egg.jpg is original generated artwork, no real person's likeness.
-ui/splash.py shows it, with the caption easter_egg.caption, after a hidden
-click sequence on the splash.
+Six clicks within two seconds on the suite splash show it, with the caption
+easter_egg.caption ("Кури ушную серу!", the same Russian line in every UI
+language), for three seconds or until another click, once per launch. The
+suite window stays the splash; the picture is a separate window opened from
+the splash on_click hook.
 
 Suite action icons
 ------------------

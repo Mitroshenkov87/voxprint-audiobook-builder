@@ -1,3 +1,6 @@
+# Suite library, release v0.1.1. pip checks the sha256 fragment against the wheel.
+voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.1.1/voxprint_common-0.1.1-py3-none-any.whl#sha256=c9361d5d00913faf39497fc55124e682ba15b2098c775068c49582c0520cd4d1
+
 # Voxprint - dependencies (no hard pins here; only lower bounds and the upper bounds that are needed).
 # Installation order on Windows (done by build.bat):
 #   1) uv pip install torch==2.11.0 torchaudio==2.11.0 --torch-backend=cu130    (fallback: requirements-torch.txt)
@@ -24,7 +27,7 @@ hf_xet                                  # fast model downloads from HF (on Windo
 # qwen-asr 0.0.6 still says transformers==4.57.6 in its METADATA. It is installed with --no-deps; infra/qwen_tf_compat.py
 # patches the two import breaks. qwen-tts-hf 0.1.1.post1 (import name qwen_tts) needs transformers>=5.15.1,<6.
 transformers>=5.16.1,<5.17
-huggingface_hub>=1.32.0,<2              # 1.32.0 has the hub deserialization / path-traversal fixes; 2.x is httpx2
+huggingface_hub>=1.32.0,<2              # AIKIDO-2026-285573 fixed in 1.32.0; 2.x is httpx2
 sentencepiece                           # tokenizer of the Opus-MT translation models (MarianTokenizer)
 ctranslate2                             # CTranslate2 wheels are CUDA 12 builds; see infra/cuda12_libs.py
 nvidia-cublas-cu12==12.9.2.10           # CUDA 12 runtime for CTranslate2 (not shipped by torch cu130)

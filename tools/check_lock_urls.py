@@ -30,11 +30,15 @@ def check(w: dict) -> str:
 
 def main() -> int:
     lock = json.loads(LOCK.read_text(encoding="utf-8"))
+    files = list(lock["wheels"])
+    suite = lock.get("suite")
+    if isinstance(suite, dict) and suite.get("url"):
+        files.append(suite)
     with cf.ThreadPoolExecutor(8) as ex:
-        bad = [m for m in ex.map(check, lock["wheels"]) if m]
+        bad = [m for m in ex.map(check, files) if m]
     for m in bad:
         print("PROBLEM:", m)
-    print(f"{len(lock['wheels']) - len(bad)} of {len(lock['wheels'])} files are where the lock says")
+    print(f"{len(files) - len(bad)} of {len(files)} files are where the lock says")
     return 1 if bad else 0
 
 

@@ -44,7 +44,7 @@ pyinstaller --onedir --windowed --noconfirm --clean --name Voxprint --distpath d
   --add-data "%CD%\core\data;core\data" ^
   --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^
   --collect-submodules core --collect-submodules infra --collect-submodules ui --collect-submodules workers --collect-submodules tools ^
-  --hidden-import netroute --hidden-import soundfile --collect-all certifi ^
+  --hidden-import netroute --hidden-import soundfile --collect-all certifi --collect-all voxprint_common ^
   --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
   %META% %EXCL% main.py
 set PYI_ERR=%ERRORLEVEL%
@@ -69,7 +69,7 @@ pyinstaller --onedir --console --noconfirm --name voxprint-cli --distpath dist\t
   --add-data "%CD%\core\data;core\data" ^
   --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^
   --collect-submodules core --collect-submodules infra --collect-submodules ui --collect-submodules workers --collect-submodules tools ^
-  --hidden-import netroute --hidden-import soundfile --collect-all certifi ^
+  --hidden-import netroute --hidden-import soundfile --collect-all certifi --collect-all voxprint_common ^
   --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
   %META% %EXCL% main.py
 if errorlevel 1 (echo [ERROR] Console PyInstaller failed. & exit /b 1)

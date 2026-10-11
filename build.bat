@@ -90,6 +90,7 @@ pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --hidden-import onnxruntime --hidden-import sox --hidden-import nagisa --hidden-import six ^
   --hidden-import huggingface_hub --hidden-import librosa ^
   --collect-all qwen_asr --collect-all qwen_tts --collect-all nagisa --collect-all imageio_ffmpeg ^
+  --collect-all voxprint_common ^
   --collect-all bitsandbytes --collect-data librosa --collect-all hf_xet --collect-all certifi ^
   --collect-all ru_normalizr --collect-all rutextnorm --collect-all pymorphy3 --collect-all pymorphy3_dicts_ru ^
   --collect-all num2words --collect-all eng_to_ipa --collect-all sentencepiece ^

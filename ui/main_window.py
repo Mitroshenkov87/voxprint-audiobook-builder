@@ -41,6 +41,41 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from voxprint_common.ui.theme import (
+    ACCENT,
+    ACCENT_HOVER,
+    ACCENT_SOFT,
+    ACCENT_STRONG,
+    AMBER,
+    BADGE_AMBER_TEXT,
+    BADGE_GREEN_TEXT,
+    CARD_GLASS,
+    CARD_GLASS_MORE,
+    CARD_PLAIN,
+    CONTROL_BG,
+    CONTROL_BORDER,
+    CONTROL_HOVER,
+    GREEN,
+    MENU_BG,
+    MENU_SELECTION,
+    NOTE_BG,
+    NOTE_BORDER,
+    PRIMARY,
+    PRIMARY_BORDER,
+    PRIMARY_DISABLED_BG,
+    PRIMARY_DISABLED_TEXT,
+    PRIMARY_HOVER,
+    ROOT_GLASS,
+    ROOT_GLASS_MORE,
+    ROOT_PLAIN,
+    TEXT,
+    TEXT_DISABLED,
+    TEXT_FAINT,
+    TEXT_MUTED,
+    TEXT_ON_ACCENT,
+    TEXT_ON_PRIMARY,
+)
+
 from core import adapter_strength, i18n, model_export, train_presets, voice_info
 from core import consent as consent_mod
 from core.appinfo import APP_DISPLAY_NAME
@@ -81,46 +116,14 @@ AUDIO_EXT = {".wav", ".mp3", ".flac", ".m4a", ".ogg", ".aac", ".wma", ".opus", "
 TEXT_EXT = {".txt"}
 ALL_STAGES: List[Stage] = [Stage.UPDATES, Stage.MODEL, Stage.ALIGN, Stage.SLICE, Stage.TRAIN, Stage.SAVE]
 
-# Dark theme.  Design rules (WCAG AA, i.e. >= 4.5:1 for all readable text, see tests/test_ui.py::test_theme_contrast):
+# Dark theme tokens come from voxprint_common.ui.theme (tokens.json). Design rules (WCAG AA, i.e. >= 4.5:1
+# for all readable text, see tests/test_ui.py::test_theme_contrast):
 #  * every text colour is OPAQUE - translucent text would take on whatever the blurred desktop behind it looks like;
 #  * panels/buttons/inputs are (almost) solid dark fills, so the contrast does not depend on the backdrop;
 #  * only the window background itself is translucent in Acrylic mode, with a strong dark tint (~87 % opaque),
 #    which keeps a subtle glass feel while the worst case (a white desktop) still ends up dark.
 # ``{root_bg}`` / ``{card_bg}`` are the only parts that differ between the Acrylic and the plain fallback look.
-TEXT = "#f2f2f5"            # primary text
-TEXT_MUTED = "#c4c4d0"      # secondary text (subtitle, file name, status)
-TEXT_FAINT = "#a8a8b8"      # tertiary text (hints, footer, inactive stage chips)
-TEXT_DISABLED = "#8e8e9e"   # disabled controls (exempt from WCAG, still legible)
-TEXT_ON_ACCENT = "#0b1220"  # dark text on the light-blue accent
-ACCENT = "#60a5fa"
-ACCENT_HOVER = "#7db9ff"
-ACCENT_SOFT = "#93c5fd"
-ACCENT_STRONG = "#2563eb"   # progress chunk / selection: white text on it passes AA
-ROOT_PLAIN = "#17171c"
-ROOT_GLASS = "rgba(16,16,22,222)"
-CARD_PLAIN = "#202029"
-CARD_GLASS = "rgba(34,34,44,238)"
-CONTROL_BG = "#2c2c38"      # buttons, combo boxes, line edits
-CONTROL_HOVER = "#383846"
-CONTROL_BORDER = "#4b4b5c"
-AMBER = "#fcd34d"           # warnings / "personal use only" accents
-NOTE_BG = "#2a2418"         # background of warning notes (e.g. the AAC disclaimer)
-NOTE_BORDER = "#6b5720"
-GREEN = "#86efac"
-BADGE_GREEN_TEXT = "#0b1f12"
-BADGE_AMBER_TEXT = "#251a02"
-# Soft blue / yellow palette: yellow primary buttons, soft blue menus, lists and accents.
-PRIMARY = "#f5d76e"          # main action buttons ("Start", "Narrate", the primary Studio card border)
-PRIMARY_HOVER = "#f9e291"
-PRIMARY_BORDER = "#fbe8a6"
-TEXT_ON_PRIMARY = "#1c1604"
-PRIMARY_DISABLED_BG = "#36321f"
-PRIMARY_DISABLED_TEXT = "#b9b08a"
-MENU_BG = "#1c2535"          # drop-down lists and menus: a soft blue tint of the dark background
-MENU_SELECTION = "#2f4c78"
 # Window transparency (Settings): "more" lets ~25 % more of the blurred desktop through than the default tint.
-ROOT_GLASS_MORE = "rgba(16,16,22,167)"
-CARD_GLASS_MORE = "rgba(34,34,44,214)"
 
 
 def recommended_text(text: str) -> str:
@@ -184,6 +187,11 @@ QMenu::item:selected {{{{ background: {menu_sel}; color: #ffffff; }}}}
 QLineEdit {{{{ background: {control}; border: 1px solid {border}; border-radius: 8px;
             padding: 6px 12px; selection-background-color: {strong}; }}}}
 QPushButton#gear {{{{ padding: 6px 12px; font-size: 18px; }}}}
+QPushButton#disclosure {{{{
+    background: transparent; border: none; padding: 4px 2px;
+    font-weight: 600; font-size: 15px;
+}}}}
+QPushButton#disclosure:hover {{{{ color: {soft}; background: transparent; }}}}
 QScrollArea {{{{ background: transparent; border: none; }}}}
 QWidget#content {{{{ background: transparent; }}}}
 QScrollBar:vertical {{{{ background: transparent; width: 10px; margin: 2px; }}}}

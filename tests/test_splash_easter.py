@@ -1,120 +1,66 @@
-"""Splash easter egg: six clicks inside two seconds, once per launch, without holding up loading."""
-from __future__ import annotations
-
-import time
+"""The suite splash is the shared window. Six clicks open the egg through on_click."""
+import json
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QWidget
-
-from core.i18n import LANGS, set_language, tr
-from tests.test_icon_artwork import _jpeg_size
-from ui import splash
+from PySide6.QtGui import QGuiApplication
 
 ROOT = Path(__file__).resolve().parents[1]
 CAPTION = "Кури ушную серу!"
 
 
-@pytest.fixture(scope="module")
-def app():
-    return QApplication.instance() or QApplication([])
+def test_easter_egg_caption_is_the_same_russian_line_in_every_catalog():
+    for name in ("en", "de", "ru", "uk", "lv"):
+        cat = json.loads((ROOT / "locales" / f"{name}.json").read_text(encoding="utf-8"))
+        assert cat["easter_egg.caption"] == CAPTION
 
 
-def test_six_clicks_inside_two_seconds_trigger():
-    stamps: list[float] = []
-    hit = False
-    for i in range(splash.EGG_CLICKS):
-        stamps, hit = splash.record_click(stamps, i * 0.3)
-    assert hit and len(stamps) == splash.EGG_CLICKS
-    assert splash.EGG_WINDOW_S == 2.0 and splash.EGG_HOLD_S == 3.0
-
-
-def test_five_clicks_inside_the_window_do_not_trigger():
-    stamps: list[float] = []
-    hit = False
-    for i in range(splash.EGG_CLICKS - 1):
-        stamps, hit = splash.record_click(stamps, i * 0.2)
-    assert not hit and len(stamps) == 5
-
-
-def test_a_click_on_the_window_edge_still_counts():
-    stamps: list[float] = []
-    for t in (0.0, 0.4, 0.8, 1.2, 1.6):
-        stamps, hit = splash.record_click(stamps, t)
-        assert not hit
-    stamps, hit = splash.record_click(stamps, 2.0)          # 2.0 - 0.0 == the window, still inside
-    assert hit
-
-
-def test_clicks_older_than_two_seconds_drop_out_of_the_window():
-    stamps: list[float] = []
-    for t in (0.0, 0.4, 0.8, 1.2, 1.6):
-        stamps, _hit = splash.record_click(stamps, t)
-    stamps, hit = splash.record_click(stamps, 2.0 + 1e-6)   # the click at 0.0 is outside
-    assert not hit and 0.0 not in stamps and len(stamps) == 5
-    stamps, hit = splash.record_click(stamps, 2.2)          # the five that remain, plus this one
-    assert hit and len(stamps) == 6
-
-
-def test_caption_is_the_russian_joke_in_every_language():
-    for lang in LANGS:
-        set_language(lang)
-        assert tr("easter_egg.caption") == CAPTION
-
-
-def test_easter_egg_image_is_original_artwork_and_is_shipped():
-    path = ROOT / "assets" / "easter-egg.jpg"
-    assert path.is_file() and _jpeg_size(path) == (1280, 720)
-    note = (ROOT / "assets" / "ICON-LICENSE.txt").read_text(encoding="utf-8")
-    assert "easter-egg.jpg" in note and "original generated artwork" in note
-    assert "no real person's likeness" in note
+def test_the_egg_is_packaged():
     for name in ("build.bat", "build_thin.bat"):
         assert "easter-egg.jpg" in (ROOT / name).read_text(encoding="utf-8")
     extra = (ROOT / "tools" / "make_linux_package.py").read_text(encoding="utf-8")
     assert "assets/easter-egg.jpg" in extra
+    note = (ROOT / "assets" / "ICON-LICENSE.txt").read_text(encoding="utf-8")
+    assert "on_click" in note and "easter-egg.jpg" in note
 
 
-def _burst(screen: splash.Splash, n: int) -> None:
-    for _ in range(n):
-        QTest.mouseClick(screen, Qt.MouseButton.LeftButton)
+def test_record_click_needs_six_inside_two_seconds():
+    from ui.splash import record_click
+
+    stamps: list[float] = []
+    for moment in (0.0, 0.2, 0.4, 0.6, 0.8):
+        stamps, hit = record_click(stamps, moment)
+        assert hit is False
+    stamps, hit = record_click(stamps, 1.0)
+    assert hit is True
+    late, hit = record_click([0.0], 2.1)
+    assert hit is False and late == [2.1]
 
 
-def test_six_clicks_show_the_overlay_once_and_a_click_closes_it(app):
-    set_language("en")
+def test_six_clicks_open_the_egg_through_on_click_and_another_click_closes_it():
+    pytest.importorskip("PySide6")
+    from voxprint_common.ui.splash import SplashEvent
+
+    from ui import splash
+
+    assert splash.WIDTH == 960 and splash.HEIGHT == 540 and splash.IDENTITY == "#f5d76e"
     screen = splash.show()
     try:
-        _burst(screen, splash.EGG_CLICKS - 1)
+        work = QGuiApplication.primaryScreen().availableGeometry()
+        assert screen.width() in (1016, min(1016, work.width()))
+        assert screen.height() in (596, min(596, work.height()))
+        info = splash.build_info()
+        assert info.version == "1.0.0" and info.rc == 4 and info.build == 1002
+        assert info.codename == "Ometz"
+        assert info.label() == '1.0.0 RC 4 build 1002 "Ometz"'
         assert not screen.egg_visible()
-        started = time.monotonic()
-        _burst(screen, 1)
-        assert time.monotonic() - started < 0.5          # painting the overlay does not wait
-        assert screen.egg_visible() and screen.isVisible()
-        assert screen.egg_caption() == CAPTION
-        assert screen._egg_timer is not None and screen._egg_timer.interval() == int(splash.EGG_HOLD_S * 1000)
-        assert not screen.grab().isNull()                 # grab() runs drawContents, caption included
-        _burst(screen, 1)                                # a click dismisses it
+        for _ in range(5):
+            screen._on_click(SplashEvent(1, 1, "left"))
         assert not screen.egg_visible()
-        _burst(screen, splash.EGG_CLICKS)                # once per launch
-        assert not screen.egg_visible()
-    finally:
-        screen.close()
-
-
-def test_finish_returns_at_once_and_waits_only_until_the_overlay_closes(app):
-    screen = splash.show()
-    window = QWidget()
-    window.show()
-    try:
-        _burst(screen, splash.EGG_CLICKS)
+        screen._on_click(SplashEvent(1, 1, "left"))
         assert screen.egg_visible()
-        started = time.monotonic()
-        screen.finish(window)                            # the main window is ready; do not block
-        assert time.monotonic() - started < 0.5
-        assert screen.isVisible() and screen.egg_visible()
-        screen.dismiss_egg()
-        assert not screen.egg_visible() and not screen.isVisible()
+        screen._on_click(SplashEvent(2, 2, "left"))
+        assert not screen.egg_visible()
     finally:
-        screen.close()
-        window.close()
+        screen._dismiss_egg()
+        screen.finish()

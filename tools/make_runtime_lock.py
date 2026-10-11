@@ -59,6 +59,15 @@ GROUPS = [
 TEST_EXTRAS = {"huggingface-hub", "requests", "scipy", "pyyaml", "tqdm", "urllib3", "filelock", "fsspec", "typing-extensions",
                "hf-xet", "idna", "charset-normalizer"}
 COMPAT = {"torch": ">=2.11,<2.12", "python_minor_must_match": True}
+#: Released suite wheel. The thin shell bundles it. It is not a PyPI runtime download.
+SUITE_DIST = "voxprint-common"
+SUITE_VERSION = "0.1.1"
+SUITE_FILE = "voxprint_common-0.1.1-py3-none-any.whl"
+SUITE_URL = (
+    "https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.1.1/" + SUITE_FILE
+)
+SUITE_SHA256 = "c9361d5d00913faf39497fc55124e682ba15b2098c775068c49582c0520cd4d1"
+SUITE_SIZE = 53842
 
 
 def norm(n: str) -> str:
@@ -180,15 +189,43 @@ def build(py: str, torch_version: str, torchaudio_version: str = TORCHAUDIO_VERS
     return {"schema": SCHEMA, "generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"), "python": py,
             "platform": "win_amd64", "compat": COMPAT, "torch_version": torch_version,
             "torchaudio_version": torchaudio_version, "flavors": list(FLAVORS), "ci_flavors": list(CI_FLAVORS),
-            "group_titles": titles, "shell": shell, "wheels": libs + torch}
+            "group_titles": titles, "shell": shell, "suite": suite_record(), "wheels": libs + torch}
+
+
+def suite_record() -> dict:
+    """The released voxprint-common wheel (url, size, sha256). Not a PyPI download."""
+    return {
+        "dist": SUITE_DIST, "version": SUITE_VERSION, "file": SUITE_FILE, "url": SUITE_URL,
+        "size": SUITE_SIZE, "sha256": SUITE_SHA256,
+    }
+
+
+def suite_requirement(row: Optional[dict] = None) -> str:
+    """pip requirement. The ``#sha256=`` fragment is checked when the wheel is downloaded."""
+    item = suite_record() if row is None else row
+    return f"{item['dist']} @ {item['url']}#sha256={item['sha256']}"
+
+
+def git_dist_names(lock: dict) -> List[str]:
+    """Distribution names bundled with the shell: the suite wheel, and any leftover ``git`` pins."""
+    names = []
+    suite = lock.get("suite")
+    if isinstance(suite, dict) and str(suite.get("dist") or "").strip():
+        names.append(str(suite["dist"]).strip())
+    for line in lock.get("git") or []:
+        name = str(line).split("@", 1)[0].strip()
+        if name and name not in names:
+            names.append(name)
+    return names
 
 
 def pyinstaller_metadata_args(lock: dict) -> List[str]:
     """PyInstaller copies a package's code but NOT its ``*.dist-info``; ``importlib.metadata`` then cannot see it and the downloaded
     libraries' version checks fail (real PC: transformers -> "No package metadata was found for packaging").  One
-    ``--copy-metadata`` per package the shell bundles fixes that."""
+    ``--copy-metadata`` per package the shell bundles fixes that. The suite wheel (voxprint-common) is bundled too."""
     out: List[str] = []
-    for dist in sorted(lock["shell"]):
+    dists = set(lock["shell"]) | set(git_dist_names(lock))
+    for dist in sorted(dists):
         out += ["--copy-metadata", dist]
     return out
 
@@ -215,7 +252,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             for w in lock["wheels"]:
                 if w["dist"] in TEST_EXTRAS:
                     pins[w["dist"]] = w["version"]
-        print("\n".join(f"{n}=={v}" for n, v in pins.items()))
+        lines = [f"{n}=={v}" for n, v in pins.items()]
+        if a.test_requirements:
+            suite = lock.get("suite")
+            if isinstance(suite, dict) and suite.get("url") and suite.get("sha256"):
+                lines.append(suite_requirement(suite))
+            lines.extend(str(item) for item in (lock.get("git") or []))
+        print("\n".join(lines))
         return 0
     lock = build(a.python, a.torch, a.torchaudio)
     Path(a.out).write_text(json.dumps(lock, indent=1) + "\n", encoding="utf-8")

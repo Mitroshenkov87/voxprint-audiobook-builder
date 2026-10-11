@@ -176,6 +176,9 @@ def test_style_modes():
     assert mw.ROOT_GLASS in build_style(True) and mw.ROOT_PLAIN in build_style(False)
     assert mw.CARD_GLASS in build_style(True) and mw.CARD_PLAIN in build_style(False)
     assert mw.ROOT_GLASS not in build_style(False)
+    plain = build_style(False)
+    assert "QPushButton#gear" in plain
+    assert "QPushButton#disclosure" in plain and "QPushButton#disclosure:hover" in plain
 
 
 def _lum(hex_color):

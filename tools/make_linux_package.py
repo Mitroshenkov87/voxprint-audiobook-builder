@@ -25,6 +25,11 @@ import zipfile
 from pathlib import Path
 from typing import Iterable, List, Optional
 
+try:
+    from voxprint_common.hashing import sha256_file as _sha256_file
+except ImportError:  # the Linux package job hashes the tree before this library is installed
+    _sha256_file = None
+
 SCHEMA = 1
 ZIP_NAME = "Voxprint-linux-app.zip"
 TAR_NAME = "Voxprint-linux-experimental.tar.gz"
@@ -37,7 +42,8 @@ DEFAULT_REPO = "Mitroshenkov87/voxprint-audiobook-builder"
 TOP_FILES = ["main.py", "credits.json", "requirements.txt", "requirements-verified.txt", "requirements-nodeps.txt",
              "requirements-torch.txt", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"]
 TOP_DIRS = ["core", "infra", "ui", "workers", "locales", "prompts", "licenses", "third_party"]
-EXTRA = ["assets/voxprint.png", "assets/voxprint.ico", "assets/check.png", "assets/splash.jpg", "assets/easter-egg.jpg",
+EXTRA = ["assets/voxprint.png", "assets/voxprint.ico", "assets/check.png", "assets/splash.jpg",
+         "assets/easter-egg.jpg",
          "assets/ICON-LICENSE.txt",
          "assets/icons/save.svg", "assets/icons/save-as.svg", "assets/icons/save-copy.svg",
          "assets/icons/export.svg", "assets/icons/download.svg", "assets/icons/LICENSE.txt",
@@ -46,11 +52,13 @@ EXTRA = ["assets/voxprint.png", "assets/voxprint.ico", "assets/check.png", "asse
 
 
 def sha256_of(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for b in iter(lambda: f.read(1 << 20), b""):
-            h.update(b)
-    return h.hexdigest()
+    if _sha256_file is not None:
+        return _sha256_file(path)
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def app_files(root: Path) -> List[str]:

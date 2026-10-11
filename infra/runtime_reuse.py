@@ -9,7 +9,7 @@ win and the foreign environment only supplies ``torch`` and ``torchaudio``.  If 
 
 Compatibility rules (all must hold; every rejection is logged with its reason):
 
-1. same CPython minor version as the running Voxprint (binary wheels: the ``Tag:`` in the wheel's ``WHEEL`` file, e.g. ``cp311``) and
+1. same CPython minor version as the running Voxprint (binary wheels: the ``Tag:`` in the wheel's ``WHEEL`` file, e.g. ``cp314``) and
    64-bit Windows (``win_amd64``);
 2. ``torch`` version inside ``compat.torch`` of ``infra/runtime_lock.json`` (a range around the version we tested);
 3. ``torchaudio`` is installed in the same ``site-packages``, the same release number as ``torch``, and the same flavor
@@ -40,7 +40,7 @@ from typing import Callable, Dict, Iterable, List, Optional, Tuple
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from packaging.version import InvalidVersion, Version
 
-from infra import env_probe, paths
+from infra import env_probe, paths, suite_shared
 
 log = logging.getLogger("voxprint.reuse")
 
@@ -213,6 +213,7 @@ def _suite_runtime_prefixes(env: Dict[str, str], home: Path) -> List[Path]:
             continue
         seen.add(key)
         found.append(root / "shared" / "runtime")
+        found.append(root / "shared" / "runtime" / "py314-torch2.11-cu130")
         try:
             children = sorted(p for p in root.glob("runtime-*") if p.is_dir())
         except OSError:
@@ -314,7 +315,7 @@ def candidate_prefixes(environ: Optional[Dict[str, str]] = None, home: Optional[
 def _looks_like_site(folder: Path) -> bool:
     """True when ``folder`` itself is a site-packages tree (``torch`` unpacked directly into it).
 
-    ``modules.install`` writes wheels into ``<home>/shared/runtime`` that way. A venv still has them under
+    ``modules.install`` writes wheels into the shared torch component that way. A venv still has them under
     ``Lib/site-packages``, which :func:`_site_dirs_of` already covers.
     """
     try:
@@ -342,6 +343,10 @@ def _own_runtime_dirs(own_runtime: Optional[Path] = None) -> set:
         folders.append(paths.app_home() / "runtime")
         shared = os.environ.get("VOXPRINT_SHARED", "").strip()
         folders.append((Path(shared) / "runtime") if shared else (paths.app_home() / "shared" / "runtime"))
+        try:
+            folders.append(suite_shared.torch_dir())
+        except OSError:
+            pass
     found = set()
     for folder in folders:
         if folder is None:

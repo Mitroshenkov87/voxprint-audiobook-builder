@@ -12,7 +12,8 @@ def test_copy_metadata_args_cover_every_shell_package_of_the_lock():
     lock = json.loads((ROOT / "infra" / "runtime_lock.json").read_text(encoding="utf-8"))
     args = mrl.pyinstaller_metadata_args(lock)
     copied = {args[i + 1] for i, a in enumerate(args) if a == "--copy-metadata"}
-    assert copied == set(lock["shell"]) and {"packaging", "psutil", "soundfile", "cffi", "pycparser", "pyside6", "shiboken6"} <= copied
+    assert copied == set(lock["shell"]) | set(mrl.git_dist_names(lock))
+    assert {"packaging", "psutil", "soundfile", "cffi", "pycparser", "pyside6", "shiboken6", "voxprint-common"} <= copied
     assert set(lock["shell"]) == mrl.SHELL_PROVIDED          # the lock is in sync with the list of what the shell provides
 
 
