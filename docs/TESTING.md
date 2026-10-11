@@ -69,9 +69,9 @@ The Linux test-suite (`QT_QPA_PLATFORM=offscreen python -m pytest`) covers the p
 `scripts/vm_test.sh` is the non-interactive check for a Linux machine with an NVIDIA GPU. `scripts/vm_test.ps1` is the same check for the Windows VM. Neither script prompts.
 
 ```
-scripts/vm_test.sh --smoke --json --tag v1.0.0-rc.4
+scripts/vm_test.sh --smoke --json --tag v1.0.0-rc.5
 scripts/vm_test.sh --full --json
-powershell -File scripts/vm_test.ps1 --smoke --json --tag v1.0.0-rc.4
+powershell -File scripts/vm_test.ps1 --smoke --json --tag v1.0.0-rc.5
 powershell -File scripts/vm_test.ps1 --full --json
 ```
 

@@ -5,10 +5,17 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+## [1.0.0-rc.5] - 2026-10-11 - build 1003 "Amud"
+
+Codename *Amud* (pillar): the app now stands on the shared suite library. The version is **1.0.0-rc.5**. The release tag for this build is `v1.0.0-rc.5` (a pre-release). People see `1.0.0 RC5 · build 1003 "Amud"`; the Windows file version is `1.0.0.1003`. The build number is the `build` field in `BUILD.json` (**1003**). `offset` is history only and is not added to the CI run number. Release notes: [docs/RELEASE-NOTES-1003-AMUD.md](docs/RELEASE-NOTES-1003-AMUD.md).
+
 ### Changed
-- **voxprint-common 0.1.1.** Paths, suite settings, the GPU lock, thermal pauses, the mirror download, build labels, file hashes, theme tokens and the splash come from the suite library. The pin is the released wheel `voxprint_common-0.1.1-py3-none-any.whl` with its SHA-256 (`requirements.txt` and `infra/runtime_lock.json`), not a git commit.
-- **Shared runtime schema 1.** Torch 2.11.0+cu130 is one refcounted component under `shared/runtime/py314-torch2.11-cu130`. An existing per-app runtime is moved there on upgrade. A CPU `onnxruntime` is kept out of that tree. Uninstall drops this app's ref and deletes the component only when nothing else still lists it. Required models are recorded as a component under the suite models root (`<home>/models`). `shared/models` is still read when it already holds models and that root does not.
-- **Suite splash.** The start-up window is the shared 960×540 splash. `assets/splash.jpg` is the 16:9 art. The build line is read with `voxprint_common.buildinfo.load`. Six clicks within two seconds call the splash `on_click` hook and show `assets/easter-egg.jpg`. The stylesheet includes `#gear` and `#disclosure`.
+- **voxprint-common 0.1.1.** Paths, suite settings, the GPU lock, thermal pauses, the GPU probe, downloads with mirror failover, build info, file hashes, theme tokens and the splash come from the suite library. The pin is the released wheel `voxprint_common-0.1.1-py3-none-any.whl` with its SHA-256 (`requirements.txt` and `infra/runtime_lock.json`), not a git commit.
+- **Shared runtime.** Torch 2.11.0+cu130 is one shared runtime under `shared/runtime/py314-torch2.11-cu130`, with a manifest that counts the programs using it. An existing per-app runtime is moved there on upgrade. A compatible PyTorch is reused. A CPU `onnxruntime` is kept out of that tree. Uninstall drops this app's count and deletes the runtime only when nothing else still lists it. Required models are recorded under the suite models folder (`<home>/models`). `shared/models` is still read when it already holds models and that folder does not.
+- **Suite splash.** The start-up window is the shared 960×540 splash. `assets/splash.jpg` is the 16:9 art. The build line is read from the shared build info. Six clicks within two seconds show `assets/easter-egg.jpg`.
+
+### Fixed
+- **Release smoke checks.** The checks that follow a silent install now look in the shared runtime and the suite models folder. They cover reuse of a compatible PyTorch, a bad manifest, and uninstall dropping this app's claim on the shared runtime. A runtime laid out the old flat way is treated as another program's PyTorch. These checks run on every pull request.
 
 ## [1.0.0-rc.4] - 2026-10-11 - build 1002 "Ometz"
 
