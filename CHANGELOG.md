@@ -12,6 +12,7 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 - **Setup file.** The Windows installer is `voxprint-audiobook-builder-setup-<version>-win-x64.exe` with a `.sha256` file. The same bytes are also published as `voxprint-audiobook-builder-setup-win-x64.exe` (and its `.sha256`), which is the name `install.ps1` downloads.
 
 ### Fixed
+- **Shared models stay when one app is removed.** Setup no longer records the models root, `shared/runtime`, the voices root or a cache root as one manifest component. Model files belong to VOXPrint MDL. Uninstall, a failed setup, `--unregister-suite` and `--unregister-runtime-user` drop only this app's ref and delete a directory only when this app was the last ref. Those commands refuse to delete a shared root, or a folder that contains one, even when the ref list is empty.
 - **Clean install.** Setup no longer treats a missing status file as success. The model download is VOXPrint MDL, which drops a mirror at or under 84 KiB/s when another mirror is faster, and resumes a partial file. The CI test installer is built against a local manifest, and a manifest URL that names a missing GitHub tag fails the check.
 
 ## [1.0.0-rc.5] - 2026-10-11 - build 1003 "Amud"

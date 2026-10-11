@@ -66,6 +66,8 @@ jobs:
         run: |
           .app/bin/python main.py --selftest-text
           .app/bin/python main.py --selftest-speech
+      - name: Shared models root survives uninstall
+        run: .app/bin/python -m pytest -q tests/test_suite_roots.py --tb=short
 
   windows:
     runs-on: windows-latest
@@ -122,6 +124,9 @@ jobs:
         run: |
           .app\Scripts\python.exe main.py --selftest-text
           .app\Scripts\python.exe main.py --selftest-speech
+      - name: Shared models root survives uninstall
+        shell: pwsh
+        run: .app\Scripts\python.exe -m pytest -q tests\test_suite_roots.py --tb=short
 
   windows-installer:
     runs-on: windows-latest
@@ -186,6 +191,37 @@ jobs:
           $p = Start-Process $setup.FullName -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxmdl","/LOG=C:\vxmdl.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxmdl.log -Tail 80; throw "install exit code $($p.ExitCode)" }
           if (-not (Test-Path C:\vxmdl\voxprint-audiobook-builder.exe)) { throw "the shell was not installed" }
+          $env:VOXPRINT_HOME = "C:\vxmdl-home"
+          $cli = "C:\vxmdl\voxprint-audiobook-cli.exe"
+          if (-not (Test-Path $cli)) { throw "cli missing: $cli" }
+          $models = "C:\vxmdl-home\models"
+          New-Item -ItemType Directory -Force (Join-Path $models "movie-dubber") | Out-Null
+          $marker = Join-Path $models "movie-dubber\weights.bin"
+          Set-Content -Path $marker -Value "other-app" -Encoding ascii
+          $shared = "C:\vxmdl-home\shared"
+          New-Item -ItemType Directory -Force $shared | Out-Null
+          $stored = ($models -replace '\\', '/')
+          $sha = "ab" * 32
+          @"
+{
+  "schema": 1,
+  "components": {
+    "shared-models": {
+      "kind": "model",
+      "version": "1",
+      "path": "$stored",
+      "sha256": "$sha",
+      "installed_at": "2026-01-01T00:00:00+00:00",
+      "refs": ["audiobook-builder"]
+    }
+  }
+}
+"@ | Set-Content -Encoding utf8 (Join-Path $shared "manifest.json")
+          & $cli --unregister-suite
+          if ($LASTEXITCODE -ne 0) { throw "unregister-suite exited $LASTEXITCODE" }
+          & $cli --unregister-runtime-user
+          if ($LASTEXITCODE -ne 0) { throw "unregister-runtime-user exited $LASTEXITCODE" }
+          if (-not (Test-Path -LiteralPath $marker)) { throw "uninstall deleted another app's models" }
       - uses: actions/upload-artifact@v4
         with:
           name: voxprint-audiobook-builder-setup

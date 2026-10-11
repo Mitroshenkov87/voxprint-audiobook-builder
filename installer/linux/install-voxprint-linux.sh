@@ -326,7 +326,7 @@ say "Installing the other Python packages (this takes a few minutes)"
 if [ "${VOXPRINT_SKIP_SUITE:-}" != "1" ]; then
   say "Downloading the required models (voxprint-mdl)"
   "$VPY" "$APP/main.py" --run-mdl download --app audiobook-builder --manifest "$APP/voxprint-app-models.json" --json \
-    || die "model download failed"
+    || { "$VPY" "$APP/main.py" --unregister-suite || true; die "model download failed"; }
 fi
 
 # ----------------------------------------------------------------------------------------------- launcher, menu entry

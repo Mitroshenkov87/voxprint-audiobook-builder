@@ -124,14 +124,18 @@ def install_suite(progress: Callable[[float, str], None] = lambda _f, _m: None, 
         (0.0, 0.8, tr("suite.runtime"), modules_fn or _default_modules),
         (0.8, 1.0, tr("suite.ffmpeg"), ffmpeg_fn or _default_ffmpeg),
     )
-    for start, end, label, fn in steps:
-        span = end - start
+    try:
+        for start, end, label, fn in steps:
+            span = end - start
 
-        def step_progress(fraction: float, message: str = "", s=start, w=span, title=label) -> None:
-            progress(s + w * max(0.0, min(1.0, float(fraction))), message or title)
+            def step_progress(fraction: float, message: str = "", s=start, w=span, title=label) -> None:
+                progress(s + w * max(0.0, min(1.0, float(fraction))), message or title)
 
-        progress(start, label)
-        fn(step_progress)
+            progress(start, label)
+            fn(step_progress)
+    except Exception:
+        suite_shared.rollback(suite_shared.APP_ID)
+        raise
     suite_shared.register(suite_shared.APP_ID, APP_RESOURCES)
     progress(1.0, tr("suite.done"))
     report = inspect_shared()
@@ -158,8 +162,7 @@ def cli(argv: Sequence[str]) -> int:
     """
     args = list(argv)
     if "--unregister-suite" in args:
-        unused = suite_shared.unregister(suite_shared.APP_ID)
-        suite_shared.delete_resources(unused)
+        suite_shared.rollback(suite_shared.APP_ID)
         return 0
 
     def progress(fraction: float, message: str) -> None:

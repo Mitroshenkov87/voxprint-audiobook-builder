@@ -75,9 +75,7 @@ def test_installer_and_ci_use_the_same_file_name():
     root = Path(__file__).resolve().parents[1]
     iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
     assert "'.users.json'" in iss and '"audiobook-builder"' in iss and "--unregister-models-user" in iss
-    assert "UninstallModelsQuestion" in iss and "MB_DEFBUTTON2" in iss
-    for lang in ("english", "russian", "german"):
-        assert f"{lang}.UninstallModelsQuestion=" in iss
+    assert "DelTree(SharedModelsDir" not in iss and "UninstallModelsQuestion" not in iss
     assert mu.USERS_FILE == ".users.json" and mu.USER_KEY == "audiobook-builder"
 
 

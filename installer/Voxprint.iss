@@ -236,9 +236,6 @@ german.PortableBadFolder=Der Ordner %1 kann nicht verwendet werden (er kann nich
 english.ModelsSiblingFound=VOXPrint AI Movie Dubber is installed on this PC. Both programs use one models folder, so every model is downloaded only once.
 russian.ModelsSiblingFound=На этом ПК установлен VOXPrint AI Movie Dubber. Обе программы используют одну папку моделей, поэтому каждая модель скачивается только один раз.
 german.ModelsSiblingFound=VOXPrint AI Movie Dubber ist auf diesem PC installiert. Beide Programme nutzen einen Modellordner, daher wird jedes Modell nur einmal geladen.
-english.UninstallModelsQuestion=No other VOXPrint program uses the models in%n%1%n%nDelete these models too (about 15-28 GB)? Choose No to keep them for a later install.
-russian.UninstallModelsQuestion=Модели в папке%n%1%nбольше не использует ни одна программа VOXPrint.%n%nУдалить и их (около 15-28 ГБ)? Нажмите «Нет», чтобы оставить их для следующей установки.
-german.UninstallModelsQuestion=Kein anderes VOXPrint-Programm verwendet die Modelle in%n%1%n%nDiese Modelle ebenfalls löschen (etwa 15-28 GB)? Wählen Sie Nein, um sie für eine spätere Installation zu behalten.
 english.PortableMissing=The setup folder %1 (from /FromFolder) was not found or has no manifest.json.
 russian.PortableMissing=Папка установки %1 (из /FromFolder) не найдена или в ней нет manifest.json.
 german.PortableMissing=Der Setup-Ordner %1 (aus /FromFolder) wurde nicht gefunden oder enthält keine manifest.json.
@@ -1553,6 +1550,7 @@ begin
   end;
   if not RunChecked(Exe, '--install-suite', SW_HIDE) then
   begin
+    UnregisterSuite();
     SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['runtime']), mbError, MB_OK, IDOK);
     Abort;
   end;
@@ -1560,6 +1558,7 @@ begin
   if not FileExists(Mdl) then
   begin
     Log('Suite install failed: voxprint-mdl.cmd is missing');
+    UnregisterSuite();
     SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['voxprint-mdl']), mbError, MB_OK, IDOK);
     Abort;
   end;
@@ -1571,6 +1570,7 @@ begin
     Show := SW_SHOWNORMAL;
   if not RunChecked(ExpandConstant('{cmd}'), Params, Show) then
   begin
+    UnregisterSuite();
     SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['models']), mbError, MB_OK, IDOK);
     Abort;
   end;
@@ -1745,37 +1745,18 @@ begin
   end;
 end;
 
-{ Uninstall: remove our key with the program itself (ProgramExe --unregister-models-user --out FILE).  FILE gets the number of
-  OTHER programs still using the models and the models folder.  -1 (helper failed) means: never offer to delete. }
-var
-  OtherModelUsers: Integer;
-  SharedModelsDir: String;
-
+{ Uninstall: drop our key in models\.users.json. The models root itself is never deleted. }
 procedure UnregisterModelsUser;
 var
   Rc: Integer;
-  OutFile: String;
-  Lines: TArrayOfString;
 begin
-  OtherModelUsers := -1;
-  SharedModelsDir := '';
-  OutFile := AddBackslash(GetTempDir()) + 'voxprint-models-users.txt';
-  DeleteFile(OutFile);
-  if not FileExists(ProgramExe()) then Exit;
-  if Exec(ProgramExe(), '--unregister-models-user --out "' + OutFile + '"', ExpandConstant('{app}'),
-          SW_HIDE, ewWaitUntilTerminated, Rc) and (Rc = 0) then
-    if LoadStringsFromFile(OutFile, Lines) and (GetArrayLength(Lines) >= 2) then
-    begin
-      OtherModelUsers := StrToIntDef(Trim(Lines[0]), -1);
-      SharedModelsDir := RemoveBackslash(Trim(Lines[1]));
-    end;
-  DeleteFile(OutFile);
+  if FileExists(ProgramExe()) then
+    if not Exec(ProgramExe(), '--unregister-models-user', ExpandConstant('{app}'), SW_HIDE,
+                ewWaitUntilTerminated, Rc) then
+      Log('models users file not updated');
 end;
 
-{ The models are deleted only when no other Voxprint program uses them AND the user says yes (default: keep; a silent uninstall
-  with /SUPPRESSMSGBOXES keeps them).  Only the default folder is ever offered: a folder the user chose stays untouched. Voices,
-  settings and projects in %LOCALAPPDATA%\Voxprint are never deleted here. }
-{ runtime\.users.json: remove our key. The same flag drops our ref in shared\manifest.json and deletes the torch component only when no other app still lists it. }
+{ runtime\.users.json: remove our key. The same flag drops our runtime ref and deletes that version directory only when no other app still lists it. A shared root is never deleted. }
 procedure UnregisterRuntimeUser;
 var
   Rc: Integer;
@@ -1786,7 +1767,7 @@ begin
       Log('runtime users file not updated');
 end;
 
-{ Drop our app from the shared manifest and delete resources no other Voxprint app still lists. }
+{ Drop our app from the shared manifest. A directory goes only when this app was its last ref and it is not a shared root. }
 procedure UnregisterSuite();
 var
   Rc: Integer;
@@ -1859,10 +1840,4 @@ begin
 #endif
   if CurUninstallStep = usPostUninstall then
     RemoveDir(ExtractFileDir(RemoveBackslash(ExpandConstant('{app}'))));
-  if CurUninstallStep = usPostUninstall then
-    if (OtherModelUsers = 0) and (SharedModelsDir <> '') and DirExists(SharedModelsDir) and
-       (CompareText(SharedModelsDir, DefaultModelsDir()) = 0) then
-      if SuppressibleMsgBox(FmtMessage(CustomMessage('UninstallModelsQuestion'), [SharedModelsDir]),
-         mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES then
-        DelTree(SharedModelsDir, True, True, True);
 end;
