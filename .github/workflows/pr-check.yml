@@ -156,9 +156,11 @@ jobs:
         shell: pwsh
         run: |
           python -m venv .venv
+          python -m pip install -q uv
           python tools\make_runtime_lock.py --test-requirements | Out-File -Encoding ascii build-req.txt
           Get-Content build-req.txt
-          .venv\Scripts\python.exe -m pip install --quiet -r build-req.txt pyinstaller
+          # The suite pin carries --hash. pip then requires a hash on every package in the command, including PyInstaller.
+          uv pip install --python .venv\Scripts\python.exe -r build-req.txt pyinstaller
       - name: Build number and codename (BUILD.json build field or the release tag; BUILD.json is not changed)
         shell: pwsh
         run: |

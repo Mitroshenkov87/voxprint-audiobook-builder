@@ -432,9 +432,11 @@ jobs:
         shell: pwsh
         run: |
           python -m venv .venv
+          python -m pip install -q uv
           python tools\make_runtime_lock.py --test-requirements | Out-File -Encoding ascii build-req.txt
           Get-Content build-req.txt
-          .venv\Scripts\python.exe -m pip install --quiet -r build-req.txt -r requirements-docs.txt pyinstaller pytest pytest-timeout
+          # The suite pin carries --hash. pip then requires a hash on every package in the command.
+          uv pip install --python .venv\Scripts\python.exe -r build-req.txt -r requirements-docs.txt pyinstaller pytest pytest-timeout
       - name: Tests that need no PyTorch
         if: ${{ !inputs.skip_tests }}
         timeout-minutes: 25

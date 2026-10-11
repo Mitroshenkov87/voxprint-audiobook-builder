@@ -149,3 +149,12 @@ def test_pr_check_workflow_stays_inside_its_run_block():
     text = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-check.yml").read_text(encoding="utf-8")
     assert not any(line.startswith(("{", "[", '"@')) for line in text.splitlines())
     assert "ConvertTo-Json" in text and "shared-models" in text
+
+
+def test_installer_ci_installs_the_hashed_pin_with_uv():
+    root = Path(__file__).resolve().parents[1]
+    needle = "uv pip install --python .venv\\Scripts\\python.exe -r build-req.txt"
+    for name in (".github/workflows/pr-check.yml", ".github/workflows/build-installer.yml"):
+        text = (root / name).read_text(encoding="utf-8")
+        assert needle in text
+        assert "pip install --quiet -r build-req.txt" not in text
