@@ -22,10 +22,10 @@ python main.py
 
 ## Build options
 ```bat
-build.bat              :: venv + torch (uv, CUDA auto-detect) + dependencies + notices + tests + dist\VOXPrint AI Audiobook Builder.exe and dist\voxprint-audiobook-cli.exe (--onefile) + installer if Inno Setup 6 exists
-build.bat onedir       :: dist\VOXPrint AI Audiobook Builder\ folder (preferred: faster start, and Qt/PySide6 stay replaceable - see Licences)
+build.bat              :: venv + torch (uv, CUDA auto-detect) + dependencies + notices + tests + dist\voxprint-audiobook-builder.exe and dist\voxprint-audiobook-cli.exe (--onefile) + installer if Inno Setup 6 exists
+build.bat onedir       :: dist\voxprint-audiobook-builder\ folder (preferred: faster start, and Qt/PySide6 stay replaceable - see Licences)
 :: quick rebuild:  set VOX_SKIP_TESTS=1 & set VOX_SKIP_INSTALLER=1 & build.bat onedir
-:: verify a frozen build contains every library:  "dist\VOXPrint AI Audiobook Builder\VOXPrint AI Audiobook Builder.exe" --selftest-imports   (result in <app home>\logs\selftest_imports.txt)
+:: verify a frozen build contains every library:  "dist\voxprint-audiobook-builder\voxprint-audiobook-builder.exe" --selftest-imports   (result in <app home>\logs\selftest_imports.txt)
 ```
 Experimental thin installer (shell only, modules downloaded by the app): `build_thin.bat`, then `installer\build_online.ps1 -Thin` - see [THIN-INSTALLER.md](THIN-INSTALLER.md).
 Command-line maintenance flags of `main.py`: `--prefetch` (download models now), `--selftest`, `--selftest-imports`, `--selftest-speech` (model-free TTS / ASR smoke), `--selftest-narrate [voice]` (headless: narrates two sentences with the first voice, result in `<app home>\logs\selftest_narrate.txt`, exit code 0 / 1 / 2 = no voice), `--verify-install`, `--repair`.
@@ -70,7 +70,7 @@ not carry a number, so `build` is used. `VOXPRINT_BUILD` overrides both. `GITHUB
 does not consume a number. `BUILD.json` also holds the **codename**: one Biblical Hebrew word in Latin transliteration
 (ASCII letters only) that names the build's changes - edit it for each release. `tools/build_number.py --stamp` writes
 number, codename and commit into `credits.json` before the Windows shell and the Linux package are built;
-`tools/embed_build_stamp.py` reads the same number onto `Voxprint.exe`. The app shows `1.0.0 RC5 · build 1003 "Amud"`
+`tools/embed_build_stamp.py` reads the same number onto `voxprint-audiobook-builder.exe`. The app shows `1.0.0 RC5 · build 1003 "Amud"`
 once that stamp is in the build (About, splash, Settings, diagnostic report), the installer gets `VersionInfoVersion`
 `1.0.0.1003` and a numbered copy `Voxprint-Setup-online-<version>-build<N>.exe` (the plain `Voxprint-Setup-online.exe`
 stays for stable links), and the components manifest records `build`, so the Components window offers a same-version

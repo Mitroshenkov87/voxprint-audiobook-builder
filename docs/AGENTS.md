@@ -10,9 +10,9 @@ The command reference with the same flags is [CLI.md](CLI.md).
 
 Substitute this executable for `voxprint` in every recipe below.
 
-**Windows (default install).** `C:\Program Files\VOXPrint AI Suite\Audiobook Builder\voxprint-audiobook-cli.exe` for scripts (console; the exit code is the command's code). `C:\Program Files\VOXPrint AI Suite\Audiobook Builder\VOXPrint AI Audiobook Builder.exe` is the windowed program. The installer adds that folder to the user PATH.
+**Windows (default install).** `C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe` for scripts (console; the exit code is the command's code). `C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-builder.exe` is the windowed program. The installer adds that folder to the user PATH.
 
-The installer uses that folder unless the person picked another one. The Start menu folder is "VOXPrint AI Suite", shortcut "Audiobook Builder". There is no desktop shortcut. If the file is not there, read the suite manifest or the registry (see [CLI.md](CLI.md), "Calling from other apps"), then:
+The installer uses that folder unless the person picked another one. The Start menu folder is "VOXPrint AI Suite", shortcut "VOXPrint AI Audiobook Builder". There is no desktop shortcut. If the file is not there, read the suite manifest or the registry (see [CLI.md](CLI.md), "Calling from other apps"), then:
 
 ```
 where.exe voxprint-audiobook-cli
@@ -22,8 +22,8 @@ where.exe voxprint-audiobook-cli
 
 | Piece | Path |
 |---|---|
-| Launcher on `PATH` | `~/.local/bin/voxprint-audiobook-cli` (`voxprint` starts the same program) |
-| Program tree | `~/.local/share/voxprint/app` |
+| Launcher on `PATH` | `/usr/local/bin/voxprint-audiobook-cli` (`voxprint` starts the same program) |
+| Program tree | `/opt/voxprint-ai-suite/audiobook-builder` |
 | Data, models, voices, logs | `~/.local/share/voxprint` (`$XDG_DATA_HOME/voxprint`, or `$VOXPRINT_HOME`) |
 
 **Source checkout.** From the repository root, with the project environment active:
@@ -270,7 +270,7 @@ Extra fields by command:
 
 `modules`: one row per concrete model (`tts-1.7b`, `tts-0.6b`, `aligner`, `asr-0.6b`, `asr-1.7b`, text models such as `sage-ru` and `opus-big-en-ru`, `denoise`, `llm`, `dnsmos`, `openvoice`). `optional: false` means a core speech model. `installed: true` means the files are on disk.
 
-`runtime.thin`: `false` on a normal install (Python libraries are already there). On a thin install, `runtime.modules` is filled only from a cached manifest. Otherwise use `Voxprint.exe --modules-status`.
+`runtime.thin`: `false` on a normal install (Python libraries are already there). On a thin install, `runtime.modules` is filled only from a cached manifest. Otherwise use `voxprint-audiobook-builder.exe --modules-status`.
 
 `version`, `build`, `codename`, `platform` (`win32` or `linux`), `voices` (same shape as `voices list`).
 
@@ -316,7 +316,7 @@ By default a voice trained with this CLI is marked consent method `none` and sco
 | Exit 3, voice not found | `voxprint voices list --json` and pass `id` |
 | Exit 2 | `voxprint <command> --help` |
 | Exit 1 | `voxprint diag --out report.zip --json` |
-| `voxprint` is not on PATH (Windows) | `"C:\Program Files\VOXPrint AI Suite\Audiobook Builder\voxprint-audiobook-cli.exe"`, or `where.exe voxprint-audiobook-cli` |
+| `voxprint` is not on PATH (Windows) | `"C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe"`, or `where.exe voxprint-audiobook-cli` |
 | Linux launcher missing | The Linux package is temporarily unavailable. Use a source checkout: `python main.py …` |
 | Translation model missing | `voxprint models download translate --json` or one id such as `opus-big-en-ru` |
 | Re-voice says the recogniser is missing | `voxprint models download asr --json` |

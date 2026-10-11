@@ -10,12 +10,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_windows_default_layout_names():
-    assert install_layout.windows_install_dir() == r"C:\Program Files\VOXPrint AI Suite\Audiobook Builder"
-    assert install_layout.windows_cli_path().endswith(r"Audiobook Builder\voxprint-audiobook-cli.exe")
-    assert install_layout.GUI_EXE == "VOXPrint AI Audiobook Builder.exe"
+    assert install_layout.windows_install_dir() == r"C:\Program Files\voxprint-ai-suite\audiobook-builder"
+    assert install_layout.windows_cli_path().endswith(r"audiobook-builder\voxprint-audiobook-cli.exe")
+    assert install_layout.GUI_EXE == "voxprint-audiobook-builder.exe"
     assert install_layout.CLI_EXE == "voxprint-audiobook-cli.exe"
     assert install_layout.START_MENU == "VOXPrint AI Suite"
-    assert install_layout.SHORTCUT == "Audiobook Builder"
+    assert install_layout.SHORTCUT == "VOXPrint AI Audiobook Builder"
+    assert install_layout.LINUX_INSTALL == "/opt/voxprint-ai-suite/audiobook-builder"
+    assert install_layout.LINUX_DESKTOP.endswith("voxprint-audiobook-builder.desktop")
     assert install_layout.legacy_program_dir() == r"C:\Program Files\Voxprint"
 
 
@@ -23,44 +25,51 @@ def test_migration_removes_the_old_program_and_keeps_user_data():
     old = r"C:\Program Files\Voxprint\Voxprint.exe"
     data = r"C:\Users\me\AppData\Local\Voxprint\voices\narrator.txt"
     shared = r"C:\Users\me\AppData\Local\Voxprint\shared\manifest.json"
-    suite = install_layout.legacy_suite_dir()
-    assert suite == r"C:\Program Files\Voxprint AI Suite\Audiobook Builder"
+    new = install_layout.windows_install_dir()
+    suites = install_layout.legacy_suite_app_dirs()
+    assert suites == [
+        r"C:\Program Files\Voxprint AI Suite\Audiobook Builder",
+        r"C:\Program Files\VOXPrint AI Suite\Audiobook Builder",
+    ]
     assert install_layout.migration_removes_program_dir(old)
+    assert install_layout.migration_removes_program_dir(suites[0])
+    assert install_layout.migration_removes_program_dir(suites[1] + r"\VOXPrint AI Audiobook Builder.exe")
     assert not install_layout.migration_removes_program_dir(data)
     assert not install_layout.migration_removes_program_dir(shared)
-    assert not install_layout.migration_removes_program_dir(suite)
-    assert not install_layout.migration_removes_program_dir(suite + r"\Voxprint AI Audiobook Builder.exe")
+    assert not install_layout.migration_removes_program_dir(new)
     assert install_layout.user_data_dir(r"C:\Users\me\AppData\Local").endswith(r"\Voxprint")
 
 
-def test_old_suite_spelling_is_renamed_in_place():
-    assert install_layout.case_only_rename("Voxprint AI Suite", install_layout.SUITE_DIR)
-    assert install_layout.case_only_rename(install_layout.LEGACY_SUITE_GUI, install_layout.GUI_EXE)
-    assert not install_layout.case_only_rename("Voxprint", install_layout.SUITE_DIR)
-    assert not install_layout.case_only_rename(install_layout.SUITE_DIR, install_layout.SUITE_DIR)
+def test_old_suite_spelling_is_removed_and_the_start_menu_keeps_its_display_case():
+    assert install_layout.case_only_rename("Voxprint AI Suite", install_layout.START_MENU)
+    assert not install_layout.case_only_rename("VOXPrint AI Suite", install_layout.SUITE_DIR)
+    assert not install_layout.case_only_rename(install_layout.LEGACY_SUITE_GUI, install_layout.GUI_EXE)
     iss = (ROOT / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
     assert '#define LegacySuiteDir "Voxprint AI Suite"' in iss
-    assert '#define LegacyDisplayName "Voxprint AI Audiobook Builder"' in iss
-    assert "procedure FixBrandCasing" in iss
-    assert "procedure RenameChildCase" in iss
+    assert '#define LegacySuiteDirDisplay "VOXPrint AI Suite"' in iss
+    assert '#define SuiteDir "voxprint-ai-suite"' in iss
+    assert '#define StartMenu "VOXPrint AI Suite"' in iss
+    assert "procedure FixStartMenuCasing" in iss
+    assert "procedure RemoveAppDirIfOurs" in iss
     post = iss.split("RunSuiteInstall();", 1)[1].split("RegisterSuiteDiscovery();", 1)[0]
-    assert "RemoveLegacyInstall();" in post and "FixBrandCasing();" in post
-    assert post.index("RemoveLegacyInstall();") < post.index("FixBrandCasing();")
+    assert post.index("RemoveLegacyInstall();") < post.index("FixStartMenuCasing();")
     body = iss.split("procedure RemoveLegacyInstall", 1)[1].split("procedure ", 1)[0]
-    assert "LegacySuite" not in body
+    assert "LegacySuiteDir" in body and "LegacySuiteDirDisplay" in body
     assert "DelTree(Legacy, True, True, True)" in body
+    assert "{localappdata}\\Voxprint" not in body
 
 
 def test_installer_script_migrates_without_the_old_uninstaller():
     iss = (ROOT / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
     assert r"DefaultDirName={autopf}\{#SuiteDir}\{#AppFolder}" in iss
     assert "UsePreviousAppDir=no" in iss
-    assert '#define AppExe "VOXPrint AI Audiobook Builder.exe"' in iss
+    assert "UninstallDisplayName={#AppDisplayName}" in iss
+    assert '#define AppExe "voxprint-audiobook-builder.exe"' in iss
     assert '#define CliExe "voxprint-audiobook-cli.exe"' in iss
-    assert r"{group}\{#AppFolder}" in iss
+    assert r"{group}\{#AppDisplayName}" in iss
     assert "procedure RemoveLegacyInstall" in iss
     assert "procedure DropLegacyUninstallKey" in iss
-    assert r"Software\Voxprint\Apps\audiobook-builder" in iss
+    assert r"Software\voxprint\Apps\audiobook-builder" in iss
     body = iss.split("procedure RemoveLegacyInstall", 1)[1].split("procedure ", 1)[0]
     assert "unins" not in body.lower()
     assert "unregister-models" not in body.lower()
@@ -92,22 +101,37 @@ def test_ci_smoke_installs_the_old_layout_then_the_new_one():
     wf = (ROOT / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")
     assert r"C:\Program Files\Voxprint" in wf
     assert r"C:\Program Files\Voxprint AI Suite\Audiobook Builder" in wf
-    assert "Voxprint AI Audiobook Builder.exe" in wf
+    assert r"C:\Program Files\voxprint-ai-suite\audiobook-builder" in wf
+    assert "voxprint-audiobook-builder.exe" in wf
+    assert "VOXPrint AI Audiobook Builder.lnk" in wf
     assert "suite-marker.txt" in wf
     assert "StringComparison]::Ordinal" in wf
     assert "voxprint-audiobook-cli.exe" in wf
     assert "--version" in wf
     assert "migration-marker.txt" in wf
     assert '/DIR=`"$dest`"' in wf
-    assert "Voxprint-AI-Audiobook-Builder-patch-" in wf
+    assert "voxprint-audiobook-builder-patch-" in wf
+
+
+def test_current_docs_name_the_kebab_install_and_keep_the_display_name():
+    manual = (ROOT / "docs" / "manual" / "src" / "manual_en.md").read_text(encoding="utf-8")
+    cli = (ROOT / "docs" / "CLI.md").read_text(encoding="utf-8")
+    assert r"C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe" in manual
+    assert "voxprint-audiobook-builder.exe" in manual
+    assert "VOXPrint AI Audiobook Builder" in manual
+    assert r"C:\Program Files\Voxprint\Voxprint.exe" not in manual
+    assert "voxprint-audiobook-builder.exe --modules-status" in cli
+    assert "voxprint-ai-suite" in cli and "audiobook-builder" in cli
 
 
 def test_linux_launcher_name_and_compatibility_link():
     script = (ROOT / "installer" / "linux" / "install-voxprint-linux.sh").read_text(encoding="utf-8")
+    assert 'PREFIX="/opt/voxprint-ai-suite/audiobook-builder"' in script
     assert 'LAUNCHER="$BIN_DIR/voxprint-audiobook-cli"' in script
     assert 'ln -sfn "voxprint-audiobook-cli"' in script
-    assert "voxprint-audiobook.desktop" in script
-    assert "voxprint-audiobook-cli" in script
+    assert "voxprint-audiobook-builder.desktop" in script
+    assert "remove_old_user_package" in script
+    assert "~/.local/share/voxprint/app" in script
 
 
 def test_choose_primary_prefers_a_fast_hugging_face_over_a_slow_modelscope():

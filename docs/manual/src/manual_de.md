@@ -510,7 +510,7 @@ Am Ende erscheint eine Zusammenfassung, zum Beispiel *Check finished: 24 checked
 
 > Bekanntes Problem in Build 667: Während der Prüfung wird die rechte Spalte der Einstellungen gestaucht, und die Erklärtexte überlappen sich (erstes Bild). Das ist nur optisch und wird in einem der nächsten Builds behoben.
 
-Dieselbe Prüfung läuft ohne Fenster als `Voxprint.exe --auto-repair` (Kapitel 11).
+Dieselbe Prüfung läuft ohne Fenster als `voxprint-audiobook-builder.exe --auto-repair` (Kapitel 11).
 
 # Glossar
 
@@ -620,7 +620,7 @@ Alles in diesem Kapitel ist optional: Die Fenster können dasselbe. Die Kommando
 
 ## Wo das Programm liegt und die Regeln
 
-Das installierte Programm ist `C:\Program Files\Voxprint\Voxprint.exe` (ein anderer Ordner, wenn Sie einen gewählt haben; `where.exe Voxprint` findet es). In einem Quellcode-Checkout verwenden Sie `python main.py`. Unten steht `voxprint` für beides.
+Skripte rufen `C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe` auf (ein anderer Ordner, wenn Sie einen gewählt haben; `where.exe voxprint-audiobook-cli` findet es). Das Fenster ist `voxprint-audiobook-builder.exe` in demselben Ordner; die Verknüpfung im Startmenü heißt VOXPrint AI Audiobook Builder. In einem Quellcode-Checkout verwenden Sie `python main.py`. Unten steht `voxprint` für das Konsolenprogramm oder `python main.py`.
 
 * Nichts fragt nach; `--yes` wird von jedem Befehl akzeptiert.
 * `--json` gibt den Fortschritt als JSON-Zeilen aus und endet mit einem Ergebnisobjekt (`type: result`, `ok`, `exit_code`, `outputs`, `warnings`, `error`, `hint`).
@@ -681,8 +681,8 @@ voxprint restore --from DIR [--link] [--json]
 ```
 voxprint status --json                 # Version, GPU, Stimmen, Formate, Modelle
 voxprint models download required      # TTS, Ausrichtung und Spracherkennung, falls sie fehlen
-Voxprint.exe --verify-install          # schnelle Installationsprüfung mit Ursachen-Codes
-Voxprint.exe --auto-repair             # Prüfen und reparieren: jede Datei per SHA-256
+voxprint-audiobook-builder.exe --verify-install   # schnelle Installationsprüfung mit Ursachen-Codes
+voxprint-audiobook-builder.exe --auto-repair      # Prüfen und reparieren: jede Datei per SHA-256
 voxprint diag --out report.zip         # Diagnosebericht
 ```
 

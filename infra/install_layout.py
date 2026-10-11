@@ -1,12 +1,15 @@
-"""Where this program is installed, and how another Voxprint app finds it.
+"""Where this program is installed, and how another VOXPrint app finds it.
 
-Windows installs under ``C:\\Program Files\\VOXPrint AI Suite\\Audiobook Builder``.
-The windowed program is ``VOXPrint AI Audiobook Builder.exe``. Scripts call
-``voxprint-audiobook-cli.exe``. Linux keeps ``~/.local/share/voxprint/app`` and
-puts ``voxprint-audiobook-cli`` on ``PATH`` (``voxprint`` remains a compatibility name).
+Windows installs under ``C:\\Program Files\\voxprint-ai-suite\\audiobook-builder``.
+The windowed file is ``voxprint-audiobook-builder.exe``. Scripts call
+``voxprint-audiobook-cli.exe``. The Start menu folder is ``VOXPrint AI Suite`` and the
+shortcut is ``VOXPrint AI Audiobook Builder`` (display names only). Linux installs the
+package at ``/opt/voxprint-ai-suite/audiobook-builder`` and puts
+``voxprint-audiobook-cli`` on ``PATH``. Voices and settings stay in
+``%LOCALAPPDATA%\\Voxprint`` and ``~/.local/share/voxprint``.
 
 Peers read the shared manifest key ``installs`` (not ``apps``, which counted
-resources), then the Windows registry ``Software\\Voxprint\\Apps\\audiobook-builder``,
+resources), then the Windows registry ``Software\\voxprint\\Apps\\audiobook-builder``,
 then the default path. voxprint-common 0.1.1 has no install registry; the extra
 manifest key is the stand-in until the library grows one.
 
@@ -32,20 +35,26 @@ from infra import platform_win, suite_shared
 
 log = logging.getLogger("voxprint.install")
 
-SUITE_DIR = "VOXPrint AI Suite"
-APP_FOLDER = "Audiobook Builder"
-GUI_EXE = "VOXPrint AI Audiobook Builder.exe"
+SUITE_DIR = "voxprint-ai-suite"
+APP_FOLDER = "audiobook-builder"
+GUI_EXE = "voxprint-audiobook-builder.exe"
 CLI_EXE = "voxprint-audiobook-cli.exe"
 LINUX_CLI = "voxprint-audiobook-cli"
 LINUX_CLI_COMPAT = "voxprint"
+LINUX_INSTALL = "/opt/voxprint-ai-suite/audiobook-builder"
+LINUX_LAUNCHER = "/usr/local/bin/voxprint-audiobook-cli"
+LINUX_DESKTOP = "/usr/share/applications/voxprint-audiobook-builder.desktop"
+#: Per-user package from before the /opt layout. Data next to it is kept.
+OLD_LINUX_APP = "~/.local/share/voxprint/app"
 LEGACY_DIR = "Voxprint"
 LEGACY_GUI = "Voxprint.exe"
 LEGACY_CLI = "voxprint-cli.exe"
-#: The suite folder as first spelled. On Windows it is the same directory; only the case changes.
-LEGACY_SUITE_DIR = "Voxprint AI Suite"
-LEGACY_SUITE_GUI = "Voxprint AI Audiobook Builder.exe"
+#: Earlier suite folders. On Windows the two spellings are one directory, and neither is the kebab-case folder.
+LEGACY_SUITE_DIRS = ("Voxprint AI Suite", "VOXPrint AI Suite")
+LEGACY_APP_FOLDER = "Audiobook Builder"
+LEGACY_SUITE_GUI = "VOXPrint AI Audiobook Builder.exe"
 START_MENU = "VOXPrint AI Suite"
-SHORTCUT = "Audiobook Builder"
+SHORTCUT = "VOXPrint AI Audiobook Builder"
 INSTALLS_KEY = "installs"
 APP_ID = suite_shared.APP_ID
 #: Silent migration removes the old program folder. It never runs the old uninstaller
@@ -54,7 +63,7 @@ USER_DATA_DIR_NAME = "Voxprint"
 
 
 def windows_install_dir(program_files: str = r"C:\Program Files") -> str:
-    """Default Windows install directory ({autopf}\\VOXPrint AI Suite\\Audiobook Builder)."""
+    """Default Windows install directory ({autopf}\\voxprint-ai-suite\\audiobook-builder)."""
     return str(PureWindowsPath(program_files) / SUITE_DIR / APP_FOLDER)
 
 
@@ -73,25 +82,31 @@ def user_data_dir(local_app_data: str) -> str:
     return str(PureWindowsPath(local_app_data) / USER_DATA_DIR_NAME)
 
 
+def legacy_suite_app_dirs(program_files: str = r"C:\Program Files") -> list[str]:
+    """Earlier suite install folders (``Voxprint AI Suite`` and ``VOXPrint AI Suite``)."""
+    return [str(PureWindowsPath(program_files) / name / LEGACY_APP_FOLDER) for name in LEGACY_SUITE_DIRS]
+
+
 def migration_removes_program_dir(path: str, program_files: str = r"C:\Program Files") -> bool:
-    """True when silent migration may delete ``path`` (the old program folder only)."""
-    legacy = PureWindowsPath(legacy_program_dir(program_files))
+    """True when silent migration may delete ``path`` (an old program folder only)."""
     candidate = PureWindowsPath(path)
-    return candidate == legacy or legacy in candidate.parents
+    roots = [PureWindowsPath(legacy_program_dir(program_files))]
+    roots.extend(PureWindowsPath(item) for item in legacy_suite_app_dirs(program_files))
+    return any(candidate == root or root in candidate.parents for root in roots)
 
 
 def case_only_rename(actual: str, wanted: str) -> bool:
     """True when ``actual`` and ``wanted`` are the same name apart from case.
 
-    ``C:\\Program Files\\Voxprint`` is a different folder from the suite directory, so it is not
-    a case-only rename. The suite folder spelled ``Voxprint AI Suite`` is.
+    The Start menu folder ``Voxprint AI Suite`` is renamed to ``VOXPrint AI Suite``.
+    The program folder ``voxprint-ai-suite`` is a different directory, so it is not a case rename.
     """
     return actual.casefold() == wanted.casefold() and actual != wanted
 
 
 def legacy_suite_dir(program_files: str = r"C:\Program Files") -> str:
-    """The suite folder with the previous spelling (same directory as :func:`windows_install_dir`)."""
-    return str(PureWindowsPath(program_files) / LEGACY_SUITE_DIR / APP_FOLDER)
+    """The earlier suite install folder (``Audiobook Builder`` under the mixed-case suite name)."""
+    return legacy_suite_app_dirs(program_files)[0]
 
 
 def default_install_dir() -> Path:
@@ -99,16 +114,14 @@ def default_install_dir() -> Path:
     if sys.platform == "win32":
         root = os.environ.get("ProgramFiles", r"C:\Program Files")
         return Path(root) / SUITE_DIR / APP_FOLDER
-    data = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
-    return Path(data) / "voxprint" / "app"
+    return Path(LINUX_INSTALL)
 
 
 def default_cli_path() -> Path:
     """The well-known console program, whether or not it is installed yet."""
     if sys.platform == "win32":
         return default_install_dir() / CLI_EXE
-    bin_dir = os.environ.get("XDG_BIN_HOME") or str(Path.home() / ".local" / "bin")
-    return Path(bin_dir) / LINUX_CLI
+    return Path(LINUX_LAUNCHER)
 
 
 def cli_file_name() -> str:

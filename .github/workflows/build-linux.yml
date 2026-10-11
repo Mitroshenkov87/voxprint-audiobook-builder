@@ -62,26 +62,29 @@ jobs:
           export VOXPRINT_PYTHON="$(python -c 'import sys; print(sys.executable)')"
           bash build/linux-test/install-voxprint-linux.sh --check || true
           bash build/linux-test/install-voxprint-linux.sh --install-deps --yes --skip-gpu-check --torch-backend cpu
-          test -x ~/.local/bin/voxprint
-          test -f ~/.local/share/applications/voxprint.desktop
-          test -f ~/.local/share/icons/hicolor/256x256/apps/voxprint.png
+          test -x /usr/local/bin/voxprint-audiobook-cli
+          test -x /usr/local/bin/voxprint
+          test -d /opt/voxprint-ai-suite/audiobook-builder
+          test ! -e ~/.local/share/voxprint/app
+          test -f /usr/share/applications/voxprint-audiobook-builder.desktop
+          test -f /usr/share/icons/hicolor/256x256/apps/voxprint.png
           cat ~/.local/share/voxprint/install.json
 
       - name: Unit tests with the installed environment
         run: |
-          V=~/.local/share/voxprint/venv
+          V=/opt/voxprint-ai-suite/audiobook-builder/venv
           $V/bin/uv pip install --python $V/bin/python -r requirements-dev.txt -r requirements-docs.txt
           $V/bin/python -m pytest -q -p no:cacheprovider
 
       - name: Smoke tests of the installed program
         run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          voxprint --selftest-imports
-          voxprint --selftest-text
-          voxprint --selftest-speech
-          voxprint --selftest
+          export PATH="/usr/local/bin:$PATH"
+          voxprint-audiobook-cli --selftest-imports
+          voxprint-audiobook-cli --selftest-text
+          voxprint-audiobook-cli --selftest-speech
+          voxprint-audiobook-cli --selftest
           sudo apt-get install -y desktop-file-utils
-          desktop-file-validate ~/.local/share/applications/voxprint.desktop
+          desktop-file-validate /usr/share/applications/voxprint-audiobook-builder.desktop
           # update path: running the installer again keeps the environment and succeeds quickly
           VOXPRINT_BASE_URL=http://127.0.0.1:8099 bash build/linux-test/install-voxprint-linux.sh --yes --skip-check --skip-gpu-check
           # the one-file archive installs from its own tree (no network for the program itself)
@@ -90,8 +93,11 @@ jobs:
           bash /tmp/tarcheck/voxprint-linux/install-voxprint-linux.sh --help | grep -q uninstall
           # removal
           bash build/linux-test/install-voxprint-linux.sh --uninstall
-          test ! -e ~/.local/bin/voxprint
-          test ! -e ~/.local/share/applications/voxprint.desktop
+          test ! -e /usr/local/bin/voxprint-audiobook-cli
+          test ! -e /usr/local/bin/voxprint
+          test ! -e /opt/voxprint-ai-suite/audiobook-builder
+          test ! -e /usr/share/applications/voxprint-audiobook-builder.desktop
+          test -d ~/.local/share/voxprint
 
       - name: SHA-256 of the release assets
         run: |

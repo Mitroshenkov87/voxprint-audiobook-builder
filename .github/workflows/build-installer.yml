@@ -134,7 +134,7 @@ jobs:
           '@ | Set-Content -Encoding ascii C:\vxver.cs
           & $csc /nologo /out:C:\vxver.exe C:\vxver.cs
           if ($LASTEXITCODE -ne 0) { throw "could not compile the version stub" }
-          Copy-Item C:\vxver.exe "dist\Voxprint\VOXPrint AI Audiobook Builder.exe"
+          Copy-Item C:\vxver.exe "dist\Voxprint\voxprint-audiobook-builder.exe"
           Copy-Item C:\vxver.exe dist\Voxprint\voxprint-audiobook-cli.exe
           python -c "import os; [open(f'dist/Voxprint/_internal/lib/blob{i}.bin','wb').write(os.urandom(6*1024*1024)) for i in range(5)]"
           Copy-Item THIRD_PARTY_NOTICES.md build\notices\
@@ -188,7 +188,7 @@ jobs:
           # uninstall removes the downloaded files
           # no -Wait: the uninstaller starts a temporary copy of itself and Start-Process would wait for the whole tree
           $p = Start-Process C:\vxsmoke\unins000.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/LOG=C:\vxsmoke-un.log" -PassThru
-          $gui = "C:\vxsmoke\VOXPrint AI Audiobook Builder.exe"
+          $gui = "C:\vxsmoke\voxprint-audiobook-builder.exe"
           for ($i = 0; $i -lt 60 -and (Test-Path -LiteralPath $gui); $i++) { Start-Sleep 2 }
           Get-Process | Where-Object { $_.ProcessName -like "unins*" -or $_.ProcessName -like "*vxsmoke*" } | Format-Table Id, ProcessName
           if (Test-Path -LiteralPath $gui) { if (Test-Path C:\vxsmoke-un.log) { Get-Content C:\vxsmoke-un.log -Tail 30 }; throw "files left after the uninstall" }
@@ -202,7 +202,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $old = "C:\Program Files\Voxprint"
           $oldSuite = "C:\Program Files\Voxprint AI Suite\Audiobook Builder"
-          $dest = "C:\Program Files\VOXPrint AI Suite\Audiobook Builder"
+          $dest = "C:\Program Files\voxprint-ai-suite\audiobook-builder"
           New-Item -ItemType Directory -Force $old, $oldSuite | Out-Null
           Copy-Item C:\vxver.exe "$old\Voxprint.exe"
           Copy-Item C:\vxver.exe "$old\voxprint-cli.exe"
@@ -250,16 +250,20 @@ jobs:
           $pf = "C:\Program Files"
           $flat = @(Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name.Equals("Voxprint", [StringComparison]::Ordinal) })
           if ($flat.Count -ne 0) { throw "the old program folder is still there" }
-          $suiteName = @(Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name.Equals("VOXPrint AI Suite", [StringComparison]::Ordinal) })
+          $mixed = @(Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name.Equals("Voxprint AI Suite", [StringComparison]::OrdinalIgnoreCase) })
+          if ($mixed.Count -ne 0) { throw "the mixed-case suite folder is still there: $($mixed.Name -join ', ')" }
+          if (Test-Path -LiteralPath (Join-Path $oldSuite "suite-marker.txt")) { throw "the old suite install was kept" }
+          $suiteName = @(Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name.Equals("voxprint-ai-suite", [StringComparison]::Ordinal) })
           if ($suiteName.Count -ne 1) {
-            $seen = (Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name -like "*Suite*" } | ForEach-Object { $_.Name }) -join ", "
-            throw "suite folder casing is wrong: $seen"
+            $seen = (Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name -like "*voxprint*" } | ForEach-Object { $_.Name }) -join ", "
+            throw "install folder name is wrong: $seen"
           }
-          if (-not (Test-Path -LiteralPath (Join-Path $dest "suite-marker.txt"))) { throw "the suite folder was replaced instead of renamed" }
-          $exeName = @(Get-ChildItem -LiteralPath $dest -Force -File | Where-Object { $_.Name.Equals("VOXPrint AI Audiobook Builder.exe", [StringComparison]::Ordinal) })
+          $appName = @(Get-ChildItem -LiteralPath (Join-Path $pf "voxprint-ai-suite") -Force | Where-Object { $_.Name.Equals("audiobook-builder", [StringComparison]::Ordinal) })
+          if ($appName.Count -ne 1) { throw "app folder name is wrong" }
+          $exeName = @(Get-ChildItem -LiteralPath $dest -Force -File | Where-Object { $_.Name.Equals("voxprint-audiobook-builder.exe", [StringComparison]::Ordinal) })
           if ($exeName.Count -ne 1) {
-            $seen = (Get-ChildItem -LiteralPath $dest -Force -File | Where-Object { $_.Name -like "*Audiobook Builder.exe" } | ForEach-Object { $_.Name }) -join ", "
-            throw "program file casing is wrong: $seen"
+            $seen = (Get-ChildItem -LiteralPath $dest -Force -File | ForEach-Object { $_.Name }) -join ", "
+            throw "program file name is wrong: $seen"
           }
           $menuParent = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs"
           $menuName = @(Get-ChildItem -LiteralPath $menuParent -Force | Where-Object { $_.Name.Equals("VOXPrint AI Suite", [StringComparison]::Ordinal) })
@@ -283,19 +287,23 @@ jobs:
           if ($wrongCase.Count -gt 0) { throw "PATH still has the old suite casing: $pathNow" }
           if ((Get-Content -Raw (Join-Path $data "migration-marker.txt")) -notmatch "keep-me") { throw "user data was not kept" }
           if (-not (Test-Path -LiteralPath (Join-Path $data "voices\narrator.txt"))) { throw "voices were not kept" }
-          $gui = Join-Path $dest "VOXPrint AI Audiobook Builder.exe"
+          $gui = Join-Path $dest "voxprint-audiobook-builder.exe"
           $cli = Join-Path $dest "voxprint-audiobook-cli.exe"
           foreach ($exe in @($gui, $cli)) {
             if (-not (Test-Path -LiteralPath $exe)) { throw "missing after migration: $exe" }
             $ran = Start-Process -FilePath $exe -ArgumentList "--version" -Wait -PassThru -NoNewWindow
             if ($ran.ExitCode -ne 0) { throw "$exe --version exited $($ran.ExitCode)" }
           }
-          $reg = Get-ItemProperty "HKLM:\Software\Voxprint\Apps\audiobook-builder"
+          $shortcut = Join-Path $menuParent "VOXPrint AI Suite\VOXPrint AI Audiobook Builder.lnk"
+          if (-not (Test-Path -LiteralPath $shortcut)) { throw "Start menu shortcut is missing: $shortcut" }
+          $reg = Get-ItemProperty "HKLM:\Software\voxprint\Apps\audiobook-builder"
           if ($reg.InstallPath -ne $dest) { throw "discovery InstallPath is $($reg.InstallPath)" }
           if ($reg.CliPath -ne $cli) { throw "discovery CliPath is $($reg.CliPath)" }
           $un = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F1D2B7A-3C54-4E0B-9A41-7B5E0C9D2F18}_is1"
           $loc = (Get-ItemProperty $un).InstallLocation
           if ($loc.TrimEnd("\") -eq $old) { throw "the uninstall key still points at the old folder" }
+          $shown = (Get-ItemProperty $un).DisplayName
+          if ($shown -ne "VOXPrint AI Audiobook Builder") { throw "uninstall display name is $shown" }
           "migrated"
       - name: Logs
         if: always()
@@ -333,7 +341,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist\Voxprint\_internal, build\notices | Out-Null
-          Copy-Item "$env:WINDIR\System32\whoami.exe" "dist\Voxprint\VOXPrint AI Audiobook Builder.exe"
+          Copy-Item "$env:WINDIR\System32\whoami.exe" "dist\Voxprint\voxprint-audiobook-builder.exe"
           python -c "import os; open('dist/Voxprint/_internal/shell.bin','wb').write(os.urandom(2*1024*1024))"
           Copy-Item THIRD_PARTY_NOTICES.md build\notices\
           @'
@@ -364,7 +372,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $p = Start-Process build\online-release\Voxprint-Setup-thin.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxthin","/LOG=C:\vxthin.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxthin.log -Tail 60; throw "install exit code $($p.ExitCode)" }
-          if (-not (Test-Path -LiteralPath "C:\vxthin\VOXPrint AI Audiobook Builder.exe")) { throw "the shell is missing" }
+          if (-not (Test-Path -LiteralPath "C:\vxthin\voxprint-audiobook-builder.exe")) { throw "the shell is missing" }
           if (-not (Test-Path C:\vxthin\_internal\modules.json)) { throw "modules.json is missing" }
           if (Test-Path C:\vxthin\_internal\torch) { throw "the thin installer installed a runtime module into the shell" }
           $env:VOXPRINT_MODULES_CONFIG = "C:\vxthin\_internal\modules.json"
@@ -458,19 +466,19 @@ jobs:
           python -c @'
           import hashlib, json, os
           from pathlib import Path
-          exe = Path("dist/thin/VOXPrint AI Audiobook Builder/VOXPrint AI Audiobook Builder.exe")
+          exe = Path("dist/thin/voxprint-audiobook-builder/voxprint-audiobook-builder.exe")
           if not exe.is_file():
               raise SystemExit(f"thin shell exe is missing: {exe}")
           sha = hashlib.sha256(exe.read_bytes()).hexdigest()
           lock = hashlib.sha256(Path("infra/runtime_lock.json").read_bytes()).hexdigest()
-          (exe.parent / "VOXPrint AI Audiobook Builder.exe.sha256").write_text(
-              f"{sha}  VOXPrint AI Audiobook Builder.exe\n", encoding="ascii")
+          (exe.parent / "voxprint-audiobook-builder.exe.sha256").write_text(
+              f"{sha}  voxprint-audiobook-builder.exe\n", encoding="ascii")
           credits = json.loads(Path("credits.json").read_text(encoding="utf-8"))
           patch = {
               "build": int(os.environ["VOXPRINT_BUILD"]),
               "codename": os.environ.get("VOXPRINT_CODENAME", ""),
               "version": str(credits["app"]["version"]),
-              "exe": "VOXPrint AI Audiobook Builder.exe",
+              "exe": "voxprint-audiobook-builder.exe",
               "sha256": sha,
               "runtime_lock_sha256": lock,
           }
@@ -481,7 +489,7 @@ jobs:
         shell: pwsh
         run: |
           $tag = if ($env:REL_TAG) { $env:REL_TAG } else { "v0.0.0-dev" }
-          ./installer/build_online.ps1 -Dist "dist\thin\VOXPrint AI Audiobook Builder" -Tag $tag -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
+          ./installer/build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag $tag -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
           Get-ChildItem build\online-release | Format-Table Name, Length
       - name: End to end with the frozen shell - download the runtime from upstream (CPU PyTorch, internal CI only) and import it
         shell: pwsh
@@ -500,7 +508,7 @@ jobs:
           Start-Sleep 3
           @{ schema = 1; manifest_url = $man } | ConvertTo-Json | Out-File -Encoding ascii C:\vx-modules.json
           $env:VOXPRINT_MODULES_CONFIG = "C:\vx-modules.json"
-          $exe = (Resolve-Path "dist\thin\VOXPrint AI Audiobook Builder\VOXPrint AI Audiobook Builder.exe").Path
+          $exe = (Resolve-Path "dist\thin\voxprint-audiobook-builder\voxprint-audiobook-builder.exe").Path
           $sw = [Diagnostics.Stopwatch]::StartNew()
           $p = Start-Process $exe -ArgumentList "--install-modules" -Wait -PassThru
           "install-modules: exit $($p.ExitCode) in $([int]$sw.Elapsed.TotalSeconds) s"
@@ -536,7 +544,7 @@ jobs:
           Copy-Item $src $other -Recurse -Force
           Get-ChildItem $other | Select-Object -ExpandProperty Name
           $env:VOXPRINT_MODULES_CONFIG = "C:\vx-modules.json"
-          $exe = (Resolve-Path "dist\thin\VOXPrint AI Audiobook Builder\VOXPrint AI Audiobook Builder.exe").Path
+          $exe = (Resolve-Path "dist\thin\voxprint-audiobook-builder\voxprint-audiobook-builder.exe").Path
           $p = Start-Process $exe -ArgumentList "--install-modules" -Wait -PassThru
           Get-Content C:\vxhome2\logs\modules.txt
           Get-Content C:\vxhome2\logs\voxprint.log -ErrorAction SilentlyContinue | Select-String "reuse|PyTorch|torch" | Select-Object -Last 12
@@ -559,9 +567,9 @@ jobs:
         with:
           name: Voxprint-patch
           path: |
-            dist/thin/VOXPrint AI Audiobook Builder/VOXPrint AI Audiobook Builder.exe
-            dist/thin/VOXPrint AI Audiobook Builder/VOXPrint AI Audiobook Builder.exe.sha256
-            dist/thin/VOXPrint AI Audiobook Builder/patch.json
+            dist/thin/voxprint-audiobook-builder/voxprint-audiobook-builder.exe
+            dist/thin/voxprint-audiobook-builder/voxprint-audiobook-builder.exe.sha256
+            dist/thin/voxprint-audiobook-builder/patch.json
           retention-days: 14
       - name: Attach to the release (installer, hash, manifest, shell parts; older assets are not touched)
         if: ${{ env.REL_TAG != '' }}
@@ -574,10 +582,10 @@ jobs:
           $build = [int]$env:VOXPRINT_BUILD
           $stage = "build\voxprint-patch"
           New-Item -ItemType Directory -Force $stage | Out-Null
-          $exeName = "Voxprint-AI-Audiobook-Builder-patch-$build.exe"
-          $shellDir = "dist\thin\VOXPrint AI Audiobook Builder"
-          Copy-Item -LiteralPath "$shellDir\VOXPrint AI Audiobook Builder.exe" (Join-Path $stage $exeName) -Force
-          $sha = (Get-Content -LiteralPath "$shellDir\VOXPrint AI Audiobook Builder.exe.sha256" -Raw).Split(" ", [StringSplitOptions]::RemoveEmptyEntries)[0].Trim()
+          $exeName = "voxprint-audiobook-builder-patch-$build.exe"
+          $shellDir = "dist\thin\voxprint-audiobook-builder"
+          Copy-Item -LiteralPath "$shellDir\voxprint-audiobook-builder.exe" (Join-Path $stage $exeName) -Force
+          $sha = (Get-Content -LiteralPath "$shellDir\voxprint-audiobook-builder.exe.sha256" -Raw).Split(" ", [StringSplitOptions]::RemoveEmptyEntries)[0].Trim()
           "$sha  $exeName" | Out-File -Encoding ascii (Join-Path $stage "$exeName.sha256")
           Copy-Item -LiteralPath "$shellDir\patch.json" (Join-Path $stage "patch-$build.json") -Force
           foreach ($f in @(

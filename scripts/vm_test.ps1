@@ -66,9 +66,13 @@ if ($BinOpt) {
     if (-not (Test-Path -LiteralPath $env:VOXPRINT_BIN)) { Die-Usage "voxprint was not found (set --bin or VOXPRINT_BIN)" }
     $Vox = @($env:VOXPRINT_BIN)
 } else {
+    $known = Join-Path $env:ProgramFiles "voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe"
+    if (Test-Path -LiteralPath $known) { $Vox = @($known) }
+    else {
     foreach ($name in @("voxprint-audiobook-cli", "voxprint-cli", "voxprint")) {
         $cmd = Get-Command $name -ErrorAction SilentlyContinue
         if ($cmd) { $Vox = @($cmd.Source); break }
+    }
     }
     if (-not $Vox -and (Test-Path -LiteralPath (Join-Path $Root "main.py"))) { $Vox = @($Python, (Join-Path $Root "main.py")) }
     if (-not $Vox) { Die-Usage "voxprint was not found (set --bin or VOXPRINT_BIN)" }

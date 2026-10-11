@@ -459,7 +459,7 @@ def main(argv=None) -> int:
     # system / GPU / settings block of the log; the GPU probe imports PyTorch, so it runs beside the UI
     threading.Thread(target=diagnostics.log_startup, name="diag-startup", daemon=True).start()
     app.setApplicationName("Voxprint")
-    app.setDesktopFileName("voxprint")      # Linux: ties the window to voxprint.desktop (icon / Wayland app-id); ignored elsewhere
+    app.setDesktopFileName("voxprint-audiobook-builder")  # Linux: ties the window to the desktop file; ignored elsewhere
     try:   # window / taskbar icon (the file ships in assets/, next to the other resources in a build)
         from PySide6.QtGui import QIcon
 

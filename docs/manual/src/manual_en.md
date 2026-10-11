@@ -445,7 +445,7 @@ At the end a summary appears, for example *Check finished: 24 checked, 0 repaire
 
 > Known issue in build 667: while the check runs, the right column of Settings is squeezed and the explanatory texts overlap (first picture). This is cosmetic and will be fixed in a coming build.
 
-The same check runs without the window as `Voxprint.exe --auto-repair` (chapter 11).
+The same check runs without the window as `voxprint-audiobook-builder.exe --auto-repair` (chapter 11).
 
 # Glossary
 
@@ -555,7 +555,7 @@ Everything in this chapter is optional: the windows do all of it. The command li
 
 ## Where the program is and the rules
 
-The installed program is `C:\Program Files\Voxprint\Voxprint.exe` (another folder if you chose one; `where.exe Voxprint` finds it). In a source checkout use `python main.py`. Below, `voxprint` stands for either.
+Scripts call `C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe` (another folder if you chose one; `where.exe voxprint-audiobook-cli` finds it). The window is `voxprint-audiobook-builder.exe` in that folder; the Start menu shortcut is VOXPrint AI Audiobook Builder. In a source checkout use `python main.py`. Below, `voxprint` stands for the console program or `python main.py`.
 
 * Nothing prompts; `--yes` is accepted by every command.
 * `--json` prints progress as JSON lines and ends with one result object (`type: result`, `ok`, `exit_code`, `outputs`, `warnings`, `error`, `hint`).
@@ -616,8 +616,8 @@ voxprint restore --from DIR [--link] [--json]
 ```
 voxprint status --json                 # version, GPU, voices, formats, installed models
 voxprint models download required      # TTS, aligner and speech recognition, if missing
-Voxprint.exe --verify-install          # quick install check with reason codes
-Voxprint.exe --auto-repair             # Check & repair: every file by SHA-256
+voxprint-audiobook-builder.exe --verify-install   # quick install check with reason codes
+voxprint-audiobook-builder.exe --auto-repair      # Check & repair: every file by SHA-256
 voxprint diag --out report.zip         # diagnostic report
 ```
 

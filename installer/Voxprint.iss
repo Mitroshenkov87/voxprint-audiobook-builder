@@ -40,23 +40,28 @@
 
 #define AppName "Voxprint"
 ; AppName stays the data-folder name (%LOCALAPPDATA%\Voxprint). It is not the install folder.
-; The program installs under {autopf}\VOXPrint AI Suite\Audiobook Builder.
-#define SuiteDir "VOXPrint AI Suite"
-#define AppFolder "Audiobook Builder"
+; The program installs under {autopf}\voxprint-ai-suite\audiobook-builder.
+; Start menu folder and shortcut are display names (VOXPrint AI Suite / VOXPrint AI Audiobook Builder).
+#define SuiteDir "voxprint-ai-suite"
+#define AppFolder "audiobook-builder"
+#define StartMenu "VOXPrint AI Suite"
 #define AppDisplayName "VOXPrint AI Audiobook Builder"
 #define AppVersion "1.0.0-rc.5"
 ; Windows version resources are four numbers. The pre-release suffix stays in AppVersion.
 #define AppVersionInfo "1.0.0"
-#define AppExe "VOXPrint AI Audiobook Builder.exe"
+#define AppExe "voxprint-audiobook-builder.exe"
 ; Console companion (PyInstaller --console). Scripts use this so the process exit code is the command's code.
 #define CliExe "voxprint-audiobook-cli.exe"
 ; Previous install (up to the suite layout). Removed on upgrade. User data under %LOCALAPPDATA%\Voxprint is kept.
 #define LegacyDir "Voxprint"
 #define LegacyGui "Voxprint.exe"
 #define LegacyCli "voxprint-cli.exe"
-; The suite folder as first spelled. Same path on Windows apart from case; renamed, not deleted.
+; Earlier suite folders. On Windows the two spellings are one directory. Removed on upgrade, not renamed.
 #define LegacySuiteDir "Voxprint AI Suite"
-#define LegacySuiteGui "Voxprint AI Audiobook Builder.exe"
+#define LegacySuiteDirDisplay "VOXPrint AI Suite"
+#define LegacyAppFolder "Audiobook Builder"
+#define LegacySuiteGui "VOXPrint AI Audiobook Builder.exe"
+#define LegacySuiteGuiOld "Voxprint AI Audiobook Builder.exe"
 #define LegacyDisplayName "Voxprint AI Audiobook Builder"
 ; CI build number and codename (tools/build_number.py; build_online.ps1 passes /DAppBuild= /DAppCodename=); 0 = local build
 #ifndef AppBuild
@@ -87,12 +92,13 @@ VersionInfoProductVersion={#AppVersionInfo}.{#AppBuild}
 AppVerName={#AppDisplayName} {#AppVersion} build {#AppBuild} {#AppCodename}
 #endif
 AppPublisher=VOXPrint
+UninstallDisplayName={#AppDisplayName}
 DefaultDirName={autopf}\{#SuiteDir}\{#AppFolder}
 ; An upgrade must not stay in C:\Program Files\Voxprint. /DIR= still wins.
 UsePreviousAppDir=no
-; Start menu folder "VOXPrint AI Suite", shortcut "Audiobook Builder". No desktop shortcut.
+; Start menu folder "VOXPrint AI Suite", shortcut "VOXPrint AI Audiobook Builder". No desktop shortcut.
 ; UsePreviousGroup=no moves an older "Voxprint" or "VOXPrint AI Audiobook Builder" folder. [InstallDelete] removes the old shortcut.
-DefaultGroupName={#SuiteDir}
+DefaultGroupName={#StartMenu}
 UsePreviousGroup=no
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExe}
@@ -260,20 +266,22 @@ Type: dirifempty; Name: "{userprograms}\{#AppDisplayName}"
 Type: files; Name: "{commonprograms}\{#LegacyDir}\{#AppDisplayName}.lnk"
 Type: files; Name: "{commonprograms}\{#LegacyDir}\{#LegacyGui}.lnk"
 Type: files; Name: "{commonprograms}\{#LegacyDir}\Voxprint.lnk"
-Type: files; Name: "{commonprograms}\{#LegacyDir}\{#AppFolder}.lnk"
+Type: files; Name: "{commonprograms}\{#LegacyDir}\{#LegacyAppFolder}.lnk"
 Type: files; Name: "{userprograms}\{#LegacyDir}\{#AppDisplayName}.lnk"
 Type: files; Name: "{userprograms}\{#LegacyDir}\Voxprint.lnk"
-Type: files; Name: "{userprograms}\{#LegacyDir}\{#AppFolder}.lnk"
+Type: files; Name: "{userprograms}\{#LegacyDir}\{#LegacyAppFolder}.lnk"
 Type: dirifempty; Name: "{commonprograms}\{#LegacyDir}"
 Type: dirifempty; Name: "{userprograms}\{#LegacyDir}"
-; The suite folder spelled "Voxprint AI Suite" is the same Start menu folder. Remove the old shortcut
+; The mixed-case suite Start menu folder is the same folder as the new one. Remove the old shortcut
 ; files before the new one is written. Do not remove the folder: another suite program may share it.
 Type: files; Name: "{commondesktop}\{#LegacyDisplayName}.lnk"
 Type: files; Name: "{userdesktop}\{#LegacyDisplayName}.lnk"
-Type: files; Name: "{commonprograms}\{#LegacySuiteDir}\{#AppFolder}.lnk"
+Type: files; Name: "{commonprograms}\{#LegacySuiteDir}\{#LegacyAppFolder}.lnk"
 Type: files; Name: "{commonprograms}\{#LegacySuiteDir}\{#LegacyDisplayName}.lnk"
-Type: files; Name: "{userprograms}\{#LegacySuiteDir}\{#AppFolder}.lnk"
+Type: files; Name: "{commonprograms}\{#LegacySuiteDir}\{#AppDisplayName}.lnk"
+Type: files; Name: "{userprograms}\{#LegacySuiteDir}\{#LegacyAppFolder}.lnk"
 Type: files; Name: "{userprograms}\{#LegacySuiteDir}\{#LegacyDisplayName}.lnk"
+Type: files; Name: "{userprograms}\{#LegacySuiteDir}\{#AppDisplayName}.lnk"
 
 [Files]
 #ifdef ONLINE
@@ -281,7 +289,7 @@ Type: files; Name: "{userprograms}\{#LegacySuiteDir}\{#LegacyDisplayName}.lnk"
 Source: "..\build\online\voxprint-fetch.exe"; DestDir: "{tmp}"; Flags: dontcopy
 #else
 #ifdef ONEDIR
-Source: "..\dist\VOXPrint AI Audiobook Builder\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\voxprint-audiobook-builder\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 #else
 Source: "..\dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\dist\{#CliExe}"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
@@ -300,7 +308,7 @@ Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 
 [Icons]
-Name: "{group}\{#AppFolder}"; Filename: "{app}\{#AppExe}"
+Name: "{group}\{#AppDisplayName}"; Filename: "{app}\{#AppExe}"
 
 [Run]
 ; (the Visual C++ runtime is installed from [Code]: InstallVcRedist)
@@ -1043,56 +1051,10 @@ begin
     Log('renamed ' + Actual + ' to ' + Wanted);
 end;
 
-{ A PATH segment that is this folder with the old spelling is rewritten to Dir. }
-procedure RewriteUserPathCase(const Dir: String);
-var
-  OldPath, NewPath, Piece, Rest, Trimmed: String;
-  P: Integer;
-  Changed: Boolean;
+procedure FixStartMenuCasing();
 begin
-  if Dir = '' then Exit;
-  if not RegQueryStringValue(HKCU, 'Environment', 'Path', OldPath) then Exit;
-  NewPath := '';
-  Rest := OldPath;
-  Changed := False;
-  while Rest <> '' do
-  begin
-    P := Pos(';', Rest);
-    if P = 0 then
-    begin
-      Piece := Rest;
-      Rest := '';
-    end
-    else
-    begin
-      Piece := Copy(Rest, 1, P - 1);
-      Rest := Copy(Rest, P + 1, Length(Rest));
-    end;
-    Trimmed := RemoveBackslash(Trim(Piece));
-    if CompareText(Trimmed, Dir) = 0 then
-    begin
-      if CompareStr(Trimmed, Dir) <> 0 then Changed := True;
-      Piece := Dir;
-    end;
-    if (NewPath = '') and (Piece <> '') then
-      NewPath := Piece
-    else if Piece <> '' then
-      NewPath := NewPath + ';' + Piece;
-  end;
-  if Changed then
-    RegWriteExpandStringValue(HKCU, 'Environment', 'Path', NewPath);
-end;
-
-procedure FixBrandCasing();
-var
-  App: String;
-begin
-  RenameChildCase(ExpandConstant('{autopf}'), '{#SuiteDir}');
-  App := RemoveBackslash(ExpandConstant('{app}'));
-  RenameChildCase(App, '{#AppExe}');
-  RenameChildCase(ExpandConstant('{commonprograms}'), '{#SuiteDir}');
-  RenameChildCase(ExpandConstant('{userprograms}'), '{#SuiteDir}');
-  RewriteUserPathCase(App);
+  RenameChildCase(ExpandConstant('{commonprograms}'), '{#StartMenu}');
+  RenameChildCase(ExpandConstant('{userprograms}'), '{#StartMenu}');
 end;
 
 function IsLegacyProgramDir(const Dir: String): Boolean;
@@ -1153,19 +1115,55 @@ begin
         RegDeleteKeyIncludingSubkeys(Roots[I], Key);
 end;
 
+function LegacySuiteAppDir(const SuiteName: String): String;
+begin
+  Result := RemoveBackslash(AddBackslash(ExpandConstant('{autopf}')) + SuiteName + '\{#LegacyAppFolder}');
+end;
+
+function DirHasOurProgram(const Dir: String): Boolean;
+begin
+  Result := FileExists(AddBackslash(Dir) + '{#LegacyGui}')
+    or FileExists(AddBackslash(Dir) + '{#LegacyCli}')
+    or FileExists(AddBackslash(Dir) + '{#LegacySuiteGui}')
+    or FileExists(AddBackslash(Dir) + '{#LegacySuiteGuiOld}')
+    or FileExists(AddBackslash(Dir) + '{#AppExe}')
+    or FileExists(AddBackslash(Dir) + '{#CliExe}');
+end;
+
+procedure RemoveAppDirIfOurs(const Dir: String);
+var
+  App: String;
+begin
+  if Dir = '' then Exit;
+  App := RemoveBackslash(ExpandConstant('{app}'));
+  if CompareText(RemoveBackslash(Dir), App) = 0 then Exit;
+  if DirExists(Dir) and DirHasOurProgram(Dir) then
+  begin
+    Log('Removing the previous install at ' + Dir);
+    DelTree(Dir, True, True, True);
+  end;
+  RemoveDirFromUserPath(Dir);
+  if DirExists(ExtractFileDir(RemoveBackslash(Dir))) then
+    RmDir(ExtractFileDir(RemoveBackslash(Dir)));
+end;
+
 procedure RemoveLegacyInstall();
 var
   Legacy, App: String;
 begin
   Legacy := LegacyInstallDir();
   App := RemoveBackslash(ExpandConstant('{app}'));
-  if CompareText(Legacy, App) = 0 then Exit;
-  if DirExists(Legacy) and IsLegacyProgramDir(Legacy) then
+  if CompareText(Legacy, App) <> 0 then
   begin
-    Log('Removing the previous install at ' + Legacy);
-    DelTree(Legacy, True, True, True);
+    if DirExists(Legacy) and IsLegacyProgramDir(Legacy) then
+    begin
+      Log('Removing the previous install at ' + Legacy);
+      DelTree(Legacy, True, True, True);
+    end;
+    RemoveDirFromUserPath(Legacy);
   end;
-  RemoveDirFromUserPath(Legacy);
+  RemoveAppDirIfOurs(LegacySuiteAppDir('{#LegacySuiteDir}'));
+  RemoveAppDirIfOurs(LegacySuiteAppDir('{#LegacySuiteDirDisplay}'));
 end;
 
 procedure RegisterSuiteDiscovery();
@@ -1173,7 +1171,7 @@ var
   Key, InstallPath, CliPath: String;
   Rc: Integer;
 begin
-  Key := 'Software\Voxprint\Apps\audiobook-builder';
+  Key := 'Software\voxprint\Apps\audiobook-builder';
   InstallPath := RemoveBackslash(ExpandConstant('{app}'));
   if FileExists(ExpandConstant('{app}\{#CliExe}')) then
     CliPath := ExpandConstant('{app}\{#CliExe}')
@@ -1194,7 +1192,7 @@ var
   Rc: Integer;
   Key, Exe: String;
 begin
-  Key := 'Software\Voxprint\Apps\audiobook-builder';
+  Key := 'Software\voxprint\Apps\audiobook-builder';
   if FileExists(ExpandConstant('{app}\{#CliExe}')) then
     Exe := ExpandConstant('{app}\{#CliExe}')
   else
@@ -1711,13 +1709,13 @@ begin
     end;
     RunSuiteInstall();
     RemoveLegacyInstall();
-    FixBrandCasing();
+    FixStartMenuCasing();
     RegisterSuiteDiscovery();
     AddAppToUserPath();
   end;
 end;
 
-{ Uninstall: remove our key with the program itself (Voxprint.exe --unregister-models-user --out FILE).  FILE gets the number of
+{ Uninstall: remove our key with the program itself (ProgramExe --unregister-models-user --out FILE).  FILE gets the number of
   OTHER programs still using the models and the models folder.  -1 (helper failed) means: never offer to delete. }
 var
   OtherModelUsers: Integer;

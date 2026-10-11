@@ -11,4 +11,4 @@ Icon=voxprint
 Terminal=false
 Categories=AudioVideo;Audio;AudioVideoEditing;
 Keywords=audiobook;tts;voice;clone;speech;
-StartupWMClass=voxprint
+StartupWMClass=voxprint-audiobook-builder

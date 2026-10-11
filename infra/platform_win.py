@@ -332,7 +332,7 @@ def _typeperf_read(paths: list) -> Optional[int]:
 
 
 #: Current-user and machine registry. Peers (Plotweaver and the other suite apps) read InstallPath and CliPath.
-DISCOVERY_KEY = r"Software\Voxprint\Apps"
+DISCOVERY_KEY = r"Software\voxprint\Apps"
 
 
 def _discovery_path(app_id: str) -> str:

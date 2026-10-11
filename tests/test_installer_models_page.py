@@ -102,7 +102,7 @@ def test_no_desktop_shortcut_only_start_menu_and_upgrades_remove_the_old_one():
     assert "desktopicon" not in t and "{autodesktop}" not in t and "CreateDesktopIcon" not in t
     assert not re.search(r"^\[Tasks\]", t, re.M)
     icons = section("Icons")
-    assert "{group}\\{#AppFolder}" in icons and "desktop" not in icons.lower()
+    assert "{group}\\{#AppDisplayName}" in icons and "desktop" not in icons.lower()
     deletes = section("InstallDelete")
     assert "{commondesktop}\\{#AppDisplayName}.lnk" in deletes and "{userdesktop}\\{#AppDisplayName}.lnk" in deletes
 

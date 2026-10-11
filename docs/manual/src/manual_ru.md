@@ -512,7 +512,7 @@
 
 > Известная проблема сборки 667: во время проверки правая колонка настроек сжимается, и пояснительные тексты наезжают друг на друга (первый рисунок). Это только внешний вид; будет исправлено в одной из следующих сборок.
 
-Та же проверка без окна запускается командой `Voxprint.exe --auto-repair` (глава 11).
+Та же проверка без окна запускается командой `voxprint-audiobook-builder.exe --auto-repair` (глава 11).
 
 # Словарь терминов
 
@@ -622,7 +622,7 @@
 
 ## Где программа и общие правила
 
-Установленная программа — `C:\Program Files\Voxprint\Voxprint.exe` (или другая папка, если вы её выбрали; найти можно командой `where.exe Voxprint`). В исходном коде используйте `python main.py`. Ниже `voxprint` означает любой из вариантов.
+Скрипты вызывают `C:\Program Files\voxprint-ai-suite\audiobook-builder\voxprint-audiobook-cli.exe` (или другую папку, если вы её выбрали; найти можно командой `where.exe voxprint-audiobook-cli`). Окно — `voxprint-audiobook-builder.exe` в той же папке; ярлык в меню «Пуск» называется VOXPrint AI Audiobook Builder. В исходном коде используйте `python main.py`. Ниже `voxprint` означает консольную программу или `python main.py`.
 
 * Ничего не спрашивается; `--yes` принимает любая команда.
 * `--json` выводит ход работы строками JSON и заканчивает одним объектом результата (`type: result`, `ok`, `exit_code`, `outputs`, `warnings`, `error`, `hint`).
@@ -683,8 +683,8 @@ voxprint restore --from DIR [--link] [--json]
 ```
 voxprint status --json                 # версия, видеокарта, голоса, форматы, модели
 voxprint models download required      # TTS, выравниватель и распознавание, если их нет
-Voxprint.exe --verify-install          # быстрая проверка установки с кодами причин
-Voxprint.exe --auto-repair             # проверка и восстановление: каждый файл по SHA-256
+voxprint-audiobook-builder.exe --verify-install   # быстрая проверка установки с кодами причин
+voxprint-audiobook-builder.exe --auto-repair      # проверка и восстановление: каждый файл по SHA-256
 voxprint diag --out report.zip         # диагностический отчёт
 ```
 

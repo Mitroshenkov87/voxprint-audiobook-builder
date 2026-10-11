@@ -4,12 +4,13 @@
 #   curl -fsSL https://github.com/@REPO@/releases/download/@TAG@/install-voxprint-linux.sh | bash
 #   or, from the unpacked Voxprint-linux-experimental.tar.gz:   ./install-voxprint-linux.sh
 #
-# Installs for the current user only (no root, except the optional "apt-get install" of system libraries):
-#   ~/.local/share/voxprint/app    the program (Python source, same code as the Windows build)
-#   ~/.local/share/voxprint/venv   its Python environment (PySide6, PyTorch, transformers ...)
-#   ~/.local/share/voxprint/       models, voices, settings, logs (created by the program)
-#   ~/.local/bin/voxprint-audiobook-cli   the launcher (voxprint is a compatibility name)
-#   ~/.local/share/applications/voxprint-audiobook.desktop  the menu entry
+# Installs the package for the machine (writes /opt and /usr with sudo when this user is not root):
+#   /opt/voxprint-ai-suite/audiobook-builder          the program (Python source)
+#   /opt/voxprint-ai-suite/audiobook-builder/venv     its Python environment
+#   ~/.local/share/voxprint/                          models, voices, settings, logs (per user; kept on upgrade)
+#   /usr/local/bin/voxprint-audiobook-cli             the launcher (voxprint is a compatibility name)
+#   /usr/share/applications/voxprint-audiobook-builder.desktop
+# An older install under ~/.local/share/voxprint/app is removed. That data folder is not.
 # PyTorch: torch 2.11.0 cu130 (NVIDIA driver 600+) with TorchAudio 2.11.0.
 # An NVIDIA GeForce RTX 40-series or newer GPU (compute capability 8.9+) is required. There is no CPU-only install.
 # Internal CI switches, not shown in --help: --skip-gpu-check, --gpu-check-only, and --torch-backend cpu (only with --skip-gpu-check).
@@ -22,14 +23,38 @@ TAG="${VOXPRINT_TAG:-@TAG@}"
 BASE_URL="${VOXPRINT_BASE_URL:-https://github.com/$REPO/releases/download/$TAG}"
 
 DATA="${VOXPRINT_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/voxprint}"
-BIN_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
-APPS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
-ICON_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps"
+PREFIX="/opt/voxprint-ai-suite/audiobook-builder"
+BIN_DIR="/usr/local/bin"
+APPS_DIR="/usr/share/applications"
+DESKTOP_NAME="voxprint-audiobook-builder.desktop"
+ICON_DIR="/usr/share/icons/hicolor/256x256/apps"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/voxprint"
-APP="$DATA/app"
-VENV="$DATA/venv"
+APP="$PREFIX"
+VENV="$PREFIX/venv"
 LAUNCHER="$BIN_DIR/voxprint-audiobook-cli"
 LAUNCHER_COMPAT="$BIN_DIR/voxprint"
+OLD_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/voxprint"
+OLD_APP="$OLD_DATA/app"
+OLD_VENV="$OLD_DATA/venv"
+OLD_BIN="${XDG_BIN_HOME:-$HOME/.local/bin}"
+OLD_APPS="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+OLD_ICON="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps"
+
+as_root() {
+  if [ "$(id -u)" = 0 ]; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
+# Drop a previous per-user package. Models, voices and settings in the data folder stay.
+remove_old_user_package() {
+  rm -rf "$OLD_APP" "$OLD_APP.old" "$OLD_APP.new" "$OLD_VENV"
+  rm -f "$OLD_BIN/voxprint" "$OLD_BIN/voxprint-audiobook-cli" \
+    "$OLD_APPS/voxprint.desktop" "$OLD_APPS/voxprint-audiobook.desktop" \
+    "$OLD_APPS/voxprint-audiobook-builder.desktop" "$OLD_ICON/voxprint.png"
+}
 
 # system packages (Debian / Ubuntu / AnduinOS / Mint names): Qt xcb platform plugin, OpenGL, ffmpeg, venv
 APT_PACKAGES="python3-venv ffmpeg libegl1 libgl1 libdbus-1-3 libfontconfig1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libpulse0"
@@ -132,9 +157,12 @@ done
 # ----------------------------------------------------------------------------------------------- uninstall
 if [ "$MODE" = uninstall ]; then
   say "Removing VOXPrint (program, environment, launcher, menu entry)"
-  rm -rf "$APP" "$APP.old" "$APP.new" "$VENV" "$DATA/install.json"
-  rm -f "$LAUNCHER" "$LAUNCHER_COMPAT" "$APPS_DIR/voxprint-audiobook.desktop" "$APPS_DIR/voxprint.desktop" "$ICON_DIR/voxprint.png"
-  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+  as_root rm -rf "$APP"
+  as_root rmdir /opt/voxprint-ai-suite 2>/dev/null || true
+  as_root rm -f "$LAUNCHER" "$LAUNCHER_COMPAT" "$APPS_DIR/$DESKTOP_NAME" "$APPS_DIR/voxprint-audiobook.desktop" "$APPS_DIR/voxprint.desktop" "$ICON_DIR/voxprint.png"
+  remove_old_user_package
+  rm -f "$DATA/install.json"
+  command -v update-desktop-database >/dev/null 2>&1 && as_root update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
   if [ "$PURGE" = 1 ]; then
     say "Deleting $DATA (models, voices, settings, logs)"
     rm -rf "$DATA"
@@ -233,23 +261,26 @@ fi
 "$PY" -c 'import venv, ensurepip' 2>/dev/null || die "python3-venv is missing: sudo apt-get install python3-venv"
 
 # ----------------------------------------------------------------------------------------------- the program
-mkdir -p "$DATA" "$CACHE" "$BIN_DIR"
+remove_old_user_package
+mkdir -p "$DATA" "$CACHE"
+STAGE="$(mktemp -d "${TMPDIR:-/tmp}/voxprint-stage.XXXXXX")"
+APP_NEW="$STAGE/app"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo .)"
 SRC=""
 if [ -n "$FROM_DIR" ]; then SRC="$FROM_DIR"
 elif [ -f "$HERE/app/main.py" ]; then SRC="$HERE/app"        # unpacked Voxprint-linux-experimental.tar.gz
 fi
-rm -rf "$APP.new"
+rm -rf "$APP_NEW"
 if [ -n "$SRC" ]; then
   [ -f "$SRC/main.py" ] || die "$SRC does not contain main.py"
   say "Installing the program from $SRC"
-  mkdir -p "$APP.new"
+  mkdir -p "$APP_NEW"
   for item in main.py credits.json requirements.txt requirements-verified.txt requirements-nodeps.txt requirements-torch.txt \
               LICENSE NOTICE THIRD_PARTY_NOTICES.md core infra ui workers locales prompts licenses assets installer; do
-    [ -e "$SRC/$item" ] && cp -a "$SRC/$item" "$APP.new/"
+    [ -e "$SRC/$item" ] && cp -a "$SRC/$item" "$APP_NEW/"
   done
-  find "$APP.new" -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null || true
-  [ -d "$SRC/docs" ] && mkdir -p "$APP.new/docs" && cp -a "$SRC"/docs/LINUX-TEST-CHECKLIST.md "$APP.new/docs/" 2>/dev/null
+  find "$APP_NEW" -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null || true
+  [ -d "$SRC/docs" ] && mkdir -p "$APP_NEW/docs" && cp -a "$SRC"/docs/LINUX-TEST-CHECKLIST.md "$APP_NEW/docs/" 2>/dev/null
 else
   say "Downloading the program ($TAG)"
   FETCH="$CACHE/voxprint-fetch.py"
@@ -260,13 +291,16 @@ req = urllib.request.Request(url, headers={"User-Agent": "voxprint-install/1"})
 with urllib.request.urlopen(req, timeout=60) as r, open(dst, "wb") as f:
     f.write(r.read())
 PYDL
-  "$PY" "$FETCH" --manifest "$BASE_URL/manifest-linux.json" --dest "$APP.new" --cache "$CACHE" || die "download of the program failed (see the message above)"
+  "$PY" "$FETCH" --manifest "$BASE_URL/manifest-linux.json" --dest "$APP_NEW" --cache "$CACHE" || die "download of the program failed (see the message above)"
 fi
-[ -f "$APP.new/main.py" ] || die "the program files are incomplete"
-rm -rf "$APP.old"
-[ -d "$APP" ] && mv "$APP" "$APP.old"
-mv "$APP.new" "$APP"
-rm -rf "$APP.old"
+[ -f "$APP_NEW/main.py" ] || die "the program files are incomplete"
+say "Copying the program to $APP"
+as_root mkdir -p "$(dirname "$APP")"
+as_root rm -rf "$APP"
+as_root cp -a "$APP_NEW" "$APP"
+rm -rf "$STAGE"
+OWNER="$(id -un)"
+as_root chown -R "$OWNER" "$APP"
 
 # ----------------------------------------------------------------------------------------------- the Python environment
 if [ "$RECREATE" = 1 ]; then rm -rf "$VENV"; fi
@@ -292,25 +326,26 @@ say "Installing the other Python packages (this takes a few minutes)"
 
 # ----------------------------------------------------------------------------------------------- launcher, menu entry
 say "Creating the launcher $LAUNCHER"
-cat > "$LAUNCHER" <<LAUNCH
+as_root mkdir -p "$BIN_DIR"
+as_root tee "$LAUNCHER" >/dev/null <<LAUNCH
 #!/usr/bin/env bash
-# Voxprint launcher (written by install-voxprint-linux.sh).  Extra Qt hints: QT_QPA_PLATFORM=xcb voxprint-audiobook-cli
+# VOXPrint launcher (written by install-voxprint-linux.sh).  Extra Qt hints: QT_QPA_PLATFORM=xcb voxprint-audiobook-cli
 export VOXPRINT_HOME="\${VOXPRINT_HOME:-$DATA}"
 export PYTHONNOUSERSITE=1
 exec "$VPY" "$APP/main.py" "\$@"
 LAUNCH
-chmod +x "$LAUNCHER"
-ln -sfn "voxprint-audiobook-cli" "$LAUNCHER_COMPAT"
-rm -f "$APPS_DIR/voxprint.desktop"
+as_root chmod +x "$LAUNCHER"
+as_root ln -sfn "voxprint-audiobook-cli" "$LAUNCHER_COMPAT"
+as_root rm -f "$APPS_DIR/voxprint.desktop" "$APPS_DIR/voxprint-audiobook.desktop"
 if [ "$NO_DESKTOP" = 0 ]; then
-  mkdir -p "$APPS_DIR" "$ICON_DIR"
-  [ -f "$APP/installer/linux/voxprint-256.png" ] && cp "$APP/installer/linux/voxprint-256.png" "$ICON_DIR/voxprint.png"
-  if [ -f "$APP/installer/linux/voxprint.desktop" ]; then
-    sed "s|@LAUNCHER@|$LAUNCHER|g" "$APP/installer/linux/voxprint.desktop" > "$APPS_DIR/voxprint-audiobook.desktop"
-    chmod 644 "$APPS_DIR/voxprint-audiobook.desktop"
+  as_root mkdir -p "$APPS_DIR" "$ICON_DIR"
+  [ -f "$APP/installer/linux/voxprint-256.png" ] && as_root cp "$APP/installer/linux/voxprint-256.png" "$ICON_DIR/voxprint.png"
+  if [ -f "$APP/installer/linux/voxprint-audiobook-builder.desktop" ]; then
+    sed "s|@LAUNCHER@|$LAUNCHER|g" "$APP/installer/linux/voxprint-audiobook-builder.desktop" | as_root tee "$APPS_DIR/$DESKTOP_NAME" >/dev/null
+    as_root chmod 644 "$APPS_DIR/$DESKTOP_NAME"
   fi
-  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
-  command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q -t "${ICON_DIR%/hicolor/*}/hicolor" >/dev/null 2>&1 || true
+  command -v update-desktop-database >/dev/null 2>&1 && as_root update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+  command -v gtk-update-icon-cache >/dev/null 2>&1 && as_root gtk-update-icon-cache -q -t "${ICON_DIR%/hicolor/*}/hicolor" >/dev/null 2>&1 || true
 fi
 GPU="none"
 command -v nvidia-smi >/dev/null 2>&1 && GPU="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)"
@@ -329,6 +364,6 @@ fi
 echo
 if [ "$RC" = 0 ]; then say "VOXPrint is installed."; else warn "VOXPrint is installed, but a self-test failed - see docs/LINUX-TEST-CHECKLIST.md"; fi
 echo "Start it from the application menu or with:  voxprint-audiobook-cli"
-case ":$PATH:" in *":$BIN_DIR:"*) ;; *) warn "$BIN_DIR is not in PATH - log out and in again, or run: $LAUNCHER" ;; esac
+case ":$PATH:" in *":$BIN_DIR:"*) ;; *) warn "$BIN_DIR is not in PATH - run: $LAUNCHER" ;; esac
 echo "Models are downloaded on the first run into $DATA/models.  Update: run this script again.  Remove: install-voxprint-linux.sh --uninstall"
 exit "$RC"
