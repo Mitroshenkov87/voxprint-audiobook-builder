@@ -127,3 +127,9 @@ def test_setup_rolls_back_our_ref_and_never_deletes_the_models_root():
     linux = (root / "installer" / "linux" / "install-voxprint-linux.sh").read_text(encoding="utf-8")
     failed = linux[linux.index("voxprint-mdl"):linux.index("Creating the launcher")]
     assert "--unregister-suite" in failed
+
+
+def test_pr_check_workflow_stays_inside_its_run_block():
+    text = (Path(__file__).resolve().parents[1] / ".github" / "workflows" / "pr-check.yml").read_text(encoding="utf-8")
+    assert not any(line.startswith(("{", "[", '"@')) for line in text.splitlines())
+    assert "ConvertTo-Json" in text and "shared-models" in text

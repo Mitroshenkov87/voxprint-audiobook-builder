@@ -147,6 +147,7 @@ def test_installers_download_without_asking_ready():
     body = iss[iss.index("procedure RunSuiteInstall"):iss.index("procedure AddAppToUserPath")]
     assert "SkipSuiteInstall()" in body
     assert body.index("SkipSuiteInstall()") < body.index("download --app audiobook-builder")
+    assert iss.index("procedure UnregisterSuite();") < iss.index("procedure RunSuiteInstall();")
     assert "--json" in body and "ready()" not in body and "mdl.ready" not in body
     linux = (ROOT / "installer" / "linux" / "install-voxprint-linux.sh").read_text(encoding="utf-8")
     block = linux[linux.index("Downloading the required models"):linux.index("Creating the launcher")]

@@ -1532,6 +1532,16 @@ begin
   Result := True;
 end;
 
+{ Defined before RunSuiteInstall. The Inno compiler resolves a name only after its procedure. }
+procedure UnregisterSuite();
+var
+  Rc: Integer;
+begin
+  if FileExists(ProgramExe()) then
+    if not Exec(ProgramExe(), '--unregister-suite', ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Rc) then
+      Log('shared suite manifest was not updated');
+end;
+
 procedure RunSuiteInstall();
 var
   Exe, Mdl, Params: String;
@@ -1766,16 +1776,6 @@ begin
     if not Exec(ProgramExe(), '--unregister-runtime-user', ExpandConstant('{app}'), SW_HIDE,
                 ewWaitUntilTerminated, Rc) then
       Log('runtime users file not updated');
-end;
-
-{ Drop our app from the shared manifest. A directory goes only when this app was its last ref and it is not a shared root. }
-procedure UnregisterSuite();
-var
-  Rc: Integer;
-begin
-  if FileExists(ProgramExe()) then
-    if not Exec(ProgramExe(), '--unregister-suite', ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Rc) then
-      Log('shared suite manifest was not updated');
 end;
 
 #ifdef ONLINE
