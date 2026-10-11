@@ -69,7 +69,7 @@ sys.exit(2)
 
 
 def _exe(path: Path, text: str) -> None:
-    path.write_text(text, encoding="utf-8")
+    path.write_text(text, encoding="utf-8", newline="\n")
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
 
@@ -79,12 +79,21 @@ def _layout(tmp_path: Path) -> dict:
     bindir = tmp_path / "bin"
     bindir.mkdir()
     log = tmp_path / "calls.log"
-    _exe(bindir / "voxprint", "#!/usr/bin/env python3\n" + FAKE_VOX)
+    (bindir / "fake_vox.py").write_text(FAKE_VOX, encoding="utf-8", newline="\n")
+    # A bash wrapper so Git Bash does not depend on a python3 store alias.
+    _exe(bindir / "voxprint", """#!/bin/bash
+if python3 -c "import sys" >/dev/null 2>&1; then PY=python3; else PY=python; fi
+export PYTHONIOENCODING=utf-8
+export PYTHONUTF8=1
+exec "$PY" "$(cd "$(dirname "$0")" && pwd)/fake_vox.py" "$@"
+""")
     _exe(bindir / "nvidia-smi", "#!/bin/sh\necho 2048\nexit 0\n")
     env = os.environ.copy()
     env["HOME"] = str(home)
     env["PATH"] = str(bindir) + os.pathsep + env.get("PATH", "")
     env["FAKE_LOG"] = str(log)
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
     env.pop("VOXPRINT_BIN", None)
     env.pop("VOXPRINT_VM_RESULTS", None)
     env.pop("VOXPRINT_VM_DONE", None)

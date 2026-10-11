@@ -9,8 +9,16 @@
 # Results land in ./vm-results/audiobook-builder/<tag>/ unless --results or $VOXPRINT_VM_RESULTS is set.
 # Sync that folder to /workspace/vm-results/audiobook-builder/<tag>/.
 set -eu
+export PYTHONIOENCODING=utf-8
+export PYTHONUTF8=1
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
+# Git Bash on Windows may resolve python3 to a store alias that does not run.
+if python3 -c "import sys" >/dev/null 2>&1; then
+  PY=python3
+else
+  PY=python
+fi
 WANT_JSON=0
 SMOKE_FLAG=0
 FULL_FLAG=0
@@ -73,9 +81,7 @@ resolve_bin() {
     return 0
   fi
   if [[ -f "$ROOT/main.py" ]]; then
-    local py="python3"
-    command -v python3 >/dev/null 2>&1 || py="python"
-    VOX=("$py" "$ROOT/main.py")
+    VOX=("$PY" "$ROOT/main.py")
     return 0
   fi
   return 1
@@ -120,7 +126,7 @@ mkdir -p "$RESULTS" "$DONE" "$WORK" || exit 2
 
 note() {
   local id="$1" status="$2" rc="$3" line
-  line=$(STEP_ID="$id" STEP_STATUS="$status" STEP_RC="$rc" python3 - <<'PY'
+  line=$(STEP_ID="$id" STEP_STATUS="$status" STEP_RC="$rc" "$PY" - <<'PY'
 import json, os
 print(json.dumps({
     "type": "step",
@@ -141,8 +147,9 @@ PY
 finish() {
   local code="$1" reason="$2"
   cleanup
+  set +e
   CODE="$code" REASON="$reason" MODE="$MODE" TAG="$TAG" RESULTS="$RESULTS" PEAK_FILE="$PEAK" WANT_JSON="$WANT_JSON" \
-    python3 - <<'PY'
+    "$PY" - <<'PY'
 import json, os
 from pathlib import Path
 results = Path(os.environ["RESULTS"])
@@ -219,7 +226,7 @@ mark_done() {
 
 require_json_dry_run() {
   local log="$1"
-  python3 - "$log" <<'PY'
+  "$PY" - "$log" <<'PY'
 import json, sys
 lines = [ln for ln in open(sys.argv[1], encoding="utf-8").read().splitlines() if ln.strip()]
 if not lines:
@@ -234,7 +241,7 @@ PY
 
 require_narration_result() {
   local log="$1"
-  python3 - "$log" <<'PY'
+  "$PY" - "$log" <<'PY'
 import json, sys
 lines = [ln for ln in open(sys.argv[1], encoding="utf-8").read().splitlines() if ln.strip()]
 objs = [json.loads(ln) for ln in lines]
@@ -267,7 +274,7 @@ step_version() {
   fi
   if [[ -z "$TAG_OPT" ]]; then
     local discovered
-    discovered=$(python3 - "$RESULTS/$id.log" <<'PY'
+    discovered=$("$PY" - "$RESULTS/$id.log" <<'PY'
 import json, re, sys
 text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
 ver = ""
@@ -397,7 +404,7 @@ step_dialogue() {
   local rc1=$?
   set -e
   if [[ "$rc1" -ne 0 ]]; then note "$id" fail "$rc1"; finish 1 "speakers failed"; fi
-  if ! python3 - "$WORK/marks.txt" <<'PY'
+  if ! "$PY" - "$WORK/marks.txt" <<'PY'
 import sys
 text = open(sys.argv[1], encoding="utf-8").read().casefold()
 need = ("male", "female", "муж", "жен")
@@ -428,7 +435,7 @@ step_yo() {
   local rc=$?
   set -e
   if [[ "$rc" -ne 0 ]]; then note "$id" fail "$rc"; finish 1 "yo prepare failed"; fi
-  if ! python3 - "$WORK/yo-only.txt" <<'PY'
+  if ! "$PY" - "$WORK/yo-only.txt" <<'PY'
 import sys
 text = open(sys.argv[1], encoding="utf-8").read()
 sys.exit(0 if ("\u0451" in text or "\u0401" in text) else 1)
@@ -444,9 +451,7 @@ PY
 step_vxbook() {
   local id="vxbook"
   if skipped "$id"; then note "$id" skipped 0; return 0; fi
-  local py="python3"
-  command -v python3 >/dev/null 2>&1 || py="python"
-  if ! "$py" "$ROOT/scripts/vm_vxbook.py" "$WORK/story.vxbook" >"$RESULTS/$id-pack.log" 2>"$RESULTS/$id-pack.err"; then
+  if ! "$PY" "$ROOT/scripts/vm_vxbook.py" "$WORK/story.vxbook" >"$RESULTS/$id-pack.log" 2>"$RESULTS/$id-pack.err"; then
     note "$id" fail 2
     finish 2 "could not write the vxbook"
   fi
@@ -464,7 +469,7 @@ step_vxbook() {
 step_mp3_labels() {
   local id="mp3-labels"
   if skipped "$id"; then note "$id" skipped 0; return 0; fi
-  if ! python3 - "$WORK/vxbook-out" <<'PY'
+  if ! "$PY" - "$WORK/vxbook-out" <<'PY'
 import os, re, sys
 pat = re.compile(r"^\d{2,} - .+\.mp3$", re.IGNORECASE)
 found = []
