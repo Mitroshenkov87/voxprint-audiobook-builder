@@ -2,7 +2,7 @@
 
 Resumable and hash-checked. Depends on the app path and mirror tables in this package. Licence: Apache-2.0.
 
-Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
+Credit: VOXPrint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
 
 
 A download goes into ``<name>.partial``; only after verification is the folder renamed, so a partially downloaded
@@ -589,6 +589,12 @@ STALL_RETRIES = 3
 STALL_PAUSE = 3.0
 
 
+def _retry_same_source(exc: BaseException, retry: int) -> bool:
+    """Resume the same source after a stall that delivered bytes. A source that is merely slow is left for the next one."""
+    return (isinstance(exc, download_watch.Stalled) and exc.progressed and not getattr(exc, "slow", False)
+            and retry < STALL_RETRIES)
+
+
 #: Longest pre-download check of "is Hugging Face usable" (seconds); a slower answer counts as "slow".
 PROBE_CAP = 5.0
 _SOURCE_NAMES = {"gh": "GitHub", "hf": "Hugging Face", "ms": "ModelScope", "hfm": "Hugging Face mirror"}
@@ -1009,14 +1015,31 @@ def _ensure_model(
             except model_release.ReleaseError as exc:
                 log.warning("GitHub release copy of %s unusable: %s", repo_id, exc)
                 rel = None
+    hf_preferred = False
+    measured: Optional[List[str]] = None
     if mirror_only or finished:
         order: List[str] = []
     elif mirror_ok:
-        fast = _hf_fast(repo_id, hf_probe)
         mirror_download = mirror_download or _default_mirror_download
-        order = ["hf", "hfm", "ms"] if fast else ["ms", "hf", "hfm"]
-        if not fast:
-            log.warning("Hugging Face is slow or unreachable - trying ModelScope first for %s", repo_id)
+        # An injected probe, or a verdict already learned this session, keeps the previous order.
+        # Otherwise a short throughput sample prefers Hugging Face over a ~84 KB/s ModelScope feed.
+        if hf_probe is None and modelscope_mirror.hf_verdict() is None:
+            hf_bps, ms_bps = parallel_download.measure(repo_id)
+            ranked = parallel_download.order_for(hf_bps, ms_bps)
+            if ranked is not None:
+                measured = list(ranked)
+                chosen = parallel_download.choose_primary(hf_bps, ms_bps)
+                hf_preferred = chosen == "hf" and hf_bps > ms_bps > 0
+                modelscope_mirror.remember_hf(chosen == "hf")
+                log.info("mirror speeds for %s: Hugging Face %.0f KB/s, ModelScope %.0f KB/s",
+                         repo_id, hf_bps / 1024, ms_bps / 1024)
+        if measured is None:
+            fast = _hf_fast(repo_id, hf_probe)
+            order = ["hf", "hfm", "ms"] if fast else ["ms", "hf", "hfm"]
+            if not fast:
+                log.warning("Hugging Face is slow or unreachable - trying ModelScope first for %s", repo_id)
+        else:
+            order = measured
     else:
         order = ["hf", "hfm"]
     if mirror_only:
@@ -1087,7 +1110,10 @@ def _ensure_model(
             log.info("downloading %s from %s", repo_id, label)
             t_dl = time.monotonic()
             before = download_watch.progress_bytes(partial)
-            download_watch.run_watched(funcs[src], partial, meter, cur["cancel"], on_tick=tick, idle_ok=complete)
+            slow_bps = parallel_download.SLOW_BPS if src == "ms" and hf_preferred else None
+            slow_after = parallel_download.SLOW_AFTER if slow_bps is not None else None
+            download_watch.run_watched(funcs[src], partial, meter, cur["cancel"], on_tick=tick, idle_ok=complete,
+                                       slow_bps=slow_bps, slow_after=slow_after)
             ok_source = src
             # speed of THIS attempt: the bytes it fetched over the time it ran (earlier attempts' files are not counted)
             spent = time.monotonic() - t_dl
@@ -1099,7 +1125,7 @@ def _ensure_model(
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{src}: {type(exc).__name__}: {exc}")
             log.warning("download of %s from %s failed: %s", repo_id, src, exc)
-            if isinstance(exc, download_watch.Stalled) and exc.progressed and retry < STALL_RETRIES:
+            if _retry_same_source(exc, retry):
                 # the source delivered data and then stalled: resume it from the partial files before switching
                 attempts.insert(0, (src, retry + 1))
                 _sleep(STALL_PAUSE)

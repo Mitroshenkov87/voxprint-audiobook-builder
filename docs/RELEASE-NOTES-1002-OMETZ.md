@@ -1,4 +1,4 @@
-**Voxprint 1.0.0 RC4 · build 1002 "Ometz"** (courage and resolve; tag `v1.0.0-rc.4`): the fixes from a real GPU test. Setup installs the shared programs into one folder, a script can follow narration as JSON only, and a book file whose chapter id starts with a digit is accepted.
+**VOXPrint 1.0.0 RC4 · build 1002 "Ometz"** (courage and resolve; tag `v1.0.0-rc.4`): the fixes from a real GPU test. Setup installs the shared programs into one folder, a script can follow narration as JSON only, and a book file whose chapter id starts with a digit is accepted.
 
 Install: download `Voxprint-Setup-online.exe` from this release only. Check its SHA-256 against the `.sha256` file, then run it. Or read [install.ps1](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/blob/main/install.ps1) and, in an Administrator PowerShell:
 
@@ -26,7 +26,7 @@ Code signing is being applied for (SignPath Foundation). The warning will go awa
 
 New:
 
-- **Shared suite install.** Setup, including a silent install, installs the Python runtime, PyTorch, ffmpeg and the required models into the shared Voxprint folder. A compatible PyTorch already installed by another Voxprint app is reused.
+- **Shared suite install.** Setup, including a silent install, installs the Python runtime, PyTorch, ffmpeg and the required models into the shared Voxprint folder. A compatible PyTorch already installed by another VOXPrint app is reused.
 - **Console program.** `voxprint-cli.exe` is the program scripts should call. `narrate --json` prints only JSON on stdout and ends with one result line.
 - **Components window.** Free disk space is checked before a download. Essential models are downloaded first; the optional models are not all started at once.
 - **Build number.** This build is 1002, taken from the project file. A failed build job does not skip a number.

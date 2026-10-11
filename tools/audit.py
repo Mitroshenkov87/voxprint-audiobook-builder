@@ -1,4 +1,4 @@
-"""One-shot code audit for Voxprint AI Audiobook Builder.
+"""One-shot code audit for VOXPrint AI Audiobook Builder.
 
 Runs ruff, mypy, bandit, pip-audit, vulture, radon and gitleaks. Prints one summary (and, on GitHub Actions, writes
 that same summary to the job summary) and the full text to ``audit-report.txt``.

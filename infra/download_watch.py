@@ -2,7 +2,8 @@
 
 The download itself runs in a helper thread (:func:`run_watched`); the calling thread samples the size of the target folder
 once a second.  If no byte arrives for ``STALL_SECONDS`` the source is abandoned (:class:`Stalled`), so that the caller can
-switch to the next one - the partial files stay and are resumed.  Standard library only.
+switch to the next one - the partial files stay and are resumed.  A source that stays under a
+caller-supplied byte rate is abandoned the same way (``slow=True``), so the caller does not resume it.
 """
 from __future__ import annotations
 
@@ -35,10 +36,11 @@ class Stalled(OSError):
 
     ``progressed`` tells whether the abandoned attempt had received data before it stalled (worth resuming the same source)."""
 
-    def __init__(self, *args: Any, progressed: bool = False) -> None:
-        """Store the OS error and whether any bytes had arrived before the stall."""
+    def __init__(self, *args: Any, progressed: bool = False, slow: bool = False) -> None:
+        """Store the OS error, whether any bytes had arrived, and whether the source was only too slow."""
         super().__init__(*args)
         self.progressed = progressed
+        self.slow = slow
 
 
 def _key(folder: Path) -> str:
@@ -270,9 +272,13 @@ class Meter:
 
 def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threading.Event,
                 on_tick: Optional[Callable[[Meter], None]] = None, idle_ok: Optional[Callable[[], bool]] = None, stall: Optional[float] = None, poll: Optional[float] = None,
-                clock: Callable[[], float] = time.monotonic, grace: Optional[float] = None, log_every: float = 15.0) -> Any:
+                clock: Callable[[], float] = time.monotonic, grace: Optional[float] = None, log_every: float = 15.0,
+                slow_bps: Optional[float] = None, slow_after: Optional[float] = None) -> Any:
     """Run ``fn`` in a helper thread and watch ``folder``.  Returns its result, re-raises its exception, or raises
     :class:`Stalled` (after setting ``cancel`` so that the helper stops at its next progress call)."""
+    # parallel_download imports Stalled from this module, so the speed check is imported here.
+    from infra.parallel_download import too_slow
+
     stall = STALL_SECONDS if stall is None else stall
     grace = ABORT_GRACE if grace is None else grace
     poll = POLL if poll is None else poll
@@ -288,7 +294,8 @@ def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threa
     th = threading.Thread(target=target, daemon=True, name="vx-model-download")
     base = dir_bytes(folder)                  # before the helper runs, so its first write still counts as progress
     th.start()
-    last_size, last_move, last_log = base, clock(), clock()
+    started = clock()
+    last_size, last_move, last_log = base, started, started
     meter.sample(progress_bytes(folder))      # each file once (progress line)
     while True:
         th.join(poll)
@@ -309,6 +316,12 @@ def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threa
             total = meter.total
             log.info("download via %s: %s%s, %s/s", meter.source, fmt_bytes(min(meter.done, total) if total else meter.done),
                      f" of {fmt_bytes(total)}" if total else "", fmt_bytes(meter.speed))
+        if too_slow(meter.speed, now - started, slow_bps, slow_after, last_size > base):
+            log.info("download via %s is too slow (%.0f B/s) - switching source", meter.source, meter.speed)
+            cancel.set()
+            th.join(grace)
+            _abandon(folder, th)
+            raise Stalled(f"{meter.source} stayed under {int(slow_bps or 0)} B/s", progressed=True, slow=True)
         if now - last_move >= stall:
             if idle_ok is not None and idle_ok():
                 # nothing is left to download (everything is on disk): that is not a stall - finish with what we have

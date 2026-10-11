@@ -57,16 +57,16 @@ def test_the_heavy_full_build_cannot_run_any_more():
 
 
 def test_thin_job_publishes_an_exe_patch():
-    """build-thin uploads Voxprint.exe plus patch.json, and attaches the same three files to a release."""
+    """build-thin uploads the GUI exe plus patch.json, and attaches the same three files to a release."""
     wf = (ROOT / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")
     assert "name: Voxprint-patch\n" in wf
-    assert "dist/thin/Voxprint/Voxprint.exe\n" in wf
-    assert "dist/thin/Voxprint/Voxprint.exe.sha256\n" in wf
-    assert "dist/thin/Voxprint/patch.json\n" in wf
-    patch = wf.split("name: Voxprint-patch", 1)[1][:400]
+    assert "dist/thin/voxprint-audiobook-builder/voxprint-audiobook-builder.exe\n" in wf
+    assert "dist/thin/voxprint-audiobook-builder/voxprint-audiobook-builder.exe.sha256\n" in wf
+    assert "dist/thin/voxprint-audiobook-builder/patch.json\n" in wf
+    patch = wf.split("name: Voxprint-patch", 1)[1][:500]
     assert "retention-days: 14" in patch
     assert "runtime_lock_sha256" in wf and "VOXPRINT_BUILD" in wf
-    assert 'Voxprint-patch-$build.exe' in wf
+    assert 'voxprint-audiobook-builder-patch-$build.exe' in wf
     assert '"$exeName.sha256"' in wf and 'patch-$build.json' in wf
     assert "gh release upload $env:REL_TAG $f --clobber" in wf
     ps1 = (ROOT / "installer" / "build_online.ps1").read_text(encoding="utf-8")

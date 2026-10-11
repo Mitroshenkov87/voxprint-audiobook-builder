@@ -1,6 +1,6 @@
 # Online installer (thin): design and status
 
-**Goal.** `Voxprint-Setup-online.exe` is a small file (a few tens of MB). It installs only our own program shell (Qt + the Voxprint code)
+**Goal.** `voxprint-audiobook-builder-setup-<version>-win-x64.exe` is a small file (a few tens of MB). The same bytes are also copied as `voxprint-audiobook-builder-setup-win-x64.exe`. It installs only our own program shell (Qt + the Voxprint code)
 and then downloads whatever is missing **from the developers' own sites** — PyTorch from `download.pytorch.org`, every other library from
 PyPI — pinned by version and SHA-256. Before downloading anything it looks at what the PC already has and reuses it. Nothing third-party
 is repacked or uploaded by us, so a CI build takes minutes instead of an hour and the release holds only the shell and a manifest.
@@ -27,10 +27,10 @@ every file is still at its address with the pinned size). CI only reads the comm
 1. **Our own runtime folder** (`%LOCALAPPDATA%\Voxprint\runtime`, survives uninstall/reinstall): every component whose SHA-256 is recorded is skipped.
 2. **PyTorch of another program** (system Python, conda, a project venv, a Pinokio app, `VIRTUAL_ENV`): `infra/runtime_reuse.py` reads the
    `torch-*.dist-info` folders it finds (nothing is executed from foreign environments), applies the rules below and then **runs a check in a child
-   process of Voxprint** (`Voxprint.exe --probe-torch`: import torch/torchaudio, a tensor computation, a NumPy round trip, and a CUDA computation if
+   process of Voxprint** (`voxprint-audiobook-builder.exe --probe-torch`: import torch/torchaudio, a tensor computation, a NumPy round trip, and a CUDA computation if
    the PC has an NVIDIA GPU). Only if it passes is that `site-packages` appended to the **end** of `sys.path` (our own pinned libraries always win; the
    foreign environment only supplies `torch` and `torchaudio`) and remembered in `runtime\reuse.json`. If a remembered copy changes or disappears it is
-   forgotten and the module is downloaded. `Voxprint.exe --install-modules --own-torch` forces our own copy; `VOXPRINT_NO_REUSE=1` switches the search off.
+   forgotten and the module is downloaded. `voxprint-audiobook-builder.exe --install-modules --own-torch` forces our own copy; `VOXPRINT_NO_REUSE=1` switches the search off.
 3. **ffmpeg** on `PATH` (smoke-tested) is used before the pinned download (`core/audio_utils.ensure_ffmpeg`, `infra/assets.py`).
 4. **Visual C++ runtime**: the setup reads `HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64` and skips the redistributable when 14.29+ is present.
 
@@ -49,7 +49,7 @@ The flavor we download is `cu130` when the driver supports CUDA 13 (driver 600 o
 
 ## Start-up flow
 
-1. `Voxprint-Setup-online.exe` (Inno, `/DONLINE /DTHIN`) runs `voxprint-fetch --role core`: downloads the shell, writes `_internal\modules.json`
+1. `voxprint-audiobook-builder-setup-<version>-win-x64.exe` (Inno, `/DONLINE /DTHIN`) runs `voxprint-fetch --role core`: downloads the shell, writes `_internal\modules.json`
    (manifest address `manifest-thin-<channel>.json`), installs the Visual C++ runtime if needed.
 2. The app starts, activates what is in the runtime folder (`infra/modules.activate()`), and opens the **Components** window (also Settings → Components).
 3. The window reads the manifest (last good copy cached offline), looks for a reusable PyTorch, and downloads the missing modules (`libs`, `text`,
@@ -58,7 +58,7 @@ The flavor we download is `cu130` when the driver supports CUDA 13 (driver 600 o
    afterwards; features that need a module work as soon as it is ready.
 4. Step 2 follows at once: the first-run download of ALL models (TTS, aligner, Qwen3-ASR, SAGE if step 1 could not get it) into the chosen models
    folder, mirrored on the same live line (backup restore and existing copies first; no "maximum quality" button). Closing the window does not stop it.
-5. CLI for scripts and CI: `voxprint-cli.exe --modules-status`, `--install-modules [ids] [--own-torch]`, `--probe-torch` (results also in `logs\modules.txt`, `logs\probe_torch.txt`). `voxprint-cli.exe` is the console build; `Voxprint.exe` is windowed and does not return an exit code to a script.
+5. CLI for scripts and CI: `voxprint-audiobook-cli.exe --modules-status`, `--install-modules [ids] [--own-torch]`, `--probe-torch` (results also in `logs\modules.txt`, `logs\probe_torch.txt`). `voxprint-audiobook-cli.exe` is the console build; `voxprint-audiobook-builder.exe` is windowed and does not return an exit code to a script.
 
 ## Failure and resume
 
@@ -85,7 +85,7 @@ Every release's manifest is *pinned*: the exact files (size + SHA-256) this rele
 ## CI (`build-thin` job of `.github/workflows/build-installer.yml`)
 
 Installs only the pinned shell packages (Qt, numpy, soundfile ...) into a venv, runs the unit tests that need no PyTorch, builds the shell with
-PyInstaller (`build_thin.bat`), writes `Voxprint-shell-01.zip` + `manifest-thin-<channel>.json` and compiles `Voxprint-Setup-online.exe`
+PyInstaller (`build_thin.bat`), writes `Voxprint-shell-01.zip` + `manifest-thin-<channel>.json` and compiles `voxprint-audiobook-builder-setup-<version>-win-x64.exe`
 (`installer/build_online.ps1 -RuntimeLock infra\runtime_lock.json`). It then **really runs the product on the runner**: the frozen shell downloads the whole
 runtime from upstream (a CPU PyTorch wheel, internal to this job), imports it, and a second run proves that a PyTorch lying around on the PC is found, checked and reused instead of
 downloaded. Only then are the installer, its hash and the manifest attached to the release (older assets are never touched).

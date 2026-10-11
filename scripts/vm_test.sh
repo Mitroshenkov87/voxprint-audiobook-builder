@@ -78,14 +78,19 @@ resolve_bin() {
     VOX=("$VOXPRINT_BIN")
     return 0
   fi
-  if command -v voxprint-cli >/dev/null 2>&1; then
-    VOX=("voxprint-cli")
-    return 0
-  fi
-  if command -v voxprint >/dev/null 2>&1; then
-    VOX=("voxprint")
-    return 0
-  fi
+  local name candidate
+  for candidate in /usr/local/bin/voxprint-audiobook-cli /opt/voxprint-ai-suite/audiobook-builder/voxprint-audiobook-cli; do
+    if [[ -x "$candidate" ]]; then
+      VOX=("$candidate")
+      return 0
+    fi
+  done
+  for name in voxprint-audiobook-cli voxprint-cli voxprint; do
+    if command -v "$name" >/dev/null 2>&1; then
+      VOX=("$name")
+      return 0
+    fi
+  done
   if [[ -f "$ROOT/main.py" ]]; then
     VOX=("$PY" "$ROOT/main.py")
     return 0

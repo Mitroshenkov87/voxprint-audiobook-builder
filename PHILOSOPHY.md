@@ -1,4 +1,4 @@
-# Voxprint AI Media Suite: Philosophy
+# VOXPrint AI Media Suite: Philosophy
 
 *Complete, local, and built for the computer you have now: install it and start making.*
 

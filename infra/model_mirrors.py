@@ -23,11 +23,11 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, Iterable, Optional
 
-from voxprint_common.download import download as download_file
 from voxprint_common.download import huggingface_url
 from voxprint_common.hashing import sha256_file as _sha256_file
 
 from infra import netroute
+from infra.parallel_download import download_with_retry as download_file
 
 log = logging.getLogger("voxprint.models")
 
@@ -137,6 +137,8 @@ def _default_fetch(mirror_repo: str, filename: str, revision: str, local_dir: Pa
     target.parent.mkdir(parents=True, exist_ok=True)
     if not sha256:
         raise MirrorError(f"{mirror_repo}: {filename} has no sha256")
+    # voxprint-common 0.1.1 resumes a partial and tries each URL once. download_file
+    # retries that call (backoff, same partial) until the library grows a retry loop.
     download_file(target, [huggingface_url(mirror_repo, filename, revision)], sha256=sha256, size=size or None)
     return str(target)
 

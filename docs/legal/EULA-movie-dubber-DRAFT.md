@@ -1,11 +1,11 @@
-# Voxprint AI Movie Dubber - End User Agreement (DRAFT)
+# VOXPrint AI Movie Dubber - End User Agreement (DRAFT)
 
 > **DRAFT for a program that does not exist yet.** Nothing here is in force. Items in [square brackets] are open decisions.
 > **Not legal advice.** The author is not a lawyer; have this text reviewed before the program is released, especially for commercial use.
 
 Version 0.0-draft · 2026-10-04 · Copyright 2026 Aleksandr Mitroshenkov ("the author") · based on [`EULA-TEMPLATE.md`](EULA-TEMPLATE.md)
 
-By installing or using Voxprint AI Movie Dubber ("the program") you agree to this text. If you do not agree, do not install or use the program.
+By installing or using VOXPrint AI Movie Dubber ("the program") you agree to this text. If you do not agree, do not install or use the program.
 
 ## 1. What you get (licence)
 * The **source code** is licensed under the **Apache License 2.0** (see `LICENSE` and `NOTICE`).

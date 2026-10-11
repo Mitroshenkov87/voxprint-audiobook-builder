@@ -24,7 +24,9 @@
 ; Silent: /ModelsFolder="D:\Voxprint models".  The older /ModelsDir="D:\old\models" (a folder to IMPORT models from, written to
 ; state\existing_models_dir.txt) still works.  Wizard languages: English, Russian, German.
 ;
-; ONLINE variant:  ISCC /DONLINE /DONEDIR /DManifestUrl=<https://.../manifest-beta.json> installer\Voxprint.iss  ->  Output\Voxprint-Setup-online.exe
+; ONLINE variant:  ISCC /DONLINE /DONEDIR /DManifestUrl=<https://.../manifest-beta.json> installer\Voxprint.iss
+;   ->  Output\voxprint-audiobook-builder-setup-<version>-win-x64.exe
+; build_online.ps1 also copies the stable alias voxprint-audiobook-builder-setup-win-x64.exe and writes both .sha256 files.
 ; A small installer (a few MB + vc_redist): it embeds build\online\voxprint-fetch.exe (tools/online_fetch.py), which downloads the
 ; payload parts listed in the manifest (release assets, each < 2 GiB, verified by SHA-256, resumable, parts that are already
 ; installed are skipped) and unpacks them into {app}.  One UAC prompt (PrivilegesRequired=admin) covers everything; the
@@ -35,18 +37,37 @@
 ; (/FromFolder=<dir>, the remembered one, Documents\Voxprint Portable, or next to the installer) and installs without internet; with
 ; internet only the changed parts are fetched.  Silent: /Portable=1 [/PortableDir=<dir>] [/PortableModels=none|auto|all] [/FromFolder=<dir>].
 ; THIN variant (add /DTHIN to the ONLINE command; see docs/THIN-INSTALLER.md): only the components with role "core" (the small
-; UI shell built by build_thin.bat) are fetched in PrepareToInstall -> Output\Voxprint-Setup-thin.exe. ssPostInstall then runs
-; voxprint-cli.exe --install-suite, which installs the Python runtime, torch/CUDA wheels, ffmpeg and the required models.
+; UI shell built by build_thin.bat) are fetched in PrepareToInstall. The setup file uses the same name as the online build. ssPostInstall then runs
+; voxprint-audiobook-cli.exe --install-suite, which installs the Python runtime, torch/CUDA wheels, ffmpeg and the required models.
 
 #define AppName "Voxprint"
-; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
-#define AppDisplayName "Voxprint AI Audiobook Builder"
+; AppName stays the data-folder name (%LOCALAPPDATA%\Voxprint). It is not the install folder.
+; The program installs under {autopf}\VOXPrint AI Suite\Audiobook Builder.
+; Start menu folder and shortcut use the same display names.
+#define SuiteDir "VOXPrint AI Suite"
+#define AppFolder "Audiobook Builder"
+#define StartMenu "VOXPrint AI Suite"
+#define AppDisplayName "VOXPrint AI Audiobook Builder"
 #define AppVersion "1.0.0-rc.5"
 ; Windows version resources are four numbers. The pre-release suffix stays in AppVersion.
 #define AppVersionInfo "1.0.0"
-#define AppExe "Voxprint.exe"
+#define AppExe "voxprint-audiobook-builder.exe"
 ; Console companion (PyInstaller --console). Scripts use this so the process exit code is the command's code.
-#define CliExe "voxprint-cli.exe"
+#define CliExe "voxprint-audiobook-cli.exe"
+; Previous install (up to the suite layout). Removed on upgrade. User data under %LOCALAPPDATA%\Voxprint is kept.
+#define LegacyDir "Voxprint"
+#define LegacyGui "Voxprint.exe"
+#define LegacyCli "voxprint-cli.exe"
+; Earlier suite folders. On Windows the two spellings are one directory. Removed on upgrade, not renamed.
+#define LegacySuiteDir "Voxprint AI Suite"
+#define LegacySuiteDirDisplay "VOXPrint AI Suite"
+#define LegacyAppFolder "Audiobook Builder"
+#define LegacySuiteGui "VOXPrint AI Audiobook Builder.exe"
+#define LegacySuiteGuiOld "Voxprint AI Audiobook Builder.exe"
+#define LegacyDisplayName "Voxprint AI Audiobook Builder"
+; Intermediate layout. A different directory from the display-case folder, so upgrade deletes it.
+#define LegacyKebabSuite "voxprint-ai-suite"
+#define LegacyKebabApp "audiobook-builder"
 ; CI build number and codename (tools/build_number.py; build_online.ps1 passes /DAppBuild= /DAppCodename=); 0 = local build
 #ifndef AppBuild
 #define AppBuild "0"
@@ -75,27 +96,26 @@ VersionInfoProductVersion={#AppVersionInfo}.{#AppBuild}
 #if AppBuild != "0"
 AppVerName={#AppDisplayName} {#AppVersion} build {#AppBuild} {#AppCodename}
 #endif
-AppPublisher=Voxprint
-DefaultDirName={autopf}\{#AppName}
-; One Start menu folder "Voxprint" for every Voxprint program (Audiobook Builder, Movie Dubber); each program removes only its
-; own shortcut on uninstall, and Windows / Inno remove the folder only when it is empty.  UsePreviousGroup=no moves the entry of
-; builds up to 703 (folder "Voxprint AI Audiobook Builder") into it; [InstallDelete] removes the old one.
-DefaultGroupName=Voxprint
+AppPublisher=VOXPrint
+UninstallDisplayName={#AppDisplayName}
+DefaultDirName={autopf}\{#SuiteDir}\{#AppFolder}
+; An upgrade must not stay in C:\Program Files\Voxprint or in voxprint-ai-suite. /DIR= still wins.
+UsePreviousAppDir=no
+; Start menu folder "VOXPrint AI Suite", shortcut "VOXPrint AI Audiobook Builder". No desktop shortcut.
+; UsePreviousGroup=no moves an older "Voxprint" or "VOXPrint AI Audiobook Builder" folder. [InstallDelete] removes the old shortcut.
+DefaultGroupName={#StartMenu}
 UsePreviousGroup=no
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExe}
 SetupIconFile=..\assets\voxprint-setup.ico
 OutputDir=Output
+OutputBaseFilename=voxprint-audiobook-builder-setup-{#AppVersion}-win-x64
 #ifdef ONLINE
 #ifdef THIN
-OutputBaseFilename=Voxprint-Setup-thin
 ExtraDiskSpaceRequired=800000000
 #else
-OutputBaseFilename=Voxprint-Setup-online
 ExtraDiskSpaceRequired=4500000000
 #endif
-#else
-OutputBaseFilename=Voxprint-Setup
 #endif
 Compression=lzma2/max
 SolidCompression=yes
@@ -109,7 +129,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; InitializeSetup again with the detected build number (English, Russian, German).
 MinVersion=10.0.26100
 CloseApplications=yes
-; {app} is added to the user PATH so voxprint-cli.exe is found after a scripted install.
+; {app} is added to the user PATH so voxprint-audiobook-cli.exe is found after a scripted install.
 ChangesEnvironment=yes
 
 [Languages]
@@ -118,9 +138,9 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [Messages]
-english.WinVersionTooLowError=Voxprint AI Audiobook Builder requires Windows 11 24H2 or newer (build 26100). This version of Windows is older and is not supported. Setup will exit.
-russian.WinVersionTooLowError=Voxprint AI Audiobook Builder требует Windows 11 24H2 или новее (сборка 26100). Эта версия Windows старше и не поддерживается. Установка будет завершена.
-german.WinVersionTooLowError=Voxprint AI Audiobook Builder benötigt Windows 11 24H2 oder neuer (Build 26100). Diese Windows-Version ist älter und wird nicht unterstützt. Die Installation wird beendet.
+english.WinVersionTooLowError=VOXPrint AI Audiobook Builder requires Windows 11 24H2 or newer (build 26100). This version of Windows is older and is not supported. Setup will exit.
+russian.WinVersionTooLowError=VOXPrint AI Audiobook Builder требует Windows 11 24H2 или новее (сборка 26100). Эта версия Windows старше и не поддерживается. Установка будет завершена.
+german.WinVersionTooLowError=VOXPrint AI Audiobook Builder benötigt Windows 11 24H2 oder neuer (Build 26100). Diese Windows-Version ist älter und wird nicht unterstützt. Die Installation wird beendet.
 
 [CustomMessages]
 english.RunPrefetch=Start %1 now
@@ -150,9 +170,9 @@ german.VcRedistStatus=Microsoft Visual C++-Komponenten werden installiert...
 english.WinBuildTooOld=%1 requires Windows 11 24H2 or newer (build 26100). This PC is Windows build %2, which is older. Setup will exit.
 russian.WinBuildTooOld=%1 требует Windows 11 24H2 или новее (сборка 26100). На этом ПК сборка Windows %2 — она старше. Установка будет завершена.
 german.WinBuildTooOld=%1 benötigt Windows 11 24H2 oder neuer (Build 26100). Dieser PC hat Windows-Build %2 und ist damit älter. Die Installation wird beendet.
-english.GpuRequired=Voxprint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: %1.
-russian.GpuRequired=Voxprint нужна видеокарта NVIDIA GeForce RTX 40-й серии или новее. Обнаружено: %1.
-german.GpuRequired=Voxprint benötigt eine NVIDIA GeForce RTX der 40er-Serie oder neuer. Erkannt: %1.
+english.GpuRequired=VOXPrint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: %1.
+russian.GpuRequired=VOXPrint нужна видеокарта NVIDIA GeForce RTX 40-й серии или новее. Обнаружено: %1.
+german.GpuRequired=VOXPrint benötigt eine NVIDIA GeForce RTX der 40er-Serie oder neuer. Erkannt: %1.
 english.GpuNone=none
 russian.GpuNone=нет
 german.GpuNone=keine
@@ -162,9 +182,9 @@ german.ModelsPageCaption=Modellordner
 english.ModelsPageDescription=Where should the models (all of them: about %1 GB) be stored?
 russian.ModelsPageDescription=Где хранить модели (все вместе: около %1 ГБ)?
 german.ModelsPageDescription=Wo sollen die Modelle (alle zusammen: ca. %1 GB) gespeichert werden?
-english.ModelsPageSubCaption=Keep the default or choose another folder or drive. An empty folder becomes the models folder (models are downloaded into it); models it already holds are used. A folder with a Voxprint backup (voxprint-backup.json) is only read: on the first start its models and voices are restored into the default folder. Your voices and settings stay in the user profile.
-russian.ModelsPageSubCaption=Оставьте папку по умолчанию или выберите другую папку или диск. Пустая папка становится папкой моделей (модели скачиваются в неё); уже имеющиеся в ней модели используются. Папка с резервной копией Voxprint (voxprint-backup.json) только читается: при первом запуске модели и голоса восстанавливаются из неё в папку по умолчанию. Ваши голоса и настройки остаются в профиле пользователя.
-german.ModelsPageSubCaption=Behalten Sie den Standard oder wählen Sie einen anderen Ordner oder ein anderes Laufwerk. Ein leerer Ordner wird zum Modellordner (die Modelle werden dorthin geladen); vorhandene Modelle werden verwendet. Ein Ordner mit einer Voxprint-Sicherung (voxprint-backup.json) wird nur gelesen: Beim ersten Start werden Modelle und Stimmen daraus in den Standardordner wiederhergestellt. Ihre Stimmen und Einstellungen bleiben im Benutzerprofil.
+english.ModelsPageSubCaption=Keep the default or choose another folder or drive. An empty folder becomes the models folder (models are downloaded into it); models it already holds are used. A folder with a VOXPrint backup (voxprint-backup.json) is only read: on the first start its models and voices are restored into the default folder. Your voices and settings stay in the user profile.
+russian.ModelsPageSubCaption=Оставьте папку по умолчанию или выберите другую папку или диск. Пустая папка становится папкой моделей (модели скачиваются в неё); уже имеющиеся в ней модели используются. Папка с резервной копией VOXPrint (voxprint-backup.json) только читается: при первом запуске модели и голоса восстанавливаются из неё в папку по умолчанию. Ваши голоса и настройки остаются в профиле пользователя.
+german.ModelsPageSubCaption=Behalten Sie den Standard oder wählen Sie einen anderen Ordner oder ein anderes Laufwerk. Ein leerer Ordner wird zum Modellordner (die Modelle werden dorthin geladen); vorhandene Modelle werden verwendet. Ein Ordner mit einer VOXPrint-Sicherung (voxprint-backup.json) wird nur gelesen: Beim ersten Start werden Modelle und Stimmen daraus in den Standardordner wiederhergestellt. Ihre Stimmen und Einstellungen bleiben im Benutzerprofil.
 english.ModelsPagePrompt=Models folder:
 russian.ModelsPagePrompt=Папка моделей:
 german.ModelsPagePrompt=Modellordner:
@@ -174,19 +194,19 @@ german.ModelsPageBadFolder=Der Ordner %1 kann nicht angelegt werden oder ist nic
 english.ModelsPageProtected=The folder %1 is inside Program Files: the program runs without administrator rights and could not download models there. Choose another folder.
 russian.ModelsPageProtected=Папка %1 находится в Program Files: программа работает без прав администратора и не сможет скачивать туда модели. Выберите другую папку.
 german.ModelsPageProtected=Der Ordner %1 liegt in Program Files: Das Programm läuft ohne Administratorrechte und könnte dort keine Modelle speichern. Wählen Sie einen anderen Ordner.
-english.ModelsPageBackupFound=The folder %1 contains a Voxprint backup. It will not be used as the models folder: on the first start its models and voices are copied into %2 (the backup itself is only read).
-russian.ModelsPageBackupFound=В папке %1 найдена резервная копия Voxprint. Она не станет папкой моделей: при первом запуске модели и голоса будут скопированы из неё в %2 (сама копия только читается).
-german.ModelsPageBackupFound=Der Ordner %1 enthält eine Voxprint-Sicherung. Er wird nicht als Modellordner verwendet: Beim ersten Start werden Modelle und Stimmen nach %2 kopiert (die Sicherung selbst wird nur gelesen).
+english.ModelsPageBackupFound=The folder %1 contains a VOXPrint backup. It will not be used as the models folder: on the first start its models and voices are copied into %2 (the backup itself is only read).
+russian.ModelsPageBackupFound=В папке %1 найдена резервная копия VOXPrint. Она не станет папкой моделей: при первом запуске модели и голоса будут скопированы из неё в %2 (сама копия только читается).
+german.ModelsPageBackupFound=Der Ordner %1 enthält eine VOXPrint-Sicherung. Er wird nicht als Modellordner verwendet: Beim ersten Start werden Modelle und Stimmen nach %2 kopiert (die Sicherung selbst wird nur gelesen).
 
 english.LatestCheck=Try the latest component versions (falls back to the verified ones)
 russian.LatestCheck=Попробовать последние версии компонентов (с откатом на проверенные)
 german.LatestCheck=Neueste Komponentenversionen versuchen (sonst die geprüften)
-english.OnlineStatus=Downloading and unpacking the Voxprint components (the download can be resumed if it is interrupted)...
-russian.OnlineStatus=Загрузка и распаковка компонентов Voxprint (при обрыве загрузку можно продолжить)...
-german.OnlineStatus=Voxprint-Komponenten werden geladen und entpackt (bei einem Abbruch kann der Download fortgesetzt werden)...
-english.OnlineFailed=The download of the Voxprint components failed:%n%n%1%n%nCheck the internet connection and run the setup again: finished parts are kept and the download continues where it stopped.
-russian.OnlineFailed=Не удалось загрузить компоненты Voxprint:%n%n%1%n%nПроверьте подключение к интернету и запустите установку снова: готовые части сохранены, загрузка продолжится с места остановки.
-german.OnlineFailed=Der Download der Voxprint-Komponenten ist fehlgeschlagen:%n%n%1%n%nPrüfen Sie die Internetverbindung und starten Sie das Setup erneut: Fertige Teile bleiben erhalten, der Download wird fortgesetzt.
+english.OnlineStatus=Downloading and unpacking the VOXPrint components (the download can be resumed if it is interrupted)...
+russian.OnlineStatus=Загрузка и распаковка компонентов VOXPrint (при обрыве загрузку можно продолжить)...
+german.OnlineStatus=VOXPrint-Komponenten werden geladen und entpackt (bei einem Abbruch kann der Download fortgesetzt werden)...
+english.OnlineFailed=The download of the VOXPrint components failed:%n%n%1%n%nCheck the internet connection and run the setup again: finished parts are kept and the download continues where it stopped.
+russian.OnlineFailed=Не удалось загрузить компоненты VOXPrint:%n%n%1%n%nПроверьте подключение к интернету и запустите установку снова: готовые части сохранены, загрузка продолжится с места остановки.
+german.OnlineFailed=Der Download der VOXPrint-Komponenten ist fehlgeschlagen:%n%n%1%n%nPrüfen Sie die Internetverbindung und starten Sie das Setup erneut: Fertige Teile bleiben erhalten, der Download wird fortgesetzt.
 english.OnlineStalled=The downloader stopped responding.
 russian.OnlineStalled=Загрузчик перестал отвечать.
 german.OnlineStalled=Der Downloader antwortet nicht mehr.
@@ -213,12 +233,12 @@ english.PortableBadFolder=The folder %1 cannot be used (it cannot be created or 
 russian.PortableBadFolder=Папку %1 нельзя использовать (её нельзя создать или записать в неё). Выберите другую папку.
 german.PortableBadFolder=Der Ordner %1 kann nicht verwendet werden (er kann nicht angelegt oder beschrieben werden). Wählen Sie einen anderen Ordner.
 
-english.ModelsSiblingFound=Voxprint AI Movie Dubber is installed on this PC. Both programs use one models folder, so every model is downloaded only once.
-russian.ModelsSiblingFound=На этом ПК установлен Voxprint AI Movie Dubber. Обе программы используют одну папку моделей, поэтому каждая модель скачивается только один раз.
-german.ModelsSiblingFound=Voxprint AI Movie Dubber ist auf diesem PC installiert. Beide Programme nutzen einen Modellordner, daher wird jedes Modell nur einmal geladen.
-english.UninstallModelsQuestion=No other Voxprint program uses the models in%n%1%n%nDelete these models too (about 15-28 GB)? Choose No to keep them for a later install.
-russian.UninstallModelsQuestion=Модели в папке%n%1%nбольше не использует ни одна программа Voxprint.%n%nУдалить и их (около 15-28 ГБ)? Нажмите «Нет», чтобы оставить их для следующей установки.
-german.UninstallModelsQuestion=Kein anderes Voxprint-Programm verwendet die Modelle in%n%1%n%nDiese Modelle ebenfalls löschen (etwa 15-28 GB)? Wählen Sie Nein, um sie für eine spätere Installation zu behalten.
+english.ModelsSiblingFound=VOXPrint AI Movie Dubber is installed on this PC. Both programs use one models folder, so every model is downloaded only once.
+russian.ModelsSiblingFound=На этом ПК установлен VOXPrint AI Movie Dubber. Обе программы используют одну папку моделей, поэтому каждая модель скачивается только один раз.
+german.ModelsSiblingFound=VOXPrint AI Movie Dubber ist auf diesem PC installiert. Beide Programme nutzen einen Modellordner, daher wird jedes Modell nur einmal geladen.
+english.UninstallModelsQuestion=No other VOXPrint program uses the models in%n%1%n%nDelete these models too (about 15-28 GB)? Choose No to keep them for a later install.
+russian.UninstallModelsQuestion=Модели в папке%n%1%nбольше не использует ни одна программа VOXPrint.%n%nУдалить и их (около 15-28 ГБ)? Нажмите «Нет», чтобы оставить их для следующей установки.
+german.UninstallModelsQuestion=Kein anderes VOXPrint-Programm verwendet die Modelle in%n%1%n%nDiese Modelle ebenfalls löschen (etwa 15-28 GB)? Wählen Sie Nein, um sie für eine spätere Installation zu behalten.
 english.PortableMissing=The setup folder %1 (from /FromFolder) was not found or has no manifest.json.
 russian.PortableMissing=Папка установки %1 (из /FromFolder) не найдена или в ней нет manifest.json.
 german.PortableMissing=Der Setup-Ordner %1 (aus /FromFolder) wurde nicht gefunden oder enthält keine manifest.json.
@@ -239,11 +259,31 @@ Type: files; Name: "{commondesktop}\{#AppDisplayName}.lnk"
 Type: files; Name: "{userdesktop}\{#AppDisplayName}.lnk"
 Type: files; Name: "{commondesktop}\{#AppName}.lnk"
 Type: files; Name: "{userdesktop}\{#AppName}.lnk"
-; builds up to 703 had their own Start menu folder; from 704 on the entry is in the shared "Voxprint" folder
+; builds up to 703 had their own Start menu folder; the shared "Voxprint" folder was the next layout.
+; Both are cleared of this program's shortcuts. dirifempty leaves a sibling program's shortcut in place.
 Type: files; Name: "{commonprograms}\{#AppDisplayName}\{#AppDisplayName}.lnk"
 Type: dirifempty; Name: "{commonprograms}\{#AppDisplayName}"
 Type: files; Name: "{userprograms}\{#AppDisplayName}\{#AppDisplayName}.lnk"
 Type: dirifempty; Name: "{userprograms}\{#AppDisplayName}"
+Type: files; Name: "{commonprograms}\{#LegacyDir}\{#AppDisplayName}.lnk"
+Type: files; Name: "{commonprograms}\{#LegacyDir}\{#LegacyGui}.lnk"
+Type: files; Name: "{commonprograms}\{#LegacyDir}\Voxprint.lnk"
+Type: files; Name: "{commonprograms}\{#LegacyDir}\{#LegacyAppFolder}.lnk"
+Type: files; Name: "{userprograms}\{#LegacyDir}\{#AppDisplayName}.lnk"
+Type: files; Name: "{userprograms}\{#LegacyDir}\Voxprint.lnk"
+Type: files; Name: "{userprograms}\{#LegacyDir}\{#LegacyAppFolder}.lnk"
+Type: dirifempty; Name: "{commonprograms}\{#LegacyDir}"
+Type: dirifempty; Name: "{userprograms}\{#LegacyDir}"
+; The mixed-case suite Start menu folder is the same folder as the new one. Remove the old shortcut
+; files before the new one is written. Do not remove the folder: another suite program may share it.
+Type: files; Name: "{commondesktop}\{#LegacyDisplayName}.lnk"
+Type: files; Name: "{userdesktop}\{#LegacyDisplayName}.lnk"
+Type: files; Name: "{commonprograms}\{#LegacySuiteDir}\{#LegacyAppFolder}.lnk"
+Type: files; Name: "{commonprograms}\{#LegacySuiteDir}\{#LegacyDisplayName}.lnk"
+Type: files; Name: "{commonprograms}\{#LegacySuiteDir}\{#AppDisplayName}.lnk"
+Type: files; Name: "{userprograms}\{#LegacySuiteDir}\{#LegacyAppFolder}.lnk"
+Type: files; Name: "{userprograms}\{#LegacySuiteDir}\{#LegacyDisplayName}.lnk"
+Type: files; Name: "{userprograms}\{#LegacySuiteDir}\{#AppDisplayName}.lnk"
 
 [Files]
 #ifdef ONLINE
@@ -251,9 +291,10 @@ Type: dirifempty; Name: "{userprograms}\{#AppDisplayName}"
 Source: "..\build\online\voxprint-fetch.exe"; DestDir: "{tmp}"; Flags: dontcopy
 #else
 #ifdef ONEDIR
-Source: "..\dist\Voxprint\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\voxprint-audiobook-builder\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 #else
 Source: "..\dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\{#CliExe}"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 #endif
 #endif
 ; Third-party licences (LGPL/GPL/Apache etc.): the component list and the full licence texts.
@@ -562,7 +603,7 @@ begin
   Result := '';
 end;
 
-{ True when Voxprint AI Movie Dubber is installed: an Apps list entry with "Movie Dubber" in its name, or its key in the models
+{ True when VOXPrint AI Movie Dubber is installed: an Apps list entry with "Movie Dubber" in its name, or its key in the models
   folder's .users.json (infra/models_users.py). }
 function UninstallEntryFound(RootKey: Integer; const Needle: String): Boolean;
 var
@@ -956,6 +997,243 @@ begin
 #endif
 end;
 
+{ Old installs: C:\Program Files\Voxprint with Voxprint.exe or voxprint-cli.exe, and the
+  lower-case folder voxprint-ai-suite\audiobook-builder. Both are removed on upgrade, with their
+  PATH entries. A folder that differs only by case (Voxprint AI Suite) is renamed, not deleted.
+  Never run the old uninstaller (it would drop model and runtime refcounts). Never delete
+  the per-user Voxprint data folder. }
+function LegacyInstallDir(): String;
+begin
+  Result := RemoveBackslash(AddBackslash(ExpandConstant('{autopf}')) + '{#LegacyDir}');
+end;
+
+{ The name Windows stored for a child of Parent, when it matches Wanted ignoring case. }
+function ChildActualName(const Parent, Wanted: String): String;
+var
+  FindRec: TFindRec;
+begin
+  Result := '';
+  if FindFirst(AddBackslash(Parent) + '*', FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Name <> '.') and (FindRec.Name <> '..') and
+           (CompareText(FindRec.Name, Wanted) = 0) then
+        begin
+          Result := FindRec.Name;
+          Exit;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+
+{ Windows will not change only the case of a name in one step. A temporary name sits in between. }
+procedure RenameChildCase(const Parent, Wanted: String);
+var
+  Actual, FromPath, TempPath, ToPath: String;
+begin
+  Actual := ChildActualName(Parent, Wanted);
+  if (Actual = '') or (CompareStr(Actual, Wanted) = 0) then Exit;
+  FromPath := AddBackslash(Parent) + Actual;
+  TempPath := AddBackslash(Parent) + Actual + '.voxcase';
+  ToPath := AddBackslash(Parent) + Wanted;
+  if not RenameFile(FromPath, TempPath) then
+  begin
+    Log('could not start the case rename of ' + FromPath);
+    Exit;
+  end;
+  if not RenameFile(TempPath, ToPath) then
+  begin
+    RenameFile(TempPath, FromPath);
+    Log('could not finish the case rename to ' + ToPath);
+  end
+  else
+    Log('renamed ' + Actual + ' to ' + Wanted);
+end;
+
+procedure FixStartMenuCasing();
+begin
+  RenameChildCase(ExpandConstant('{commonprograms}'), '{#StartMenu}');
+  RenameChildCase(ExpandConstant('{userprograms}'), '{#StartMenu}');
+end;
+
+{ The install folder keeps the display spelling. Windows will not change only the case in one step. }
+procedure FixInstallFolderCasing();
+var
+  SuiteParent: String;
+begin
+  RenameChildCase(ExpandConstant('{autopf}'), '{#SuiteDir}');
+  SuiteParent := AddBackslash(ExpandConstant('{autopf}')) + '{#SuiteDir}';
+  if DirExists(SuiteParent) then
+    RenameChildCase(SuiteParent, '{#AppFolder}');
+end;
+
+function IsLegacyProgramDir(const Dir: String): Boolean;
+begin
+  Result := FileExists(AddBackslash(Dir) + '{#LegacyGui}') or FileExists(AddBackslash(Dir) + '{#LegacyCli}');
+end;
+
+procedure RemoveDirFromUserPath(const Dir: String);
+var
+  OldPath, NewPath, Piece, Rest: String;
+  P: Integer;
+begin
+  if Dir = '' then Exit;
+  if not RegQueryStringValue(HKCU, 'Environment', 'Path', OldPath) then Exit;
+  NewPath := '';
+  Rest := OldPath;
+  while Rest <> '' do
+  begin
+    P := Pos(';', Rest);
+    if P = 0 then
+    begin
+      Piece := Rest;
+      Rest := '';
+    end
+    else
+    begin
+      Piece := Copy(Rest, 1, P - 1);
+      Rest := Copy(Rest, P + 1, Length(Rest));
+    end;
+    if CompareText(RemoveBackslash(Trim(Piece)), Dir) <> 0 then
+    begin
+      if (NewPath = '') and (Piece <> '') then
+        NewPath := Piece
+      else if Piece <> '' then
+        NewPath := NewPath + ';' + Piece;
+    end;
+  end;
+  RegWriteExpandStringValue(HKCU, 'Environment', 'Path', NewPath);
+end;
+
+{ Delete the uninstall key only while InstallLocation is still the old folder, and not the new directory.
+  Called from PrepareToInstall, before Inno rewrites the same key for the new directory. }
+procedure DropLegacyUninstallKey();
+var
+  Key, Loc, Legacy, App: String;
+  Roots: array[0..1] of Integer;
+  I: Integer;
+begin
+  Legacy := LegacyInstallDir();
+  App := RemoveBackslash(ExpandConstant('{app}'));
+  if CompareText(Legacy, App) = 0 then Exit;
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F1D2B7A-3C54-4E0B-9A41-7B5E0C9D2F18}_is1';
+  Roots[0] := HKLM;
+  Roots[1] := HKCU;
+  for I := 0 to 1 do
+    if RegQueryStringValue(Roots[I], Key, 'InstallLocation', Loc) then
+      if CompareText(RemoveBackslash(Loc), Legacy) = 0 then
+        RegDeleteKeyIncludingSubkeys(Roots[I], Key);
+end;
+
+function LegacySuiteAppDir(const SuiteName: String): String;
+begin
+  Result := RemoveBackslash(AddBackslash(ExpandConstant('{autopf}')) + SuiteName + '\{#LegacyAppFolder}');
+end;
+
+function LegacyKebabAppDir(): String;
+begin
+  Result := RemoveBackslash(AddBackslash(ExpandConstant('{autopf}')) + '{#LegacyKebabSuite}\{#LegacyKebabApp}');
+end;
+
+function DirHasOurProgram(const Dir: String): Boolean;
+begin
+  Result := FileExists(AddBackslash(Dir) + '{#LegacyGui}')
+    or FileExists(AddBackslash(Dir) + '{#LegacyCli}')
+    or FileExists(AddBackslash(Dir) + '{#LegacySuiteGui}')
+    or FileExists(AddBackslash(Dir) + '{#LegacySuiteGuiOld}')
+    or FileExists(AddBackslash(Dir) + '{#AppExe}')
+    or FileExists(AddBackslash(Dir) + '{#CliExe}');
+end;
+
+procedure RemoveAppDirIfOurs(const Dir: String);
+var
+  App: String;
+begin
+  if Dir = '' then Exit;
+  App := RemoveBackslash(ExpandConstant('{app}'));
+  if CompareText(RemoveBackslash(Dir), App) = 0 then Exit;
+  if DirExists(Dir) and DirHasOurProgram(Dir) then
+  begin
+    Log('Removing the previous install at ' + Dir);
+    DelTree(Dir, True, True, True);
+  end;
+  RemoveDirFromUserPath(Dir);
+  if DirExists(ExtractFileDir(RemoveBackslash(Dir))) then
+    RemoveDir(ExtractFileDir(RemoveBackslash(Dir)));
+end;
+
+procedure RemoveLegacyInstall();
+var
+  Legacy, App: String;
+begin
+  Legacy := LegacyInstallDir();
+  App := RemoveBackslash(ExpandConstant('{app}'));
+  if CompareText(Legacy, App) <> 0 then
+  begin
+    if DirExists(Legacy) and IsLegacyProgramDir(Legacy) then
+    begin
+      Log('Removing the previous install at ' + Legacy);
+      DelTree(Legacy, True, True, True);
+    end;
+    RemoveDirFromUserPath(Legacy);
+  end;
+  RemoveAppDirIfOurs(LegacySuiteAppDir('{#LegacySuiteDir}'));
+  RemoveAppDirIfOurs(LegacySuiteAppDir('{#LegacySuiteDirDisplay}'));
+  RemoveAppDirIfOurs(LegacyKebabAppDir());
+end;
+
+{ Old program files left in the install folder. The folder itself stays. }
+procedure RemoveOldExeNames();
+begin
+  DeleteFile(ExpandConstant('{app}\{#LegacyGui}'));
+  DeleteFile(ExpandConstant('{app}\{#LegacyCli}'));
+  DeleteFile(ExpandConstant('{app}\{#LegacySuiteGui}'));
+  DeleteFile(ExpandConstant('{app}\{#LegacySuiteGuiOld}'));
+end;
+
+procedure RegisterSuiteDiscovery();
+var
+  Key, InstallPath, CliPath: String;
+  Rc: Integer;
+begin
+  Key := 'Software\voxprint\Apps\audiobook-builder';
+  InstallPath := RemoveBackslash(ExpandConstant('{app}'));
+  if FileExists(ExpandConstant('{app}\{#CliExe}')) then
+    CliPath := ExpandConstant('{app}\{#CliExe}')
+  else
+    CliPath := ExpandConstant('{app}\{#AppExe}');
+  RegWriteStringValue(HKLM, Key, 'InstallPath', InstallPath);
+  RegWriteStringValue(HKLM, Key, 'CliPath', CliPath);
+  RegWriteStringValue(HKCU, Key, 'InstallPath', InstallPath);
+  RegWriteStringValue(HKCU, Key, 'CliPath', CliPath);
+  if FileExists(CliPath) then
+    if not ExecAsOriginalUser(CliPath, '--register-install', ExpandConstant('{app}'), SW_HIDE,
+                              ewWaitUntilTerminated, Rc) then
+      Log('suite discovery manifest was not written; the app writes it at its next start');
+end;
+
+procedure UnregisterSuiteDiscovery();
+var
+  Rc: Integer;
+  Key, Exe: String;
+begin
+  Key := 'Software\voxprint\Apps\audiobook-builder';
+  if FileExists(ExpandConstant('{app}\{#CliExe}')) then
+    Exe := ExpandConstant('{app}\{#CliExe}')
+  else
+    Exe := ExpandConstant('{app}\{#AppExe}');
+  if FileExists(Exe) then
+    if not Exec(Exe, '--unregister-install', ExpandConstant('{app}'), SW_HIDE,
+                ewWaitUntilTerminated, Rc) then
+      Log('suite discovery manifest was not updated');
+  RegDeleteKeyIncludingSubkeys(HKLM, Key);
+  RegDeleteKeyIncludingSubkeys(HKCU, Key);
+end;
+
 #ifdef ONLINE
 function VxTick(): Cardinal;
 external 'GetTickCount@kernel32.dll stdcall';
@@ -971,6 +1249,9 @@ begin
   if FileExists(StatusFile) and LoadStringsFromFile(StatusFile, Lines) and (GetArrayLength(Lines) >= 3) then
   begin
     State := Trim(Lines[0]);
+    if (Length(State) >= 1) and (Ord(State[1]) = $FEFF) then
+      Delete(State, 1, 1);
+    State := Trim(State);
     Permille := StrToIntDef(Trim(Lines[1]), 0);
     Msg := Trim(Lines[2]);
     if GetArrayLength(Lines) >= 4 then Beat := Trim(Lines[3]) else Beat := '';
@@ -1077,7 +1358,14 @@ end;
   silent) and the wizard goes back, so that the user can retry; the cache keeps the finished parts for the next try. }
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
+  DropLegacyUninstallKey();
   Result := RunOnlineDownload();
+end;
+#else
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  DropLegacyUninstallKey();
+  Result := '';
 end;
 #endif
 
@@ -1167,7 +1455,7 @@ begin
   SaveStringToFile(F, AnsiString(S), False);
 end;
 
-{ voxprint-cli.exe when the console companion was packed; otherwise the windowed exe (smoke copies whoami.exe there). }
+{ voxprint-audiobook-cli.exe when the console companion was packed; otherwise the windowed exe. }
 function ProgramExe(): String;
 begin
   if FileExists(ExpandConstant('{app}\{#CliExe}')) then
@@ -1177,7 +1465,7 @@ begin
 end;
 
 { The shared settings file (state\suite.json) gets the models folder chosen above (null = default) and the UI language if it has
-  none yet: voxprint-cli.exe --sync-suite-settings (infra/suite_settings.py) - run as the user who started the setup, so it is that
+  none yet: voxprint-audiobook-cli.exe --sync-suite-settings (infra/suite_settings.py) - run as the user who started the setup, so it is that
   user's %LOCALAPPDATA%.  A failure is harmless: the app copies the same values at its next start. }
 procedure SyncSuiteSettings();
 var
@@ -1202,6 +1490,9 @@ begin
   if FileExists(StatusFile) and LoadStringsFromFile(StatusFile, Lines) and (GetArrayLength(Lines) >= 3) then
   begin
     State := Trim(Lines[0]);
+    if (Length(State) >= 1) and (Ord(State[1]) = $FEFF) then
+      Delete(State, 1, 1);
+    State := Trim(State);
     Permille := StrToIntDef(Trim(Lines[1]), 0);
     Msg := Trim(Lines[2]);
     if GetArrayLength(Lines) >= 4 then Beat := Trim(Lines[3]) else Beat := '';
@@ -1250,7 +1541,7 @@ begin
   { Inno Setup 6.6+: width and height are arguments; ClientWidth is read-only afterwards. }
   Form := CreateCustomForm(ScaleX(460), ScaleY(100), False, False);
   try
-    Form.Caption := 'Voxprint';
+    Form.Caption := '{#AppDisplayName}';
     Form.BorderStyle := bsDialog;
     Form.Position := poScreenCenter;
     Lbl := TNewStaticText.Create(Form);
@@ -1326,17 +1617,54 @@ end;
 { Append the program folder to the user PATH once, keeping REG_EXPAND_SZ so %SystemRoot% stays unexpanded. }
 procedure AddAppToUserPath();
 var
-  OldPath, NewPath, AppDir: String;
+  OldPath, NewPath, AppDir, Piece, Rest: String;
+  P: Integer;
+  Seen: Boolean;
 begin
   AppDir := RemoveBackslash(ExpandConstant('{app}'));
   if not RegQueryStringValue(HKCU, 'Environment', 'Path', OldPath) then
     OldPath := '';
-  if Pos(';' + Uppercase(AppDir) + ';', ';' + Uppercase(OldPath) + ';') > 0 then
-    Exit;
-  if OldPath = '' then
-    NewPath := AppDir
-  else
-    NewPath := OldPath + ';' + AppDir;
+  NewPath := '';
+  Rest := OldPath;
+  Seen := False;
+  while Rest <> '' do
+  begin
+    P := Pos(';', Rest);
+    if P = 0 then
+    begin
+      Piece := Rest;
+      Rest := '';
+    end
+    else
+    begin
+      Piece := Copy(Rest, 1, P - 1);
+      Rest := Copy(Rest, P + 1, Length(Rest));
+    end;
+    if CompareText(RemoveBackslash(Trim(Piece)), AppDir) = 0 then
+    begin
+      if Seen then
+        Piece := ''
+      else
+      begin
+        Piece := AppDir;
+        Seen := True;
+      end;
+    end;
+    if Piece <> '' then
+    begin
+      if NewPath = '' then
+        NewPath := Piece
+      else
+        NewPath := NewPath + ';' + Piece;
+    end;
+  end;
+  if not Seen then
+  begin
+    if NewPath = '' then
+      NewPath := AppDir
+    else
+      NewPath := NewPath + ';' + AppDir;
+  end;
   if not RegWriteExpandStringValue(HKCU, 'Environment', 'Path', NewPath) then
     Log('could not add the program folder to PATH');
 end;
@@ -1446,11 +1774,16 @@ begin
       SaveStringsToUTF8FileWithoutBOM(StateDir + '\language', Lines, False);
     end;
     RunSuiteInstall();
+    RemoveLegacyInstall();
+    RemoveOldExeNames();
+    FixInstallFolderCasing();
+    FixStartMenuCasing();
+    RegisterSuiteDiscovery();
     AddAppToUserPath();
   end;
 end;
 
-{ Uninstall: remove our key with the program itself (Voxprint.exe --unregister-models-user --out FILE).  FILE gets the number of
+{ Uninstall: remove our key with the program itself (ProgramExe --unregister-models-user --out FILE).  FILE gets the number of
   OTHER programs still using the models and the models folder.  -1 (helper failed) means: never offer to delete. }
 var
   OtherModelUsers: Integer;
@@ -1555,12 +1888,15 @@ begin
     UnregisterModelsUser;
     UnregisterRuntimeUser;
     UnregisterSuite;
+    UnregisterSuiteDiscovery;
     RemoveAppFromUserPath;
   end;
 #ifdef ONLINE
   if CurUninstallStep = usPostUninstall then
     DeleteProgramFolder;
 #endif
+  if CurUninstallStep = usPostUninstall then
+    RemoveDir(ExtractFileDir(RemoveBackslash(ExpandConstant('{app}'))));
   if CurUninstallStep = usPostUninstall then
     if (OtherModelUsers = 0) and (SharedModelsDir <> '') and DirExists(SharedModelsDir) and
        (CompareText(SharedModelsDir, DefaultModelsDir()) = 0) then

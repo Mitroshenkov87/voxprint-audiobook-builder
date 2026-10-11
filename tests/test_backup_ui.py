@@ -165,7 +165,7 @@ def test_restore_validates_the_folder_then_restores_and_reports_conflicts(dlg, t
     # a folder that is no backup
     dlg.pick_folder = lambda title: str(tmp_path)
     assert not dlg.start_restore()
-    assert "No Voxprint backup" in dlg.lbl_backup_status.text() and dlg.notices
+    assert "No VOXPrint backup" in dlg.lbl_backup_status.text() and dlg.notices
     # restore into an empty home, one voice already exists with other content
     import shutil
 

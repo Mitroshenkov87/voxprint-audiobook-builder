@@ -108,8 +108,8 @@ def test_projects_folder_default_choice_onedrive_and_shortcut(tmp_path, monkeypa
     link = projects.ensure_shortcut(other, docs, make_link=lambda lnk, tgt: made.append((lnk, tgt)))
     assert link is not None and link.parent == docs and made == [(link, other)]
     if os.name != "nt":
-        assert projects.ensure_shortcut(other, docs) == docs / "Voxprint Projects"
-        assert (docs / "Voxprint Projects").resolve() == other.resolve()
+        assert projects.ensure_shortcut(other, docs) == docs / "VOXPrint Projects"
+        assert (docs / "VOXPrint Projects").resolve() == other.resolve()
 
 
 def test_training_project_goes_into_the_projects_folder(tmp_path):
@@ -174,10 +174,10 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     heading5 = '## [1.0.0-rc.5] - 2026-10-11 - build 1003 "Amud"'
     assert heading5 in log and log.index("## [Unreleased]") < log.index(heading5) < log.index(heading4)
     notes = (root / "docs" / "RELEASE-NOTES-1003-AMUD.md").read_text(encoding="utf-8")
-    assert notes.startswith("**Voxprint 1.0.0 RC5")
+    assert notes.startswith("**VOXPrint 1.0.0 RC5")
     assert "Amud" in notes and "v1.0.0-rc.5" in notes and "1003" in notes
     notes = (root / "docs" / "RELEASE-NOTES-1002-OMETZ.md").read_text(encoding="utf-8")
-    assert notes.startswith("**Voxprint 1.0.0 RC4")
+    assert notes.startswith("**VOXPrint 1.0.0 RC4")
     assert "Ometz" in notes and "v1.0.0-rc.4" in notes and "1002" in notes
     notes = (root / "docs" / "RELEASE-NOTES-1001-TAMIM.md").read_text(encoding="utf-8")
     assert "945" in notes and "run 56" in notes and "Tamim" in notes and "v1.0.0-rc.3" in notes

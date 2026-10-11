@@ -104,7 +104,7 @@ def test_studio_has_three_cards_gear_and_the_product_name(app, lib):
     i18n.set_language("en")
     s = make_studio(lib)
     s.show_studio()
-    assert s.windowTitle() == "Voxprint AI Audiobook Builder" and s.lbl_title.text() == "Voxprint AI Audiobook Builder"
+    assert s.windowTitle() == "VOXPrint AI Audiobook Builder" and s.lbl_title.text() == "VOXPrint AI Audiobook Builder"
     assert s.lbl_tagline.text() == "Train a voice, narrate books"
     assert [c.lbl_title.text() for c in (s.card_narrate, s.card_train, s.card_voices)] == [
         "Narrate a book", "Train your voice", "My voices"]
@@ -158,12 +158,12 @@ def test_back_button_and_title_of_the_training_window_only_inside_the_studio(app
     from ui.main_window import MainWindow
     alone = MainWindow(runner=lambda *a: None, autocheck=False, auto_open_folder=False)
     alone.show()
-    assert not alone.btn_back.isVisible() and alone.windowTitle() == "Voxprint AI Audiobook Builder"
+    assert not alone.btn_back.isVisible() and alone.windowTitle() == "VOXPrint AI Audiobook Builder"
     s = make_studio(lib)
     i18n.set_language("en")
     s.retranslate_all()
     s.trainer.retranslate()
-    assert s.trainer.windowTitle() == "Voxprint AI Audiobook Builder - Train your voice"
+    assert s.trainer.windowTitle() == "VOXPrint AI Audiobook Builder - Train your voice"
     assert s.trainer.btn_back.text() == "\u2190 Studio"
     s.shutdown()
 

@@ -75,7 +75,7 @@ def test_package_contents_and_manifest(built):
     with zipfile.ZipFile(out / c["file"]) as z:
         names = set(z.namelist())
     assert {"main.py", "credits.json", "requirements.txt", "core/translate.py", "ui/studio.py", "locales/de.json",
-            "installer/linux/voxprint.desktop", "installer/linux/install-voxprint-linux.sh", "assets/voxprint.png"} <= names
+            "installer/linux/voxprint-audiobook-builder.desktop", "installer/linux/install-voxprint-linux.sh", "assets/voxprint.png"} <= names
     assert not any(n.startswith(("tests/", ".github/", "docs/manual")) or "__pycache__" in n or n.endswith(".pyc") for n in names)
     assert "installer/Voxprint.iss" not in names and "build.bat" not in names
     sums = (out / "SHA256SUMS-linux.txt").read_text(encoding="utf-8")
@@ -153,7 +153,7 @@ def test_installer_script_syntax_and_help():
 
 
 def test_desktop_entry_and_icon():
-    text = (ROOT / "installer" / "linux" / "voxprint.desktop").read_text(encoding="utf-8")
+    text = (ROOT / "installer" / "linux" / "voxprint-audiobook-builder.desktop").read_text(encoding="utf-8")
     kv = dict(line.split("=", 1) for line in text.splitlines() if "=" in line and not line.startswith("#"))
     assert kv["Type"] == "Application" and kv["Icon"] == "voxprint" and kv["Exec"].startswith("@LAUNCHER@")
     assert kv["Categories"].endswith(";") and kv["Terminal"] == "false"

@@ -1,4 +1,4 @@
-site_name: Voxprint AI Audiobook Builder
+site_name: VOXPrint AI Audiobook Builder
 site_description: Train a voice from a short recording and narrate books offline.
 site_url: https://mitroshenkov87.github.io/voxprint-audiobook-builder/
 repo_url: https://github.com/Mitroshenkov87/voxprint-audiobook-builder
@@ -225,6 +225,7 @@ nav:
           - gpu_prefs: api/infra.gpu_prefs.md
           - gpu_requirement: api/infra.gpu_requirement.md
           - hard_exit: api/infra.hard_exit.md
+          - install_layout: api/infra.install_layout.md
           - install_state: api/infra.install_state.md
           - keep_awake: api/infra.keep_awake.md
           - llm_tool: api/infra.llm_tool.md

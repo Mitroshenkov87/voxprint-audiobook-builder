@@ -1,4 +1,4 @@
-"""voxprint-fetch: the downloader inside the ONLINE installer (``Voxprint-Setup-online.exe``).  Standard library only.
+"""voxprint-fetch: the downloader inside the ONLINE installer (``voxprint-audiobook-builder-setup-<version>-win-x64.exe``).  Standard library only.
 
 The installer (Inno Setup) hands over a *manifest* (JSON, see ``tools/make_online_payload.py``) and the install folder.
 For every component of the manifest this program
@@ -81,8 +81,11 @@ class Status:
             state, permille, text = self._cur
             tmp = self.path.with_name(self.path.name + ".tmp")
             try:
+                # UTF-8, with a BOM on Windows: Inno Setup reads UTF-8 only when the BOM is present,
+                # and Notepad on Windows does the same. ASCII-with-replace dropped every non-ASCII message.
+                encoding = "utf-8-sig" if sys.platform == "win32" else "utf-8"
                 tmp.write_text(f"{state}\n{permille}\n{text.replace(chr(10), ' ')[:300]}\n{self._beat}\n",
-                               encoding="ascii", errors="replace")
+                               encoding=encoding)
                 os.replace(tmp, self.path)
             except OSError:
                 pass

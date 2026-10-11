@@ -1,6 +1,6 @@
 # FAQ
 
-## What is Voxprint?
+## What is VOXPrint?
 *Train a voice, narrate books.* (Short name and technical identifier: **Voxprint** - the package, the executable and the data folder keep that name.)
 
 **Your voice from a recording in one click - and then whole books in that voice.** Give Voxprint a 5-15 minute recording of a voice (yours, or of a person who has given permission) and
@@ -23,8 +23,8 @@ Full table: [Downloads and requirements](DOWNLOADS.md#hardware-requirements).
 > and many settings are defaults that may change. Expect rough edges; back up your recordings and voices ([Backup](MODELS.md#backup-restore-and-existing-models)); report problems as issues.
 > Voices are personal data - read [Voice owner's consent](USER-GUIDE.md#voice-owners-consent-and-usage-scope) and the licence notes before sharing anything.
 
-## Who is behind it? Is it connected to other "Voxprint" products?
-> **Independent project.** Voxprint AI Audiobook Builder is an independent, non-commercial open-source project by Aleksandr Mitroshenkov. It is **not affiliated with, endorsed by or connected to** any other product, service, company or project that has a similar name (for example web transcription services or voice-identity tools called "VoxPrint"/"Voxprint", or printing companies). All product names mentioned belong to their owners.
+## Who is behind it? Is it connected to other "VOXPrint" products?
+> **Independent project.** VOXPrint AI Audiobook Builder is an independent, non-commercial open-source project by Aleksandr Mitroshenkov. It is **not affiliated with, endorsed by or connected to** any other product, service, company or project that has a similar name (for example web transcription services or voice-identity tools called "VoxPrint"/"Voxprint", or printing companies). All product names mentioned belong to their owners.
 
 ## Is my data sent anywhere?
 No telemetry, no account; recordings, text and voices stay on your computer. The complete list of network connections is in [PRIVACY.md](PRIVACY.md).
@@ -33,7 +33,7 @@ No telemetry, no account; recordings, text and voices stay on your computer. The
 Only with the voice owner's permission and within the voice's licence (CC0, CC-BY ... or personal-only); every voice carries a licence and a consent record. See [Voices and licences](VOICES.md) and the consent section of the [User guide](USER-GUIDE.md#voice-owners-consent-and-usage-scope).
 
 ## Windows warns about the installer. Is it safe?
-The installer is not code-signed yet, so a new download has no reputation. Download it only from the GitHub releases page. Check the SHA-256 against [DOWNLOADS.md](DOWNLOADS.md) (or the `.sha256` file) with `Get-FileHash .\Voxprint-Setup-online.exe -Algorithm SHA256`, and only then keep or run it. Edge is the strictest: do not click **Delete** on the download bar. Hover the download, then **... -> Keep -> Show more -> Keep anyway**. The file can be removed before you run it. SmartScreen (*Windows protected your PC* -> *More info -> Run anyway*) is usually milder, and an antivirus program may also flag the file. Code signing is being applied for (SignPath Foundation); the warning will go away later. The source is in this repository and the installer is built by a public GitHub Actions workflow; you can also [build it yourself](BUILDING.md).
+The installer is not code-signed yet, so a new download has no reputation. Download it only from the GitHub releases page. Check the SHA-256 against [DOWNLOADS.md](DOWNLOADS.md) (or the `.sha256` file) with `Get-FileHash .\voxprint-audiobook-builder-setup-win-x64.exe -Algorithm SHA256`, and only then keep or run it. Edge is the strictest: do not click **Delete** on the download bar. Hover the download, then **... -> Keep -> Show more -> Keep anyway**. The file can be removed before you run it. SmartScreen (*Windows protected your PC* -> *More info -> Run anyway*) is usually milder, and an antivirus program may also flag the file. Code signing is being applied for (SignPath Foundation); the warning will go away later. The source is in this repository and the installer is built by a public GitHub Actions workflow; you can also [build it yourself](BUILDING.md).
 
 ## Does it work on Linux or without an NVIDIA GPU?
 Linux is experimental ([LINUX.md](LINUX.md)). The same GPU is required there: an NVIDIA GeForce RTX 40-series or newer. There is no CPU-only mode.

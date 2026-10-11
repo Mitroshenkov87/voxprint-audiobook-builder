@@ -98,6 +98,7 @@ Do not edit the module pages by hand.
 - [`infra.gpu_prefs`](infra.gpu_prefs.md)
 - [`infra.gpu_requirement`](infra.gpu_requirement.md)
 - [`infra.hard_exit`](infra.hard_exit.md)
+- [`infra.install_layout`](infra.install_layout.md)
 - [`infra.install_state`](infra.install_state.md)
 - [`infra.keep_awake`](infra.keep_awake.md)
 - [`infra.llm_tool`](infra.llm_tool.md)

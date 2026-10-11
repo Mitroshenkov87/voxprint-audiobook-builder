@@ -11,7 +11,12 @@ import subprocess
 import sys
 from ctypes import wintypes
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional, Tuple, cast
+
+try:
+    import winreg
+except ImportError:  # not Windows
+    winreg = None  # type: ignore[assignment]
 
 from core.i18n import tr
 
@@ -324,3 +329,54 @@ def _typeperf_read(paths: list) -> Optional[int]:
     result = subprocess.run(
         ["typeperf", *paths, "-sc", "1"], capture_output=True, text=True, timeout=8, creationflags=_CREATE_NO_WINDOW)
     return parse_typeperf_csv(result.stdout or "")
+
+
+#: Current-user and machine registry. Peers (Plotweaver and the other suite apps) read InstallPath and CliPath.
+DISCOVERY_KEY = r"Software\voxprint\Apps"
+
+
+def _discovery_path(app_id: str) -> str:
+    return DISCOVERY_KEY + "\\" + app_id
+
+
+def _winreg() -> Any:
+    """The stdlib registry module. Callers return first when it was not imported."""
+    return cast(Any, winreg)
+
+
+def write_install_registry(app_id: str, install_path: str, cli_path: str) -> bool:
+    """Write the current-user discovery key. No-op off Windows."""
+    if not IS_WINDOWS or winreg is None:
+        return False
+    reg = _winreg()
+    with reg.CreateKey(reg.HKEY_CURRENT_USER, _discovery_path(app_id)) as key:
+        reg.SetValueEx(key, "InstallPath", 0, reg.REG_SZ, install_path)
+        reg.SetValueEx(key, "CliPath", 0, reg.REG_SZ, cli_path)
+    return True
+
+
+def read_install_registry(app_id: str) -> Optional[Tuple[str, str]]:
+    """``(install_path, cli_path)`` from HKCU, then HKLM. None when the key is absent or this is not Windows."""
+    if not IS_WINDOWS or winreg is None:
+        return None
+    reg = _winreg()
+    path = _discovery_path(app_id)
+    for hive in (reg.HKEY_CURRENT_USER, reg.HKEY_LOCAL_MACHINE):
+        try:
+            with reg.OpenKey(hive, path) as key:
+                install, _kind = reg.QueryValueEx(key, "InstallPath")
+                cli, _kind = reg.QueryValueEx(key, "CliPath")
+        except OSError:
+            continue
+        return str(install), str(cli)
+    return None
+
+
+def delete_install_registry(app_id: str) -> None:
+    """Remove the current-user discovery key. The machine key is removed by the uninstaller (it has admin rights)."""
+    if not IS_WINDOWS or winreg is None:
+        return
+    try:
+        _winreg().DeleteKey(_winreg().HKEY_CURRENT_USER, _discovery_path(app_id))
+    except OSError:
+        pass

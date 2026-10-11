@@ -17,7 +17,7 @@ these three pronouns it is always prepositional. "vsem" after any other word, in
 plural, stays.
 Licence: Apache-2.0 for this file and the rule table; the word list is MIT (e2yo/eyo-kernel).
 
-Credit: Voxprint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
+Credit: VOXPrint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
 """
 from __future__ import annotations
 

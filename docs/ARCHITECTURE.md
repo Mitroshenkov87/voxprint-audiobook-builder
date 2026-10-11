@@ -1,4 +1,4 @@
-# Voxprint architecture
+# VOXPrint architecture
 
 This document is the map of the code base: which module does what, how data flows through the application, how installation / update / model reuse work and how the UI
 is wired. Read it together with the module docstrings (every module starts with one).
@@ -60,7 +60,7 @@ Downloads are checked by size and SHA-256. The speech model, the aligner and the
 
 ## Suite command line
 
-Other programs drive this app with the same commands the windows use: `voxprint` on Linux when the package is installed, `voxprint-cli.exe` on Windows (console; `Voxprint.exe` is the windowed program), or `python main.py` from a source checkout. `--json` prints progress lines and one result object. `--dry-run` checks the inputs and the output path and does not load a model, use the GPU, or download. Exit codes are stable (0 success, 1 internal, 2 bad arguments, 3 bad input, 4 missing model, 5 out of video memory, 6 cancelled, 7 no suitable GPU). The flag list is generated from the parser: [command reference](generated/cli.md). Recipes and JSON fields: [CLI.md](CLI.md) and [AGENTS.md](AGENTS.md).
+Other programs drive this app with the same commands the windows use: `voxprint-audiobook-cli` on Linux when the package is installed (`voxprint` is the same launcher), `voxprint-audiobook-cli.exe` on Windows (console; `voxprint-audiobook-builder.exe` is the windowed program), or `python main.py` from a source checkout. How another app finds the install: [CLI.md](CLI.md), "Calling from other apps". `--json` prints progress lines and one result object. `--dry-run` checks the inputs and the output path and does not load a model, use the GPU, or download. Exit codes are stable (0 success, 1 internal, 2 bad arguments, 3 bad input, 4 missing model, 5 out of video memory, 6 cancelled, 7 no suitable GPU). The flag list is generated from the parser: [command reference](generated/cli.md). Recipes and JSON fields: [CLI.md](CLI.md) and [AGENTS.md](AGENTS.md).
 
 ## 1. Layers
 
@@ -126,7 +126,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | Module | Purpose |
 |---|---|
 | `paths.py` | application folders (`%LOCALAPPDATA%\Voxprint`, override `VOXPRINT_HOME`): `models/`, `packages/`, `voices/`, `state/`, `logs/`, `.staging/` |
-| `projects.py` | the projects folder (`<app home>/Projects`, changeable in Settings): `Audiobooks/`, `Voices/`, `Re-voice/`; real Documents via the Known Folder API, OneDrive check, *Voxprint Projects* shortcut |
+| `projects.py` | the projects folder (`<app home>/Projects`, changeable in Settings): `Audiobooks/`, `Voices/`, `Re-voice/`; real Documents via the Known Folder API, OneDrive check, *VOXPrint Projects* shortcut |
 | `voice_repository.py` | online voice index (`index.json`, URL configurable, placeholder default) and verified downloads (HTTPS, size cap, SHA-256); never raises to the UI |
 | `voice_catalog.py` | the voices the user sees: local library + index voices that are not installed (`repo:<id>` keys, matched by `repo_id`), `ensure_local` (download on first use), scope derived from the licence |
 | `text_models.py` | registry of the on-demand text models (`TextModel`, `REGISTRY`: SAGE integrated; RUPunct, en/de spelling, stress, translation, roles = placeholders), `state()` (ready / needs_download / planned), `ensure()` (pinned revision via `model_downloader`), `make_engine`, `build_plan(rule_steps, neural_steps)` |
@@ -144,7 +144,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `cuda12_libs.py` | registers the CUDA 12 cublas and cuDNN wheels before CTranslate2 is imported |
 | `install_state.py` | completion manifest, health check with stable reason codes (`--verify-install`), uv-based venv plan for `--repair` |
 | `model_downloader.py`, `modelscope_mirror.py`, `parallel_download.py` | model download from Hugging Face (multi-connection Range for large weights) with ModelScope / own-mirror fallbacks; post-download SHA-256 status |
-| `version_manager.py`, `verified_manifest.py` | PyPI/HF version queries and comparison; the "verified by Voxprint" manifest (`verified_manifest.json`) with update channels |
+| `version_manager.py`, `verified_manifest.py` | PyPI/HF version queries and comparison; the "verified by VOXPrint" manifest (`verified_manifest.json`) with update channels |
 | `updater.py` | check -> install into `.staging/` -> smoke test -> swap, rollback on failure |
 | `qwen_tf_compat.py` | import shim so qwen-asr 0.0.6 loads on transformers 5.16 (the decorator call, and replacing the native `qwen3_asr` registration) |
 | `vram_optimizer.py` | chooses LoRA training parameters (batch, accumulation, 8-bit optimizer, checkpointing) from the available VRAM |

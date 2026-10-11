@@ -70,7 +70,7 @@ def test_no_gpu_is_refused(gate):
     assert report.ok is False and report.detected == "none" and report.best is None
     assert report.source == "none"
     message = gate.requirement_message(gate.detected_label(report))
-    assert message == "Voxprint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: none."
+    assert message == "VOXPrint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: none."
 
 
 def test_rtx_3090_compute_8_6_is_refused(gate):
@@ -164,7 +164,7 @@ def test_override_env_is_honoured_only_as_a_flag(gate, monkeypatch, capsys):
     shown = []
     code = gate.enforce(gui=True, dialog=shown.append, torch_module=_no_torch(), which=lambda name: None)
     assert code == gate.EXIT_GPU_REQUIRED == 7
-    assert shown == ["Voxprint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: none."]
+    assert shown == ["VOXPrint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: none."]
     err = capsys.readouterr().err
     code = gate.enforce(gui=False, torch_module=_no_torch(), which=lambda name: None)
     assert code == 7 and "Detected: none." in capsys.readouterr().err and err == ""

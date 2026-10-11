@@ -25,6 +25,14 @@ Environment:
 * ``VOXPRINT_DL_PARALLEL_MIN`` - smallest file that uses more than one connection
   (default 0 = every file);
 * ``VOXPRINT_NO_PARALLEL_DL=1`` - force the single-stream path everywhere.
+
+``download_with_retry`` and the mirror speed sample (``choose_primary``, ``measure``)
+live in this file as well. Model downloads move to VOXPrint MDL next; do not grow
+this further.
+
+    from infra.parallel_download import download_with_retry
+
+    download_with_retry(dest, [url], sha256=digest, size=nbytes)
 """
 from __future__ import annotations
 
@@ -38,8 +46,11 @@ import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from voxprint_common.download import DiskSpaceError, download as library_download
+
+from infra import modelscope_mirror, net
 from infra.download_watch import Stalled
 
 log = logging.getLogger("voxprint.models")
@@ -440,3 +451,135 @@ def download_listed(files: Dict[str, int], dest: Path, url_for: Callable[[str], 
                 _pause(wait, cancel)
         done += size if size > 0 else target.stat().st_size
         progress(min(1.0, done / total))
+
+
+#: Transient failures of a voxprint-common download before the error is raised. Partials stay on disk.
+TRIES = 5
+BACKOFF = 0.5
+_retry_sleep = time.sleep
+
+DownloadFn = Callable[..., Path]
+
+
+def _retry_permanent(exc: BaseException) -> bool:
+    """A retry cannot help: the disk is full, the digest is wrong, or the server said the file is gone."""
+    if isinstance(exc, DiskSpaceError) or type(exc).__name__ == "HashMismatch":
+        return True
+    seen: Optional[BaseException] = exc
+    for _ in range(5):
+        if seen is None:
+            break
+        code = getattr(seen, "code", None)
+        if isinstance(code, int) and 400 <= code < 500 and code not in (408, 429):
+            return True
+        seen = seen.__cause__ or seen.__context__
+    return False
+
+
+def download_with_retry(destination: Path, sources: Sequence[str], *, sha256: str, size: Optional[int] = None,
+                        download: Optional[DownloadFn] = None, tries: int = TRIES, **kwargs) -> Path:
+    """Download ``destination``, resuming the partial and retrying a transient error ``tries`` times."""
+    fetch = download or library_download
+    last: Optional[BaseException] = None
+    for attempt in range(max(1, tries)):
+        try:
+            return fetch(destination, sources, sha256=sha256, size=size, **kwargs)
+        except Exception as exc:  # noqa: BLE001 - the caller sees the last failure
+            last = exc
+            if _retry_permanent(exc) or attempt + 1 >= tries:
+                raise
+            wait = BACKOFF * (2 ** attempt)
+            log.warning("download of %s failed (%s) - retry %d of %d in %.1f s",
+                        Path(destination).name, exc, attempt + 2, tries, wait)
+            _retry_sleep(wait)
+    if last is not None:
+        raise last
+    raise RuntimeError("download was not attempted")
+
+
+#: A ModelScope feed slower than this is not worth keeping when Hugging Face is faster.
+SLOW_BPS = 100 * 1024
+#: How long a transfer may stay under ``SLOW_BPS`` before the caller switches source.
+SLOW_AFTER = 4.0
+#: Seconds spent reading each host. A timeout counts as zero bytes.
+PROBE_SECONDS = 0.75
+PROBE_BYTES = 64 * 1024
+
+Sample = Callable[[str], Tuple[float, float]]
+_sample: Optional[Sample] = None
+
+
+def choose_primary(hf_bps: float, ms_bps: float) -> Optional[str]:
+    """``"hf"``, ``"ms"``, or None when both samples are empty (the caller keeps its latency probe).
+
+    Hugging Face wins when it is at least half as fast as ModelScope, and also when
+    ModelScope is under ``SLOW_BPS`` and Hugging Face is the faster of the two.
+    """
+    if hf_bps <= 0 and ms_bps <= 0:
+        return None
+    if hf_bps <= 0:
+        return "ms"
+    if ms_bps <= 0:
+        return "hf"
+    if hf_bps >= ms_bps * 0.5:
+        return "hf"
+    if ms_bps < SLOW_BPS and hf_bps > ms_bps:
+        return "hf"
+    return "ms"
+
+
+def order_for(hf_bps: float, ms_bps: float) -> Optional[list]:
+    """Source order, or None when there is nothing to measure."""
+    chosen = choose_primary(hf_bps, ms_bps)
+    if chosen is None:
+        return None
+    if chosen == "hf":
+        return ["hf", "hfm", "ms"]
+    return ["ms", "hf", "hfm"]
+
+
+def too_slow(speed: float, elapsed: float, slow_bps: Optional[float], slow_after: Optional[float], grew: bool) -> bool:
+    """True when a source that already sent bytes is still under ``slow_bps`` after ``slow_after`` seconds."""
+    if not grew or slow_bps is None or slow_after is None or slow_bps <= 0:
+        return False
+    return elapsed >= slow_after and 0 < speed < slow_bps
+
+
+def measure(repo_id: str) -> Tuple[float, float]:
+    """``(hugging_face_bytes_per_sec, modelscope_bytes_per_sec)``. A dead host is 0."""
+    fn = _sample or _sample_network
+    try:
+        hf_bps, ms_bps = fn(repo_id)
+    except Exception:  # noqa: BLE001 - a probe must not stop the download
+        log.info("mirror speed probe failed", exc_info=True)
+        return 0.0, 0.0
+    return max(0.0, float(hf_bps)), max(0.0, float(ms_bps))
+
+
+def _sample_network(repo_id: str) -> Tuple[float, float]:
+    hf_url = f"{modelscope_mirror.hf_endpoint()}/{repo_id}/resolve/main/config.json"
+    ms_url = f"{modelscope_mirror.BASE_URL}/api/v1/models/{repo_id}/repo?" + urllib.parse.urlencode(
+        {"Revision": modelscope_mirror.REVISION, "FilePath": "config.json"})
+    box: dict = {"hf": 0.0, "ms": 0.0}
+
+    def run(key: str, url: str) -> None:
+        box[key] = _bytes_per_sec(url, PROBE_SECONDS)
+
+    threads = [threading.Thread(target=run, args=pair, daemon=True) for pair in (("hf", hf_url), ("ms", ms_url))]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(PROBE_SECONDS + 0.35)
+    return box["hf"], box["ms"]
+
+
+def _bytes_per_sec(url: str, timeout: float) -> float:
+    req = urllib.request.Request(url, headers={"User-Agent": "Voxprint", "Range": f"bytes=0-{PROBE_BYTES - 1}"})
+    started = time.monotonic()
+    try:
+        with net.urlopen(req, timeout) as response:  # noqa: S310 - huggingface.co or modelscope.cn only
+            payload = response.read(PROBE_BYTES)
+    except (OSError, urllib.error.URLError, ValueError):
+        return 0.0
+    elapsed = max(time.monotonic() - started, 0.05)
+    return len(payload) / elapsed

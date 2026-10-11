@@ -32,20 +32,20 @@
       "author": "Anastasiia Solokha (LibriVox) - public domain",
       "license": "CC0-1.0",
       "voice_type": "female",
-      "description": "Bundled open female Russian voice, trained only from the public-domain LibriVox recording 'Степные сказки (Stepnyia skazki)' by Grigory Danilevsky, read by Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Tirzah is Voxprint's own and does not imply the reader's endorsement.",
+      "description": "Bundled open female Russian voice, trained only from the public-domain LibriVox recording 'Степные сказки (Stepnyia skazki)' by Grigory Danilevsky, read by Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Tirzah is VOXPrint's own and does not imply the reader's endorsement.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
       "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/tirzah.zip",
       "sha256": "aef7c849298ec6e3f2aac1114b993ca111b6297bfd9fef0bf1634527be7ab95f",
       "size_bytes": 53274433,
       "descriptions": {
-        "en": "Bundled open female Russian voice, trained only from the public-domain LibriVox recording 'Степные сказки (Stepnyia skazki)' by Grigory Danilevsky, read by Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Tirzah is Voxprint's own and does not imply the reader's endorsement.",
-        "ru": "Встроенный открытый женский русский голос, обучен только на записи LibriVox из общественного достояния «Степные сказки (Stepnyia skazki)» (Григорий Данилевский), читает Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Свободен для любого использования, в том числе коммерческого (CC0-1.0). Атрибуция приветствуется. Имя Tirzah дано Voxprint и не означает одобрения чтеца.",
-        "de": "Mitgelieferte offene weibliche russische Stimme, nur mit der gemeinfreien LibriVox-Aufnahme 'Степные сказки (Stepnyia skazki)' von Grigory Danilevsky trainiert, gelesen von Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Frei für jede Nutzung, auch kommerziell (CC0-1.0). Namensnennung erwünscht. Der Name Tirzah stammt von Voxprint und bedeutet keine Billigung durch die Sprecher."
+        "en": "Bundled open female Russian voice, trained only from the public-domain LibriVox recording 'Степные сказки (Stepnyia skazki)' by Grigory Danilevsky, read by Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Tirzah is VOXPrint's own and does not imply the reader's endorsement.",
+        "ru": "Встроенный открытый женский русский голос, обучен только на записи LibriVox из общественного достояния «Степные сказки (Stepnyia skazki)» (Григорий Данилевский), читает Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Свободен для любого использования, в том числе коммерческого (CC0-1.0). Атрибуция приветствуется. Имя Tirzah дано VOXPrint и не означает одобрения чтеца.",
+        "de": "Mitgelieferte offene weibliche russische Stimme, nur mit der gemeinfreien LibriVox-Aufnahme 'Степные сказки (Stepnyia skazki)' von Grigory Danilevsky trainiert, gelesen von Anastasiia Solokha (https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/). Frei für jede Nutzung, auch kommerziell (CC0-1.0). Namensnennung erwünscht. Der Name Tirzah stammt von VOXPrint und bedeutet keine Billigung durch die Sprecher."
       },
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "gender": "female",
       "speaker": "Anastasiia Solokha",
-      "prepared_by": "Voxprint",
+      "prepared_by": "VOXPrint",
       "project_url": "https://librivox.org/stepnyia-skazki-by-grigory-danilevsky/",
       "retired": true,
       "hidden": true
@@ -57,20 +57,20 @@
       "author": "Kazbek (LibriVox) - public domain",
       "license": "CC0-1.0",
       "voice_type": "male",
-      "description": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Вехи (Vekhi)', a 1909 essay collection, read by Kazbek (https://librivox.org/vekhi-by-various/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Gideon is Voxprint's own and does not imply the reader's endorsement.",
+      "description": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Вехи (Vekhi)', a 1909 essay collection, read by Kazbek (https://librivox.org/vekhi-by-various/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Gideon is VOXPrint's own and does not imply the reader's endorsement.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
       "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/gideon.zip",
       "sha256": "6ca0e6824080ee86c21a4b34472bd013bd182ef15bb393c6e494fd554e1c2266",
       "size_bytes": 53031093,
       "descriptions": {
-        "en": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Вехи (Vekhi)', a 1909 essay collection, read by Kazbek (https://librivox.org/vekhi-by-various/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Gideon is Voxprint's own and does not imply the reader's endorsement.",
-        "ru": "Встроенный открытый мужской русский голос, обучен только на записи LibriVox из общественного достояния «Вехи» (сборник статей 1909 года), читает Kazbek (https://librivox.org/vekhi-by-various/). Свободен для любого использования, в том числе коммерческого (CC0-1.0). Атрибуция приветствуется. Имя Gideon дано Voxprint и не означает одобрения чтеца.",
-        "de": "Mitgelieferte offene männliche russische Stimme, nur mit der gemeinfreien LibriVox-Aufnahme 'Вехи (Vekhi)', einer Aufsatzsammlung von 1909, trainiert, gelesen von Kazbek (https://librivox.org/vekhi-by-various/). Frei für jede Nutzung, auch kommerziell (CC0-1.0). Namensnennung erwünscht. Der Name Gideon stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+        "en": "Bundled open male Russian voice, trained only from the public-domain LibriVox recording 'Вехи (Vekhi)', a 1909 essay collection, read by Kazbek (https://librivox.org/vekhi-by-various/). Free for any use, also commercial (CC0-1.0). Attribution appreciated. The name Gideon is VOXPrint's own and does not imply the reader's endorsement.",
+        "ru": "Встроенный открытый мужской русский голос, обучен только на записи LibriVox из общественного достояния «Вехи» (сборник статей 1909 года), читает Kazbek (https://librivox.org/vekhi-by-various/). Свободен для любого использования, в том числе коммерческого (CC0-1.0). Атрибуция приветствуется. Имя Gideon дано VOXPrint и не означает одобрения чтеца.",
+        "de": "Mitgelieferte offene männliche russische Stimme, nur mit der gemeinfreien LibriVox-Aufnahme 'Вехи (Vekhi)', einer Aufsatzsammlung von 1909, trainiert, gelesen von Kazbek (https://librivox.org/vekhi-by-various/). Frei für jede Nutzung, auch kommerziell (CC0-1.0). Namensnennung erwünscht. Der Name Gideon stammt von VOXPrint und bedeutet keine Billigung durch den Sprecher."
       },
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "gender": "male",
       "speaker": "Kazbek",
-      "prepared_by": "Voxprint",
+      "prepared_by": "VOXPrint",
       "project_url": "https://librivox.org/vekhi-by-various/",
       "retired": true,
       "hidden": true
@@ -82,20 +82,20 @@
       "author": "Vladimir Anyanov (LibriVox) - public domain",
       "license": "CC0-1.0",
       "voice_type": "male",
-      "description": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Teachings of Christ' by Leo Tolstoy, read by Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Asher is Voxprint's own and does not imply the reader's endorsement.",
+      "description": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Teachings of Christ' by Leo Tolstoy, read by Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Asher is VOXPrint's own and does not imply the reader's endorsement.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
       "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/asher.zip",
       "sha256": "795778a10b85495e5850d885484c313e3f7799f76ea4d81d41fe50162165a583",
       "size_bytes": 53066747,
       "descriptions": {
-        "en": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Teachings of Christ' by Leo Tolstoy, read by Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Asher is Voxprint's own and does not imply the reader's endorsement.",
-        "ru": "Необязательный мужской русский голос для каталога в программе, не входит в стандартную загрузку. Обучен только на записи LibriVox из общественного достояния «Teachings of Christ» (Лев Толстой), читает Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Asher дано Voxprint и не означает одобрения чтеца.",
-        "de": "Optionale männliche russische Stimme für den Stimmenkatalog in der App, nicht Teil des Standard-Downloads. Nur mit der gemeinfreien LibriVox-Aufnahme 'Teachings of Christ' von Leo Tolstoy trainiert, gelesen von Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Asher stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+        "en": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Teachings of Christ' by Leo Tolstoy, read by Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Asher is VOXPrint's own and does not imply the reader's endorsement.",
+        "ru": "Необязательный мужской русский голос для каталога в программе, не входит в стандартную загрузку. Обучен только на записи LibriVox из общественного достояния «Teachings of Christ» (Лев Толстой), читает Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Asher дано VOXPrint и не означает одобрения чтеца.",
+        "de": "Optionale männliche russische Stimme für den Stimmenkatalog in der App, nicht Teil des Standard-Downloads. Nur mit der gemeinfreien LibriVox-Aufnahme 'Teachings of Christ' von Leo Tolstoy trainiert, gelesen von Vladimir Anyanov (https://archive.org/details/teachingsofchrist_1204_librivox). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Asher stammt von VOXPrint und bedeutet keine Billigung durch den Sprecher."
       },
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "gender": "male",
       "speaker": "Vladimir Anyanov",
-      "prepared_by": "Voxprint",
+      "prepared_by": "VOXPrint",
       "project_url": "https://archive.org/details/teachingsofchrist_1204_librivox",
       "retired": true,
       "hidden": true
@@ -107,20 +107,20 @@
       "author": "Hanna Ponomarenko (LibriVox) - public domain",
       "license": "CC0-1.0",
       "voice_type": "female",
-      "description": "Optional female Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Izbrannye' by Sholem Aleichem, read by Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Noa is Voxprint's own and does not imply the reader's endorsement.",
+      "description": "Optional female Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Izbrannye' by Sholem Aleichem, read by Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Noa is VOXPrint's own and does not imply the reader's endorsement.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
       "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/noa.zip",
       "sha256": "755aeb47cc90a7bfb03d9349ed0fa8effbcc270fda22e5e9dc7b9539a462beed",
       "size_bytes": 53197567,
       "descriptions": {
-        "en": "Optional female Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Izbrannye' by Sholem Aleichem, read by Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Noa is Voxprint's own and does not imply the reader's endorsement.",
-        "ru": "Необязательный женский русский голос для каталога в программе, не входит в стандартную загрузку. Обучен только на записи LibriVox из общественного достояния «Izbrannye» (Шолом-Алейхем), читает Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Noa дано Voxprint и не означает одобрения чтеца.",
-        "de": "Optionale weibliche russische Stimme für den Stimmenkatalog in der App, nicht Teil des Standard-Downloads. Nur mit der gemeinfreien LibriVox-Aufnahme 'Izbrannye' von Sholem Aleichem trainiert, gelesen von Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Noa stammt von Voxprint und bedeutet keine Billigung durch die Sprecherin."
+        "en": "Optional female Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Izbrannye' by Sholem Aleichem, read by Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Noa is VOXPrint's own and does not imply the reader's endorsement.",
+        "ru": "Необязательный женский русский голос для каталога в программе, не входит в стандартную загрузку. Обучен только на записи LibriVox из общественного достояния «Izbrannye» (Шолом-Алейхем), читает Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Noa дано VOXPrint и не означает одобрения чтеца.",
+        "de": "Optionale weibliche russische Stimme für den Stimmenkatalog in der App, nicht Teil des Standard-Downloads. Nur mit der gemeinfreien LibriVox-Aufnahme 'Izbrannye' von Sholem Aleichem trainiert, gelesen von Hanna Ponomarenko (https://archive.org/details/izbrannye_2212_librivox). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Noa stammt von VOXPrint und bedeutet keine Billigung durch die Sprecherin."
       },
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "gender": "female",
       "speaker": "Hanna Ponomarenko",
-      "prepared_by": "Voxprint",
+      "prepared_by": "VOXPrint",
       "project_url": "https://archive.org/details/izbrannye_2212_librivox"
     },
     {
@@ -130,20 +130,20 @@
       "author": "tovarisch (LibriVox) - public domain",
       "license": "CC0-1.0",
       "voice_type": "male",
-      "description": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Zapiski Okhotnika (A Sportsman's Sketches)' by Ivan Turgenev, read by tovarisch (https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Eitan is Voxprint's own and does not imply the reader's endorsement.",
+      "description": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Zapiski Okhotnika (A Sportsman's Sketches)' by Ivan Turgenev, read by tovarisch (https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Eitan is VOXPrint's own and does not imply the reader's endorsement.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
       "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/eitan.zip",
       "sha256": "81627365a5f23824b13798486207eaa48950a36cb5869388949eb1a1d5f7d708",
       "size_bytes": 53156021,
       "descriptions": {
-        "en": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Zapiski Okhotnika (A Sportsman's Sketches)' by Ivan Turgenev, read by tovarisch (https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Eitan is Voxprint's own and does not imply the reader's endorsement.",
-        "ru": "Необязательный мужской русский голос для каталога в программе, не входит в стандартную загрузку. Обучен только на записи LibriVox из общественного достояния «Записки охотника» (Иван Тургенев), читает tovarisch (https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Eitan дано Voxprint и не означает одобрения чтеца.",
-        "de": "Optionale männliche russische Stimme für den Stimmenkatalog in der App, nicht Teil des Standard-Downloads. Nur mit der gemeinfreien LibriVox-Aufnahme 'Zapiski Okhotnika (Aufzeichnungen eines Jägers)' von Ivan Turgenev trainiert, gelesen von tovarisch (https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Eitan stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+        "en": "Optional male Russian voice for the in-app catalog, not part of the standard download. Trained only from the public-domain LibriVox recording 'Zapiski Okhotnika (A Sportsman's Sketches)' by Ivan Turgenev, read by tovarisch (https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Eitan is VOXPrint's own and does not imply the reader's endorsement.",
+        "ru": "Необязательный мужской русский голос для каталога в программе, не входит в стандартную загрузку. Обучен только на записи LibriVox из общественного достояния «Записки охотника» (Иван Тургенев), читает tovarisch (https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Eitan дано VOXPrint и не означает одобрения чтеца.",
+        "de": "Optionale männliche russische Stimme für den Stimmenkatalog in der App, nicht Teil des Standard-Downloads. Nur mit der gemeinfreien LibriVox-Aufnahme 'Zapiski Okhotnika (Aufzeichnungen eines Jägers)' von Ivan Turgenev trainiert, gelesen von tovarisch (https://librivox.org/zapiski-ohotnika-by-ivan-turgenev/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Eitan stammt von VOXPrint und bedeutet keine Billigung durch den Sprecher."
       },
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "gender": "male",
       "speaker": "tovarisch",
-      "prepared_by": "Voxprint",
+      "prepared_by": "VOXPrint",
       "project_url": "https://archive.org/details/zapiskiohotnika_2409_librivox",
       "retired": true,
       "hidden": true
@@ -155,20 +155,20 @@
       "author": "Виталий (LibriVox) - public domain",
       "license": "CC0-1.0",
       "voice_type": "male",
-      "description": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording Anton Chekhov's short stories 'Kapitanskiy mundir', 'Liberal' and 'Radost'' (Multilingual Short Works Collection 037), read by Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Levi is Voxprint's own and does not imply the reader's endorsement.",
+      "description": "Russian male voice for VOXPrint. Trained only from the public-domain LibriVox recording Anton Chekhov's short stories 'Kapitanskiy mundir', 'Liberal' and 'Radost'' (Multilingual Short Works Collection 037), read by Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Levi is VOXPrint's own and does not imply the reader's endorsement.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
       "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v2/levi.zip",
       "sha256": "45d649f2665a0a98a7a69e6694e279745e2d9469245470f6681464fd02744ea3",
       "size_bytes": 53227088,
       "descriptions": {
-        "en": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording Anton Chekhov's short stories 'Kapitanskiy mundir', 'Liberal' and 'Radost'' (Multilingual Short Works Collection 037), read by Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Levi is Voxprint's own and does not imply the reader's endorsement.",
-        "ru": "Русский мужской голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: рассказы Антона Чехова «Капитанский мундир», «Либерал» и «Радость» (сборник Multilingual Short Works Collection 037), читает Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Levi дано Voxprint и не означает одобрения чтеца.",
-        "de": "Russische männliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme Anton Tschechows Erzählungen 'Kapitanski mundir', 'Liberal' und 'Radost'' (Multilingual Short Works Collection 037) trainiert, gelesen von Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Levi stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+        "en": "Russian male voice for VOXPrint. Trained only from the public-domain LibriVox recording Anton Chekhov's short stories 'Kapitanskiy mundir', 'Liberal' and 'Radost'' (Multilingual Short Works Collection 037), read by Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Levi is VOXPrint's own and does not imply the reader's endorsement.",
+        "ru": "Русский мужской голос для VOXPrint. Обучен только на записи LibriVox из общественного достояния: рассказы Антона Чехова «Капитанский мундир», «Либерал» и «Радость» (сборник Multilingual Short Works Collection 037), читает Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Levi дано VOXPrint и не означает одобрения чтеца.",
+        "de": "Russische männliche Stimme für VOXPrint. Nur mit der gemeinfreien LibriVox-Aufnahme Anton Tschechows Erzählungen 'Kapitanski mundir', 'Liberal' und 'Radost'' (Multilingual Short Works Collection 037) trainiert, gelesen von Виталий (https://librivox.org/multilingual-short-works-collection-037-poetry-prose-by-various/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Levi stammt von VOXPrint und bedeutet keine Billigung durch den Sprecher."
       },
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "gender": "male",
       "speaker": "Виталий",
-      "prepared_by": "Voxprint",
+      "prepared_by": "VOXPrint",
       "project_url": "https://archive.org/details/mlswc037_2502_librivox",
       "bundled": true
     },
@@ -179,20 +179,20 @@
       "author": "Victor Seremet (LibriVox) - public domain",
       "license": "CC0-1.0",
       "voice_type": "male",
-      "description": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording 'Detstvo (Childhood)' by Leo Tolstoy, version 2, read by Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Natan is Voxprint's own and does not imply the reader's endorsement.",
+      "description": "Russian male voice for VOXPrint. Trained only from the public-domain LibriVox recording 'Detstvo (Childhood)' by Leo Tolstoy, version 2, read by Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Natan is VOXPrint's own and does not imply the reader's endorsement.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
       "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v2/natan.zip",
       "sha256": "b4f3bc838a8c5f690dbf29d98f954a59ad45d00ba2c1c8552bd129dcb7ded064",
       "size_bytes": 53227360,
       "descriptions": {
-        "en": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording 'Detstvo (Childhood)' by Leo Tolstoy, version 2, read by Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Natan is Voxprint's own and does not imply the reader's endorsement.",
-        "ru": "Русский мужской голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: «Детство» Льва Толстого (версия 2), читает Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Natan дано Voxprint и не означает одобрения чтеца.",
-        "de": "Russische männliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Detstvo (Kindheit)' von Lew Tolstoi, Version 2 trainiert, gelesen von Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Natan stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+        "en": "Russian male voice for VOXPrint. Trained only from the public-domain LibriVox recording 'Detstvo (Childhood)' by Leo Tolstoy, version 2, read by Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Natan is VOXPrint's own and does not imply the reader's endorsement.",
+        "ru": "Русский мужской голос для VOXPrint. Обучен только на записи LibriVox из общественного достояния: «Детство» Льва Толстого (версия 2), читает Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Natan дано VOXPrint и не означает одобрения чтеца.",
+        "de": "Russische männliche Stimme für VOXPrint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Detstvo (Kindheit)' von Lew Tolstoi, Version 2 trainiert, gelesen von Victor Seremet (https://librivox.org/childhood-2-by-leo-tolstoy/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Natan stammt von VOXPrint und bedeutet keine Billigung durch den Sprecher."
       },
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "gender": "male",
       "speaker": "Victor Seremet",
-      "prepared_by": "Voxprint",
+      "prepared_by": "VOXPrint",
       "project_url": "https://archive.org/details/childhood_2312_librivox"
     },
     {
@@ -202,20 +202,20 @@
       "author": "Create (LibriVox) - public domain",
       "license": "CC0-1.0",
       "voice_type": "male",
-      "description": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording 'Angelochek (The Little Angel)' by Leonid Andreyev (Christmas Short Works Collection 2009), read by Create (https://librivox.org/christmas-short-works-collection-2009-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Shimon is Voxprint's own and does not imply the reader's endorsement.",
+      "description": "Russian male voice for VOXPrint. Trained only from the public-domain LibriVox recording 'Angelochek (The Little Angel)' by Leonid Andreyev (Christmas Short Works Collection 2009), read by Create (https://librivox.org/christmas-short-works-collection-2009-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Shimon is VOXPrint's own and does not imply the reader's endorsement.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
       "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v2/shimon.zip",
       "sha256": "2470359629daadd3bbffaf813efe0e22d4782eb5431e9e1d33b6e683b2fadcee",
       "size_bytes": 53178740,
       "descriptions": {
-        "en": "Russian male voice for Voxprint. Trained only from the public-domain LibriVox recording 'Angelochek (The Little Angel)' by Leonid Andreyev (Christmas Short Works Collection 2009), read by Create (https://librivox.org/christmas-short-works-collection-2009-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Shimon is Voxprint's own and does not imply the reader's endorsement.",
-        "ru": "Русский мужской голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: «Ангелочек» Леонида Андреева (сборник Christmas Short Works Collection 2009), читает Create (https://librivox.org/christmas-short-works-collection-2009-by-various/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Shimon дано Voxprint и не означает одобрения чтеца.",
-        "de": "Russische männliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Angelotschek (Das Engelchen)' von Leonid Andrejew (Christmas Short Works Collection 2009) trainiert, gelesen von Create (https://librivox.org/christmas-short-works-collection-2009-by-various/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Shimon stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+        "en": "Russian male voice for VOXPrint. Trained only from the public-domain LibriVox recording 'Angelochek (The Little Angel)' by Leonid Andreyev (Christmas Short Works Collection 2009), read by Create (https://librivox.org/christmas-short-works-collection-2009-by-various/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Shimon is VOXPrint's own and does not imply the reader's endorsement.",
+        "ru": "Русский мужской голос для VOXPrint. Обучен только на записи LibriVox из общественного достояния: «Ангелочек» Леонида Андреева (сборник Christmas Short Works Collection 2009), читает Create (https://librivox.org/christmas-short-works-collection-2009-by-various/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Shimon дано VOXPrint и не означает одобрения чтеца.",
+        "de": "Russische männliche Stimme für VOXPrint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Angelotschek (Das Engelchen)' von Leonid Andrejew (Christmas Short Works Collection 2009) trainiert, gelesen von Create (https://librivox.org/christmas-short-works-collection-2009-by-various/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Shimon stammt von VOXPrint und bedeutet keine Billigung durch den Sprecher."
       },
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "gender": "male",
       "speaker": "Create",
-      "prepared_by": "Voxprint",
+      "prepared_by": "VOXPrint",
       "project_url": "https://archive.org/details/multilingual_christmas_0912_librivox"
     },
     {
@@ -225,20 +225,20 @@
       "author": "Maya S (LibriVox) - public domain",
       "license": "CC0-1.0",
       "voice_type": "female",
-      "description": "Russian female voice for Voxprint. Trained only from the public-domain LibriVox recording 'Portrety russkikh poetov (Portraits of Russian Poets)' by Ilya Ehrenburg, chapters on Blok, Bryusov and Sologub, read by Maya S (https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Miriam is Voxprint's own and does not imply the reader's endorsement.",
+      "description": "Russian female voice for VOXPrint. Trained only from the public-domain LibriVox recording 'Portrety russkikh poetov (Portraits of Russian Poets)' by Ilya Ehrenburg, chapters on Blok, Bryusov and Sologub, read by Maya S (https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Miriam is VOXPrint's own and does not imply the reader's endorsement.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
       "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v2/miriam.zip",
       "sha256": "a43a0e7e834603086e3aac623760e28271990a69074db6d968d2b1d2f1e9ef0c",
       "size_bytes": 53215075,
       "descriptions": {
-        "en": "Russian female voice for Voxprint. Trained only from the public-domain LibriVox recording 'Portrety russkikh poetov (Portraits of Russian Poets)' by Ilya Ehrenburg, chapters on Blok, Bryusov and Sologub, read by Maya S (https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Miriam is Voxprint's own and does not imply the reader's endorsement.",
-        "ru": "Русский женский голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: «Портреты русских поэтов» Ильи Эренбурга, главы о Блоке, Брюсове и Сологубе, читает Maya S (https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Miriam дано Voxprint и не означает одобрения чтеца.",
-        "de": "Russische weibliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Porträts russischer Dichter' von Ilja Ehrenburg, Kapitel über Blok, Brjussow und Sologub trainiert, gelesen von Maya S (https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Miriam stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+        "en": "Russian female voice for VOXPrint. Trained only from the public-domain LibriVox recording 'Portrety russkikh poetov (Portraits of Russian Poets)' by Ilya Ehrenburg, chapters on Blok, Bryusov and Sologub, read by Maya S (https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Miriam is VOXPrint's own and does not imply the reader's endorsement.",
+        "ru": "Русский женский голос для VOXPrint. Обучен только на записи LibriVox из общественного достояния: «Портреты русских поэтов» Ильи Эренбурга, главы о Блоке, Брюсове и Сологубе, читает Maya S (https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Miriam дано VOXPrint и не означает одобрения чтеца.",
+        "de": "Russische weibliche Stimme für VOXPrint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Porträts russischer Dichter' von Ilja Ehrenburg, Kapitel über Blok, Brjussow und Sologub trainiert, gelesen von Maya S (https://librivox.org/portraits-of-russian-poets-by-ilya-ehrenburg/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Miriam stammt von VOXPrint und bedeutet keine Billigung durch den Sprecher."
       },
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "gender": "female",
       "speaker": "Maya S",
-      "prepared_by": "Voxprint",
+      "prepared_by": "VOXPrint",
       "project_url": "https://archive.org/details/portraitsrussianpoets_1612_librivox",
       "bundled": true
     },
@@ -249,20 +249,20 @@
       "author": "Irina Grinberg (LibriVox) - public domain",
       "license": "CC0-1.0",
       "voice_type": "female",
-      "description": "Russian female voice for Voxprint. Trained only from the public-domain LibriVox recording 'Gore ot uma (Woe from Wit)' by Alexander Griboyedov, read by Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Rivka is Voxprint's own and does not imply the reader's endorsement.",
+      "description": "Russian female voice for VOXPrint. Trained only from the public-domain LibriVox recording 'Gore ot uma (Woe from Wit)' by Alexander Griboyedov, read by Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Rivka is VOXPrint's own and does not imply the reader's endorsement.",
       "base_model": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
       "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v2/rivka.zip",
       "sha256": "2250b5cf44382a9834e877b6edb8a900866e56007142674f0684712d28c57caa",
       "size_bytes": 53221651,
       "descriptions": {
-        "en": "Russian female voice for Voxprint. Trained only from the public-domain LibriVox recording 'Gore ot uma (Woe from Wit)' by Alexander Griboyedov, read by Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Rivka is Voxprint's own and does not imply the reader's endorsement.",
-        "ru": "Русский женский голос для Voxprint. Обучен только на записи LibriVox из общественного достояния: «Горе от ума» Александра Грибоедова, читает Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Rivka дано Voxprint и не означает одобрения чтеца.",
-        "de": "Russische weibliche Stimme für Voxprint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Gore ot uma (Verstand schafft Leiden)' von Alexander Gribojedow trainiert, gelesen von Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Rivka stammt von Voxprint und bedeutet keine Billigung durch den Sprecher."
+        "en": "Russian female voice for VOXPrint. Trained only from the public-domain LibriVox recording 'Gore ot uma (Woe from Wit)' by Alexander Griboyedov, read by Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, free for any use, also commercial. Attribution appreciated. The name Rivka is VOXPrint's own and does not imply the reader's endorsement.",
+        "ru": "Русский женский голос для VOXPrint. Обучен только на записи LibriVox из общественного достояния: «Горе от ума» Александра Грибоедова, читает Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется. Имя Rivka дано VOXPrint и не означает одобрения чтеца.",
+        "de": "Russische weibliche Stimme für VOXPrint. Nur mit der gemeinfreien LibriVox-Aufnahme 'Gore ot uma (Verstand schafft Leiden)' von Alexander Gribojedow trainiert, gelesen von Irina Grinberg (https://librivox.org/woe-from-wit-by-alexander-sergeyevich-griboedov/). CC0-1.0, frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht. Der Name Rivka stammt von VOXPrint und bedeutet keine Billigung durch den Sprecher."
       },
       "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
       "gender": "female",
       "speaker": "Irina Grinberg",
-      "prepared_by": "Voxprint",
+      "prepared_by": "VOXPrint",
       "project_url": "https://archive.org/details/woe_from_wit_ig_librivox"
     }
   ]

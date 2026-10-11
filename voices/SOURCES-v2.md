@@ -1,4 +1,4 @@
-# Voxprint voices v2 (2026-10-09): Levi, Natan, Shimon, Miriam, Rivka
+# VOXPrint voices v2 (2026-10-09): Levi, Natan, Shimon, Miriam, Rivka
 
 Same recipe as Eitan (voices-new/SOURCES.md): solo LibriVox readings (LibriVox API checked per section), originals from the Internet Archive (SHA-1 = IA metadata), cut at pauses >=0.6 s (fallback 0.4 s for fluent readers) at -45 dB, first 30-60 s (disclaimer) and last 20-40 s dropped, mono 24 kHz s16 FLAC, 20 ms fades, no denoise/EQ. (cut script and QC data kept outside the repo). Licence of the voices: CC0-1.0.
 

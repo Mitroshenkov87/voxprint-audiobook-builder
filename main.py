@@ -10,6 +10,7 @@ Flags: ``--prefetch`` (force-download the models; used by the installer), ``--se
 ``--register-models-user`` / ``--unregister-models-user --out FILE`` (shared ``models/.users.json``, infra/models_users.py);
 ``--register-runtime-user`` / ``--unregister-runtime-user --out FILE`` (``runtime/.users.json``, same format);
 ``--sync-suite-settings`` (installer: copy the models folder / UI language into the shared ``state/suite.json``).
+``--register-install`` / ``--unregister-install`` record or drop the suite discovery entry (install path and CLI path).
 User CLI subcommands (see ``cli.py`` / docs/CLI.md): ``narrate``, ``train``, ``voices``.
 """
 from __future__ import annotations
@@ -318,6 +319,14 @@ def main(argv=None) -> int:
         from infra import suite_settings
 
         return suite_settings.sync_cli()
+    if "--register-install" in argv or "--unregister-install" in argv:
+        from infra import install_layout
+
+        if "--unregister-install" in argv:
+            install_layout.unregister_install()
+        else:
+            install_layout.register_current()
+        return 0
     if "--install-suite" in argv or "--unregister-suite" in argv:
         from infra import suite_install
 
@@ -412,6 +421,9 @@ def main(argv=None) -> int:
 
     models_users.register_quietly()   # this program uses the shared models folder (models\.users.json)
     models_users.register_runtime_quietly()   # runtime\.users.json, created here on the first GUI start
+    from infra import install_layout
+
+    install_layout.register_quietly()  # frozen install: manifest installs + the current-user registry key
     from infra import suite_settings
 
     suite_settings.migrate_quietly()  # earlier choices (models folder, UI language) into the shared state\suite.json
@@ -447,7 +459,7 @@ def main(argv=None) -> int:
     # system / GPU / settings block of the log; the GPU probe imports PyTorch, so it runs beside the UI
     threading.Thread(target=diagnostics.log_startup, name="diag-startup", daemon=True).start()
     app.setApplicationName("Voxprint")
-    app.setDesktopFileName("voxprint")      # Linux: ties the window to voxprint.desktop (icon / Wayland app-id); ignored elsewhere
+    app.setDesktopFileName("voxprint-audiobook-builder")  # Linux: ties the window to the desktop file; ignored elsewhere
     try:   # window / taskbar icon (the file ships in assets/, next to the other resources in a build)
         from PySide6.QtGui import QIcon
 
@@ -517,7 +529,7 @@ def main(argv=None) -> int:
         hard_exit.arm()          # closing the main window kills every helper process at once (docs/BUILDING.md)
     win.show_studio()
     splash.finish(win)                    # closes once the Studio window is on screen
-    if not selftest:   # "Voxprint Projects" shortcut in the real Documents folder (infra/projects.py); never blocks the start
+    if not selftest:   # "VOXPrint Projects" shortcut in the real Documents folder (infra/projects.py); never blocks the start
         from infra import projects
 
         threading.Thread(target=projects.ensure_shortcut, name="projects-shortcut", daemon=True).start()

@@ -354,7 +354,7 @@ def test_ffmetadata_document_and_escaping():
     lines = doc.splitlines()
     assert lines[0] == ";FFMETADATA1" and "title=Tom\\; Jerry \\= \\#1" in lines and "artist=A. Author" in lines
     assert "composer=Anna" in lines and "genre=Audiobook" in lines and "language=ru" in lines
-    assert "comment=Narrated by the AI voice “Anna” (Voxprint AI Audiobook Builder)" in lines
+    assert "comment=Narrated by the AI voice “Anna” (VOXPrint AI Audiobook Builder)" in lines
     assert doc.count("[CHAPTER]") == 2 and "TIMEBASE=1/1000" in lines
     assert "START=0" in lines and "END=1500" in lines and "START=1500" in lines and "END=3500" in lines
     assert "title=Part\\=1\\\nline" in doc and "title=Back\\\\slash" in doc

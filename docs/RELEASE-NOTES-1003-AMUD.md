@@ -1,4 +1,4 @@
-**Voxprint 1.0.0 RC5 · build 1003 "Amud"** (pillar; tag `v1.0.0-rc.5`): the app now stands on the shared suite library. Paths, settings, the GPU lock, pauses when the card runs hot, the graphics-card check, downloads, build info, file checks, the theme and the start-up window come from that one library.
+**VOXPrint 1.0.0 RC5 · build 1003 "Amud"** (pillar; tag `v1.0.0-rc.5`): the app now stands on the shared suite library. Paths, settings, the GPU lock, pauses when the card runs hot, the graphics-card check, downloads, build info, file checks, the theme and the start-up window come from that one library.
 
 Install: download `Voxprint-Setup-online.exe` from this release only. Check its SHA-256 against the `.sha256` file, then run it. Or read [install.ps1](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/blob/main/install.ps1) and, in an Administrator PowerShell:
 
@@ -27,7 +27,7 @@ Code signing is being applied for (SignPath Foundation). The warning will go awa
 New:
 
 - **Shared suite library.** Version 0.1.1 of the shared library now supplies paths, settings, the GPU lock, thermal pauses, the graphics-card check, downloads that try a mirror when the first host fails, build info, file hashes, the theme and the splash.
-- **One shared runtime.** PyTorch lives in one place, with a manifest that counts the programs using it. Upgrading moves the runtime this app already had. A compatible PyTorch is reused instead of downloaded again. Removing this app drops its claim and deletes that runtime only when no other Voxprint app still lists it.
+- **One shared runtime.** PyTorch lives in one place, with a manifest that counts the programs using it. Upgrading moves the runtime this app already had. A compatible PyTorch is reused instead of downloaded again. Removing this app drops its claim and deletes that runtime only when no other VOXPrint app still lists it.
 - **Suite models folder.** Required models are stored in the suite models folder. Copies already in the older shared models folder are still used when the suite folder does not have them yet.
 - **Suite splash screen.** The start-up window is the shared splash (960×540). Six clicks within two seconds still show the extra picture.
 

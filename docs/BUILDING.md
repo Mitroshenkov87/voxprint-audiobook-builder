@@ -1,11 +1,11 @@
 # Building, running from source and contributing
 
 ## Build the installer locally
-`build.bat` produces `installer\Output\Voxprint-Setup.exe` (Inno Setup 6, per-machine install, Windows 11 x64; about 1.8 GB because PyTorch is inside).
+`build.bat` produces `installer\Output\voxprint-audiobook-builder-setup-<version>-win-x64.exe` (Inno Setup 6, per-machine install, Windows 11 x64; about 1.8 GB because PyTorch is inside).
 The installer does not contain the models: on first start Voxprint downloads about 7 GB once (internet needed).
 The wizard is available in **English, Russian and German** and has a page **"Models folder"** (right after the install folder): default = the current location `%LOCALAPPDATA%\Voxprint\models`, or any other folder / drive (Program Files is refused: the app runs without admin rights).
 The installer **copies nothing**; it only writes the chosen path to `%LOCALAPPDATA%\Voxprint\state\models_dir.txt` (UTF-8; removed when the default is kept). The app then keeps using models already complete in the default folder, picks up models the chosen folder already holds
-(Voxprint layout, Hugging Face cache) and downloads the rest into the chosen folder ([details](MODELS.md#models-folder)). A folder with a **Voxprint backup** (`voxprint-backup.json`) is not a models folder: it is written to `state\existing_models_dir.txt` instead, the default folder stays the live store, and the app restores models and voices from the backup on its first start. Voices and settings stay in `%LOCALAPPDATA%\Voxprint`. Silent install: `Voxprint-Setup.exe /VERYSILENT /ModelsFolder="D:\Voxprint models"`; the older `/ModelsDir="D:\old\models"` (a folder to import models from) still works.
+(Voxprint layout, Hugging Face cache) and downloads the rest into the chosen folder ([details](MODELS.md#models-folder)). A folder with a **Voxprint backup** (`voxprint-backup.json`) is not a models folder: it is written to `state\existing_models_dir.txt` instead, the default folder stays the live store, and the app restores models and voices from the backup on its first start. Voices and settings stay in `%LOCALAPPDATA%\Voxprint`. Silent install: `voxprint-audiobook-builder-setup-<version>-win-x64.exe /VERYSILENT /ModelsFolder="D:\Voxprint models"`; the older `/ModelsDir="D:\old\models"` (a folder to import models from) still works.
 Caveat: the installer runs elevated (per-machine); if the administrator account differs from the account that uses the program, `%LOCALAPPDATA%` is the administrator's - then set the folder in *Settings* instead.
 
 ## Run from source (Windows)
@@ -22,10 +22,10 @@ python main.py
 
 ## Build options
 ```bat
-build.bat              :: venv + torch (uv, CUDA auto-detect) + dependencies + notices + tests + dist\Voxprint.exe (--onefile) + installer if Inno Setup 6 exists
-build.bat onedir       :: dist\Voxprint\ folder (preferred: faster start, and Qt/PySide6 stay replaceable - see Licences)
+build.bat              :: venv + torch (uv, CUDA auto-detect) + dependencies + notices + tests + dist\voxprint-audiobook-builder.exe and dist\voxprint-audiobook-cli.exe (--onefile) + installer if Inno Setup 6 exists
+build.bat onedir       :: dist\voxprint-audiobook-builder\ folder (preferred: faster start, and Qt/PySide6 stay replaceable - see Licences)
 :: quick rebuild:  set VOX_SKIP_TESTS=1 & set VOX_SKIP_INSTALLER=1 & build.bat onedir
-:: verify a frozen build contains every library:  dist\Voxprint\Voxprint.exe --selftest-imports   (result in <app home>\logs\selftest_imports.txt)
+:: verify a frozen build contains every library:  "dist\voxprint-audiobook-builder\voxprint-audiobook-builder.exe" --selftest-imports   (result in <app home>\logs\selftest_imports.txt)
 ```
 Experimental thin installer (shell only, modules downloaded by the app): `build_thin.bat`, then `installer\build_online.ps1 -Thin` - see [THIN-INSTALLER.md](THIN-INSTALLER.md).
 Command-line maintenance flags of `main.py`: `--prefetch` (download models now), `--selftest`, `--selftest-imports`, `--selftest-speech` (model-free TTS / ASR smoke), `--selftest-narrate [voice]` (headless: narrates two sentences with the first voice, result in `<app home>\logs\selftest_narrate.txt`, exit code 0 / 1 / 2 = no voice), `--verify-install`, `--repair`.
@@ -70,15 +70,15 @@ not carry a number, so `build` is used. `VOXPRINT_BUILD` overrides both. `GITHUB
 does not consume a number. `BUILD.json` also holds the **codename**: one Biblical Hebrew word in Latin transliteration
 (ASCII letters only) that names the build's changes - edit it for each release. `tools/build_number.py --stamp` writes
 number, codename and commit into `credits.json` before the Windows shell and the Linux package are built;
-`tools/embed_build_stamp.py` reads the same number onto `Voxprint.exe`. The app shows `1.0.0 RC5 · build 1003 "Amud"`
+`tools/embed_build_stamp.py` reads the same number onto `voxprint-audiobook-builder.exe`. The app shows `1.0.0 RC5 · build 1003 "Amud"`
 once that stamp is in the build (About, splash, Settings, diagnostic report), the installer gets `VersionInfoVersion`
-`1.0.0.1003` and a numbered copy `Voxprint-Setup-online-<version>-build<N>.exe` (the plain `Voxprint-Setup-online.exe`
+`1.0.0.1003`. The setup file is `voxprint-audiobook-builder-setup-<version>-win-x64.exe` (the plain `voxprint-audiobook-builder-setup-win-x64.exe`
 stays for stable links), and the components manifest records `build`, so the Components window offers a same-version
 build only when its number is higher. `VOXPRINT_BUILD=0` leaves a local executable unstamped. The next codename must be
 unique in this repository and in the suite codename registry. See [RELEASING.md](RELEASING.md).
 History, when the number was `GITHUB_RUN_NUMBER` + `offset` (that sum is no longer used). The offset was **628** for 0.1.4: run 39 stamped 668 with offset 629, but that installer was built with an empty release tag (manifest URL `v0.0.0-dev`, setup HTTP 404) and cannot be installed. Run 40 + 628 = 668, codename **Kolot**. Runs 41-44 were test or failed runs and published nothing public. The offset was **655** for **0.2.0-beta**, build **700**, codename **Kaporet**: run 45 + 655 = 700. Run 46 failed in the Windows unit tests before it published anything, so the offset is **654** for **0.2.1-beta**, build **701**, codename **Shalem**: run 47 + 654 = 701. The offset stays **654** for **0.2.2-beta**, build **702**, codename **Shelishi**: run 48 + 654 = 702, for **0.2.3-beta**, build **703**, codename **Toledot**: run 49 + 654 = 703. Run 50 failed in the Windows tests before it published anything, so the offset is **653** for **0.2.4-beta**, build **704**, codename **Achim**: run 51 + 653 = 704. Run 52 failed in the Windows tests before it published anything, so the offset is **946** for **1.0.0-rc**, build **999**, codename **Nachon** (Genesis 41:32, established, ready): run 53 + 946 = 999, release tag `v1.0.0-rc`. Run 54 failed in the Windows tests before it published anything, so the offset is **945** for **1.0.0-rc.2**, build **1000**, codename **Chazak** (Deuteronomy 31:6, *chazak ve'ematz*, be strong): run 55 + 945 = 1000, release tag `v1.0.0-rc.2`. The offset stays **945** for **1.0.0-rc.3**, build **1001**, codename **Tamim** (Bereshit 17:1; Devarim 18:13, whole and complete): run 56 + 945 = 1001, release tag `v1.0.0-rc.3`. Run 56 failed before it published anything, so the offset is **944** from run 57 on: run 57 + 944 = 1001, release tag `v1.0.0-rc.3`. From **1.0.0-rc.4** the number is the explicit `build` field, **1002**, codename **Ometz** (Devarim 31:6, courage and resolve), release tag `v1.0.0-rc.4`. From **1.0.0-rc.5** the number is the explicit `build` field, **1003**, codename **Amud** (Shemot 13:21, pillar), release tag `v1.0.0-rc.5`.
 
-### Versions: "verified by Voxprint"
+### Versions: "verified by VOXPrint"
 `infra/verified_manifest.json` pins the package versions and model revisions (HF commit shas) Voxprint was tested with. The updater installs exactly those
 (rolling back if needed: `restore_verified()`) and merely logs newer PyPI releases as "not verified yet". Channel "latest": `VOXPRINT_CHANNEL=latest`
 (or `{"channel":"latest"}` in `state\updater_state.json`). `requirements-verified.txt` / `requirements-nodeps.txt` are generated from the manifest

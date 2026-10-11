@@ -1,10 +1,10 @@
-# Voxprint AI Audiobook Builder - End User Agreement
+# VOXPrint AI Audiobook Builder - End User Agreement
 
 > **Not legal advice.** The author is not a lawyer. This is a plain-language agreement written in good faith and not checked by a lawyer; it may not fit every country.
 
 Version 0.1 (beta) · 2026-10-04 · Copyright 2026 Aleksandr Mitroshenkov ("the author")
 
-By installing or using Voxprint AI Audiobook Builder ("the program") you agree to this text. If you do not agree, do not install or use the program.
+By installing or using VOXPrint AI Audiobook Builder ("the program") you agree to this text. If you do not agree, do not install or use the program.
 
 ## 1. What you get (licence)
 * The **source code** of the program is licensed under the **Apache License 2.0** (see `LICENSE` and `NOTICE`). You may use, modify and redistribute it, also commercially, under that licence.

@@ -22,13 +22,13 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 LANGS = ("en", "ru", "de")
 META = {
-    "en": dict(title="Voxprint AI Audiobook Builder", sub="User manual", contents="Contents", page="Page",
+    "en": dict(title="VOXPrint AI Audiobook Builder", sub="User manual", contents="Contents", page="Page",
                ver="Version 0.1.3 (beta) · build 667 “Menuchah” · manual of 9 October 2026", fallback=" (screenshot of the English interface)",
                fig="Figure", html="en"),
-    "ru": dict(title="Voxprint AI Audiobook Builder", sub="Руководство пользователя", contents="Содержание", page="Стр.",
+    "ru": dict(title="VOXPrint AI Audiobook Builder", sub="Руководство пользователя", contents="Содержание", page="Стр.",
                ver="Версия 0.1.3 (бета) · сборка 667 «Menuchah» · руководство от 9 октября 2026 г.", fallback=" (снимок английского интерфейса)",
                fig="Рис.", html="ru"),
-    "de": dict(title="Voxprint AI Audiobook Builder", sub="Benutzerhandbuch", contents="Inhalt", page="Seite",
+    "de": dict(title="VOXPrint AI Audiobook Builder", sub="Benutzerhandbuch", contents="Inhalt", page="Seite",
                ver="Version 0.1.3 (Beta) · Build 667 „Menuchah“ · Handbuch vom 9. Oktober 2026", fallback=" (Screenshot der englischen Oberfläche)",
                fig="Abb.", html="de"),
 }

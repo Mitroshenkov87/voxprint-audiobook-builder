@@ -11,12 +11,12 @@ voice recording and a text file to ready output files you can load into a neural
 * **One button, no expertise.** Hyper-parameters, model sizes, chunking and cleaning are chosen automatically for your GPU.
 * **Economical.** Models and tools that other apps (Hugging Face cache, Pinokio/Alexandria, ModelScope) already downloaded are reused
   in place, read-only - nothing is downloaded twice, nothing of other apps is touched.
-* **Honest and verifiable.** Package versions and model revisions are pinned to a "verified by Voxprint" set; failures produce stable,
+* **Honest and verifiable.** Package versions and model revisions are pinned to a "verified by VOXPrint" set; failures produce stable,
   localized messages instead of tracebacks; every claim in the README and these pages is backed by a test or a documented real run.
 * **Private by design.** Everything runs on your computer (see [Privacy](PRIVACY.md#privacy)).
 * Built jointly by a human and an AI - an honest attempt.
 
-The principles shared by every app of the Voxprint AI Media Suite (complete, local, forward-looking, open) are in [PHILOSOPHY.md](../PHILOSOPHY.md).
+The principles shared by every app of the VOXPrint AI Media Suite (complete, local, forward-looking, open) are in [PHILOSOPHY.md](../PHILOSOPHY.md).
 
 ## Features
 * **Studio** - the first window: three big cards (*Narrate a book*, *Train your voice*, *My voices*) and a gear button for Settings. Every other window has a *← Studio* button.

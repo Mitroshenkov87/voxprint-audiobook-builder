@@ -44,10 +44,10 @@ def test_dry_run_checks_a_local_release_and_refuses_anything_else(tmp_path):
     release = tmp_path / "release"
     release.mkdir()
     payload = b"voxprint-fake-installer"
-    (release / "Voxprint-Setup-online.exe").write_bytes(payload)
+    (release / "voxprint-audiobook-builder-setup-win-x64.exe").write_bytes(payload)
     digest = hashlib.sha256(payload).hexdigest()
-    sha = release / "Voxprint-Setup-online.exe.sha256"
-    sha.write_text(f"{digest}  Voxprint-Setup-online.exe\n", encoding="ascii")
+    sha = release / "voxprint-audiobook-builder-setup-win-x64.exe.sha256"
+    sha.write_text(f"{digest}  voxprint-audiobook-builder-setup-win-x64.exe\n", encoding="ascii")
 
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
@@ -73,10 +73,10 @@ def test_dry_run_checks_a_local_release_and_refuses_anything_else(tmp_path):
         ok = run("-DryRun", "-SourceUrl", local)
         assert ok.returncode == 0, ok.stdout + ok.stderr
         assert "Dry run" in ok.stdout and "SHA-256 matches" in ok.stdout
-        sha.write_text(("0" * 64) + "  Voxprint-Setup-online.exe\n", encoding="ascii")
+        sha.write_text(("0" * 64) + "  voxprint-audiobook-builder-setup-win-x64.exe\n", encoding="ascii")
         bad = run("-DryRun", "-SourceUrl", local)
         assert bad.returncode != 0 and "does not match" in (bad.stdout + bad.stderr)
-        evil = run("-DryRun", "-SourceUrl", "https://example.com/Voxprint-Setup-online.exe")
+        evil = run("-DryRun", "-SourceUrl", "https://example.com/voxprint-audiobook-builder-setup-win-x64.exe")
         assert evil.returncode != 0 and "127.0.0.1" in (evil.stdout + evil.stderr)
         real = run("-SourceUrl", local)
         assert real.returncode != 0 and "only allowed with -DryRun" in (real.stdout + real.stderr)

@@ -1,4 +1,4 @@
-# Voxprint AI Audiobook Builder
+# VOXPrint AI Audiobook Builder
 
 Train a voice from a short recording, then narrate a book in it. Offline, on your own computer.
 

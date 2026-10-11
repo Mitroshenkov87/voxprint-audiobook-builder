@@ -6,7 +6,7 @@ The longer guide, with JSON fields and exit codes, is [CLI.md](../CLI.md).
 
 ## `voxprint`
 
-Voxprint AI Audiobook Builder - headless CLI for scripts and agents. Every command is non-interactive. Guide: docs/AGENTS.md.
+VOXPrint AI Audiobook Builder - headless CLI for scripts and agents. Every command is non-interactive. Guide: docs/AGENTS.md.
 
 ### Arguments
 

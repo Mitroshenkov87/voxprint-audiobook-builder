@@ -4,7 +4,7 @@ Not legal advice. The author is not a lawyer. This is a plain-language agreement
 
 Version 0.1 (beta) - 2026-10-04 - Copyright 2026 Aleksandr Mitroshenkov ("the author")
 
-By installing or using Voxprint AI Audiobook Builder ("the program") you agree to this text. If you do not agree, do not install or use the program.
+By installing or using VOXPrint AI Audiobook Builder ("the program") you agree to this text. If you do not agree, do not install or use the program.
 
 1. WHAT YOU GET (LICENCE)
 

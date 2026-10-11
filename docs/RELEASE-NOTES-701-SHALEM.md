@@ -2,7 +2,7 @@
 
 `BUILD.json` codename is Shalem. Run 46 failed in the Windows unit tests before it published anything, so the offset is 654 and build-installer run 47 stamps build 701. The body below is the GitHub release text. Keep the Windows section.
 
-**Voxprint 0.2.1-beta · build 701 "Shalem"** (Biblical Hebrew *shalem*, שָׁלֵם, whole, complete; Genesis 33:18, Jacob came *shalem* to the city of Shechem). Fixes from the test of build 700 "Kaporet" on a real PC.
+**VOXPrint 0.2.1-beta · build 701 "Shalem"** (Biblical Hebrew *shalem*, שָׁלֵם, whole, complete; Genesis 33:18, Jacob came *shalem* to the city of Shechem). Fixes from the test of build 700 "Kaporet" on a real PC.
 
 Install: download `Voxprint-Setup-online.exe` from this release only. Check its SHA-256 against the `.sha256` file, then run it. Or read [install.ps1](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/blob/main/install.ps1) and, in an Administrator PowerShell:
 
@@ -34,7 +34,7 @@ New:
 
 Fixed:
 
-- **"'sox' is not recognized" on the console.** The SoX wrapper that the speech package imports no longer starts a shell to look for SoX when SoX is not installed. Voxprint never uses SoX.
+- **"'sox' is not recognized" on the console.** The SoX wrapper that the speech package imports no longer starts a shell to look for SoX when SoX is not installed. VOXPrint never uses SoX.
 - **"triton not found" in the log.** PyTorch's and bitsandbytes' notices about the optional Triton compiler are dropped.
 
 Full list: [CHANGELOG](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/blob/main/CHANGELOG.md).

@@ -75,7 +75,7 @@ powershell -File scripts/vm_test.ps1 --smoke --json --tag v1.0.0-rc.5
 powershell -File scripts/vm_test.ps1 --full --json
 ```
 
-`--full` includes `--smoke`. Passing both runs the full set. The program is `--bin`, else `$VOXPRINT_BIN`, else `voxprint-cli`, else `voxprint`, else `python3 main.py` from this repository.
+`--full` includes `--smoke`. Passing both runs the full set. The program is `--bin`, else `$VOXPRINT_BIN`, else `voxprint-audiobook-cli`, else `voxprint-cli`, else `voxprint`, else `python3 main.py` from this repository.
 
 | Exit | Meaning |
 |---|---|

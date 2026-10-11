@@ -1,4 +1,4 @@
-# Voxprint for Linux (experimental) - test checklist
+# VOXPrint for Linux (experimental) - test checklist
 
 Short manual test for a real Linux laptop (Ubuntu / Debian / AnduinOS). The CI already checks the install, the unit tests
 and a headless start on a clean Ubuntu 24.04 runner; this list covers what CI cannot: the real desktop, audio and the GPU.
@@ -14,7 +14,7 @@ Mark each line OK / FAIL and note the message. Logs: `~/.local/share/voxprint/lo
 
 ## 2. Start
 - [ ] Voxprint appears in the application menu with the icon; it starts from there
-- [ ] `voxprint` in a terminal starts it (if the command is not found: log out and in, or run `~/.local/bin/voxprint`)
+- [ ] `voxprint-audiobook-cli` in a terminal starts it (if the command is not found, run `/usr/local/bin/voxprint-audiobook-cli`)
 - [ ] The Studio window shows the text readably (fonts), buttons react, language switch (en / ru / de) works
 - [ ] Wayland session: the window opens. If not or the text is blurry: `QT_QPA_PLATFORM=xcb voxprint` (note which one works)
 - [ ] Closing the window ends the process (`pgrep -f voxprint/app/main.py` is empty)

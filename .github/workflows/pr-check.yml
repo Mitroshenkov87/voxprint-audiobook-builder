@@ -169,16 +169,18 @@ jobs:
       - name: Online installer (Inno, not published)
         shell: pwsh
         run: |
-          ./installer/build_online.ps1 -Dist dist\thin\Voxprint -Tag v0.0.0-dev -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
+          ./installer/build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag v0.0.0-dev -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
           Get-ChildItem build\online-release | Format-Table Name, Length
-          $setup = Get-ChildItem build\online-release\Voxprint-Setup-online*.exe | Select-Object -First 1
+          $setup = Get-Item build\online-release\voxprint-audiobook-builder-setup-win-x64.exe
+          $versioned = @(Get-ChildItem build\online-release\voxprint-audiobook-builder-setup-*-win-x64.exe)
+          if ($versioned.Count -lt 1) { throw "versioned setup file was not written" }
           "installer bytes: $($setup.Length)"
           "installer MiB: $([math]::Round($setup.Length / 1MB, 1))"
       - uses: actions/upload-artifact@v4
         with:
-          name: Voxprint-Setup-online
+          name: voxprint-audiobook-builder-setup
           path: |
-            build/online-release/Voxprint-Setup-online*.exe
-            build/online-release/Voxprint-Setup-online*.exe.sha256
+            build/online-release/voxprint-audiobook-builder-setup*.exe
+            build/online-release/voxprint-audiobook-builder-setup*.exe.sha256
             build/online-release/manifest-thin-*.json
           retention-days: 14

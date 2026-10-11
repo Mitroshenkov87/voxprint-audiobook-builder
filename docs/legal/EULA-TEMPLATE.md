@@ -1,4 +1,4 @@
-# End User Agreement - TEMPLATE for Voxprint programs
+# End User Agreement - TEMPLATE for VOXPrint programs
 
 > **Not legal advice.** The author of Voxprint is not a lawyer. This text is a plain-language agreement written in good faith; it has not been checked by a lawyer and may not fit every country. If a lot depends on it (a company, a commercial release), have it reviewed locally.
 

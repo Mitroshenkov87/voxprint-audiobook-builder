@@ -1,6 +1,6 @@
 # Roadmap
 
-Plans for Voxprint AI Audiobook Builder. Nothing here is a promise, and there are no dates. What the app does today is in the [user guide](../USER-GUIDE.md) and the [command reference](../CLI.md).
+Plans for VOXPrint AI Audiobook Builder. Nothing here is a promise, and there are no dates. What the app does today is in the [user guide](../USER-GUIDE.md) and the [command reference](../CLI.md).
 
 ## Next version
 
