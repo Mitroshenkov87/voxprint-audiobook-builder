@@ -427,10 +427,6 @@ def test_previous_install_settings_and_models_are_reused(tmp_path, monkeypatch):
     assert f and f.kind == "voxprint" and f.path == old / "models" / "Org--Tiny-1.7B"
 
 
-def _net_down(**k):
-    raise OSError("network down")
-
-
 # ------------------------------------------------------------------------------------- per-model state
 def test_model_states_missing_partial_ready(tmp_path, monkeypatch):
     from infra import model_downloader as md
@@ -448,10 +444,9 @@ def test_model_states_missing_partial_ready(tmp_path, monkeypatch):
     part.mkdir(parents=True)
     (part / "model.safetensors.incomplete").write_bytes(b"x")
     assert md.model_state("Org/A") == "partial"
-    msgs = []
-    with pytest.raises(Exception):
-        md.ensure_model("Org/A", lambda s, f, m: msgs.append(m), snapshot_download=_net_down, revision=SHA_A)
-    assert i18n.tr("progress.model_resume", short="A") in msgs and part.exists()       # kept for resuming
+    with pytest.raises(Exception) as ei:
+        md.ensure_model("Org/A")
+    assert "voxprint-mdl" in str(ei.value) and part.exists()       # the partial stays; MDL resumes it
     make_model(md.local_dir_for("Org/B"))
     assert md.model_state("Org/B") == "ready"
     hub = home / ".cache" / "huggingface" / "hub"

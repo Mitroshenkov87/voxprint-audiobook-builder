@@ -37,8 +37,9 @@ Contributions are welcome - see [`CONTRIBUTING.md`](../CONTRIBUTING.md) and [`DE
 [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) (module map, data flow). Quick start for developers:
 ```bash
 python -m venv .venv && . .venv/bin/activate        # Linux: enough to run the tests
-pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt
-pip install --no-deps -r requirements-nodeps.txt
+pip install uv                                       # requirements.txt hashes the suite wheel; pip cannot install that file
+uv pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt
+uv pip install --no-deps -r requirements-nodeps.txt
 QT_QPA_PLATFORM=offscreen python -m pytest          # ~350 tests, no GPU, no network
 python -m core.cli audio.wav text.txt --out dataset --fake-aligner     # dry run of the pipeline without a neural network
 ```

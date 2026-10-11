@@ -93,44 +93,6 @@ def _ms_ok(order):
     return ms_download
 
 
-def test_stalled_hugging_face_switches_to_modelscope_and_later_models_start_there(manifest, fast_watch, monkeypatch):
-    order = []
-
-    def hf_stalls(repo_id, local_dir, tqdm_class=None, **kw):       # connected, but no byte ever arrives (the xet/CAS symptom)
-        order.append("hf")
-        Path(local_dir).mkdir(parents=True, exist_ok=True)
-        bar = tqdm_class(total=100, unit="B")
-        for _ in range(200):
-            time.sleep(0.02)
-            bar.update(0)                                            # alive, zero bytes; the watchdog's abort is raised here
-
-    got = md.ensure_model(REPO, snapshot_download=hf_stalls, revision=SHA_A, hf_probe=lambda r: True,
-                          mirror_download=_ms_ok(order), mirror_manifest=manifest)
-    assert order == ["hf", "ms"] and md.verify_local_model(got)
-    assert ms.hf_verdict() is False                                   # remembered for the session
-
-    # the next model: no probe at all (it would raise), ModelScope first, Hugging Face is not even tried
-    monkeypatch.setattr(ms, "hf_is_fast", lambda *a, **k: (_ for _ in ()).throw(AssertionError("probe repeated")))
-    import shutil
-    shutil.rmtree(got)
-    order.clear()
-    got2 = md.ensure_model(REPO, snapshot_download=lambda **kw: order.append("hf"), revision=SHA_A,
-                           mirror_download=_ms_ok(order), mirror_manifest=manifest)
-    assert order == ["ms"] and md.verify_local_model(got2)
-
-
-def test_a_successful_hugging_face_download_remembers_that_it_is_fast(manifest, fast_watch):
-    def hf(repo_id, local_dir, **kw):
-        for n, b in FILES.items():
-            t = Path(local_dir).joinpath(*n.split("/"))
-            t.parent.mkdir(parents=True, exist_ok=True)
-            t.write_bytes(b)
-
-    md.ensure_model(REPO, snapshot_download=hf, revision=SHA_A, hf_probe=lambda r: True, mirror_download=_fail_ms,
-                    mirror_manifest=manifest)
-    assert ms.hf_verdict() is True
-
-
 def test_the_probe_is_capped(monkeypatch):
     monkeypatch.setattr(md, "PROBE_CAP", 0.2)
     t0 = time.monotonic()
@@ -186,16 +148,6 @@ def _no_network(*a, **k):
     raise AssertionError("nothing may be downloaded: the .partial folder is complete")
 
 
-def test_a_complete_partial_folder_is_finished_without_any_download(manifest, fast_watch):
-    part = _write_partial(REPO)
-    (part / ".cache" / "huggingface" / "download").mkdir(parents=True)
-    (part / ".cache" / "huggingface" / "download" / "x.lock").write_bytes(b"")
-    got = md.ensure_model(REPO, snapshot_download=_no_network, revision=SHA_A, hf_probe=_no_network,
-                          mirror_download=_no_network, hf_mirror_fetch=_no_network, mirror_manifest=manifest)
-    assert md.verify_local_model(got) and not part.exists() and not (got / ".cache").exists()
-    assert (got / ".revision").read_text() == SHA_A
-
-
 def test_an_incomplete_partial_folder_is_not_taken_for_complete(manifest, fast_watch):
     part = _write_partial(REPO, {"config.json": FILES["config.json"], "model.safetensors": b"short"})
     assert not md.partial_is_complete(part, REPO, SHA_A, manifest)
@@ -217,41 +169,6 @@ def _flaky_rename(monkeypatch, failures):
 
     monkeypatch.setattr(Path, "rename", rename)
     return calls
-
-
-def test_rename_is_retried_when_windows_denies_access(manifest, fast_watch, monkeypatch):
-    sleeps = []
-    monkeypatch.setattr(md, "_sleep", sleeps.append)
-    calls = _flaky_rename(monkeypatch, 3)
-    _write_partial(REPO)
-    got = md.ensure_model(REPO, snapshot_download=_no_network, revision=SHA_A, hf_probe=_no_network,
-                          mirror_download=_no_network, mirror_manifest=manifest)
-    assert md.verify_local_model(got) and len(calls) == 3 and len(sleeps) == 3 and sleeps == sorted(sleeps)
-
-
-def test_when_rename_never_works_the_folder_is_copied(manifest, fast_watch, monkeypatch):
-    monkeypatch.setattr(md, "_sleep", lambda s: None)
-    calls = _flaky_rename(monkeypatch, None)
-    part = _write_partial(REPO)
-    got = md.ensure_model(REPO, snapshot_download=_no_network, revision=SHA_A, hf_probe=_no_network,
-                          mirror_download=_no_network, mirror_manifest=manifest)
-    assert len(calls) == md.FINALIZE_ATTEMPTS and md.verify_local_model(got) and not part.exists()
-    assert (got / "model.safetensors").read_bytes() == FILES["model.safetensors"]
-
-
-def test_when_everything_fails_the_error_says_nothing_must_be_downloaded_again(manifest, fast_watch, monkeypatch):
-    from core.errors import ModelDownloadError
-
-    monkeypatch.setattr(md, "_sleep", lambda s: None)
-    _flaky_rename(monkeypatch, None)
-    monkeypatch.setattr(md, "_move_finished", lambda *a, **k: (_ for _ in ()).throw(PermissionError("move denied")))
-    monkeypatch.setattr(md.shutil, "copytree", lambda *a, **k: (_ for _ in ()).throw(PermissionError("copy denied")))
-    part = _write_partial(REPO)
-    with pytest.raises(ModelDownloadError) as ei:
-        md.ensure_model(REPO, snapshot_download=_no_network, revision=SHA_A, hf_probe=_no_network,
-                        mirror_download=_no_network, mirror_manifest=manifest)
-    assert "WinError 5" in (ei.value.details or "") and "copy denied" in (ei.value.details or "")
-    assert part.is_dir() and not md.local_dir_for(REPO).exists()       # the complete .partial stays: the next try only renames
 
 
 def test_all_files_present_is_not_a_stall(tmp_path):

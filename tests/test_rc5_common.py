@@ -23,13 +23,18 @@ def test_voxprint_common_is_pinned_by_the_released_wheel_and_its_sha256():
     assert suite["size"] == 125199
     pin = mrl.suite_requirement(suite)
     assert pin in req
+    assert pin == (
+        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.1/"
+        "voxprint_common-0.2.1-py3-none-any.whl --hash=sha256:7a5a41284a74fc8eb2ad724647c05575d16c42881d30dba461fddf15b96a3d2f"
+    )
     assert "git+" not in req
     assert "git" not in lock
     assert all(row["dist"] != "voxprint-common" for row in lock["wheels"])
     assert lock["python"] == "3.14"
-    parsed = Requirement(pin)
+    parsed = Requirement(pin.split(" --hash=", 1)[0])
     assert parsed.name == "voxprint-common"
-    assert parsed.url is not None and suite["sha256"] in parsed.url
+    assert parsed.url == suite["url"]
+    assert pin.endswith(" --hash=sha256:" + suite["sha256"])
 
 
 def test_test_requirements_emit_the_wheel_pin_and_shell_requirements_do_not(capsys):

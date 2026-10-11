@@ -107,6 +107,8 @@ def test_installer_installs_the_suite_and_ships_the_console_exe():
     iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
     assert "voxprint-audiobook-cli.exe" in iss and "--install-suite" in iss and "SkipSuite" in iss
     assert "voxprint-mdl.cmd" in iss and "download --app audiobook-builder" in iss
+    suite = iss[iss.index("procedure RunSuiteInstall"):iss.index("procedure AddAppToUserPath")]
+    assert "--gui" not in suite and "--json" in suite
     assert "ewWaitUntilTerminated" in iss and "wrote no status" not in iss
     assert "Abort;" in iss[iss.index("procedure RunSuiteInstall"):iss.index("procedure AddAppToUserPath")]
     assert "--unregister-suite" in iss and "ChangesEnvironment=yes" in iss

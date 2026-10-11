@@ -1565,12 +1565,10 @@ begin
   end;
   Params := '/d /c ' + AddQuotes(Mdl) + ' download --app audiobook-builder --manifest '
     + AddQuotes(ExpandConstant('{app}\voxprint-app-models.json')) + ' --json';
+  { CLI progress. The MDL window arrives in voxprint-common 0.2.2. }
   Show := SW_HIDE;
   if not WizardSilent() then
-  begin
-    Params := Params + ' --gui';
     Show := SW_SHOWNORMAL;
-  end;
   if not RunChecked(ExpandConstant('{cmd}'), Params, Show) then
   begin
     SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['models']), mbError, MB_OK, IDOK);

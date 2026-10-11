@@ -116,55 +116,6 @@ def test_fetch_error_becomes_mirror_error(manifest, tmp_path):
         mir.download(mir.load(manifest)[REPO], tmp_path / "d", fetch=boom)
 
 
-def test_ensure_model_falls_back_to_hf_mirror_right_after_the_original(manifest, tmp_path, monkeypatch):
-    monkeypatch.setenv("HOME", str(tmp_path / "h"))
-    monkeypatch.setenv("USERPROFILE", str(tmp_path / "h"))
-    monkeypatch.setenv("VOXPRINT_NO_EXTERNAL_MODELS", "1")
-    monkeypatch.chdir(tmp_path)
-    order = []
-
-    def ms(*a, **k):
-        order.append("ms")
-        raise OSError("modelscope down")
-
-    def hf(**kw):
-        order.append("hf")
-        raise OSError("network down")
-
-    calls = []
-    got = md.ensure_model(REPO, snapshot_download=hf, revision=SHA_A, hf_probe=lambda r: True, mirror_download=ms,
-                          hf_mirror_fetch=_fetcher(calls=calls), mirror_manifest=manifest)
-    assert order == ["hf", "hf"] and calls                                 # original first, then our mirror - ModelScope is not needed
-    assert md.verify_local_model(got)
-    assert (got / ".revision").read_text() == SHA_A
-
-
-def test_modelscope_is_the_last_resort_after_the_original_and_our_mirror(manifest, tmp_path, monkeypatch):
-    monkeypatch.setenv("HOME", str(tmp_path / "h"))
-    monkeypatch.setenv("USERPROFILE", str(tmp_path / "h"))
-    monkeypatch.chdir(tmp_path)
-    order = []
-
-    def hf(**kw):
-        order.append("hf")
-        raise OSError("network down")
-
-    def broken_fetch(repo, name, rev, dest):
-        order.append("hfm")
-        raise OSError("mirror down")
-
-    def ms(repo, dest, progress, expected):
-        order.append("ms")
-        for n, b in FILES.items():
-            t = Path(dest).joinpath(*n.split("/"))
-            t.parent.mkdir(parents=True, exist_ok=True)
-            t.write_bytes(b)
-
-    got = md.ensure_model(REPO, snapshot_download=hf, revision=SHA_A, hf_probe=lambda r: True, mirror_download=ms,
-                          hf_mirror_fetch=broken_fetch, mirror_manifest=manifest)
-    assert order[:2] == ["hf", "hf"] and order[-2:] == ["hfm", "ms"] and md.verify_local_model(got)
-
-
 def test_original_success_never_touches_the_mirror(manifest, tmp_path, monkeypatch):
     monkeypatch.setenv("VOXPRINT_NO_EXTERNAL_MODELS", "1")
     monkeypatch.setenv("HOME", str(tmp_path / "h"))
@@ -183,27 +134,6 @@ def test_original_success_never_touches_the_mirror(manifest, tmp_path, monkeypat
     got = md.ensure_model(REPO, snapshot_download=hf, revision=SHA_A, hf_probe=lambda r: True,
                           mirror_download=_fail_ms, hf_mirror_fetch=no_mirror, mirror_manifest=manifest)
     assert md.verify_local_model(got)
-
-
-def test_mirror_failure_reports_all_errors_and_cache_is_first(manifest, tmp_path, monkeypatch):
-    monkeypatch.setenv("VOXPRINT_NO_EXTERNAL_MODELS", "1")
-    monkeypatch.setenv("HOME", str(tmp_path / "h"))
-    monkeypatch.setenv("USERPROFILE", str(tmp_path / "h"))
-    monkeypatch.chdir(tmp_path)
-    evil = dict(FILES, **{"model.safetensors": b"X" * 64})
-    with pytest.raises(ModelDownloadError) as ei:
-        md.ensure_model(REPO, snapshot_download=_broken_hf, revision=SHA_A, hf_probe=lambda r: True,
-                        mirror_download=_fail_ms, hf_mirror_fetch=_fetcher(evil), mirror_manifest=manifest)
-    d = ei.value.details or ""
-    assert "network down" in d and "modelscope down" in d and "mismatch" in d
-    assert not md.local_dir_for(REPO).exists()
-    # a complete local copy wins over everything (no source is contacted at all)
-    ok = md.local_dir_for(REPO)
-    ok.mkdir(parents=True)
-    (ok / "config.json").write_text("{}")
-    (ok / "model.safetensors").write_bytes(b"x")
-    assert md.ensure_model(REPO, snapshot_download=_broken_hf, hf_mirror_fetch=_fetcher(evil),
-                           mirror_manifest=manifest) == ok
 
 
 def test_mirror_not_used_for_other_revision_staging_or_when_disabled(manifest, tmp_path, monkeypatch):

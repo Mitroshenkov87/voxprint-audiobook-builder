@@ -201,9 +201,9 @@ def suite_record() -> dict:
 
 
 def suite_requirement(row: Optional[dict] = None) -> str:
-    """pip requirement. The ``#sha256=`` fragment is checked when the wheel is downloaded."""
+    """pip requirement. ``--hash`` is checked when the wheel is downloaded."""
     item = suite_record() if row is None else row
-    return f"{item['dist']} @ {item['url']}#sha256={item['sha256']}"
+    return f"{item['dist']} @ {item['url']} --hash=sha256:{item['sha256']}"
 
 
 def git_dist_names(lock: dict) -> List[str]:

@@ -383,9 +383,8 @@ def test_reuse_message_in_all_locales():
     texts = set()
     for lang in i18n.LANGS:
         i18n.set_language(lang)
-        for key in ("progress.model_reused", "progress.mirror_modelscope"):
-            t = i18n.tr(key, short="Qwen3-TTS-12Hz-1.7B-Base", where="C:\\x")
-            assert t != key and "{" not in t and "Qwen3-TTS-12Hz-1.7B-Base" in t
+        t = i18n.tr("progress.model_reused", short="Qwen3-TTS-12Hz-1.7B-Base", where="C:\\x")
+        assert t != "progress.model_reused" and "{" not in t and "Qwen3-TTS-12Hz-1.7B-Base" in t
         texts.add(i18n.tr("progress.model_reused", short="S", where="W"))
     assert len(texts) == len(i18n.LANGS)
 
@@ -520,48 +519,6 @@ def _mirror_stub(files):
             p.write_bytes(body)
         progress(1.0)
     return dl
-
-
-def test_ensure_model_uses_modelscope_first_when_hf_is_slow(env, monkeypatch):
-    monkeypatch.delenv("VOXPRINT_NO_MIRROR", raising=False)
-    files = _tiny_files()
-    msgs = []
-    got = md.ensure_model(REPO, lambda s, f, m: msgs.append(m), snapshot_download=_fail_download, revision=SHA_A,
-                          hf_probe=lambda r: False, mirror_download=_mirror_stub(files))
-    assert md.verify_local_model(got) and got == md.local_dir_for(REPO)
-    assert i18n.tr("progress.mirror_modelscope", short="Tiny-1.7B") in msgs
-    assert not (got / ".revision").exists()          # sizes of the pinned commit unknown for this fake repo
-
-
-def test_modelscope_copy_gets_revision_only_if_sizes_match_pinned_commit(env, monkeypatch):
-    monkeypatch.delenv("VOXPRINT_NO_MIRROR", raising=False)
-    files = _tiny_files()
-    monkeypatch.setitem(ml.KNOWN_SIZES, REPO, (SHA_A, {k: len(v) for k, v in files.items()}))
-    got = md.ensure_model(REPO, snapshot_download=_fail_download, revision=SHA_A, hf_probe=lambda r: False,
-                          mirror_download=_mirror_stub(files))
-    assert (got / ".revision").read_text() == SHA_A
-
-
-def test_hf_failure_falls_back_to_modelscope_and_total_failure_keeps_partial(env, monkeypatch):
-    monkeypatch.delenv("VOXPRINT_NO_MIRROR", raising=False)
-    files = _tiny_files()
-
-    def broken_hf(**kw):
-        raise OSError("network down")
-
-    got = md.ensure_model(REPO, snapshot_download=broken_hf, revision=SHA_A, hf_probe=lambda r: True,
-                          mirror_download=_mirror_stub(files))
-    assert md.verify_local_model(got)
-
-    def broken_ms(*a, **k):
-        raise mm.MirrorError("down")
-
-    shutil_target = md.local_dir_for("Org/Other")
-    with pytest.raises(ModelDownloadError) as ei:
-        md.ensure_model("Org/Other", snapshot_download=broken_hf, revision=SHA_A, hf_probe=lambda r: True,
-                        mirror_download=broken_ms)
-    assert "network down" in (ei.value.details or "") and "down" in (ei.value.details or "")
-    assert not shutil_target.exists()
 
 
 def test_mirror_disabled_by_env_uses_only_hugging_face(env, monkeypatch):

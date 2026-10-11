@@ -238,7 +238,6 @@ nav:
           - modules: api/infra.modules.md
           - net: api/infra.net.md
           - netroute: api/infra.netroute.md
-          - parallel_download: api/infra.parallel_download.md
           - paths: api/infra.paths.md
           - platform_win: api/infra.platform_win.md
           - portable: api/infra.portable.md

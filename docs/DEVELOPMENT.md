@@ -20,9 +20,10 @@ A CPU build of PyTorch is **internal**: it exists so this suite and the CI jobs 
 git clone <your fork>
 cd voxprint-audiobook-builder
 python -m venv .venv && . .venv/bin/activate            # Windows: .venv\Scripts\activate
-pip install torch --index-url https://download.pytorch.org/whl/cpu    # internal, tests only
-pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt
-pip install --no-deps -r requirements-nodeps.txt          # qwen-asr / qwen-tts-hf: their transformers pins conflict with ours
+pip install uv                                          # requirements.txt hashes the suite wheel; pip cannot install that file
+uv pip install torch --index-url https://download.pytorch.org/whl/cpu    # internal, tests only
+uv pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt
+uv pip install --no-deps -r requirements-nodeps.txt          # qwen-asr / qwen-tts-hf: their transformers pins conflict with ours
 QT_QPA_PLATFORM=offscreen python -m pytest                # ~250 tests; Windows: set QT_QPA_PLATFORM=offscreen
 ```
 

@@ -3,6 +3,8 @@ import io
 import json
 from pathlib import Path
 
+import pytest
+
 import cli
 from infra import mdl_gate, paths
 from tools import check_manifest_tags as tags
@@ -85,6 +87,18 @@ def test_existing_voices_move_into_the_shared_folder(tmp_path, monkeypatch):
     assert (target / "levi" / "voice.json").is_file()
     assert (target / "miriam" / "voice.json").is_file()
     assert not (shared / "voice.json").exists()
+
+
+def test_a_missing_model_is_not_downloaded_here(tmp_path, monkeypatch):
+    from core.errors import ModelDownloadError
+    from infra import model_downloader as md
+
+    monkeypatch.setattr(md.paths, "models_dir", lambda: tmp_path)
+    monkeypatch.setattr(md, "pinned_revision", lambda _repo: None)
+    with pytest.raises(ModelDownloadError) as ei:
+        md.ensure_model("Org/Missing", root=tmp_path)
+    assert "voxprint-mdl" in ei.value.user_message
+    assert [p.name for p in tmp_path.iterdir() if not p.name.startswith(".")] == []
 
 
 def test_manage_models_uses_the_download_gui_flag():

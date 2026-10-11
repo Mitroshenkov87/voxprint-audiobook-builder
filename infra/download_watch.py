@@ -270,15 +270,19 @@ class Meter:
         return tr("progress.detail_unknown", short=short, done=fmt_bytes(self.done), speed=speed, source=self.source)
 
 
+def _too_slow(speed: float, elapsed: float, slow_bps: Optional[float], slow_after: Optional[float], grew: bool) -> bool:
+    """True when a source that already sent bytes is still under ``slow_bps`` after ``slow_after`` seconds."""
+    if not grew or slow_bps is None or slow_after is None or slow_bps <= 0:
+        return False
+    return elapsed >= slow_after and 0 < speed < slow_bps
+
+
 def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threading.Event,
                 on_tick: Optional[Callable[[Meter], None]] = None, idle_ok: Optional[Callable[[], bool]] = None, stall: Optional[float] = None, poll: Optional[float] = None,
                 clock: Callable[[], float] = time.monotonic, grace: Optional[float] = None, log_every: float = 15.0,
                 slow_bps: Optional[float] = None, slow_after: Optional[float] = None) -> Any:
     """Run ``fn`` in a helper thread and watch ``folder``.  Returns its result, re-raises its exception, or raises
     :class:`Stalled` (after setting ``cancel`` so that the helper stops at its next progress call)."""
-    # parallel_download imports Stalled from this module, so the speed check is imported here.
-    from infra.parallel_download import too_slow
-
     stall = STALL_SECONDS if stall is None else stall
     grace = ABORT_GRACE if grace is None else grace
     poll = POLL if poll is None else poll
@@ -316,7 +320,7 @@ def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threa
             total = meter.total
             log.info("download via %s: %s%s, %s/s", meter.source, fmt_bytes(min(meter.done, total) if total else meter.done),
                      f" of {fmt_bytes(total)}" if total else "", fmt_bytes(meter.speed))
-        if too_slow(meter.speed, now - started, slow_bps, slow_after, last_size > base):
+        if _too_slow(meter.speed, now - started, slow_bps, slow_after, last_size > base):
             log.info("download via %s is too slow (%.0f B/s) - switching source", meter.source, meter.speed)
             cancel.set()
             th.join(grace)

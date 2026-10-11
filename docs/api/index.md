@@ -111,7 +111,6 @@ Do not edit the module pages by hand.
 - [`infra.modules`](infra.modules.md)
 - [`infra.net`](infra.net.md)
 - [`infra.netroute`](infra.netroute.md)
-- [`infra.parallel_download`](infra.parallel_download.md)
 - [`infra.paths`](infra.paths.md)
 - [`infra.platform_win`](infra.platform_win.md)
 - [`infra.portable`](infra.portable.md)

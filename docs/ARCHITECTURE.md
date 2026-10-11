@@ -143,7 +143,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `env_probe.py` | read-only probe of Python/torch/CUDA/packages/models and the reuse / upgrade / offer / install decision per component |
 | `cuda12_libs.py` | registers the CUDA 12 cublas and cuDNN wheels before CTranslate2 is imported |
 | `install_state.py` | completion manifest, health check with stable reason codes (`--verify-install`), uv-based venv plan for `--repair` |
-| `model_downloader.py`, `modelscope_mirror.py`, `parallel_download.py` | model download from Hugging Face (multi-connection Range for large weights) with ModelScope / own-mirror fallbacks; post-download SHA-256 status |
+| `model_downloader.py` | find a model MDL already installed (local folder, import, another program's copy). It does not download |
 | `version_manager.py`, `verified_manifest.py` | PyPI/HF version queries and comparison; the "verified by VOXPrint" manifest (`verified_manifest.json`) with update channels |
 | `updater.py` | check -> install into `.staging/` -> smoke test -> swap, rollback on failure |
 | `qwen_tf_compat.py` | import shim so qwen-asr 0.0.6 loads on transformers 5.16 (the decorator call, and replacing the native `qwen3_asr` registration) |
