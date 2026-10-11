@@ -11,7 +11,7 @@ import subprocess
 import sys
 from ctypes import wintypes
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple, cast
 
 try:
     import winreg
@@ -339,13 +339,19 @@ def _discovery_path(app_id: str) -> str:
     return DISCOVERY_KEY + "\\" + app_id
 
 
+def _winreg() -> Any:
+    """The stdlib registry module. Callers return first when it was not imported."""
+    return cast(Any, winreg)
+
+
 def write_install_registry(app_id: str, install_path: str, cli_path: str) -> bool:
     """Write the current-user discovery key. No-op off Windows."""
     if not IS_WINDOWS or winreg is None:
         return False
-    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _discovery_path(app_id)) as key:
-        winreg.SetValueEx(key, "InstallPath", 0, winreg.REG_SZ, install_path)
-        winreg.SetValueEx(key, "CliPath", 0, winreg.REG_SZ, cli_path)
+    reg = _winreg()
+    with reg.CreateKey(reg.HKEY_CURRENT_USER, _discovery_path(app_id)) as key:
+        reg.SetValueEx(key, "InstallPath", 0, reg.REG_SZ, install_path)
+        reg.SetValueEx(key, "CliPath", 0, reg.REG_SZ, cli_path)
     return True
 
 
@@ -353,12 +359,13 @@ def read_install_registry(app_id: str) -> Optional[Tuple[str, str]]:
     """``(install_path, cli_path)`` from HKCU, then HKLM. None when the key is absent or this is not Windows."""
     if not IS_WINDOWS or winreg is None:
         return None
+    reg = _winreg()
     path = _discovery_path(app_id)
-    for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+    for hive in (reg.HKEY_CURRENT_USER, reg.HKEY_LOCAL_MACHINE):
         try:
-            with winreg.OpenKey(hive, path) as key:
-                install, _kind = winreg.QueryValueEx(key, "InstallPath")
-                cli, _kind = winreg.QueryValueEx(key, "CliPath")
+            with reg.OpenKey(hive, path) as key:
+                install, _kind = reg.QueryValueEx(key, "InstallPath")
+                cli, _kind = reg.QueryValueEx(key, "CliPath")
         except OSError:
             continue
         return str(install), str(cli)
@@ -370,6 +377,6 @@ def delete_install_registry(app_id: str) -> None:
     if not IS_WINDOWS or winreg is None:
         return
     try:
-        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, _discovery_path(app_id))
+        _winreg().DeleteKey(_winreg().HKEY_CURRENT_USER, _discovery_path(app_id))
     except OSError:
         pass

@@ -1016,28 +1016,30 @@ def _ensure_model(
                 log.warning("GitHub release copy of %s unusable: %s", repo_id, exc)
                 rel = None
     hf_preferred = False
+    measured: Optional[List[str]] = None
     if mirror_only or finished:
         order: List[str] = []
     elif mirror_ok:
         mirror_download = mirror_download or _default_mirror_download
-        order = None
         # An injected probe, or a verdict already learned this session, keeps the previous order.
         # Otherwise a short throughput sample prefers Hugging Face over a ~84 KB/s ModelScope feed.
         if hf_probe is None and modelscope_mirror.hf_verdict() is None:
             hf_bps, ms_bps = mirror_speed.measure(repo_id)
             ranked = mirror_speed.order_for(hf_bps, ms_bps)
             if ranked is not None:
-                order = ranked
+                measured = list(ranked)
                 chosen = mirror_speed.choose_primary(hf_bps, ms_bps)
                 hf_preferred = chosen == "hf" and hf_bps > ms_bps > 0
                 modelscope_mirror.remember_hf(chosen == "hf")
                 log.info("mirror speeds for %s: Hugging Face %.0f KB/s, ModelScope %.0f KB/s",
                          repo_id, hf_bps / 1024, ms_bps / 1024)
-        if order is None:
+        if measured is None:
             fast = _hf_fast(repo_id, hf_probe)
             order = ["hf", "hfm", "ms"] if fast else ["ms", "hf", "hfm"]
             if not fast:
                 log.warning("Hugging Face is slow or unreachable - trying ModelScope first for %s", repo_id)
+        else:
+            order = measured
     else:
         order = ["hf", "hfm"]
     if mirror_only:

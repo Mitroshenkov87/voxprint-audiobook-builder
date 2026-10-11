@@ -978,7 +978,7 @@ end;
 { Old install: C:\Program Files\Voxprint with Voxprint.exe or voxprint-cli.exe.
   Removed on upgrade: that folder, its shortcuts, its user PATH entry, and the uninstall key when it still
   points there. Never run that uninstaller (it would drop model and runtime refcounts). Never delete
-  {localappdata}\Voxprint. }
+  the per-user Voxprint data folder. }
 function LegacyInstallDir(): String;
 begin
   Result := RemoveBackslash(AddBackslash(ExpandConstant('{autopf}')) + '{#LegacyDir}');
@@ -1022,7 +1022,7 @@ begin
   RegWriteExpandStringValue(HKCU, 'Environment', 'Path', NewPath);
 end;
 
-{ Delete the uninstall key only while InstallLocation is still the old folder, and not {app}.
+{ Delete the uninstall key only while InstallLocation is still the old folder, and not the new directory.
   Called from PrepareToInstall, before Inno rewrites the same key for the new directory. }
 procedure DropLegacyUninstallKey();
 var
