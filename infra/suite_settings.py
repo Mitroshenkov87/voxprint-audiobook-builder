@@ -16,18 +16,16 @@ program's own settings::
 * ``Voxprint.exe --sync-suite-settings`` (run by the installer after it wrote ``state/models_dir.txt``) copies this program's
   models folder into the file, and its UI language when the file has none yet.
 
-Stdlib only; nothing here may fail the start of the program.
+Nothing here may fail the start of the program. The file format is the suite library's.
 """
 from __future__ import annotations
 
 import json
 import logging
-import os
-import re
-import time
-import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from voxprint_common import suite_settings as common
 
 log = logging.getLogger("voxprint.suite")
 
@@ -38,23 +36,16 @@ KEYS = ("ui_language", "theme", "models_dir", "gpu")
 DEFAULT_THEME = "glass-dark"
 THEMES = (DEFAULT_THEME,)
 DEFAULT_GPU = "auto"
-_GPU_RE = re.compile(r"^cuda:(\d{1,2})$")
 
 
 def path() -> Path:
     """``<app home>/state/suite.json``."""
-    from infra import paths
-
-    return paths.app_home() / "state" / FILENAME
+    return common.file()
 
 
 def read_raw() -> Dict[str, Any]:
     """The file as a dict (``{}`` when missing, unreadable or not an object; a BOM is accepted)."""
-    try:
-        data = json.loads(path().read_text(encoding="utf-8-sig"))
-    except (OSError, ValueError):
-        return {}
-    return data if isinstance(data, dict) else {}
+    return common.read()
 
 
 def has(key: str) -> bool:
@@ -79,28 +70,17 @@ def default_language() -> str:
 
 def normalize_theme(value: object) -> str:
     """A theme this program knows; anything else -> :data:`DEFAULT_THEME`."""
-    return value if isinstance(value, str) and value in THEMES else DEFAULT_THEME
+    return common.normalize_theme(value)
 
 
 def normalize_gpu(value: object) -> Optional[str]:
     """``auto`` / ``cuda:N`` (``cuda`` alone = ``cuda:0``), or ``None`` for anything else (including ``cpu``)."""
-    if not isinstance(value, str):
-        return None
-    v = value.strip().lower()
-    if v == "auto":
-        return v
-    if v in ("cuda", "gpu"):
-        return "cuda:0"
-    m = _GPU_RE.match(v)
-    return f"cuda:{int(m.group(1))}" if m else None
+    return common.normalize_gpu(value)
 
 
 def normalize_models_dir(value: object) -> Optional[Path]:
     """An absolute path, or ``None`` (null, empty or relative = the default folder)."""
-    if not isinstance(value, str) or not value.strip():
-        return None
-    p = Path(os.path.expandvars(os.path.expanduser(value.strip().strip('"'))))
-    return p if p.is_absolute() else None
+    return common.normalize_models_dir(value)
 
 
 # ------------------------------------------------------------------------------------------------- reading
@@ -111,18 +91,18 @@ def ui_language() -> str:
 
 def theme() -> str:
     """The shared theme name."""
-    return normalize_theme(read_raw().get("theme"))
+    return common.theme()
 
 
 def models_dir() -> Optional[Path]:
     """The shared models folder from the file (``None`` = default or not set); the environment variable is NOT applied here
     (:func:`infra.paths.configured_models_dir` does that)."""
-    return normalize_models_dir(read_raw().get("models_dir"))
+    return common.models_dir()
 
 
 def gpu() -> str:
     """The shared GPU preference."""
-    return normalize_gpu(read_raw().get("gpu")) or DEFAULT_GPU
+    return common.gpu()
 
 
 def values() -> Dict[str, Any]:
@@ -132,57 +112,30 @@ def values() -> Dict[str, Any]:
 
 
 # ------------------------------------------------------------------------------------------------- writing
-def _write(data: Dict[str, Any]) -> None:
-    f = path()
-    f.parent.mkdir(parents=True, exist_ok=True)
-    tmp = f.with_name(f"{f.name}.{uuid.uuid4().hex[:8]}.tmp")
-    tmp.write_text(json.dumps(data, indent=1, ensure_ascii=True), encoding="utf-8")
-    try:
-        for i in range(10):
-            try:
-                os.replace(tmp, f)
-                return
-            except PermissionError:                  # the other program has the file open for a moment (Windows)
-                time.sleep(0.1 * (i + 1))
-        raise PermissionError(f"cannot replace {f}")
-    finally:
-        if tmp.exists():
-            tmp.unlink()
-
-
 def set_value(key: str, value: Any) -> Any:
     """Validate and store one shared value (other keys, known or not, stay).  Returns the stored value.
 
-    ``ValueError`` for an unknown key or an invalid value."""
+    ``ValueError`` for an unknown key or an invalid value. The UI language stays this program's list
+    (``en`` / ``de`` / ``ru`` / ``uk`` / ``lv``); the file itself is the suite ``suite.json``.
+    """
     if key == "ui_language":
         stored: Any = normalize_language(value)
         if stored is None:
             raise ValueError(f"unsupported UI language {value!r}")
-    elif key == "theme":
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"invalid theme {value!r}")
-        stored = value.strip()                       # another program's theme id is kept; we read it as our default
-    elif key == "models_dir":
-        if value is None or (isinstance(value, str) and not value.strip()):
-            stored = None
-        else:
-            p = normalize_models_dir(str(value))
-            if p is None:
-                raise ValueError(f"models_dir must be an absolute path or null, got {value!r}")
-            stored = str(p)
-    elif key == "gpu":
-        stored = normalize_gpu(value)
-        if stored is None:
-            raise ValueError(f"gpu must be auto or cuda:N, got {value!r}")
-    else:
-        raise ValueError(f"not a shared setting: {key!r}")
-    data = read_raw()
-    if data.get(key, object()) == stored and data.get("schema") == SCHEMA:
+        common.set_ui_language(stored)
         return stored
-    data["schema"] = SCHEMA
-    data[key] = stored
-    _write(data)
-    return stored
+    if key == "theme":
+        return common.set_theme(value if isinstance(value, str) else "")
+    if key == "models_dir":
+        if value is None or (isinstance(value, str) and not value.strip()):
+            common.set_models_dir(None)
+            return None
+        common.set_models_dir(value)
+        folder = common.models_dir()
+        return str(folder) if folder else None
+    if key == "gpu":
+        return common.set_gpu(value if isinstance(value, str) else "")
+    raise ValueError(f"not a shared setting: {key!r}")
 
 
 def set_quietly(key: str, value: Any) -> None:

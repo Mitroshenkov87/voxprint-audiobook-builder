@@ -37,6 +37,12 @@ Remove-Item build\online-release\* -Force -ErrorAction SilentlyContinue
 # current directory, so pass absolute paths based on the repo root (the parent of this script's folder).
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $infraDir = Join-Path $RepoRoot "infra"
+# The fetch exe imports infra modules that use voxprint-common. Smoke jobs install only PyInstaller.
+& $Python -c "import voxprint_common" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    & $Python -m pip install --quiet "voxprint-common @ git+https://github.com/Mitroshenkov87/voxprint-common.git@7bb4f4078839cc7348e2bbe621a220c673ed7eb8"
+    Check "voxprint-common"
+}
 & $Python -m PyInstaller --onefile --console --name voxprint-fetch --distpath build\online --workpath build\online-work `
     --specpath build\online-work --noconfirm --log-level WARN --paths "$infraDir" --hidden-import netroute `
     --hidden-import infra.portable --hidden-import infra.model_release --hidden-import infra.model_mirrors `

@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from infra import paths
+from infra import paths, suite_shared
 from infra.cuda12_libs import prepare as prepare_cuda12
 
 log = logging.getLogger("voxprint.modules")
@@ -125,16 +125,19 @@ def _runtime_populated(folder: Path) -> bool:
 
 
 def runtime_dir() -> Path:
-    """Where the modules are unpacked: ``<app home>/shared/runtime``.
+    """Where this app's modules are unpacked.
 
-    An older install that already unpacked into ``<app home>/runtime`` keeps that folder until the shared one is filled.
+    That is the shared torch component (``runtime/py314-torch2.11-cu130``) when we may write it.
+    An older ``<app home>/runtime`` is moved there on first use. When another app already holds
+    torch 2.11.0+cu130, our other wheels go to ``wheels/audiobook-builder`` and torch is not downloaded again.
     """
-    shared = paths.shared_root() / "runtime"
-    legacy = paths.app_home() / "runtime"
-    if _runtime_populated(legacy) and not _runtime_populated(shared):
-        return legacy
-    shared.mkdir(parents=True, exist_ok=True)
-    return shared
+    suite_shared.migrate_installed_runtime()
+    if suite_shared.foreign_torch_path() is not None:
+        folder = suite_shared.wheels_dir()
+    else:
+        folder = suite_shared.torch_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
 
 
 def cache_dir() -> Path:
@@ -460,6 +463,8 @@ def install(module_ids: Optional[List[str]] = None, progress: Optional[Progress]
     if used != src:                                    # the module list must now be read from the manifest actually used
         log.info("runtime modules installed from %s (fallback / latest)", used)
         load_manifest(used)
+    suite_shared.quarantine_cpu_onnxruntime(runtime_dir())
+    suite_shared.claim_torch_if_present()
     activate()
     return n
 
@@ -471,6 +476,9 @@ def _reuse_first(man: Dict[str, Any], chosen: List[Module], progress: Optional[P
         return chosen
     from infra import runtime_reuse
 
+    if suite_shared.foreign_torch_path() is not None:
+        suite_shared.claim_torch_if_present()
+        return [m for m in chosen if m.id not in reusable]
     flavor = flavor_for(man)
     say = (lambda t: progress(0.0, t)) if progress else (lambda t: None)
     try:
@@ -483,18 +491,32 @@ def _reuse_first(man: Dict[str, Any], chosen: List[Module], progress: Optional[P
     return [m for m in chosen if m.id not in reusable]
 
 
+def _activate_dir(folder: Path) -> None:
+    """Put ``folder`` on ``sys.path`` when it holds more than bookkeeping."""
+    if not folder.is_dir():
+        return
+    if not any(p.name not in ("reuse.json", ".users.json") for p in folder.iterdir()):
+        return
+    sp = str(folder)
+    if sp not in sys.path:
+        sys.path.insert(1 if sys.path and sys.path[0] == str(paths.packages_dir()) else 0, sp)
+
+
 def activate() -> Optional[Path]:
     """Put the runtime folder on ``sys.path`` (after the updater's ``packages`` overlay).  Safe to call repeatedly."""
     rd = runtime_dir()
     try:
         # reuse.json and .users.json are bookkeeping. A users file alone must not put this folder on the import path.
-        if rd.is_dir() and any(p.name not in ("reuse.json", ".users.json") for p in rd.iterdir()):
-            sp = str(rd)
-            if sp not in sys.path:
-                sys.path.insert(1 if sys.path and sys.path[0] == str(paths.packages_dir()) else 0, sp)
-            import importlib
+        _activate_dir(rd)
+        foreign = suite_shared.foreign_torch_path()
+        if foreign is not None:
+            _activate_dir(foreign)
+        wheels = suite_shared.wheels_dir()
+        if wheels.resolve() != rd.resolve():
+            _activate_dir(wheels)
+        import importlib
 
-            importlib.invalidate_caches()
+        importlib.invalidate_caches()
     except OSError:
         pass
     try:                                   # a verified foreign PyTorch: LAST on the path, our own pinned libraries win
@@ -512,4 +534,6 @@ def activate() -> Optional[Path]:
         prepare_cuda12()
     except Exception:  # noqa: BLE001
         pass
-    return rd if _runtime_populated(rd) else None
+    if _runtime_populated(rd) or suite_shared.foreign_torch_path() is not None:
+        return rd
+    return None

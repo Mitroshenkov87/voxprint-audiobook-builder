@@ -60,7 +60,7 @@ if /I "%~1"=="onedir" set MODE=--onedir
 
 echo === Build (%MODE%) ===
 pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
-  --icon "assets\voxprint.ico" --add-data "assets\voxprint.ico;assets" --add-data "assets\check.png;assets" --add-data "assets\splash.jpg;assets" --add-data "assets\easter-egg.jpg;assets" ^
+  --icon "assets\voxprint.ico" --add-data "assets\voxprint.ico;assets" --add-data "assets\check.png;assets" --add-data "assets\splash.jpg;assets" ^
   --add-data "assets\icons;assets\icons" ^
   --paths . --paths third_party ^
   --add-data "infra\verified_manifest.json;infra" --add-data "infra\assets_manifest.json;infra" --add-data "infra\model_mirrors.json;infra" --add-data "infra\model_release.json;infra" ^
@@ -90,6 +90,7 @@ pyinstaller %MODE% --windowed --noconfirm --clean --name Voxprint ^
   --hidden-import onnxruntime --hidden-import sox --hidden-import nagisa --hidden-import six ^
   --hidden-import huggingface_hub --hidden-import librosa ^
   --collect-all qwen_asr --collect-all qwen_tts --collect-all nagisa --collect-all imageio_ffmpeg ^
+  --collect-all voxprint_common ^
   --collect-all bitsandbytes --collect-data librosa --collect-all hf_xet --collect-all certifi ^
   --collect-all ru_normalizr --collect-all rutextnorm --collect-all pymorphy3 --collect-all pymorphy3_dicts_ru ^
   --collect-all num2words --collect-all eng_to_ipa --collect-all sentencepiece ^

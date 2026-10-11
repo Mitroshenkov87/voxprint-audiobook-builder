@@ -21,7 +21,6 @@ mirror -> ModelScope (ModelScope first when Hugging Face is slow); every file is
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
@@ -34,6 +33,8 @@ import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+
+from voxprint_common.hashing import sha256_file as _sha256_file
 
 from infra import download_watch, env_probe, model_mirrors, model_release, modelscope_mirror, soundscape_model, vc_model
 
@@ -214,11 +215,7 @@ def component_path(folder: Path, comp: dict) -> Path:
 
 def sha256_file(path: Path) -> str:
     """The SHA-256 hex digest of ``path``."""
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for b in iter(lambda: f.read(1 << 22), b""):
-            h.update(b)
-    return h.hexdigest()
+    return _sha256_file(path)
 
 
 @dataclass

@@ -23,7 +23,6 @@ declared in the index (it overrides whatever the archive's own ``voice.json`` sa
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
@@ -34,6 +33,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, List, Optional
+
+from voxprint_common.hashing import sha256_file
 
 from core import voice_info
 from core.errors import CancelledByUser, VoiceRepositoryError
@@ -298,11 +299,7 @@ def fetch_index(url: Optional[str] = None, opener: Opener = net.urlopen, timeout
 
 
 def _sha256_file(p: Path) -> str:
-    h = hashlib.sha256()
-    with open(p, "rb") as f:
-        for block in iter(lambda: f.read(1 << 20), b""):
-            h.update(block)
-    return h.hexdigest()
+    return sha256_file(p)
 
 
 def download_voice(entry: RepoVoice, library: VoiceLibrary, opener: Opener = net.urlopen,

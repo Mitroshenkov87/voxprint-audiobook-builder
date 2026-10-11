@@ -12,10 +12,10 @@ with the Movie Dubber (its ``dubber/infra/model_store.py`` reads and writes the 
 * The uninstaller runs ``Voxprint.exe --unregister-models-user --out FILE`` (:func:`unregister_cli`): our key is removed and
   FILE gets two lines, the number of OTHER programs still using the folder and the folder itself.  Only when that number is
   0 does the uninstaller offer to delete the models, and the default answer is "keep" (a silent uninstall keeps them).
-* The same file format is used for the runtime folder (``<app home>/runtime/.users.json``, :func:`runtime_root`):
-  ``--register-runtime-user`` / ``--unregister-runtime-user --out FILE``.  A GUI start always writes our key, so the file
-  exists after the first launch (the folder is created then).  Only the bookkeeping exists so far; the runtime is not
-  shared between the programs yet.
+* The same file format is used for the per-app runtime bookkeeping file (``<app home>/runtime/.users.json``,
+  :func:`runtime_root`): ``--register-runtime-user`` / ``--unregister-runtime-user --out FILE``.  A GUI start always
+  writes our key.  The wheels themselves live in the shared runtime (:mod:`infra.suite_shared`); unregister also
+  drops this app's ref there and deletes the torch component only when no other app still lists it.
 * Unknown keys are kept as they are; a damaged file counts as "no users" for reading and is rewritten on the next write.
 
 Stdlib only; nothing here may fail the start of the app.

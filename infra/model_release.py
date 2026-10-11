@@ -13,7 +13,6 @@ Standard library only (HTTPS through :mod:`infra.net`).
 from __future__ import annotations
 
 import fnmatch
-import hashlib
 import json
 import logging
 import os
@@ -23,6 +22,8 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, Iterable, Optional
+
+from voxprint_common.hashing import sha256_file as _sha256_file
 
 log = logging.getLogger("voxprint.models")
 
@@ -113,11 +114,7 @@ def entry_for(repo_id: str, revision: Optional[str] = None, path: Optional[Path]
 
 def sha256_file(path: Path) -> str:
     """The SHA-256 hex digest of ``path``."""
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for block in iter(lambda: f.read(1 << 22), b""):
-            h.update(block)
-    return h.hexdigest()
+    return _sha256_file(path)
 
 
 def file_ok(path: Path, meta: Dict[str, Any]) -> bool:

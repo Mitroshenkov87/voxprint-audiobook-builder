@@ -1,309 +1,88 @@
-"""Cross-process GPU lock shared with Voxprint AI Movie Dubber.
+"""Cross-process GPU lock shared with the other Voxprint apps.
 
-One file, ``voxprint-gpu.lock``, in the system temp directory (``%TEMP%`` on Windows, :func:`tempfile.gettempdir`
-elsewhere). The holder writes this JSON, atomically (a temp file in the same directory, then ``os.replace``)::
+The file is the suite lock (:func:`voxprint_common.gpu_lock.lock_path`): ``%TEMP%/voxprint-gpu.lock``,
+or ``VOXPRINT_GPU_LOCK``. Records use ``app`` and ``stage``. This program's app id is
+``audiobook-builder``. :func:`hold` is the narration API; it waits, honours cancel, and
+:meth:`HeldLock.note` keeps ``eta`` at least two hours ahead.
 
-    {"owner": "audiobook-builder", "pid": 1234, "job": "Book", "started": "2026-10-10T04:23:00+00:00",
-     "eta": "2026-10-10T08:23:00+00:00"}
-
-``owner`` for this program is ``audiobook-builder``; the Movie Dubber uses its own owner string and the same keys.
-``started`` and ``eta`` are ISO 8601 in UTC. The lock is held for the whole narration job and removed in ``finally``.
-The same process may enter again (a nested job does not wait and does not delete the file early).
-
-Another live process: wait and poll, and report ``GPU busy: <owner> <job>``. Each poll reads the file again, so a
-holder that updates ``stage`` (and ``heartbeat``) is shown as it is now, not as it was when the wait started.
-The file is stale, and may be taken, when its pid is not running, when ``eta`` is more than two hours in the past
-(a crashed holder whose pid was reused), or when ``heartbeat`` is present and older than
-:data:`HEARTBEAT_STALE`. A lock that has no ``heartbeat`` (Movie Dubber today) keeps the pid and eta rules.
-While this process holds the lock, ``eta`` and ``heartbeat`` are refreshed. ``eta`` stays at least two hours ahead,
-so a long batch is not treated as abandoned.
+    with gpu_lock.hold(job_name, on_busy=on_busy, cancel=token) as held:
+        held.note(seconds_left, stage=phase)
 """
 from __future__ import annotations
 
-import json
 import logging
-import os
-import sys
-import tempfile
-import threading
-import time
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Iterator, Optional
 
-from infra.platform_win import process_exists
+from voxprint_common.gpu_lock import GpuLockTimeout
+from voxprint_common.gpu_lock import gpu_job
+from voxprint_common.gpu_lock import lock_path as _suite_lock_path
+from voxprint_common.gpu_lock import refresh
 
 log = logging.getLogger("voxprint.gpu_lock")
 
 OWNER = "audiobook-builder"
 LOCK_NAME = "voxprint-gpu.lock"
-#: A lock whose eta is this far in the past belongs to a job that is no longer running.
-STALE_AFTER = timedelta(hours=2)
-#: A heartbeat older than this, when the field is present, belongs to a holder that stopped updating.
-HEARTBEAT_STALE = timedelta(seconds=90)
-#: Refreshed eta never sits closer than this, so a batch with no progress events is not stolen mid-flight.
-ETA_FLOOR = timedelta(hours=2)
-POLL_S = 2.0
+#: A refreshed eta never sits closer than this, so a batch with no progress events is not stolen.
+ETA_FLOOR_S = 7200.0
 
-_guard = threading.Lock()
-_depth = 0
-_held: Optional["HeldLock"] = None
+__all__ = ["GpuLockTimeout", "HeldLock", "OWNER", "hold", "lock_path"]
 
 
 def lock_path() -> Path:
-    """``%TEMP%\\voxprint-gpu.lock`` on Windows, the same name under the temp directory elsewhere."""
-    return Path(tempfile.gettempdir()) / LOCK_NAME
-
-
-def pid_alive(pid: int) -> bool:
-    """True if ``pid`` is a running process. On Windows this does not use ``os.kill`` (that terminates the process)."""
-    if pid <= 0:
-        return False
-    if pid == os.getpid():
-        return True
-    if sys.platform == "win32":
-        return process_exists(pid)
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    stat = Path(f"/proc/{pid}/stat")
-    try:
-        text = stat.read_text(encoding="utf-8", errors="replace")
-        state = text.rsplit(")", 1)[-1].split()[0]
-        return state != "Z"
-    except OSError:
-        return True
-
-
-def _iso(dt: datetime) -> str:
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat()
-
-
-def _parse_eta(value: object) -> Optional[datetime]:
-    if not isinstance(value, str) or not value.strip():
-        return None
-    try:
-        when = datetime.fromisoformat(value.strip())
-    except ValueError:
-        return None
-    if when.tzinfo is None:
-        when = when.replace(tzinfo=timezone.utc)
-    return when.astimezone(timezone.utc)
-
-
-def _read(path: Path) -> Optional[dict]:
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    if not isinstance(data, dict) or "pid" not in data or "owner" not in data:
-        return None
-    return data
-
-
-def _atomic_write(path: Path, payload: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    os.replace(tmp, path)
-
-
-def _payload(job: str, started: str, eta: datetime, stage: str = "", heartbeat: Optional[datetime] = None) -> dict:
-    return {
-        "owner": OWNER, "pid": os.getpid(), "job": job, "started": started, "eta": _iso(eta),
-        "stage": stage, "heartbeat": _iso(heartbeat or eta),
-    }
-
-
-def _holder_label(info: dict) -> tuple:
-    """``(owner, label)`` from the current file. ``stage`` wins over a stale job name when both are set."""
-    owner = str(info.get("owner", "")).strip()
-    job = str(info.get("job", "")).strip()
-    stage = str(info.get("stage", "")).strip()
-    if stage and job and stage != job:
-        label = f"{job} — {stage}"
-    else:
-        label = stage or job
-    return owner, label
-
-
-def is_stale(info: dict, now: datetime, alive: Callable[[int], bool] = pid_alive) -> bool:
-    """True when the holder is gone, its heartbeat (if present) is old, or its eta is more than two hours ago."""
-    try:
-        pid = int(info.get("pid", 0))
-    except (TypeError, ValueError):
-        return True
-    if not alive(pid):
-        return True
-    if "heartbeat" in info:
-        beat = _parse_eta(info.get("heartbeat"))
-        if beat is None or now - beat > HEARTBEAT_STALE:
-            return True
-    eta = _parse_eta(info.get("eta"))
-    if eta is None:
-        return False
-    return now > eta + STALE_AFTER
-
-
-def _job_name(job: str) -> str:
-    text = str(job or "").replace("\n", " ").replace("\r", " ").strip() or "audiobook"
-    return text[:200]
+    """The suite GPU lock file. Tests replace this; :func:`hold` calls it when no path is passed."""
+    return _suite_lock_path()
 
 
 class HeldLock:
-    """The lock this process already owns. :meth:`note` refreshes ``eta``."""
+    """The lock this process already owns. :meth:`note` moves ``eta`` forward."""
 
-    def __init__(self, path: Path, job: str, started: str, eta: datetime,
-                 now: Callable[[], datetime]) -> None:
-        """Remember the lock file, the job name and the clock this process owns."""
+    def __init__(self, path: Path, job: str) -> None:
+        """Remember the lock file and the stage name this process acquired."""
         self.path = path
         self.job = job
-        self.started = started
-        self.eta = eta
-        self.stage = ""
-        self._now = now
 
     def note(self, seconds_left: Optional[float] = None, stage: Optional[str] = None) -> None:
-        """Move ``eta`` to the estimated finish, and never closer than :data:`ETA_FLOOR`.
-
-        ``stage`` is the step the job is on now (synthesis, export, ...). It is written with a fresh
-        ``heartbeat`` so a waiter that re-reads the file shows this step, not the one from acquire.
-        """
+        """Keep ``eta`` at least two hours ahead, or further when the job reports a longer estimate."""
+        del stage  # the suite record keeps the stage from acquire; eta is what narration refreshes
         try:
             seconds = float(seconds_left) if seconds_left is not None else 0.0
         except (TypeError, ValueError):
             seconds = 0.0
         if seconds != seconds:  # NaN
             seconds = 0.0
-        when = self._now() + max(ETA_FLOOR, timedelta(seconds=max(0.0, seconds)))
-        if stage is not None:
-            self.stage = _job_name(stage)[:80]
-        current = _read(self.path)
-        try:
-            owner_pid = int(current.get("pid", -1)) if current else -1
-        except (TypeError, ValueError):
-            owner_pid = -1
-        if owner_pid != os.getpid():
-            return
-        self.eta = when
-        try:
-            moment = self._now()
-            _atomic_write(self.path, _payload(self.job, self.started, when, self.stage, moment))
-        except OSError:
-            log.warning("could not refresh the GPU lock", exc_info=True)
+        refresh(max(ETA_FLOOR_S, max(0.0, seconds)), path=self.path, app=OWNER)
 
 
-def _release(path: Path) -> None:
-    info = _read(path)
-    try:
-        pid = int(info.get("pid", -1)) if info else -1
-    except (TypeError, ValueError):
-        pid = -1
-    if pid != os.getpid():
-        return
-    try:
-        path.unlink()
-    except OSError:
-        log.warning("could not remove the GPU lock", exc_info=True)
-
-
-def _sleep_poll(seconds: float, cancel: Optional[object], sleep: Callable[[float], None]) -> None:
-    if seconds <= 0:
-        sleep(0)
-        return
-    end = time.monotonic() + seconds
-    while True:
-        if cancel is not None:
-            cancel.check()  # type: ignore[attr-defined]
-        left = end - time.monotonic()
-        if left <= 0:
-            return
-        sleep(min(0.2, left))
-
-
-def _acquire(path: Path, job: str, on_busy: Optional[Callable[[str, str], None]], cancel: Optional[object],
-             poll_s: float, now: Callable[[], datetime], sleep: Callable[[float], None],
-             alive: Callable[[int], bool]) -> HeldLock:
-    announced: Optional[tuple] = None
-    while True:
-        if cancel is not None:
-            cancel.check()  # type: ignore[attr-defined]
-        info = _read(path)
-        moment = now()
-        try:
-            holder = int(info.get("pid", -1)) if info else -1
-        except (TypeError, ValueError):
-            holder = -1
-        if info is None or holder == os.getpid() or is_stale(info, moment, alive):
-            started = _iso(moment)
-            eta = moment + ETA_FLOOR
-            try:
-                _atomic_write(path, _payload(job, started, eta, "", moment))
-            except OSError:
-                log.warning("could not write the GPU lock", exc_info=True)
-                _sleep_poll(poll_s, cancel, sleep)
-                continue
-            got = _read(path)
-            try:
-                got_pid = int(got.get("pid", -1)) if got else -1
-            except (TypeError, ValueError):
-                got_pid = -1
-            if got_pid == os.getpid():
-                held = HeldLock(path, job, str((got or {}).get("started") or started), eta, now)
-                held.stage = str((got or {}).get("stage") or "")
-                return held
-            continue
-        owner, other = _holder_label(info)
-        key = (owner, other)
-        if key != announced:
-            log.info("GPU busy: %s %s", owner, other)
-            announced = key
-        if on_busy is not None:
-            on_busy(owner, other)
-        _sleep_poll(poll_s, cancel, sleep)
+def _stage_name(job: str) -> str:
+    text = str(job or "").replace("\n", " ").replace("\r", " ").strip() or "audiobook"
+    return text[:200]
 
 
 @contextmanager
 def hold(job: str, on_busy: Optional[Callable[[str, str], None]] = None, cancel: Optional[object] = None, *,
-         path: Optional[Path] = None, poll_s: float = POLL_S, now: Optional[Callable[[], datetime]] = None,
-         sleep: Optional[Callable[[float], None]] = None,
-         pid_alive_fn: Optional[Callable[[int], bool]] = None) -> Iterator[HeldLock]:
-    """Hold the GPU lock until the block ends. Re-entrant in this process; always released by the outermost block."""
-    global _depth, _held
+         path: Optional[Path] = None, poll_s: float = 0.25, timeout: Optional[float] = None,
+         **_ignored: object) -> Iterator[HeldLock]:
+    """Hold the GPU lock until the block ends. Re-entrant in this process; the outermost block releases it.
+
+    ``cancel.check()`` runs while another app holds the lock. ``on_busy(app, stage)`` is the wait notice.
+    ``path`` overrides the file; otherwise :func:`lock_path` (so a test can replace it).
+    """
     target = path if path is not None else lock_path()
-    clock = now or (lambda: datetime.now(timezone.utc))
-    sleeper = sleep or time.sleep
-    alive = pid_alive_fn or pid_alive
-    with _guard:
-        _depth += 1
-        nested = _depth > 1
-        current = _held
-    try:
-        if nested:
-            if current is None:
-                raise RuntimeError("GPU lock depth is nested without a holder")
-            yield current
-        else:
-            held = _acquire(target, _job_name(job), on_busy, cancel, poll_s, clock, sleeper, alive)
-            with _guard:
-                _held = held
-            try:
-                yield held
-            finally:
-                with _guard:
-                    if _held is held:
-                        _held = None
-    finally:
-        with _guard:
-            _depth -= 1
-            last = _depth == 0
-        if last:
-            _release(target)
+    stage = _stage_name(job)
+
+    def _cancel() -> bool:
+        if cancel is None:
+            return False
+        cancel.check()  # type: ignore[attr-defined]
+        return False
+
+    def _wait(holder: object, _waited: float) -> None:
+        if on_busy is None:
+            return
+        on_busy(str(getattr(holder, "app", "")), str(getattr(holder, "stage", "")))
+
+    with gpu_job(OWNER, stage, eta=ETA_FLOOR_S, timeout=timeout, poll=poll_s, path=target,
+                 cancel=_cancel if cancel is not None else None, on_wait=_wait if on_busy is not None else None):
+        yield HeldLock(target, stage)

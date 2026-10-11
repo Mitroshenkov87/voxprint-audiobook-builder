@@ -78,9 +78,10 @@ def test_splash_shows_a_status_and_closes_with_the_main_window(app):
     s = splash.show()
     s.status("Loading interface\u2026")
     assert s.isVisible() and s.message() == "Loading interface\u2026"
-    assert s.width() <= AVAIL.width() and s.height() <= AVAIL.height() and s.width() == s.height()
+    assert s.width() == 1016 and s.height() == 596
+    assert s.width() <= AVAIL.width() and s.height() <= AVAIL.height()
     s.checking()
-    assert s._fraction == 0.7 and not s.pixmap().isNull() and not s.grab().isNull()     # grab() runs drawContents
+    assert s._fraction == 0.7 and not s.grab().isNull()
     w = QWidget()
     w.show()
     s.finish(w)

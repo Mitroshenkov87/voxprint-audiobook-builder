@@ -1,8 +1,9 @@
 """Automatic GPU cooling during a long narration. There is no user setting.
 
 The first 2.5 hours of a job run at full speed. After that, if ``nvidia-smi`` reports ``temperature.gpu`` staying at
-or above 83 °C — the median of the samples from the last five minutes — narration inserts one cooling pause of
-2.5 minutes between batch groups, logs it, and then continues at full speed. The progress line says "Cooling GPU".
+or above 83 °C — the median of the samples from the last five minutes — narration pauses between batch groups until
+the median is back at or below 75 °C (:func:`voxprint_common.thermal.wait_until_ready`). The progress line says
+"Cooling GPU".
 
 ``nvidia-smi`` and the clock are injectable so tests never call the real tool or wait out the pause.
 """
@@ -16,16 +17,14 @@ import threading
 import time
 from typing import Callable, List, Optional, Tuple
 
+from voxprint_common.thermal import FULL_SPEED_S, PAUSE_C, RESUME_C, Action, decide, wait_until_ready
+
 log = logging.getLogger("voxprint.gpu_thermal")
 
-#: Full speed until the job has been running this long.
-FULL_SPEED_S = 2.5 * 3600
-#: Sustained temperature at or above this (degrees C) starts a cooling pause.
-HOT_C = 83.0
+#: Sustained temperature at or above this (degrees C) starts a cooling pause. The suite rule is 83 °C.
+HOT_C = PAUSE_C
 #: Samples older than this are ignored when judging "sustained".
 WINDOW_S = 5 * 60
-#: One pause, inside the 2-3 minute range, then full speed again.
-COOL_S = 150.0
 #: A single hot reading is not "sustained"; the median needs a few samples in the window.
 MIN_SAMPLES = 3
 SAMPLE_EVERY_S = 30.0
@@ -123,25 +122,32 @@ class Monitor:
         return float(statistics.median(window))
 
     def should_cool(self) -> bool:
-        """True after 2.5 h when the recent median temperature stays at or above 83 °C."""
-        if self.now() - self.started < FULL_SPEED_S:
-            return False
-        median = self.median_c()
-        return median is not None and median >= HOT_C
+        """True after 2.5 h when the recent median is at least 83 °C."""
+        decision = decide(self.now() - self.started, self.median_c(), 0.0, paused=False)
+        return decision.action is Action.PAUSE
 
     def cool(self, cancel: Optional[object] = None, pause: Optional[object] = None) -> None:
-        """Sleep :data:`COOL_S` seconds, still honouring cancel and pause. Logs the pause."""
-        log.info("Cooling GPU for %.0f s (temperature stayed at or above %.0f C)", COOL_S, HOT_C)
-        end = self.now() + COOL_S
-        while True:
-            if cancel is not None:
-                cancel.check()  # type: ignore[attr-defined]
-            if pause is not None:
-                pause.wait(cancel)  # type: ignore[attr-defined]
-            left = end - self.now()
-            if left <= 0:
-                return
-            self.sleep(min(0.25, left))
+        """Wait until the GPU is at or below 75 °C. Cancel and pause are still honoured."""
+        if cancel is not None:
+            cancel.check()  # type: ignore[attr-defined]
+        log.info("Cooling GPU until it is at or below %.0f C", RESUME_C)
+
+        def sample() -> tuple:
+            return self.median_c(), 0.0
+
+        def sleeper(seconds: float) -> None:
+            end = self.now() + seconds
+            while True:
+                if cancel is not None:
+                    cancel.check()  # type: ignore[attr-defined]
+                if pause is not None:
+                    pause.wait(cancel)  # type: ignore[attr-defined]
+                left = end - self.now()
+                if left <= 0:
+                    return
+                self.sleep(min(0.25, left))
+
+        wait_until_ready(sample, started=self.started, paused=True, sleep=sleeper, now=self.now, interval=5.0)
 
     def _read_temp(self) -> Optional[float]:
         if self._read is not None:

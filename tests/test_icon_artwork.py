@@ -42,9 +42,9 @@ def _ico_sizes(path: Path) -> tuple[int, ...]:
     return tuple(sizes)
 
 
-def test_icon_and_splash_are_the_square_files_the_app_loads():
+def test_icon_and_splash_are_the_files_the_app_loads():
     assert _png_size(ROOT / "assets" / "voxprint.png") == (1024, 1024)
-    assert _jpeg_size(ROOT / "assets" / "splash.jpg") == (1024, 1024)
+    assert _jpeg_size(ROOT / "assets" / "splash.jpg") == (1920, 1080)
     assert _png_size(ROOT / "installer" / "linux" / "voxprint-256.png") == (256, 256)
     for name in ("voxprint.ico", "voxprint-setup.ico"):
         assert _ico_sizes(ROOT / "assets" / name) == tuple((s, s) for s in ICON_SIZES)

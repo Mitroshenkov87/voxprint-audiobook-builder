@@ -16,13 +16,18 @@ download from the original repository (:func:`infra.model_downloader.manifest_ba
 from __future__ import annotations
 
 import fnmatch
-import hashlib
 import json
 import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Dict, Iterable, Optional
+
+from voxprint_common.download import download as download_file
+from voxprint_common.download import huggingface_url
+from voxprint_common.hashing import sha256_file as _sha256_file
+
+from infra import netroute
 
 log = logging.getLogger("voxprint.models")
 
@@ -109,11 +114,7 @@ def entry_for(repo_id: str, path: Optional[Path] = None) -> Optional[MirrorEntry
 
 def sha256_file(path: Path) -> str:
     """SHA-256 (hex) of a file."""
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for block in iter(lambda: f.read(1 << 22), b""):
-            h.update(block)
-    return h.hexdigest()
+    return _sha256_file(path)
 
 
 def file_ok(path: Path, meta: Dict[str, Any]) -> bool:
@@ -125,24 +126,19 @@ def file_ok(path: Path, meta: Dict[str, Any]) -> bool:
 
 
 def _default_fetch(mirror_repo: str, filename: str, revision: str, local_dir: Path,
-                   size: int = 0, on_bytes=None, cancel=None) -> Any:
-    """Download one file of the mirror repository (multi-connection Range when large; else hub)."""
-    from infra import parallel_download
-
+                   size: int = 0, on_bytes=None, cancel=None, sha256: str = "") -> Any:
+    """Download one mirror file through :func:`voxprint_common.download.download` (resume, hash, disk check)."""
+    del on_bytes, cancel  # the suite downloader reports progress itself; cancel stays on the snapshot path
     try:
-        from infra import netroute
-
         netroute.prepare_hf()
     except Exception:  # noqa: BLE001 - never block the download
         pass
     target = Path(local_dir).joinpath(*filename.split("/"))
-    if size > 0 and parallel_download.enabled() and size >= parallel_download.parallel_min():
-        url = parallel_download.hf_file_url(mirror_repo, filename, revision)
-        parallel_download.download_file(url, target, size, on_bytes=on_bytes or (lambda n: None), cancel=cancel)
-        return str(target)
-    from huggingface_hub import hf_hub_download
-
-    return hf_hub_download(repo_id=mirror_repo, filename=filename, revision=revision, local_dir=str(local_dir))
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if not sha256:
+        raise MirrorError(f"{mirror_repo}: {filename} has no sha256")
+    download_file(target, [huggingface_url(mirror_repo, filename, revision)], sha256=sha256, size=size or None)
+    return str(target)
 
 
 def download(entry: MirrorEntry, dest: Path, progress: Callable[[float], None] = lambda f: None,
@@ -174,7 +170,7 @@ def download(entry: MirrorEntry, dest: Path, progress: Callable[[float], None] =
 
                 if fetch is _default_fetch or fetch is None:
                     _default_fetch(entry.mirror_repo, name, entry.mirror_revision, dest,
-                                   size=size, on_bytes=on_bytes)
+                                   size=size, on_bytes=on_bytes, sha256=str(meta["sha256"]))
                 else:
                     fetch(entry.mirror_repo, name, entry.mirror_revision, dest)
             except Exception as exc:  # noqa: BLE001 - network / auth / missing file: the caller falls back or reports

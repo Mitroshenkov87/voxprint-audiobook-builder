@@ -298,7 +298,7 @@ def main(argv=None) -> int:
     except Exception:  # noqa: BLE001
         pass
     if "--register-runtime-user" in argv or "--unregister-runtime-user" in argv:
-        # installer / uninstaller helper for runtime\.users.json (bookkeeping only; the runtime is not shared yet)
+        # installer / uninstaller helper: runtime\.users.json, and drop our shared-runtime ref
         from infra import models_users
 
         root = models_users.runtime_root()
@@ -306,7 +306,14 @@ def main(argv=None) -> int:
             models_users.register_quietly(root)
             return 0
         i = argv.index("--out") if "--out" in argv else -1
-        return models_users.unregister_cli(argv[i + 1] if 0 <= i < len(argv) - 1 else None, root=root)
+        code = models_users.unregister_cli(argv[i + 1] if 0 <= i < len(argv) - 1 else None, root=root)
+        try:
+            from infra import suite_shared
+
+            suite_shared.release_runtime()
+        except Exception:  # noqa: BLE001 - the users file is already written; a missing manifest is normal
+            logging.getLogger("voxprint").debug("shared runtime ref not released", exc_info=True)
+        return code
     if "--sync-suite-settings" in argv:      # installer helper: shared state\suite.json (infra/suite_settings.py)
         from infra import suite_settings
 

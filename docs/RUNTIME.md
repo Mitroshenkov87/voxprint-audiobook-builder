@@ -15,6 +15,10 @@ TorchAudio has no wheel for torch 2.12–2.14 on `cu130` and Python 3.14, so bot
 
 The pinned Windows wheels are in `infra/runtime_lock.json` (`python tools/make_runtime_lock.py`). A few libraries publish an abi3 wheel tagged for an older 3.x (`audioop-lts` cp313, `av` and `soxr` cp312). Those wheels install on Python 3.14. Every package that publishes a cp314 wheel is pinned to that wheel.
 
+`voxprint-common` 0.1.0 (tag `v0.1.0`, commit `7bb4f4078839cc7348e2bbe621a220c673ed7eb8`) is pinned by git URL in `requirements.txt` and in the lock's `git` list. The thin shell bundles it. It is not a downloaded wheel.
+
+The shared runtime is one `shared/manifest.json` (schema 1, `components`). Torch 2.11.0+cu130 lives at `shared/runtime/py314-torch2.11-cu130` and is reused when another Voxprint app already refs that component, instead of being downloaded again. This app's other wheels, including a CPU `onnxruntime`, stay in `shared/wheels/audiobook-builder`. An upgrade moves an existing `<app home>/runtime` (or a flat `shared/runtime` that still has torch at the top) into those two folders. Uninstall drops this app's ref and deletes a component only when `refs` is empty. There is no separate setup page for that.
+
 ## Why cu130 only
 
 The wheels we ship are CUDA 13.0 (`cu130`). They need an NVIDIA driver that supports CUDA 13, which starts at driver **600**. Older drivers are not offered a wheel: `cu126` and `cu128` are not in the lock. CI installs the CPU wheels (`ci_flavors` in the lock); that flavor is not offered to users. `VOXPRINT_TORCH_FLAVOR=cpu` still selects those wheels for tests.

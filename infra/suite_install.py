@@ -57,7 +57,7 @@ def inspect_shared() -> dict:
     """Local check. Does not download. ``missing`` names resources that are absent or empty."""
     missing: List[str] = []
     for name in APP_RESOURCES:
-        if not suite_shared.populated(suite_shared.root() / name):
+        if not suite_shared.populated(suite_shared.component_dir(name)):
             missing.append(name)
     return {
         "ok": not missing,

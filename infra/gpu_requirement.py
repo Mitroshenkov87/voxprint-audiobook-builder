@@ -28,16 +28,19 @@ import sys
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence, Tuple
 
+from voxprint_common.gpu_probe import MIN_COMPUTE as _SUITE_COMPUTE
+from voxprint_common.gpu_probe import MIN_DRIVER_MAJOR as _SUITE_DRIVER
+
 from core.i18n import tr
 
 #: Ada Lovelace and newer. RTX 4090 is 8.9; RTX 3090 is 8.6 and is refused.
-MIN_COMPUTE: Tuple[int, int] = (8, 9)
+MIN_COMPUTE: Tuple[int, int] = _SUITE_COMPUTE
 MIN_COMPUTE_TEXT = "8.9"
 #: Internal. Honoured only so CI and the unit tests can start without an RTX 40-series GPU.
 ENV_ALLOW = "VOXPRINT_ALLOW_NO_GPU"
 EXIT_GPU_REQUIRED = 7
 #: cu130 wheels need an NVIDIA driver whose major version is at least this (branch 600).
-MIN_DRIVER_MAJOR = 600
+MIN_DRIVER_MAJOR = _SUITE_DRIVER
 NVIDIA_DRIVER_URL = "https://www.nvidia.com/Download/index.aspx"
 _TRUE = {"1", "true", "yes", "on"}
 _SKIP_FLAGS = {"--json", "--yes", "-y", "--dry-run"}

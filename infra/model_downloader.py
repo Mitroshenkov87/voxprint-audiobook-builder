@@ -30,6 +30,8 @@ from typing import Any, Callable, Dict, List, Optional, cast
 
 from core.errors import ModelDownloadError
 from core.events import ProgressCallback, Stage, noop_progress
+from voxprint_common.download import DEFAULT_MARGIN
+
 from infra import download_watch, model_mirrors, model_release, modelscope_mirror, netroute, parallel_download, paths
 
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
@@ -843,7 +845,7 @@ def _ensure_model(
         free_gb = shutil.disk_usage(target.parent).free / 1024 ** 3
     except OSError:
         free_gb = None
-    if free_gb is not None and free_gb < need_gb * 1.2:
+    if free_gb is not None and free_gb < need_gb * DEFAULT_MARGIN:
         raise ModelDownloadError(
             tr("err.disk_model", short=short, need=f"{need_gb:.0f}", free=f"{free_gb:.1f}"),
             url=hf_url(repo_id))

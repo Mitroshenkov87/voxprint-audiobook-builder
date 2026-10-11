@@ -8,7 +8,6 @@ directory is replaced/deleted only if it carries our ownership marker.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
@@ -18,6 +17,8 @@ import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from voxprint_common.hashing import sha256_file as _sha256_file
 
 from infra import paths
 
@@ -84,11 +85,7 @@ def tools_dir() -> Path:
 
 def sha256_file(p: Path) -> str:
     """SHA-256 hex digest of a file, read in 1 MiB chunks."""
-    h = hashlib.sha256()
-    with open(p, "rb") as f:
-        for chunk in iter(lambda: f.read(CHUNK), b""):
-            h.update(chunk)
-    return h.hexdigest()
+    return _sha256_file(p)
 
 
 def _run(args: List[str]) -> Tuple[int, str]:

@@ -59,6 +59,11 @@ GROUPS = [
 TEST_EXTRAS = {"huggingface-hub", "requests", "scipy", "pyyaml", "tqdm", "urllib3", "filelock", "fsspec", "typing-extensions",
                "hf-xet", "idna", "charset-normalizer"}
 COMPAT = {"torch": ">=2.11,<2.12", "python_minor_must_match": True}
+#: Direct URL pins. Not wheels: the thin shell bundles these, and a HEAD check of a git URL is not a file hash.
+GIT_PINS = [
+    "voxprint-common @ git+https://github.com/Mitroshenkov87/voxprint-common.git@7bb4f4078839cc7348e2bbe621a220c673ed7eb8",
+]
+GIT_SHA = "7bb4f4078839cc7348e2bbe621a220c673ed7eb8"
 
 
 def norm(n: str) -> str:
@@ -180,15 +185,26 @@ def build(py: str, torch_version: str, torchaudio_version: str = TORCHAUDIO_VERS
     return {"schema": SCHEMA, "generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"), "python": py,
             "platform": "win_amd64", "compat": COMPAT, "torch_version": torch_version,
             "torchaudio_version": torchaudio_version, "flavors": list(FLAVORS), "ci_flavors": list(CI_FLAVORS),
-            "group_titles": titles, "shell": shell, "wheels": libs + torch}
+            "group_titles": titles, "shell": shell, "git": list(GIT_PINS), "wheels": libs + torch}
+
+
+def git_dist_names(lock: dict) -> List[str]:
+    """Distribution names of the ``git`` pins (the part before ``@``)."""
+    names = []
+    for line in lock.get("git") or []:
+        name = str(line).split("@", 1)[0].strip()
+        if name:
+            names.append(name)
+    return names
 
 
 def pyinstaller_metadata_args(lock: dict) -> List[str]:
     """PyInstaller copies a package's code but NOT its ``*.dist-info``; ``importlib.metadata`` then cannot see it and the downloaded
     libraries' version checks fail (real PC: transformers -> "No package metadata was found for packaging").  One
-    ``--copy-metadata`` per package the shell bundles fixes that."""
+    ``--copy-metadata`` per package the shell bundles fixes that. Git pins such as voxprint-common are bundled too."""
     out: List[str] = []
-    for dist in sorted(lock["shell"]):
+    dists = set(lock["shell"]) | set(git_dist_names(lock))
+    for dist in sorted(dists):
         out += ["--copy-metadata", dist]
     return out
 
@@ -215,7 +231,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             for w in lock["wheels"]:
                 if w["dist"] in TEST_EXTRAS:
                     pins[w["dist"]] = w["version"]
-        print("\n".join(f"{n}=={v}" for n, v in pins.items()))
+        lines = [f"{n}=={v}" for n, v in pins.items()]
+        if a.test_requirements:
+            lines.extend(str(item) for item in (lock.get("git") or []))
+        print("\n".join(lines))
         return 0
     lock = build(a.python, a.torch, a.torchaudio)
     Path(a.out).write_text(json.dumps(lock, indent=1) + "\n", encoding="utf-8")

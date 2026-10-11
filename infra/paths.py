@@ -25,6 +25,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from voxprint_common import paths as suite_paths
+
 APP_NAME = "Voxprint"
 
 
@@ -32,14 +34,7 @@ def app_home() -> Path:
     """Root data directory: ``$VOXPRINT_HOME``, else ``%LOCALAPPDATA%\\Voxprint`` (Windows) / ``$XDG_DATA_HOME/voxprint``
     (Linux and others, default ``~/.local/share/voxprint`` - lower case by XDG habit; the Linux installer keeps ``app/`` and
     ``venv/`` there too)."""
-    env = os.environ.get("VOXPRINT_HOME")
-    if env:
-        p = Path(env)
-    elif sys.platform == "win32":
-        p = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / APP_NAME
-    else:
-        xdg = os.environ.get("XDG_DATA_HOME", "").strip()
-        p = (Path(xdg) if xdg and os.path.isabs(xdg) else Path.home() / ".local" / "share") / APP_NAME.lower()
+    p = suite_paths.home()
     p.mkdir(parents=True, exist_ok=True)
     return p
 
@@ -62,7 +57,7 @@ def shared_root() -> Path:
     Windows: ``%LOCALAPPDATA%\\Voxprint\\shared``. Linux: ``~/.local/share/voxprint/shared``.
     """
     env = os.environ.get("VOXPRINT_SHARED", "").strip()
-    p = Path(env) if env else app_home() / "shared"
+    p = Path(env) if env else suite_paths.shared_dir()
     p.mkdir(parents=True, exist_ok=True)
     return p
 

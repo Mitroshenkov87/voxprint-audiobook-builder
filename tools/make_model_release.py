@@ -11,7 +11,7 @@ copy of ``infra/model_release.json``) are attached.  Nothing heavy goes into the
     python tools/make_model_release.py --fetch          # download + verify into --work, write infra/model_release.json
     python tools/make_model_release.py --fetch --upload # ... and create the release / upload the assets with ``gh``
 
-Needs: Python 3.9+, ``gh`` (logged in) only for ``--upload``.  Standard library only.
+Needs: Python 3.14, ``gh`` (logged in) only for ``--upload``.  Standard library only.
 """
 from __future__ import annotations
 

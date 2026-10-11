@@ -1480,7 +1480,7 @@ end;
 { The models are deleted only when no other Voxprint program uses them AND the user says yes (default: keep; a silent uninstall
   with /SUPPRESSMSGBOXES keeps them).  Only the default folder is ever offered: a folder the user chose stays untouched. Voices,
   settings and projects in %LOCALAPPDATA%\Voxprint are never deleted here. }
-{ runtime\.users.json: remove our key (bookkeeping only; the runtime is not shared yet, nothing is deleted because of it). }
+{ runtime\.users.json: remove our key. The same flag drops our ref in shared\manifest.json and deletes the torch component only when no other app still lists it. }
 procedure UnregisterRuntimeUser;
 var
   Rc: Integer;

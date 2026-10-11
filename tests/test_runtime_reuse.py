@@ -268,8 +268,9 @@ def upstream(tmp_path, monkeypatch):
     add("transformers", "4.57.6", "libs")
     for fl in LOCK["flavors"]:
         for pkg in ("torch", "torchaudio"):
-            add(pkg, f"2.11.0+{fl}", "torch", fl, f"{pkg}-2.11.0+{fl}-cp311-cp311-win_amd64.whl")
-    lock = dict(LOCK, schema=1, python="3.11", platform="win_amd64", torch_version="2.11.0", wheels=wheels,
+            add(pkg, f"2.11.0+{fl}", "torch", fl, f"{pkg}-2.11.0+{fl}-{TAG}-{TAG}-win_amd64.whl")
+    py = f"{sys.version_info.major}.{sys.version_info.minor}"
+    lock = dict(LOCK, schema=1, python=py, platform="win_amd64", torch_version="2.11.0", wheels=wheels,
                 group_titles={"torch": "PyTorch", "libs": "Libraries", "audio": "Audio", "text": "Text"}, shell={})
     lp = tmp_path / "lock.json"
     lp.write_text(json.dumps(lock))
@@ -310,7 +311,7 @@ def test_install_downloads_only_the_flavor_of_this_pc_from_upstream(upstream, mo
     monkeypatch.setenv("VOXPRINT_NO_REUSE", "1")
     n = mods.install()
     got = {p[0].lstrip("/") for p in srv.requests}
-    assert "torch-2.11.0+cu128-cp311-cp311-win_amd64.whl" in got and not any("cu126" in g or "+cpu" in g for g in got)
+    assert f"torch-2.11.0+cu128-{TAG}-{TAG}-win_amd64.whl" in got and not any("cu126" in g or "+cpu" in g for g in got)
     assert n == 3 + 2 and all(m.installed for m in mods.modules(mods.load_manifest()))
     assert (mods.runtime_dir() / "torchaudio-2.11.0+cu128.dist-info" / "METADATA").is_file()
     assert mods.install() == 0 and mods.installed_without_network()
@@ -348,7 +349,7 @@ def test_a_reused_copy_that_fails_the_check_falls_back_to_our_own(upstream, tmp_
     monkeypatch.setattr(rr, "verify", lambda ext, run=None: (False, "VXTORCH FAIL OSError: DLL load failed"))
     mods.install()
     got = {p[0].lstrip("/") for p in srv.requests}
-    assert "torch-2.11.0+cu128-cp311-cp311-win_amd64.whl" in got
+    assert f"torch-2.11.0+cu128-{TAG}-{TAG}-win_amd64.whl" in got
     assert rr.reused("torch") is None and str(prefix / "Lib" / "site-packages") not in sys.path
 
 
@@ -384,7 +385,7 @@ def test_a_non_pure_sdist_is_refused(tmp_path):
 
     def run(cmd, **k):
         (tmp_path / "o").mkdir(exist_ok=True)
-        (tmp_path / "o" / "x-1-cp311-cp311-win_amd64.whl").write_bytes(b"")
+        (tmp_path / "o" / "x-1-cp314-cp314-win_amd64.whl").write_bytes(b"")
         return R()
 
     with pytest.raises(SystemExit, match="not pure"):

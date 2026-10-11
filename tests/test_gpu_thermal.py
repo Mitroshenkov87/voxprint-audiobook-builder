@@ -11,19 +11,27 @@ def _monitor(now, **kw):
     return gpu_thermal.Monitor(started=0.0, now=now, read_temp=lambda: None, **kw)
 
 
-def test_pause_length_is_between_two_and_three_minutes():
-    assert 120 <= gpu_thermal.COOL_S <= 180
-    clock = {"t": 10_000.0}
+def test_cool_waits_until_the_median_drops_to_75():
+    clock = {"t": gpu_thermal.FULL_SPEED_S + 30.0}
+    box = {}
 
     def now():
         return clock["t"]
 
     def sleep(seconds):
         clock["t"] += seconds
+        if clock["t"] < gpu_thermal.FULL_SPEED_S + gpu_thermal.WINDOW_S:
+            clock["t"] = gpu_thermal.FULL_SPEED_S + gpu_thermal.WINDOW_S + 5
+        for i in range(5):
+            box["mon"].observe(70, at=clock["t"] - 20 + i)
 
     mon = _monitor(now, sleep=sleep)
+    box["mon"] = mon
+    for i in range(5):
+        mon.observe(90, at=clock["t"] - 40 + i)
+    assert mon.median_c() == 90
     mon.cool(None)
-    assert clock["t"] == pytest.approx(10_000.0 + gpu_thermal.COOL_S)
+    assert mon.median_c() == 70
 
 
 def test_the_first_two_and_a_half_hours_stay_at_full_speed():

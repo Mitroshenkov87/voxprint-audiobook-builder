@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import argparse
 import datetime
-import hashlib
 import json
 import os
 import sys
 import zipfile
 from pathlib import Path
 from typing import List, Optional
+
+from voxprint_common.hashing import sha256_file
 
 SCHEMA = 1
 DEFAULT_LIMIT_MIB = 1800
@@ -31,11 +32,7 @@ def channel_for(tag: str) -> str:
 
 
 def sha256_of(path: Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for b in iter(lambda: f.read(1 << 20), b""):
-            h.update(b)
-    return h.hexdigest()
+    return sha256_file(path)
 
 
 def list_files(dist: Path) -> List[Path]:

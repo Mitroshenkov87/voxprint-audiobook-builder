@@ -11,13 +11,16 @@ untouched so a short peak (the codec decoder, a long chunk) and anything else on
     10
 
 ``gpu.vram_fraction`` / ``VOXPRINT_VRAM_FRACTION`` is an optional extra cap (0.70-0.80 of the card's total). It is off
-unless the user sets it. At least one item is always allowed. Stdlib only.
+unless the user sets it. At least one item is always allowed. :func:`suite_tier` is the shared card-size
+label (8 / 16 / 24 GB) used by the suite; the narration batch above is separate from that label.
 """
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
 from typing import Optional
+
+from voxprint_common.gpu_probe import gib_from_mib, tier_for_gib
 
 #: Never plan into the last 2 GB, and never into the last 8 % of the card (whichever is larger).
 RESERVE_FLOOR_GB = 2.0
@@ -26,6 +29,15 @@ RESERVE_RATIO = 0.08
 DEFAULT_FRACTION = 0.75
 MIN_FRACTION = 0.70
 MAX_FRACTION = 0.80
+
+
+def suite_tier(memory_mib: float) -> str:
+    """Suite VRAM tier for a card whose ``memory.total`` nvidia-smi reports in MiB.
+
+    Boundaries are 15.5 and 23.5 GiB: below 15.5 is ``8gb``, below 23.5 is ``16gb``, and at
+    least 23.5 is ``24gb``.
+    """
+    return str(tier_for_gib(gib_from_mib(memory_mib)).value)
 
 
 def clamp_fraction(value: object, default: float = DEFAULT_FRACTION) -> float:

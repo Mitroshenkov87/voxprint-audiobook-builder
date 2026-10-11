@@ -12,12 +12,13 @@ file sizes.
 """
 from __future__ import annotations
 
-import hashlib
 import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
+
+from voxprint_common.hashing import sha256_file as _sha256_file
 
 from core.errors import ModelDownloadError
 from core.events import ProgressCallback, noop_progress
@@ -290,14 +291,10 @@ def repos() -> List[str]:
 
 def sha256_of(path: Path) -> str:
     """SHA-256 of a file ("" if it cannot be read)."""
-    h = hashlib.sha256()
     try:
-        with open(path, "rb") as f:
-            for block in iter(lambda: f.read(1 << 20), b""):
-                h.update(block)
+        return _sha256_file(path)
     except OSError:
         return ""
-    return h.hexdigest()
 
 
 def make_engine(model: TextModel, device: str = ""):
