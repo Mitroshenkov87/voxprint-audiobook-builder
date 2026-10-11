@@ -227,8 +227,14 @@ jobs:
           "keep-me" | Set-Content -Encoding utf8 (Join-Path $data "migration-marker.txt")
           "narrator" | Set-Content -Encoding utf8 (Join-Path $data "voices\narrator.txt")
           $setup = "build\online-release\Voxprint-Setup-online.exe"
-          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=$dest","/LOG=C:\vxmigrate.log" -Wait -PassThru
-          if ($p.ExitCode -ne 0) { Get-Content C:\vxmigrate.log -Tail 80; throw "migration install exit code $($p.ExitCode)" }
+          # Start-Process splits an unquoted /DIR on spaces, so the suite path would become C:\Program.
+          $psi = New-Object System.Diagnostics.ProcessStartInfo
+          $psi.FileName = (Resolve-Path -LiteralPath $setup).Path
+          $psi.Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SKIPGPUCHECK /SkipSuite=1 /DIR=`"$dest`" /LOG=C:\vxmigrate.log"
+          $psi.UseShellExecute = $false
+          $proc = [System.Diagnostics.Process]::Start($psi)
+          $null = $proc.WaitForExit()
+          if ($proc.ExitCode -ne 0) { Get-Content C:\vxmigrate.log -Tail 80; throw "migration install exit code $($proc.ExitCode)" }
           if (Test-Path -LiteralPath $old) { throw "the old program folder is still there: $old" }
           foreach ($menu in @(
             "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Voxprint",

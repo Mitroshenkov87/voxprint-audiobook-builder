@@ -72,6 +72,7 @@ def test_ci_smoke_installs_the_old_layout_then_the_new_one():
     assert "voxprint-audiobook-cli.exe" in wf
     assert "--version" in wf
     assert "migration-marker.txt" in wf
+    assert '/DIR=`"$dest`"' in wf
     assert "Voxprint-AI-Audiobook-Builder-patch-" in wf
 
 
