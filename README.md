@@ -6,7 +6,7 @@ Part of the Voxprint AI Media Suite (with [Voxprint AI Movie Dubber](https://git
 
 ![status: beta](https://img.shields.io/badge/status-beta%20%2F%20experimental-orange) ![licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue) ![platform: Windows 11 + RTX 40+](https://img.shields.io/badge/platform-Windows%2011%20%2B%20RTX%2040%2B-lightgrey)
 
-> **1.0.0 RC3 (build 1001 "Tamim", tag v1.0.0-rc.3).** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs an **NVIDIA GeForce RTX 40-series or newer** GPU, and **Windows 11 24H2+** or a **Linux release from 2025+**. There is no CPU-only mode. 16 GB of VRAM is recommended. Details: [tests and caveats](docs/TESTING.md).
+> **1.0.0 RC4 (build 1002 "Ometz", tag v1.0.0-rc.4).** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs an **NVIDIA GeForce RTX 40-series or newer** GPU, and **Windows 11 24H2+** or a **Linux release from 2025+**. There is no CPU-only mode. 16 GB of VRAM is recommended. Details: [tests and caveats](docs/TESTING.md).
 
 <p align="center"><img src="docs/screenshots/rc2/abb-03-narrate.png" alt="Narrate window: a Russian book ready to read with the Levi voice, MP3 per chapter and one M4B file selected" width="720"></p>
 
