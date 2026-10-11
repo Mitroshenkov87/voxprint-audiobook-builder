@@ -79,3 +79,26 @@ def test_installer_and_ci_use_the_same_file_name():
     for lang in ("english", "russian", "german"):
         assert f"{lang}.UninstallModelsQuestion=" in iss
     assert mu.USERS_FILE == ".users.json" and mu.USER_KEY == "audiobook-builder"
+
+
+def test_setup_registers_the_suite_models_root_and_smoke_checks_that_file():
+    """A silent install writes ``.users.json`` in ``DefaultModelsDir`` (``%LOCALAPPDATA%\\Voxprint\\models``).
+
+    That is the store :func:`infra.paths.default_models_dir` uses. The online-smoke step must look there,
+    and must reject a fresh ``shared\\models\\.users.json``.
+    """
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
+    assert "ExpandConstant('{localappdata}\\Voxprint\\models')" in iss
+    post = iss.split("register this program in the live models folder", 1)[1].split("SyncSuiteSettings", 1)[0]
+    assert "Dir := DefaultModelsDir()" in post and "RegisterModelsUser(Dir)" in post
+    wf = (root / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")
+    smoke = wf.split("Silent install, reuse, failure and uninstall", 1)[1].split("\n      - name:", 1)[0]
+    assert '$users = Join-Path $env:LOCALAPPDATA "Voxprint\\models\\.users.json"' in smoke
+    assert 'if (-not (Test-Path $users)) { throw "models users file was not created: $users" }' in smoke
+    assert (
+        'if (Test-Path (Join-Path $env:LOCALAPPDATA "Voxprint\\shared\\models\\.users.json")) '
+        '{ throw "setup wrote the previous shared\\models users file" }'
+    ) in smoke

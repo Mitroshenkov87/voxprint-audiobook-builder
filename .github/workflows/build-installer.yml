@@ -145,12 +145,12 @@ jobs:
           }
           Get-Content C:\vxsmoke\voxprint-components.json
           if (Test-Path C:\vxsmoke\unins000.exe) { "uninstaller present" } else { throw "no uninstaller" }
-          # Shared models folder (infra/paths.py default_models_dir): setup registers this program in
-          # %LOCALAPPDATA%\Voxprint\shared\models\.users.json. The legacy models\.users.json path is not used.
-          $sharedModels = Join-Path $env:LOCALAPPDATA "Voxprint\shared\models"
-          $users = Join-Path $sharedModels ".users.json"
-          if (-not (Test-Path $users)) { throw "shared models users file was not created: $users" }
-          if (Test-Path (Join-Path $env:LOCALAPPDATA "Voxprint\models\.users.json")) { throw "setup still wrote the legacy models users file" }
+          # Suite models root (infra/paths.py default_models_dir, installer DefaultModelsDir): setup
+          # registers this program in %LOCALAPPDATA%\Voxprint\models\.users.json. A fresh install does
+          # not create the previous shared\models\.users.json.
+          $users = Join-Path $env:LOCALAPPDATA "Voxprint\models\.users.json"
+          if (-not (Test-Path $users)) { throw "models users file was not created: $users" }
+          if (Test-Path (Join-Path $env:LOCALAPPDATA "Voxprint\shared\models\.users.json")) { throw "setup wrote the previous shared\models users file" }
           if (-not (Select-String -Path $users -Pattern '"audiobook-builder": true' -SimpleMatch -Quiet)) { throw "models users file has no audiobook-builder key" }
           '{"movie-dubber": true}' | Set-Content -Encoding ascii $users
           $blob = "C:\vxsmoke\_internal\lib\blob0.bin"
