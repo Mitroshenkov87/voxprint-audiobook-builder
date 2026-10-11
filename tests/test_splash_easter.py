@@ -50,9 +50,9 @@ def test_six_clicks_open_the_egg_through_on_click_and_another_click_closes_it():
         assert screen.width() in (1016, min(1016, work.width()))
         assert screen.height() in (596, min(596, work.height()))
         info = splash.build_info()
-        assert info.version == "1.0.0" and info.rc == 4 and info.build == 1002
-        assert info.codename == "Ometz"
-        assert info.label() == '1.0.0 RC 4 build 1002 "Ometz"'
+        assert info.version == "1.0.0" and info.rc == 5 and info.build == 1003
+        assert info.codename == "Amud"
+        assert info.label() == '1.0.0 RC 5 build 1003 "Amud"'
         assert not screen.egg_visible()
         for _ in range(5):
             screen._on_click(SplashEvent(1, 1, "left"))
