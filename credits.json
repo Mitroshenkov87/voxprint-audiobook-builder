@@ -238,11 +238,11 @@
    ],
    "url": "https://github.com/QwenLM/Qwen3-TTS",
    "purpose": {
-    "en": "Qwen3-TTS model code (speech synthesis and the audio tokenizer)",
-    "de": "Qwen3-TTS-Modellcode (Sprachsynthese und Audio-Tokenizer)",
-    "ru": "Код моделей Qwen3-TTS (синтез речи и аудио-токенизатор)",
-    "uk": "Код моделей Qwen3-TTS (синтез мовлення й аудіотокенізатор)",
-    "lv": "Qwen3-TTS modeļa kods (runas sintēze un audio tokenizators)"
+    "en": "Qwen3-TTS model code (speech synthesis and the audio tokenizer), installed as the qwen-tts-hf compatibility build",
+    "de": "Qwen3-TTS-Modellcode (Sprachsynthese und Audio-Tokenizer), installiert als Kompatibilitätsbau qwen-tts-hf",
+    "ru": "Код моделей Qwen3-TTS (синтез речи и аудио-токенизатор), ставится как сборка совместимости qwen-tts-hf",
+    "uk": "Код моделей Qwen3-TTS (синтез мовлення й аудіотокенізатор), ставиться як збірка сумісності qwen-tts-hf",
+    "lv": "Qwen3-TTS modeļa kods (runas sintēze un audio tokenizators), instalēts kā qwen-tts-hf saderības būvējums"
    }
   },
   {

@@ -866,7 +866,7 @@ def build_parser() -> argparse.ArgumentParser:
     bn.add_argument("--modes", default="batched,graphs", metavar="LIST", help="Comma-separated: batched, graphs")
     bn.add_argument("--out", type=Path, default=None, metavar="DIR", help="Also save bench-<mode>.wav here to listen")
     bn.add_argument("--install-graphs", action="store_true",
-                    help="First download faster-qwen3-tts 0.3.2 (MIT, 43 KB, SHA-256 checked) into the packages folder")
+                    help="First download faster-qwen3-tts 0.5.4 (MIT, 43 KB, SHA-256 checked) into the packages folder")
     bn.set_defaults(_handler="bench")
     return ap
 

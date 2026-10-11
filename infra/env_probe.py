@@ -17,7 +17,7 @@ mixing site-packages of different environments breaks binary wheels.
 
 Unsloth (checked 2026-10-03): NOT used.  It does not support Qwen3-TTS fine-tuning yet (unslothai/unsloth#3951 open,
 needs huggingface/transformers#44517, which is still an open PR), Qwen3-TTS uses a custom training loop, and installing
-Unsloth would pull its own pins (trl, xformers, transformers range incl. 5.x) that conflict with the verified set.
+Unsloth would pull its own pins (trl, xformers) that conflict with the verified set.
 Voxprint keeps its own LoRA loop (core/lora_trainer.py).  If found it is only reported (reason ``no_qwen3_tts_training``).
 
 NVIDIA driver -> PyTorch wheel flavor follows the CUDA version printed by ``nvidia-smi``.  The only wheel we ship
@@ -49,7 +49,7 @@ log = logging.getLogger("voxprint.env")
 Runner = Callable[[List[str]], Tuple[int, str]]
 #: What we ask other Pythons about (metadata only).
 PROBED_PACKAGES = ("torch", "torchaudio", "transformers", "peft", "accelerate", "bitsandbytes", "huggingface_hub",
-                   "qwen-tts", "qwen-asr", "unsloth", "safetensors")
+                   "qwen-tts-hf", "qwen-asr", "unsloth", "safetensors")
 #: Upper bound on the number of other interpreters we ask (each probe is a subprocess).
 MAX_PYTHONS = 6
 

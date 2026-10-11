@@ -1,15 +1,15 @@
 {
   "schema": 1,
   "name": "Voxprint verified set",
-  "date": "2026-10-05",
-  "note": "Versions Voxprint was verified with (unit tests + a tiny model on the CPU, peft 0.18.1 and 0.21.2; later also a full GPU run on Windows Server 2025 / RTX 4090). peft is pinned to Alexandria's version (0.18.1): the adapter format must be readable by its PeftModel.from_pretrained. ASR and SAGE are pinned so the first-run download-all verifies them by size+SHA against model_mirrors.json.",
+  "date": "2026-10-10",
+  "note": "Versions Voxprint was verified with (unit tests + a tiny model on the CPU, peft 0.18.1 and 0.21.2). The 2026-10-05 GPU run (Windows Server 2025 / RTX 4090) used transformers 4.57.6 and qwen-tts 0.1.1. This set (transformers 5.16.1, huggingface_hub 1.32.0, qwen-tts-hf 0.1.1.post1, faster-qwen3-tts 0.5.4) has unit and import coverage only; it has not been run on a GPU. peft stays at Alexandria's 0.18.1 so PeftModel.from_pretrained can still read the adapter. ASR and SAGE are pinned so the first-run download-all verifies them by size+SHA against model_mirrors.json.",
   "packages": {
     "qwen-asr": "0.0.6",
-    "qwen-tts": "0.1.1",
-    "transformers": "4.57.6",
+    "qwen-tts-hf": "0.1.1.post1",
+    "transformers": "5.16.1",
     "peft": "0.18.1",
     "accelerate": "1.15.0",
-    "huggingface_hub": "0.36.2",
+    "huggingface_hub": "1.32.0",
     "ru-normalizr": "0.3.0",
     "rutextnorm": "2.1.0"
   },

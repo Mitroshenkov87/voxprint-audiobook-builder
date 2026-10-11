@@ -27,6 +27,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, cast
 
 from core import model_cache
 from infra import paths, sysinfo
+from infra.qwen_tf_compat import install as install_qwen_tf
 
 log = logging.getLogger("voxprint.preload")
 
@@ -196,6 +197,8 @@ def load_tts(path: Path, cuda: bool) -> Any:
     """Qwen3-TTS base on the CPU, in the dtype the engine uses; returns ``(model, attention)`` (SDPA: flash-attn 2 cannot
     be selected while the weights are on the CPU, and it is not available for Windows anyway)."""
     import torch
+
+    install_qwen_tf()
     from qwen_tts import Qwen3TTSModel
 
     dtype = torch.bfloat16 if cuda else torch.float32
@@ -210,6 +213,8 @@ def load_tts(path: Path, cuda: bool) -> Any:
 def load_asr(path: Path, cuda: bool) -> Any:
     """Qwen3-ASR on the CPU (moved to the GPU by :meth:`core.asr.Qwen3ASR.load`)."""
     import torch
+
+    install_qwen_tf()
     from qwen_asr import Qwen3ASRModel
 
     return Qwen3ASRModel.from_pretrained(str(path), dtype=torch.bfloat16 if cuda else torch.float32, device_map="cpu")

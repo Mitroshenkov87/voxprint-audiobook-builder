@@ -56,8 +56,11 @@ AUTOCHECK_DAYS = 7
 SMOKE_CODE = r"""
 import sys, json
 sys.path.insert(0, sys.argv[1])
+from infra.qwen_tf_compat import install
+install()
 import transformers
-assert int(transformers.__version__.split('.')[0]) < 5, 'transformers>=5 is not supported by qwen-asr/qwen-tts'
+parts = [int(p) for p in transformers.__version__.split('.')[:3]]
+assert parts >= [5, 16, 1] and parts < [5, 17], transformers.__version__
 import peft, accelerate
 from peft import LoraConfig
 from qwen_asr.inference.qwen3_forced_aligner import Qwen3ForceAlignProcessor

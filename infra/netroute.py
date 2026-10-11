@@ -15,8 +15,9 @@ The user can force a choice: ``VOXPRINT_NET_IFACE`` or ``<state>/net_iface.txt``
 ``auto`` (default: the behaviour above), ``default`` (never hop: the OS decides) or an interface name / local IP address
 (bind to it, never hop).  Nothing here detects a particular VPN product.
 
-Entry points: :func:`urlopen` (urllib users), :func:`prepare_hf` (huggingface_hub / requests, which cannot bind per request:
-the working source address is installed once as the hub's HTTP backend), :func:`local_addresses`, :func:`describe`.
+Entry points: :func:`urlopen` (urllib users), :func:`prepare_hf` (huggingface_hub's shared httpx client cannot bind
+per request: the working source address is installed once as that client's transport), :func:`local_addresses`,
+:func:`describe`.
 """
 from __future__ import annotations
 
@@ -38,7 +39,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 log = logging.getLogger("voxprint.net")
 
@@ -524,7 +525,7 @@ def pick_fastest(url: str, routes: Optional[List[Route]] = None, cap: float = SP
     return best
 
 
-# ----------------------------------------------------------------------------------------------- huggingface_hub (requests)
+# ----------------------------------------------------------------------------------------------- huggingface_hub (httpx)
 #: The whole route search before a model download may take this long (seconds); the routes are probed in parallel.
 PROBE_CAP = 5.0
 
@@ -631,32 +632,57 @@ def ensure_hub_session() -> None:
         log.debug("hub session not configured: %s", exc)
 
 
+def _httpx_timeout(timeout: Any) -> Any:
+    """The httpx timeout for one hub request: connect capped, read bounded, never left unset."""
+    httpx: Any = importlib.import_module("httpx")
+    unset = getattr(httpx, "USE_CLIENT_DEFAULT", None)
+    if timeout is None or timeout is unset:
+        connect, read = HUB_CONNECT_TIMEOUT, HUB_READ_TIMEOUT
+    elif isinstance(timeout, httpx.Timeout):
+        return timeout
+    elif isinstance(timeout, (int, float)):
+        connect, read = hub_timeout(float(timeout))
+    elif isinstance(timeout, tuple) and len(timeout) >= 2:
+        connect, read = float(timeout[0]), float(timeout[1])
+    else:
+        connect, read = HUB_CONNECT_TIMEOUT, HUB_READ_TIMEOUT
+    return httpx.Timeout(read, connect=connect, pool=connect)
+
+
 def _install_hf_adapter(ip: str) -> None:
-    """Make huggingface_hub's requests sessions use bounded connect / read timeouts and bind to ``ip`` ("" = the default
-    route).  The Rust downloader (hf_xet) cannot bind, so it is switched off while a specific address is used."""
+    """Make huggingface_hub's shared httpx client use bounded connect / read timeouts and bind to ``ip`` ("" = the
+    default route).  The Rust downloader (hf_xet) cannot bind, so it is switched off while a specific address is used.
+
+    huggingface_hub 1.x dropped ``configure_http_backend`` (requests).  From 1.0 the hub uses one shared ``httpx.Client``
+    installed with ``set_client_factory``.  Loaded by name: voxprint-fetch.exe must not pull huggingface_hub / httpx /
+    torch into the installer.
+    """
     global _hub_ip
-    # loaded by name: voxprint-fetch.exe (PyInstaller) must not pull huggingface_hub / requests / torch into the installer
-    configure_http_backend = importlib.import_module("huggingface_hub").configure_http_backend
-    requests = importlib.import_module("requests")
-    HTTPAdapter: type = importlib.import_module("requests.adapters").HTTPAdapter
+    httpx: Any = importlib.import_module("httpx")
+    hub_http = importlib.import_module("huggingface_hub.utils._http")
     set_hub_timeouts()
+    hook = getattr(hub_http, "hf_request_event_hook", None)
+    event_hooks = {"request": [hook]} if hook is not None else None
 
-    class HubAdapter(HTTPAdapter):
-        def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
-            if ip:
-                pool_kwargs["source_address"] = (ip, 0)
-            super().init_poolmanager(connections, maxsize, block=block, **pool_kwargs)
+    class HubClient(httpx.Client):
+        """The shared hub client: every request and stream gets :func:`_httpx_timeout`."""
 
-        def send(self, request, stream=False, timeout=None, *args, **kwargs):
-            return super().send(request, stream, hub_timeout(timeout), *args, **kwargs)
+        def request(self, method: str, url: Any, **kwargs: Any) -> Any:
+            kwargs["timeout"] = _httpx_timeout(kwargs.get("timeout"))
+            return super().request(method, url, **kwargs)
 
-    def factory():
-        s = requests.Session()
-        s.mount("https://", HubAdapter())
-        s.mount("http://", HubAdapter())
-        return s
+        def stream(self, method: str, url: Any, **kwargs: Any) -> Any:
+            kwargs["timeout"] = _httpx_timeout(kwargs.get("timeout"))
+            return super().stream(method, url, **kwargs)
 
-    configure_http_backend(backend_factory=factory)
+    def factory() -> Any:
+        transport = httpx.HTTPTransport(local_address=ip) if ip else httpx.HTTPTransport()
+        kwargs: dict = {"transport": transport, "follow_redirects": True, "timeout": None}
+        if event_hooks is not None:
+            kwargs["event_hooks"] = event_hooks
+        return HubClient(**kwargs)
+
+    hub_http.set_client_factory(factory)
     _hub_ip = ip
     if not ip:
         return

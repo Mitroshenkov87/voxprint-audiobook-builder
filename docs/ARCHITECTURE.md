@@ -119,7 +119,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `tts_engine.py` | the real engine `Qwen3AdapterEngine` (qwen-tts + PEFT adapter, voice-clone prompt from `ref_sample.wav`); attention backend flash-attn 2 > SDPA > eager with fallback; `synthesize_batch` / `max_batch` (batch by free VRAM); validated on an RTX 4090 |
 | `audiobook_export.py` | format registry, file naming, `ffmetadata` chapters, `.m3u8`, ffmpeg command builders, encoder pre-check, `Exporter` (per-chapter encodes during synthesis, single files in parallel at the end, results in a fixed order) / `export_formats` (injectable `run`; ffmpeg at below-normal priority) |
 | `cpu_budget.py` | CPU pool size and torch thread count for narration from the physical cores (`VOXPRINT_CPU_WORKERS` overrides) |
-| `vram_policy.py`, `gpu_lock.py`, `gpu_thermal.py`, `sysmem_spill.py`, `fast_decode.py`, `bench.py` | VRAM rule (free memory minus `max(2 GB, 8 % of the card)`; optional 70-80 % cap, off by default); shared `voxprint-gpu.lock`; automatic cooling after 2.5 h; Windows shared-memory spill guard; optional CUDA Graphs decode via faster-qwen3-tts 0.3.x (+ tolerant RoPE init); `voxprint bench` |
+| `vram_policy.py`, `gpu_lock.py`, `gpu_thermal.py`, `sysmem_spill.py`, `fast_decode.py`, `bench.py` | VRAM rule (free memory minus `max(2 GB, 8 % of the card)`; optional 70-80 % cap, off by default); shared `voxprint-gpu.lock`; automatic cooling after 2.5 h; Windows shared-memory spill guard; optional CUDA Graphs decode via faster-qwen3-tts 0.5.x (+ tolerant RoPE init); `voxprint bench` |
 | `model_cache.py` | models preloaded into RAM (`put` / `take` with ownership transfer, `take` waits for a load in progress, `to_device` for the qwen wrappers); used by `tts_engine`, `asr`, `text_cleanup` |
 
 ### `infra/`
@@ -146,6 +146,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `model_downloader.py`, `modelscope_mirror.py`, `parallel_download.py` | model download from Hugging Face (multi-connection Range for large weights) with ModelScope / own-mirror fallbacks; post-download SHA-256 status |
 | `version_manager.py`, `verified_manifest.py` | PyPI/HF version queries and comparison; the "verified by Voxprint" manifest (`verified_manifest.json`) with update channels |
 | `updater.py` | check -> install into `.staging/` -> smoke test -> swap, rollback on failure |
+| `qwen_tf_compat.py` | import shim so qwen-asr 0.0.6 loads on transformers 5.16 (the decorator call, and replacing the native `qwen3_asr` registration) |
 | `vram_optimizer.py` | chooses LoRA training parameters (batch, accumulation, 8-bit optimizer, checkpointing) from the available VRAM |
 
 ### `workers/`

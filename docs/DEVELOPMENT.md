@@ -22,7 +22,7 @@ cd voxprint-audiobook-builder
 python -m venv .venv && . .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install torch --index-url https://download.pytorch.org/whl/cpu    # internal, tests only
 pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt
-pip install --no-deps -r requirements-nodeps.txt          # qwen-asr / qwen-tts: their transformers pins conflict
+pip install --no-deps -r requirements-nodeps.txt          # qwen-asr / qwen-tts-hf: their transformers pins conflict with ours
 QT_QPA_PLATFORM=offscreen python -m pytest                # ~250 tests; Windows: set QT_QPA_PLATFORM=offscreen
 ```
 

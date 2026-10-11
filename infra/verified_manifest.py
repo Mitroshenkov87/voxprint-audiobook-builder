@@ -111,7 +111,7 @@ def load_manifest(fetch_json: Optional[Callable[[str], Any]] = None, url: Option
     return best
 
 
-NODEPS_PREFIXES = ("qwen-",)   # qwen-asr / qwen-tts pin different transformers versions -> they are installed with --no-deps
+NODEPS_PREFIXES = ("qwen-",)   # qwen-asr pins transformers==4.57.6; qwen-tts-hf pins >=5.15.1 and accelerate==1.12.0. --no-deps keeps our pins.
 
 
 def requirements_lines(m: Optional[Manifest] = None, nodeps: bool = False) -> List[str]:

@@ -241,6 +241,7 @@ nav:
           - preload: api/infra.preload.md
           - projects: api/infra.projects.md
           - quality_models: api/infra.quality_models.md
+          - qwen_tf_compat: api/infra.qwen_tf_compat.md
           - runtime_reuse: api/infra.runtime_reuse.md
           - setup_mode: api/infra.setup_mode.md
           - soundscape_model: api/infra.soundscape_model.md

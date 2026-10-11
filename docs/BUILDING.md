@@ -14,7 +14,7 @@ py -3.14 -m venv .venv && .venv\Scripts\activate
 pip install uv
 uv pip install torch==2.11.0 torchaudio==2.11.0 --torch-backend=cu130       :: fallback: pip install -r requirements-torch.txt
 uv pip install -r requirements.txt -r requirements-verified.txt
-uv pip install --no-deps -r requirements-nodeps.txt        :: qwen-asr/qwen-tts: their transformers pins conflict
+uv pip install --no-deps -r requirements-nodeps.txt        :: qwen-asr/qwen-tts-hf: their transformers pins conflict with ours
 python -m bitsandbytes                                     :: optional check of the 8-bit optimizer (plain AdamW otherwise - fine)
 python main.py
 ```

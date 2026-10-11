@@ -108,7 +108,7 @@ the full licence texts are in the `licenses/` folder next to this file. This fil
 
 ### qwen-tts
 
-* Purpose: Qwen3-TTS model code (speech synthesis and the audio tokenizer)
+* Purpose: Qwen3-TTS model code (speech synthesis and the audio tokenizer), installed as the qwen-tts-hf compatibility build
 * Licence: Apache-2.0
 * Project: <https://github.com/QwenLM/Qwen3-TTS>
 * Status: bundled

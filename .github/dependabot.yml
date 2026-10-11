@@ -1,5 +1,5 @@
 # Dependency update PRs: weekly for pip, monthly for the GitHub Actions; few open PRs at a time.
-# PyTorch / transformers / qwen-* are pinned on purpose (verified with the models): their PRs are ignored here.
+# PyTorch / transformers / huggingface_hub / qwen-* are pinned on purpose (verified with the models): their PRs are ignored here.
 version: 2
 updates:
   - package-ecosystem: pip
@@ -11,7 +11,10 @@ updates:
       - dependency-name: torch
       - dependency-name: torchaudio
       - dependency-name: transformers
+      - dependency-name: huggingface_hub
+      - dependency-name: huggingface-hub
       - dependency-name: qwen-tts
+      - dependency-name: qwen-tts-hf
       - dependency-name: qwen-asr
   - package-ecosystem: github-actions
     directory: /
