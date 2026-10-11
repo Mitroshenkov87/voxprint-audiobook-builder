@@ -45,6 +45,11 @@ The principles shared by every app of the Voxprint AI Media Suite (complete, loc
 * Acrylic (glass) look on Windows 11 with a dark, high-contrast (WCAG AA) theme and a plain fallback.
 
 ## Screenshots
+Narrate and the first-run Components window from the 1.0.0-rc.2 run on an RTX 4090 (Russian UI), in [`docs/screenshots/rc2/`](screenshots/rc2). The taskbar is cropped out.
+
+<p align="center"><img src="screenshots/rc2/abb-03-narrate.png" alt="Narrate window: a Russian book ready to read with the Levi voice, MP3 per chapter and one M4B file selected" width="640"></p>
+<p align="center"><img src="screenshots/rc2/abb-01-main-components-first-run.png" alt="Components window on first start: program components and models, with sizes shown and free space checked before a download" width="640"></p>
+
 Real screenshots of build 667 "Menuchah" (0.1.3-beta) on **Windows 11 (RTX 4090, dark theme, English UI)**, in [`docs/screenshots/en-667/`](screenshots/en-667). Personal paths and network addresses are blurred. Older Russian and German screenshots (0.1.0) are in [`docs/screenshots/ru/`](screenshots/ru) and [`docs/screenshots/de/`](screenshots/de).
 
 | Studio | My voices (build 667 screenshot; Tirzah and Gideon are bundled, the picture also shows Boaz, which is retired) |

@@ -21,6 +21,7 @@ PySide6 is imported only when a dialog is shown. PyTorch is imported only when C
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -35,6 +36,9 @@ MIN_COMPUTE_TEXT = "8.9"
 #: Internal. Honoured only so CI and the unit tests can start without an RTX 40-series GPU.
 ENV_ALLOW = "VOXPRINT_ALLOW_NO_GPU"
 EXIT_GPU_REQUIRED = 7
+#: cu130 wheels need an NVIDIA driver whose major version is at least this (branch 600).
+MIN_DRIVER_MAJOR = 600
+NVIDIA_DRIVER_URL = "https://www.nvidia.com/Download/index.aspx"
 _TRUE = {"1", "true", "yes", "on"}
 _SKIP_FLAGS = {"--json", "--yes", "-y", "--dry-run"}
 _HELP_FLAGS = {"--help", "-h", "--version", "-V"}
@@ -42,7 +46,7 @@ _LIGHT_COMMANDS = {"help", "status", "capabilities", "diag", "diagnostics"}
 _BOOKKEEPING = {
     "--register-runtime-user", "--unregister-runtime-user",
     "--register-models-user", "--unregister-models-user",
-    "--sync-suite-settings",
+    "--sync-suite-settings", "--install-suite", "--unregister-suite",
 }
 Runner = Callable[[Sequence[str]], Tuple[int, str]]
 
@@ -223,6 +227,26 @@ def requirement_message(detected: str) -> str:
     return tr("gpu.required", device=detected)
 
 
+def driver_major(text: str) -> Optional[int]:
+    """The first number of an NVIDIA driver version (``560.76`` -> 560), or None."""
+    match = re.match(r"\s*(\d+)", text or "")
+    return int(match.group(1)) if match else None
+
+
+def driver_too_old(report: GpuReport) -> str:
+    """A sentence and the NVIDIA download link when the driver cannot run the CUDA wheels.
+
+    Empty when the card was not named, the driver string is missing, the driver is new enough,
+    or the internal no-GPU override is set.
+    """
+    if report.overridden or report.best is None:
+        return ""
+    major = driver_major(report.best.driver)
+    if major is None or major >= MIN_DRIVER_MAJOR:
+        return ""
+    return tr("gpu.driver_old", driver=report.best.driver, url=NVIDIA_DRIVER_URL)
+
+
 def show_dialog(message: str) -> None:
     """Modal error. PySide6 is imported here so a CLI refusal does not load Qt."""
     from PySide6.QtWidgets import QApplication, QMessageBox
@@ -238,9 +262,12 @@ def show_dialog(message: str) -> None:
 def enforce(*, gui: bool, dialog: Optional[Callable[[str], None]] = None, **detect_kwargs) -> int:
     """``0`` when the PC may run (or the internal override is set). Otherwise ``EXIT_GPU_REQUIRED``."""
     report = check_gpu(**detect_kwargs)
-    if report.ok or report.overridden:
+    if report.overridden:
         return 0
-    message = requirement_message(detected_label(report))
+    old_driver = driver_too_old(report) if report.ok else ""
+    if report.ok and not old_driver:
+        return 0
+    message = old_driver or requirement_message(detected_label(report))
     if gui:
         (dialog or show_dialog)(message)
     else:

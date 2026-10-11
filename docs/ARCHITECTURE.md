@@ -60,7 +60,7 @@ Downloads are checked by size and SHA-256. The speech model, the aligner and the
 
 ## Suite command line
 
-Other programs drive this app with the same commands the windows use: `voxprint` on Linux when the package is installed, `Voxprint.exe` on Windows, or `python main.py` from a source checkout. `--json` prints progress lines and one result object. `--dry-run` checks the inputs and the output path and does not load a model, use the GPU, or download. Exit codes are stable (0 success, 1 internal, 2 bad arguments, 3 bad input, 4 missing model, 5 out of video memory, 6 cancelled, 7 no suitable GPU). The flag list is generated from the parser: [command reference](generated/cli.md). Recipes and JSON fields: [CLI.md](CLI.md) and [AGENTS.md](AGENTS.md).
+Other programs drive this app with the same commands the windows use: `voxprint` on Linux when the package is installed, `voxprint-cli.exe` on Windows (console; `Voxprint.exe` is the windowed program), or `python main.py` from a source checkout. `--json` prints progress lines and one result object. `--dry-run` checks the inputs and the output path and does not load a model, use the GPU, or download. Exit codes are stable (0 success, 1 internal, 2 bad arguments, 3 bad input, 4 missing model, 5 out of video memory, 6 cancelled, 7 no suitable GPU). The flag list is generated from the parser: [command reference](generated/cli.md). Recipes and JSON fields: [CLI.md](CLI.md) and [AGENTS.md](AGENTS.md).
 
 ## 1. Layers
 
@@ -98,7 +98,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 | `voice_info.py` | `voice.json` (schema 3): fields, gender / age group (derived voice type), **licences** (`LICENSES`, `license_allows_commercial`, derived `commercial_use`), migration of schema 1, read/write |
 | `voice_library.py` | the voice library under `voices/<id>/`: `VoiceLibrary`, `VoiceRecord`, register / import (folder, hardened zip) / update / delete / list |
 | `book_parsers.py` | TXT (heading detection), FB2 (+ `.fb2.zip`, entity guard, cover), EPUB (nav / NCX / spine), `.vxbook` -> `Book` / `Chapter`; stdlib only. The `.vxbook` reader is `vxbook.py` |
-| `vxbook.py` | Open a `.vxbook` ZIP (mimetype, hashes, size limits), map `book.md` / `speakers.json` / `cast.json` onto a `Book`, and keep an optional `sound.json` when extension `sound/1` is declared |
+| `vxbook.py` | Open a `.vxbook` ZIP (mimetype, hashes, size limits), map `book.md` / `speakers.json` / `cast.json` onto a `Book`, and keep an optional `sound.json` when extension `sound/1` is declared. Chapter and speaker ids match `^[a-z0-9][a-z0-9_-]{0,63}$` (`1`, `2`, `ch01`, `part-2`; 64 characters at most). A `vx:` directive name and its attribute names stay `^[a-z][a-z0-9_]*` |
 | `soundscape.py` | Plan and mix that soundscape under a finished chapter. Beds are one 45 s clip looped with a crossfade. Plain books and a `.vxbook` without `sound/1` are left alone |
 | `num_words.py` | own number-to-words for Russian (cardinals, ordinals with case / gender / number, decimals) and English (cardinals, ordinals, years); no `num2words` (LGPL-2.1, no declension by suffix). Cyrillic *data* |
 | `text_prep.py` | rule-based book preparation: steps `layout, noise, quotes, links, headings, numbers, abbrev, yo` (`STEP_KEYS`), `PrepOptions`, `prepare_text_block`, `prepare_book` -> `(Book, PrepReport)`, `resolve_language`; ru + en for the shared steps, `yo` for Russian only, other languages only the neutral steps |

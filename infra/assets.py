@@ -70,10 +70,16 @@ def spec_for(name: str, platform: Optional[str] = None, manifest: Optional[Dict[
 
 
 def tools_dir() -> Path:
-    """Directory where pinned third-party tools (ffmpeg) are installed: ``<app_home>/tools``."""
-    p = paths.app_home() / "tools"
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    """Pinned third-party tools (ffmpeg): ``<app home>/shared/tools``.
+
+    An older install that already has ``<app home>/tools/ffmpeg`` keeps that copy until the shared folder has one.
+    """
+    shared = paths.shared_root() / "tools"
+    legacy = paths.app_home() / "tools" / "ffmpeg"
+    if legacy.exists() and not (shared / "ffmpeg").exists():
+        return paths.app_home() / "tools"
+    shared.mkdir(parents=True, exist_ok=True)
+    return shared
 
 
 def sha256_file(p: Path) -> str:

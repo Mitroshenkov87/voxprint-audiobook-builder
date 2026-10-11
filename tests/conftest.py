@@ -33,6 +33,8 @@ def _isolated_home(tmp_path, monkeypatch):
     monkeypatch.setenv("VOXPRINT_OWN_ENV", "1")   # the test interpreter counts as Voxprint-owned (auto-upgrade); external-env tests pass external_env=True
     # Internal: this suite has no RTX 40-series GPU. Not a user option (see infra/gpu_requirement.py).
     monkeypatch.setenv("VOXPRINT_ALLOW_NO_GPU", "1")
+    # Suite downloads belong to the installer and a frozen launch, not to this process.
+    monkeypatch.setenv("VOXPRINT_SKIP_SUITE", "1")
     monkeypatch.delenv("VOXPRINT_NET_IFACE", raising=False)
     from infra import netroute
 
@@ -95,6 +97,27 @@ def leave_before_native_shutdown() -> bool:
     if sys.platform == "win32" and _terminate_windows(code):
         return True
     os._exit(code)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call(item):
+    """Dump this test's stacks if it runs longer than ``VOXPRINT_TEST_TRACEBACK_S`` seconds.
+
+    The Windows installer job sets that (about 150) together with pytest-timeout. A process-wide
+    timer is not started here: a healthy session is longer than one test.
+    """
+    raw = os.environ.get("VOXPRINT_TEST_TRACEBACK_S", "").strip()
+    try:
+        seconds = float(raw) if raw else 0.0
+    except ValueError:
+        seconds = 0.0
+    if seconds > 0:
+        faulthandler.dump_traceback_later(seconds, repeat=False, file=sys.stderr, exit=False)
+    try:
+        yield
+    finally:
+        if seconds > 0:
+            faulthandler.cancel_dump_traceback_later()
 
 
 def pytest_sessionfinish(session, exitstatus):

@@ -38,6 +38,14 @@ jobs:
         with:
           python-version: "3.14"
 
+      - name: Build number (BUILD.json build field, or the release tag) into credits.json
+        run: |
+          n=$(python3 tools/build_number.py --stamp)
+          echo "VOXPRINT_BUILD=$n" >> "$GITHUB_ENV"
+          c=$(python3 -c 'import json; print(json.load(open("BUILD.json", encoding="utf-8"))["codename"])')
+          echo "VOXPRINT_CODENAME=$c" >> "$GITHUB_ENV"
+          echo "build $n \"$c\""
+
       - name: Build the package (test copy -> local server, release copy -> GitHub)
         run: |
           TAG="${REL_TAG:-v0.0.0-ci}"

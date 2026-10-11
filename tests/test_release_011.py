@@ -133,21 +133,22 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
 
     from tools import build_number as bn
 
-    # Runs 41-44 published nothing. Offset 655: run 45 stamped 700 (Kaporet). Run 46 failed before publishing;
-    # offset 654: run 47 stamped 701 (Shalem), run 48 stamped 702 (Shelishi), run 49 stamped 703 (Toledot),
-    # run 50 failed before publishing; offset 653: run 51 stamps 704 (Achim).
-    # Run 52 failed before publishing; offset 946: run 53 stamped 999 (Nachon, 1.0.0-rc).
-    # Run 54 failed before publishing; offset 945: run 55 stamped 1000 (Chazak, 1.0.0-rc.2).
-    # The offset stays 945: run 56 stamps 1001 (Tamim, 1.0.0-rc.3).
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "56"}) == 1001 and bn.build_number({}) == 0
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "55"}) == 1000
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "54"}) == 999
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "52"}) == 997
-    assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34"}) == 700
-    assert bn.info()["offset"] == 945
+    # offset is history. The number is BUILD.json "build" (1002) or a tag that ends in +N / -buildN.
+    # GITHUB_RUN_NUMBER is ignored, including the runs that used to move the offset.
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "57"}) == 1002
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "56"}) == 1002
+    assert bn.build_number({}) == 1002
+    assert bn.build_number({"GITHUB_REF": "refs/tags/v1.0.0-rc.3", "GITHUB_REF_NAME": "v1.0.0-rc.3"}) == 1002
+    assert bn.build_number({"REL_TAG": "v1.0.0-rc.4+1005", "GITHUB_RUN_NUMBER": "99"}) == 1005
+    assert bn.build_number({"GITHUB_REF": "refs/tags/v1.0.0-rc.4-build1002",
+                            "GITHUB_REF_NAME": "v1.0.0-rc.4-build1002"}) == 1002
+    assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34", "REL_TAG": "v1.0.0-rc.4+1005"}) == 700
+    assert bn.build_number({"VOXPRINT_BUILD": "0"}) == 0
+    assert bn.info()["build"] == 1002
+    assert bn.info()["offset"] == 944
     note = bn.info()["offset_note"]
     assert "946" in note and "run 53" in note and "Nachon" in note and "run 55 + 945 = 1000" in note and "Chazak" in note
-    assert "run 56 + 945 = 1001" in note and "Tamim" in note
+    assert "run 56 + 945 = 1001" in note and "run 57 + 944 = 1001" in note and "Tamim" in note
     name = bn.info()["codename"]
     assert name == "Tamim" and name.isascii() and name.isalpha()
     from pathlib import Path

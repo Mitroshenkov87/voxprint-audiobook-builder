@@ -52,5 +52,29 @@ python tools\embed_build_stamp.py --restore-module
 if not "%PYI_ERR%"=="0" (echo [ERROR] PyInstaller failed. & exit /b 1)
 rem  The bootloader ignores a trailer. Swapping only this exe updates the build status reports.
 python tools\embed_build_stamp.py --exe "%CD%\dist\thin\Voxprint\Voxprint.exe" || (echo [ERROR] exe stamp. & exit /b 1)
+
+rem  Console companion: same code, console subsystem, so a script gets this process's exit code.
+rem  This second PyInstaller stays AFTER the windowed exe stamp (tests/test_shell_metadata.py).
+rem  Only the exe is copied into the windowed folder; both share that folder's _internal.
+echo === Build console companion ===
+pyinstaller --onedir --console --noconfirm --name voxprint-cli --distpath dist\thin --workpath build\thin-cli-work --specpath build\thin-cli-work ^
+  --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" --add-data "%CD%\assets\splash.jpg;assets" --add-data "%CD%\assets\easter-egg.jpg;assets" ^
+  --add-data "%CD%\assets\icons;assets\icons" ^
+  --paths "%CD%" --paths "%CD%\infra" --paths "%CD%\third_party" --paths "%CD%\build\stdlib_bundle" --hidden-import _vx_stdlib ^
+  --hidden-import openvoice --hidden-import openvoice.models --hidden-import openvoice.modules ^
+  --hidden-import openvoice.attentions --hidden-import openvoice.commons ^
+  --hidden-import openvoice.mel_processing --hidden-import openvoice.transforms ^
+  --add-data "%CD%\infra\verified_manifest.json;infra" --add-data "%CD%\infra\assets_manifest.json;infra" --add-data "%CD%\infra\model_mirrors.json;infra" --add-data "%CD%\infra\model_release.json;infra" --add-data "%CD%\infra\runtime_lock.json;infra" ^
+  --add-data "%CD%\locales;locales" --add-data "%CD%\prompts;prompts" --add-data "%CD%\credits.json;." --add-data "%CD%\licenses;licenses" ^
+  --add-data "%CD%\core\data;core\data" ^
+  --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^
+  --collect-submodules core --collect-submodules infra --collect-submodules ui --collect-submodules workers --collect-submodules tools ^
+  --hidden-import netroute --hidden-import soundfile --collect-all certifi ^
+  --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
+  %META% %EXCL% main.py
+if errorlevel 1 (echo [ERROR] Console PyInstaller failed. & exit /b 1)
+copy /Y "dist\thin\voxprint-cli\voxprint-cli.exe" "dist\thin\Voxprint\voxprint-cli.exe" || (echo [ERROR] voxprint-cli.exe was not copied. & exit /b 1)
+python tools\embed_build_stamp.py --exe "%CD%\dist\thin\Voxprint\voxprint-cli.exe" || (echo [ERROR] cli exe stamp. & exit /b 1)
+rmdir /s /q "dist\thin\voxprint-cli"
 echo Thin shell: dist\thin\Voxprint  ^(the packaging step adds _internal\modules.json^)
 endlocal

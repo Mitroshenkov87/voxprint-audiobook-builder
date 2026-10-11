@@ -53,6 +53,42 @@ def test_find_torch_reads_dist_info_without_running_anything(tmp_path):
     assert Path(e.site) == b / "Lib" / "site-packages"
 
 
+def test_movie_dubber_runtime_and_shared_cu130_are_found(tmp_path):
+    """A cp314 torch 2.11+cu130 in Movie Dubber's runtime-<key>\\env used to be missed, so --install-modules downloaded another copy."""
+    local = tmp_path / "Local"
+    home = tmp_path / "home"
+    home.mkdir()
+    dubber = local / "Voxprint" / "runtime-abc123def456" / "env" / "Lib" / "site-packages"
+    fake_site(dubber, torch="2.11.0+cu130", audio="2.11.0+cu130")
+    shared = local / "Voxprint" / "shared" / "runtime" / "Lib" / "site-packages"
+    fake_site(shared, torch="2.10.0_cu130", audio="2.10.0_cu130")
+    env = {"LOCALAPPDATA": str(local), "USERPROFILE": str(home), "HOME": str(home)}
+    prefixes = rr.candidate_prefixes(environ=env, home=home)
+    found = rr.find_torch(prefixes)
+    by_site = {Path(item.site): item for item in found}
+    assert dubber in by_site and by_site[dubber].flavor == "cu130" and by_site[dubber].torch == "2.11.0+cu130"
+    assert shared in by_site and by_site[shared].torch == "2.10.0+cu130" and by_site[shared].flavor == "cu130"
+    ext = rr.try_reuse_torch(LOCK, (13, 0), "cu130", prefixes=prefixes, verifier=lambda item: (item.site == str(dubber), "ok"))
+    assert ext is not None and ext.site == str(dubber)
+
+
+def test_a_free_threaded_wheel_tag_does_not_match_this_interpreter(tmp_path):
+    site = fake_site(tmp_path / "s", torch="2.11.0+cu130", audio="2.11.0+cu130")
+    wheel = next(site.glob("torch-*.dist-info")) / "WHEEL"
+    exact = f"cp{sys.version_info.major}{sys.version_info.minor}"
+    wheel.write_text(f"Wheel-Version: 1.0\nTag: py3-none-any\nTag: {exact}-{exact}-win_amd64\n", encoding="utf-8")
+    ext = rr.inspect_site(site)
+    assert ext is not None and ext.py_tag == exact and ext.platform == "win_amd64"
+    wheel.write_text(f"Wheel-Version: 1.0\nTag: {exact}-{exact}t-win_amd64\n", encoding="utf-8")
+    foreign = rr.inspect_site(site)
+    assert foreign is not None
+    ok, reason = rr.assess(foreign, LOCK, "cu130", (13, 0), py_tag=exact)
+    if "t" in (getattr(sys, "abiflags", "") or ""):
+        assert ok, reason
+    else:
+        assert not ok and "t" in reason
+
+
 def test_candidate_prefixes_find_project_venvs_and_pinokio(tmp_path):
     home = tmp_path / "home"
     (home / "work" / "tts" / ".venv").mkdir(parents=True)

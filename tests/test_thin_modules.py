@@ -288,7 +288,7 @@ def test_settings_has_the_components_button_only_in_a_thin_build(app, lib, thin,
 def test_inno_thin_switch_and_vc_redist_exit_codes():
     assert "#ifdef THIN" in ISS and "' --role core'" in ISS and "Voxprint-Setup-thin" in ISS
     assert not re.search(r"^Filename: \"\{tmp\}\\vc_redist", ISS, re.M)                  # no [Run] entry any more
-    body = ISS[ISS.index("procedure InstallVcRedist"):ISS.index("procedure CurStepChanged")]
+    body = ISS[ISS.index("procedure InstallVcRedist"):ISS.index("function AppLanguageCode")]
     for code in ("1638", "3010", "1641"):
         assert code in body
     assert "MsgBox" not in body and "SuppressibleMsgBox" not in body                      # never shown to the user

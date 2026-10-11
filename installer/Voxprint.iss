@@ -1,12 +1,13 @@
 ﻿; Voxprint installer (Inno Setup 6.x). Build with:  ISCC installer\Voxprint.iss   (or through build.bat)
 ; For the --onedir variant:  ISCC /DONEDIR installer\Voxprint.iss
-; Windows 11 x64 only. The models are not part of the installer: the app downloads them itself on first start
-; (after the installation, Voxprint can be started right away with the --prefetch flag).
-; Wizard page "Setup type" (decided 2026-10-08; infra/setup_mode.py): exactly two choices, written to state\install_mode.txt.
-;  * Full (default): the first start downloads EVERYTHING without a further click - the components and ALL models including the
-;    optional ones (about FullModelsMB + FullRuntimeMB below, from the pinned sizes); the page checks the free space first.
-;  * Quick: only the program is installed; the first start opens the Components window, which OFFERS the same complete download.
-;  Nothing is cut in either mode: the end result is identical.  Silent: /Mode=full (default) or /Mode=quick.
+; Windows 11 x64 only. Setup installs the Python runtime, the torch/CUDA wheels, ffmpeg and the required base models
+; into %LOCALAPPDATA%\Voxprint\shared\ (runtime, models, tools) while a progress window is shown, including /VERYSILENT.
+; Optional models stay in the Components window. /SkipSuite=1 skips that step (CI smoke). A too-old NVIDIA driver stops
+; setup with a message and a download link; the driver itself is not installed.
+; Wizard page "Setup type" (infra/setup_mode.py): exactly two choices, written to state\install_mode.txt.
+;  * Full (default): setup installs the required shared pieces now. Optional models are offered afterwards.
+;  * Quick: the same required pieces are installed now; the Components window waits before optional models.
+;  Silent: /Mode=full (default) or /Mode=quick.
 ; Wizard page "Models folder" (after the install folder): where the voice models (~15 GB) live. Default = the current location
 ; %LOCALAPPDATA%\Voxprint\models; the user may pick another folder or drive.  Only paths are REMEMBERED; the installer copies no model.
 ; Two cases (decided 2026-10-05):
@@ -34,8 +35,8 @@
 ; (/FromFolder=<dir>, the remembered one, Documents\Voxprint Portable, or next to the installer) and installs without internet; with
 ; internet only the changed parts are fetched.  Silent: /Portable=1 [/PortableDir=<dir>] [/PortableModels=none|auto|all] [/FromFolder=<dir>].
 ; THIN variant (add /DTHIN to the ONLINE command; see docs/THIN-INSTALLER.md): only the components with role "core" (the small
-; UI shell built by build_thin.bat) are installed -> Output\Voxprint-Setup-thin.exe; the app downloads the heavy runtime modules
-; (PyTorch ...) itself on its first start (infra/modules.py, window "Components").
+; UI shell built by build_thin.bat) are fetched in PrepareToInstall -> Output\Voxprint-Setup-thin.exe. ssPostInstall then runs
+; voxprint-cli.exe --install-suite, which installs the Python runtime, torch/CUDA wheels, ffmpeg and the required models.
 
 #define AppName "Voxprint"
 ; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
@@ -44,6 +45,8 @@
 ; Windows version resources are four numbers. The pre-release suffix stays in AppVersion.
 #define AppVersionInfo "1.0.0"
 #define AppExe "Voxprint.exe"
+; Console companion (PyInstaller --console). Scripts use this so the process exit code is the command's code.
+#define CliExe "voxprint-cli.exe"
 ; CI build number and codename (tools/build_number.py; build_online.ps1 passes /DAppBuild= /DAppCodename=); 0 = local build
 #ifndef AppBuild
 #define AppBuild "0"
@@ -106,6 +109,8 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; InitializeSetup again with the detected build number (English, Russian, German).
 MinVersion=10.0.26100
 CloseApplications=yes
+; {app} is added to the user PATH so voxprint-cli.exe is found after a scripted install.
+ChangesEnvironment=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -124,18 +129,18 @@ german.RunPrefetch=%1 jetzt starten
 english.ModePageCaption=Setup type
 russian.ModePageCaption=Тип установки
 german.ModePageCaption=Installationsart
-english.ModePageDescription=When should the components and models be downloaded?
-russian.ModePageDescription=Когда скачивать компоненты и модели?
-german.ModePageDescription=Wann sollen die Komponenten und Modelle geladen werden?
-english.ModePageSubCaption=Both choices end with the same complete program; only the moment of the download differs.
-russian.ModePageSubCaption=Оба варианта дают одну и ту же полную программу; отличается только момент загрузки.
-german.ModePageSubCaption=Beide Varianten ergeben dasselbe vollständige Programm; nur der Zeitpunkt des Downloads ist anders.
-english.ModeFull=Full (recommended): on the first start everything is downloaded without further questions - the components and ALL models, including the optional ones (about %1 GB)
-russian.ModeFull=Полная (рекомендуется): при первом запуске всё скачивается без лишних вопросов - компоненты и ВСЕ модели, включая дополнительные (около %1 ГБ)
-german.ModeFull=Vollständig (empfohlen): Beim ersten Start wird alles ohne weitere Fragen geladen - die Komponenten und ALLE Modelle, auch die optionalen (ca. %1 GB)
-english.ModeQuick=Quick: install only the program now; on the first start the Components window offers the same complete download (about %1 GB)
-russian.ModeQuick=Быстрая: сейчас установить только программу; при первом запуске окно «Компоненты» предложит ту же полную загрузку (около %1 ГБ)
-german.ModeQuick=Schnell: jetzt nur das Programm installieren; beim ersten Start bietet das Fenster „Komponenten" denselben vollständigen Download an (ca. %1 GB)
+english.ModePageDescription=Required pieces are installed during setup. Optional models can wait.
+russian.ModePageDescription=Нужное устанавливается во время установки. Дополнительные модели могут подождать.
+german.ModePageDescription=Das Nötige wird während der Installation eingerichtet. Optionale Modelle können warten.
+english.ModePageSubCaption=Both choices install the runtime, ffmpeg and the required models during setup. Optional models wait until you ask for them.
+russian.ModePageSubCaption=Оба варианта ставят среду, ffmpeg и нужные модели во время установки. Дополнительные модели ждут, пока вы их не запросите.
+german.ModePageSubCaption=Beide Varianten installieren die Laufzeit, ffmpeg und die nötigen Modelle während der Installation. Optionale Modelle warten, bis Sie sie anfordern.
+english.ModeFull=Full (recommended): setup installs the Python runtime, PyTorch, ffmpeg and the required models now (about %1 GB). Optional models are offered afterwards and are not all started at once
+russian.ModeFull=Полная (рекомендуется): установка сейчас ставит среду Python, PyTorch, ffmpeg и нужные модели (около %1 ГБ). Дополнительные модели предлагаются потом и не запускаются все сразу
+german.ModeFull=Vollständig (empfohlen): Das Setup installiert jetzt die Python-Laufzeit, PyTorch, ffmpeg und die nötigen Modelle (ca. %1 GB). Optionale Modelle werden danach angeboten und nicht alle auf einmal gestartet
+english.ModeQuick=Quick: setup installs the Python runtime, PyTorch, ffmpeg and the required models now. The Components window offers optional models (about %1 GB) and does not start them until you press Download
+russian.ModeQuick=Быстрая: установка сейчас ставит среду Python, PyTorch, ffmpeg и нужные модели. Окно «Компоненты» предлагает дополнительные модели (около %1 ГБ) и не запускает их, пока вы не нажмёте «Скачать»
+german.ModeQuick=Schnell: Das Setup installiert jetzt die Python-Laufzeit, PyTorch, ffmpeg und die nötigen Modelle. Das Fenster „Komponenten" bietet optionale Modelle an (ca. %1 GB) und startet sie erst, wenn Sie auf Download klicken
 english.ModeNoSpace=Not enough free space for the full download on %1: about %2 GB are needed, %3 GB are free.%n%nChoose a models folder on another drive (Back), free some space, or choose Quick setup.
 russian.ModeNoSpace=Недостаточно места для полной загрузки на %1: нужно около %2 ГБ, свободно %3 ГБ.%n%nВыберите папку моделей на другом диске (Назад), освободите место или выберите быструю установку.
 german.ModeNoSpace=Nicht genug freier Speicher für den vollständigen Download auf %1: etwa %2 GB werden benötigt, %3 GB sind frei.%n%nWählen Sie einen Modellordner auf einem anderen Laufwerk (Zurück), schaffen Sie Platz oder wählen Sie die schnelle Installation.
@@ -217,6 +222,15 @@ german.UninstallModelsQuestion=Kein anderes Voxprint-Programm verwendet die Mode
 english.PortableMissing=The setup folder %1 (from /FromFolder) was not found or has no manifest.json.
 russian.PortableMissing=Папка установки %1 (из /FromFolder) не найдена или в ней нет manifest.json.
 german.PortableMissing=Der Setup-Ordner %1 (aus /FromFolder) wurde nicht gefunden oder enthält keine manifest.json.
+english.SuiteStatus=Installing the Python runtime, PyTorch, ffmpeg and the required models...
+russian.SuiteStatus=Устанавливаются среда Python, PyTorch, ffmpeg и нужные модели...
+german.SuiteStatus=Python-Laufzeit, PyTorch, ffmpeg und die nötigen Modelle werden installiert...
+english.SuiteStalled=The component installer stopped responding.
+russian.SuiteStalled=Установщик компонентов перестал отвечать.
+german.SuiteStalled=Der Komponenten-Installer antwortet nicht mehr.
+english.SuiteFailed=The shared components could not be installed:%n%n%1
+russian.SuiteFailed=Не удалось установить общие компоненты:%n%n%1
+german.SuiteFailed=Die gemeinsamen Komponenten konnten nicht installiert werden:%n%n%1
 
 ; No desktop shortcut on purpose (no [Tasks] section at all, so no task can be selected, silent or not): only the Start menu entry below + the Apps list entry.
 [InstallDelete]
@@ -494,7 +508,7 @@ end;
 { The default models folder of the app (infra/paths.py: default_models_dir). }
 function DefaultModelsDir(): String;
 begin
-  Result := ExpandConstant('{localappdata}\Voxprint\models');
+  Result := ExpandConstant('{localappdata}\Voxprint\shared\models');
 end;
 
 { One string value of the shared settings file %LOCALAPPDATA%\Voxprint\state\suite.json (infra/suite_settings.py; the Movie
@@ -1153,17 +1167,212 @@ begin
   SaveStringToFile(F, AnsiString(S), False);
 end;
 
+{ voxprint-cli.exe when the console companion was packed; otherwise the windowed exe (smoke copies whoami.exe there). }
+function ProgramExe(): String;
+begin
+  if FileExists(ExpandConstant('{app}\{#CliExe}')) then
+    Result := ExpandConstant('{app}\{#CliExe}')
+  else
+    Result := ExpandConstant('{app}\{#AppExe}');
+end;
+
 { The shared settings file (state\suite.json) gets the models folder chosen above (null = default) and the UI language if it has
-  none yet: Voxprint.exe --sync-suite-settings (infra/suite_settings.py) - run as the user who started the setup, so it is that
+  none yet: voxprint-cli.exe --sync-suite-settings (infra/suite_settings.py) - run as the user who started the setup, so it is that
   user's %LOCALAPPDATA%.  A failure is harmless: the app copies the same values at its next start. }
 procedure SyncSuiteSettings();
 var
   Rc: Integer;
+  Exe: String;
 begin
-  if FileExists(ExpandConstant('{app}\{#AppExe}')) then
-    if not ExecAsOriginalUser(ExpandConstant('{app}\{#AppExe}'), '--sync-suite-settings', ExpandConstant('{app}'), SW_HIDE,
-                              ewWaitUntilTerminated, Rc) then
+  Exe := ProgramExe();
+  if FileExists(Exe) then
+    if not ExecAsOriginalUser(Exe, '--sync-suite-settings', ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Rc) then
       Log('suite settings were not synced; the app does it at its next start');
+end;
+
+#ifndef ONLINE
+function VxTick(): Cardinal;
+external 'GetTickCount@kernel32.dll stdcall';
+
+function ReadFetchStatus(const StatusFile: String; var State: String; var Permille: Integer; var Msg, Beat: String): Boolean;
+var
+  Lines: TArrayOfString;
+begin
+  Result := False;
+  if FileExists(StatusFile) and LoadStringsFromFile(StatusFile, Lines) and (GetArrayLength(Lines) >= 3) then
+  begin
+    State := Trim(Lines[0]);
+    Permille := StrToIntDef(Trim(Lines[1]), 0);
+    Msg := Trim(Lines[2]);
+    if GetArrayLength(Lines) >= 4 then Beat := Trim(Lines[3]) else Beat := '';
+    Result := True;
+  end;
+end;
+#endif
+
+{ /SkipSuite or /SkipSuite=1: CI smoke must not run the real component install. }
+function SkipSuiteInstall(): Boolean;
+var
+  V: String;
+begin
+  V := Uppercase(Trim(ExpandConstant('{param:SkipSuite|}')));
+  Result := ParamSwitch('SKIPSUITE') or (V = '1') or (V = 'YES') or (V = 'TRUE');
+end;
+
+{ After the program files are in place: install the shared runtime, ffmpeg and required models.
+  A progress form stays visible under /VERYSILENT (wizard pages are hidden). The status file is four lines
+  (state, permille, message, heartbeat). No status within 15 s means the helper is not our program (smoke);
+  a heartbeat that stops for 120 s is a stall. The process handle from ewNoWait is not closed here. }
+procedure RunSuiteInstall();
+var
+  Exe, StatusFile, Params, State, Msg, Beat, LastBeat: String;
+  Pm, Rc: Integer;
+  Form: TSetupForm;
+  Bar: TNewProgressBar;
+  Lbl: TNewStaticText;
+  LastChange, Started: Cardinal;
+  Finished, SawStatus: Boolean;
+begin
+  if SkipSuiteInstall() then
+  begin
+    Log('Suite install skipped (/SkipSuite)');
+    Exit;
+  end;
+  Exe := ProgramExe();
+  if not FileExists(Exe) then
+  begin
+    Log('Suite install skipped: no program executable');
+    Exit;
+  end;
+  StatusFile := ExpandConstant('{tmp}\suite-status.txt');
+  DeleteFile(StatusFile);
+  Params := '--install-suite --status ' + AddQuotes(StatusFile);
+  { Inno Setup 6.6+: width and height are arguments; ClientWidth is read-only afterwards. }
+  Form := CreateCustomForm(ScaleX(460), ScaleY(100), False, False);
+  try
+    Form.Caption := 'Voxprint';
+    Form.BorderStyle := bsDialog;
+    Form.Position := poScreenCenter;
+    Lbl := TNewStaticText.Create(Form);
+    Lbl.Parent := Form;
+    Lbl.Left := ScaleX(16);
+    Lbl.Top := ScaleY(14);
+    Lbl.Width := Form.ClientWidth - ScaleX(32);
+    Lbl.Height := ScaleY(36);
+    Lbl.AutoSize := False;
+    Lbl.Caption := CustomMessage('SuiteStatus');
+    Bar := TNewProgressBar.Create(Form);
+    Bar.Parent := Form;
+    Bar.Left := ScaleX(16);
+    Bar.Top := ScaleY(60);
+    Bar.Width := Form.ClientWidth - ScaleX(32);
+    Bar.Height := ScaleY(18);
+    Bar.Min := 0;
+    Bar.Max := 1000;
+    Bar.Position := 0;
+    Form.Show;
+    if not ExecAsOriginalUser(Exe, Params, ExpandConstant('{app}'), SW_HIDE, ewNoWait, Rc) then
+    begin
+      Log('suite install could not start: ' + SysErrorMessage(Rc));
+      Exit;
+    end;
+    Finished := False;
+    SawStatus := False;
+    LastBeat := '';
+    Started := VxTick();
+    LastChange := Started;
+    while not Finished do
+    begin
+      Sleep(300);
+      if ReadFetchStatus(StatusFile, State, Pm, Msg, Beat) then
+      begin
+        SawStatus := True;
+        Lbl.Caption := Msg;
+        Bar.Position := Pm;
+        WizardForm.StatusLabel.Caption := Msg;
+        WizardForm.ProgressGauge.Position := Pm;
+        if Beat <> LastBeat then
+        begin
+          LastBeat := Beat;
+          LastChange := VxTick();
+        end;
+        if State = 'done' then
+          Finished := True
+        else if State = 'error' then
+        begin
+          SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), [Msg]), mbError, MB_OK, IDOK);
+          Abort;
+        end;
+      end;
+      if not Finished then
+      begin
+        if (not SawStatus) and ((VxTick() - Started) > 15000) then
+        begin
+          Log('Suite install wrote no status; continuing');
+          Finished := True;
+        end
+        else if SawStatus and ((VxTick() - LastChange) > 120000) then
+        begin
+          SuppressibleMsgBox(CustomMessage('SuiteStalled'), mbError, MB_OK, IDOK);
+          Abort;
+        end;
+      end;
+    end;
+  finally
+    Form.Hide;
+  end;
+end;
+
+{ Append the program folder to the user PATH once, keeping REG_EXPAND_SZ so %SystemRoot% stays unexpanded. }
+procedure AddAppToUserPath();
+var
+  OldPath, NewPath, AppDir: String;
+begin
+  AppDir := RemoveBackslash(ExpandConstant('{app}'));
+  if not RegQueryStringValue(HKCU, 'Environment', 'Path', OldPath) then
+    OldPath := '';
+  if Pos(';' + Uppercase(AppDir) + ';', ';' + Uppercase(OldPath) + ';') > 0 then
+    Exit;
+  if OldPath = '' then
+    NewPath := AppDir
+  else
+    NewPath := OldPath + ';' + AppDir;
+  if not RegWriteExpandStringValue(HKCU, 'Environment', 'Path', NewPath) then
+    Log('could not add the program folder to PATH');
+end;
+
+procedure RemoveAppFromUserPath();
+var
+  OldPath, NewPath, AppDir, Piece, Rest: String;
+  P: Integer;
+begin
+  AppDir := RemoveBackslash(ExpandConstant('{app}'));
+  if not RegQueryStringValue(HKCU, 'Environment', 'Path', OldPath) then
+    Exit;
+  NewPath := '';
+  Rest := OldPath;
+  while Rest <> '' do
+  begin
+    P := Pos(';', Rest);
+    if P = 0 then
+    begin
+      Piece := Rest;
+      Rest := '';
+    end
+    else
+    begin
+      Piece := Copy(Rest, 1, P - 1);
+      Rest := Copy(Rest, P + 1, Length(Rest));
+    end;
+    if CompareText(RemoveBackslash(Trim(Piece)), AppDir) <> 0 then
+    begin
+      if (NewPath = '') and (Piece <> '') then
+        NewPath := Piece
+      else if Piece <> '' then
+        NewPath := NewPath + ';' + Piece;
+    end;
+  end;
+  RegWriteExpandStringValue(HKCU, 'Environment', 'Path', NewPath);
 end;
 
 { Only paths are remembered (UTF-8 files in state\); no model is copied.  models_dir.txt = the models folder (deleted when it is the
@@ -1236,6 +1445,8 @@ begin
       Lines[0] := AppLanguageCode();
       SaveStringsToUTF8FileWithoutBOM(StateDir + '\language', Lines, False);
     end;
+    RunSuiteInstall();
+    AddAppToUserPath();
   end;
 end;
 
@@ -1255,8 +1466,8 @@ begin
   SharedModelsDir := '';
   OutFile := AddBackslash(GetTempDir()) + 'voxprint-models-users.txt';
   DeleteFile(OutFile);
-  if not FileExists(ExpandConstant('{app}\{#AppExe}')) then Exit;
-  if Exec(ExpandConstant('{app}\{#AppExe}'), '--unregister-models-user --out "' + OutFile + '"', ExpandConstant('{app}'),
+  if not FileExists(ProgramExe()) then Exit;
+  if Exec(ProgramExe(), '--unregister-models-user --out "' + OutFile + '"', ExpandConstant('{app}'),
           SW_HIDE, ewWaitUntilTerminated, Rc) and (Rc = 0) then
     if LoadStringsFromFile(OutFile, Lines) and (GetArrayLength(Lines) >= 2) then
     begin
@@ -1274,10 +1485,20 @@ procedure UnregisterRuntimeUser;
 var
   Rc: Integer;
 begin
-  if FileExists(ExpandConstant('{app}\{#AppExe}')) then
-    if not Exec(ExpandConstant('{app}\{#AppExe}'), '--unregister-runtime-user', ExpandConstant('{app}'), SW_HIDE,
+  if FileExists(ProgramExe()) then
+    if not Exec(ProgramExe(), '--unregister-runtime-user', ExpandConstant('{app}'), SW_HIDE,
                 ewWaitUntilTerminated, Rc) then
       Log('runtime users file not updated');
+end;
+
+{ Drop our app from the shared manifest and delete resources no other Voxprint app still lists. }
+procedure UnregisterSuite();
+var
+  Rc: Integer;
+begin
+  if FileExists(ProgramExe()) then
+    if not Exec(ProgramExe(), '--unregister-suite', ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Rc) then
+      Log('shared suite manifest was not updated');
 end;
 
 #ifdef ONLINE
@@ -1333,6 +1554,8 @@ begin
   begin
     UnregisterModelsUser;
     UnregisterRuntimeUser;
+    UnregisterSuite;
+    RemoveAppFromUserPath;
   end;
 #ifdef ONLINE
   if CurUninstallStep = usPostUninstall then

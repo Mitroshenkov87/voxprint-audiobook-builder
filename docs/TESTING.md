@@ -64,6 +64,38 @@ The Linux test-suite (`QT_QPA_PLATFORM=offscreen python -m pytest`) covers the p
 * GUI click-through of the installed app on a clean machine, full `lzma2/max` installer compile and Windows SmartScreen / signing behaviour.
 * The optional `ctc-forced-aligner`; reading the adapter in Alexandria with its pinned `peft==0.18.1`.
 
+## VM test (RTX machine)
+
+`scripts/vm_test.sh` is the non-interactive check for a Linux machine with an NVIDIA GPU. `scripts/vm_test.ps1` is the same check for the Windows VM. Neither script prompts.
+
+```
+scripts/vm_test.sh --smoke --json --tag v1.0.0-rc.3
+scripts/vm_test.sh --full --json
+powershell -File scripts/vm_test.ps1 --smoke --json --tag v1.0.0-rc.3
+powershell -File scripts/vm_test.ps1 --full --json
+```
+
+`--full` includes `--smoke`. Passing both runs the full set. The program is `--bin`, else `$VOXPRINT_BIN`, else `voxprint-cli`, else `voxprint`, else `python3 main.py` from this repository.
+
+| Exit | Meaning |
+|---|---|
+| 0 | Every step that ran passed |
+| 1 | A step failed (narration, JSON shape, yo, marks, labelled MP3) |
+| 2 | Setup error: missing program, bad arguments, or the `.vxbook` could not be written |
+| 3 | `nvidia-smi` is missing or fails. These codes are the script's, not the program's own exit codes |
+
+`--smoke` is the short run (about 10 minutes on a 4090): `--version`, `--selftest`, `--dry-run --json` for `narrate` and `prepare` (stdout is JSON, `durations.audio_s` is null, `outputs` is `[]`), one short Russian narration with the default voice Levi as MP3, and the peak `memory.used` from `nvidia-smi` while that narration runs.
+
+`--full` adds the multi-voice dialogue (`speakers`, then `narrate --speaker-marks` with Levi, Natan, Shimon and Miriam), a `prepare --steps yo` check that the letter ё was restored, a `.vxbook` that declares `sound/1` (narrated with `--no-soundscape`, so a missing soundscape model still passes), and labelled chapter MP3s (`01 - Title.mp3`).
+
+A step that exits 0 writes `~/.done/<step>` (`$env:USERPROFILE\.done\<step>` on Windows, or `$VOXPRINT_VM_DONE`). The next run skips a step whose marker exists. Delete one marker to repeat that step. A failed step does not write a marker.
+
+Results are written to `./vm-results/audiobook-builder/<tag>/` (or `--results`, or `$VOXPRINT_VM_RESULTS`). `<tag>` is `--tag`, otherwise the version the program reports. `result.json` is the same object `--json` prints last. Copy that folder to the workspace with:
+
+```
+rsync -a ./vm-results/audiobook-builder/<tag>/ /workspace/vm-results/audiobook-builder/<tag>/
+```
+
 ## Code audit
 
 `tools/audit.py` is the release gate. It runs on every push and pull request to `main`, weekly, and as the first job of the installer workflow. What it blocks on, and which findings are accepted, is [AUDIT.md](AUDIT.md).

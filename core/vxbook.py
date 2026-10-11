@@ -3,7 +3,10 @@
 The file is a ZIP. The first entry is the stored mimetype ``application/vnd.voxprint.book+zip``. ``manifest.json``
 names the chapters and the SHA-256 of every other entry. ``book.md`` is the text. ``speakers.json`` and optional
 ``cast.json`` are the voices. Optional ``sound.json`` is the soundscape; this module only checks that it is a JSON
-object and keeps it. :mod:`core.soundscape` decides whether to play it.
+object and keeps it. :mod:`core.soundscape` decides whether to play it. A chapter id and a speaker id (a cast key is a
+speaker id) match ``^[a-z0-9][a-z0-9_-]{0,63}$``: a letter or a digit, then at most 63 letters, digits,
+underscores and hyphens. ``1``, ``2``, ``ch01`` and ``part-2`` are valid. Plotweaver emits the digit form.
+A ``vx:`` directive name and its attribute names stay ``^[a-z][a-z0-9_]*$``, as in ``<!-- vx:NAME key="..." -->``.
 
 A ``.vxbook`` writes the letter yo itself, so :attr:`core.book_parsers.Book.explicit_yo` is set and dictionary
 restoration stays off. A stress mark (U+0301) is left in the spoken text for the normalizer.
@@ -40,7 +43,7 @@ MAX_COVER = 20 * 1024 * 1024
 MAX_NOTE = 8 * 1024 * 1024
 MAX_RATIO = 100
 MAX_PIXELS = 100_000_000
-_ID = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 _DIRECTIVE = re.compile(r'^<!-- vx:([a-z][a-z0-9_]*)((?: [a-z][a-z0-9_]*="[^"<>]*")*) -->$')
 _ATTR_ONE = re.compile(r'([a-z][a-z0-9_]*)="([^"<>]*)"')
 _CONF = re.compile(r"^(?:0(?:\.\d{1,2})?|1(?:\.0{1,2})?)$")

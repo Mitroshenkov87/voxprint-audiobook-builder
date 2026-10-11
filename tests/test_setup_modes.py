@@ -103,9 +103,13 @@ def test_quick_setup_offers_everything_and_waits_for_the_click(app, monkeypatch)
     d.shutdown()
 
 
-def test_full_setup_starts_without_a_click(app, monkeypatch):   # noqa: F811
+def test_full_setup_shows_sizes_and_does_not_start_every_model(app, monkeypatch):   # noqa: F811
     d, workers = _dialog(monkeypatch, autostart=True)
-    assert wait_for(lambda: workers, 10) and "Quick setup" not in d.lbl_status.text()
+    assert wait_for(lambda: "Essentials" in d.lbl_status.text(), 10), d.lbl_status.text()
+    assert "Quick setup" not in d.lbl_status.text() and not workers
+    assert not d.chk_optional.isChecked()
+    d.on_download_clicked()
+    assert wait_for(lambda: workers, 10)
     d.shutdown()
 
 

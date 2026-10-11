@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sys
+import warnings
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -368,20 +369,28 @@ def test_narrate_json_progress_and_result(tmp_path, capsys):
     target = out / "story" / "story.mp3"
 
     def fake_run(job, progress, cancel, pause):
+        print("Warning: flash-attn is not installed")
+        warnings.warn("library banner", UserWarning)
         progress(NarrationProgress(1, 2, 12.0, "chapter", "synth"))
-        return SimpleNamespace(out_dir=out / "story", files=[target])
+        return SimpleNamespace(out_dir=out / "story", files=[target], seconds=4.5)
 
     code = user_cli.main(
         ["--json", "narrate", str(book), "--voice", "model-voice", "--out", str(out), "--format", "mp3"],
         run_narration_fn=fake_run, library=lib,
     )
     assert code == 0
-    lines = _json_lines(capsys.readouterr().out)
+    captured = capsys.readouterr()
+    for line in captured.out.splitlines():
+        if line.strip():
+            json.loads(line)
+    assert "flash-attn" in captured.err and "library banner" in captured.err
+    lines = _json_lines(captured.out)
     assert lines[0]["type"] == "progress" and lines[0]["stage"] == "synth"
     assert 0 <= lines[0]["percent"] <= 100
     result = lines[-1]
-    assert result["type"] == "result" and result["ok"] is True
+    assert result["type"] == "result" and result["ok"] is True and result["exit_code"] == 0
     assert str(target) in result["outputs"]
+    assert result["durations"]["audio_s"] == 4.5
     assert "duration_s" in result and result["warnings"] == []
 
 

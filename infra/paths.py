@@ -3,9 +3,13 @@ overridable with ``VOXPRINT_HOME``).
 
 Layout under :func:`app_home`::
 
-    models/      downloaded Hugging Face / ModelScope snapshots (the DEFAULT models folder; the installer's "Models folder" page
-                 or ``VOXPRINT_MODELS_DIR`` may move the download target elsewhere - see :func:`models_dir`; a folder that
-                 holds a Voxprint backup is never used as the models folder, it is restored into this one)
+    shared/      suite-wide runtime, models and tools (``runtime/``, ``models/``, ``tools/``, ``manifest.json``).
+                 Windows: ``%LOCALAPPDATA%\\Voxprint\\shared``. Linux: ``~/.local/share/voxprint/shared``.
+                 Override with ``VOXPRINT_SHARED``. See :mod:`infra.suite_shared`.
+    models/      legacy models folder. New installs use ``shared/models`` (:func:`default_models_dir`). A folder that
+                 already holds models here is still read until ``shared/models`` has some. The installer's "Models folder"
+                 page or ``VOXPRINT_MODELS_DIR`` may move the download target - see :func:`models_dir`. A folder that
+                 holds a Voxprint backup is never used as the models folder, it is restored into the default one.
     packages/    updated Python packages, put on ``sys.path`` at start-up (before heavy imports)
     voices/      the voice library: one folder per voice (adapter + voice.json), see core/voice_library.py
     state/       small settings files (language, privacy acknowledgement, updater state, last adapter ...)
@@ -52,9 +56,34 @@ MODELS_DIR_ENV = "VOXPRINT_MODELS_DIR"
 MODELS_DIR_FILE = "models_dir.txt"
 
 
+def shared_root() -> Path:
+    """Suite-wide folder: ``$VOXPRINT_SHARED``, else ``<app home>/shared``.
+
+    Windows: ``%LOCALAPPDATA%\\Voxprint\\shared``. Linux: ``~/.local/share/voxprint/shared``.
+    """
+    env = os.environ.get("VOXPRINT_SHARED", "").strip()
+    p = Path(env) if env else app_home() / "shared"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def legacy_models_dir() -> Path:
+    """The previous default ``<app home>/models``. Still read when it already holds models and ``shared/models`` does not."""
+    return app_home() / "models"
+
+
+def _has_entries(folder: Path) -> bool:
+    try:
+        return folder.is_dir() and any(folder.iterdir())
+    except OSError:
+        return False
+
+
 def default_models_dir() -> Path:
-    """The default models folder ``<app home>/models`` (``%LOCALAPPDATA%\\Voxprint\\models`` on Windows)."""
-    return _sub("models")
+    """The default models folder ``<app home>/shared/models`` (``%LOCALAPPDATA%\\Voxprint\\shared\\models`` on Windows)."""
+    p = shared_root() / "models"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
 
 
 def _absolute(text: str) -> Optional[Path]:
@@ -99,7 +128,7 @@ def set_models_dir(folder: Optional[Path]) -> None:
     f = state_dir() / MODELS_DIR_FILE
     from infra import suite_settings
 
-    if folder is None or _same(Path(folder), app_home() / "models"):
+    if folder is None or _same(Path(folder), default_models_dir()) or _same(Path(folder), legacy_models_dir()):
         f.unlink(missing_ok=True)
         suite_settings.set_quietly("models_dir", None)
         return
@@ -173,6 +202,10 @@ def models_dir() -> Path:
             return p
         except OSError:
             pass
+    shared = shared_root() / "models"
+    legacy = legacy_models_dir()
+    if _has_entries(legacy) and not _has_entries(shared):
+        return legacy
     return default_models_dir()
 
 

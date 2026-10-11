@@ -1862,14 +1862,15 @@ class MainWindow(QWidget):
         return True
 
     # ------------------------------------------------------------------ first run
-    def start_prefetch(self, hook: Optional[Callable[[Any], None]] = None) -> Optional[PrefetchWorker]:
-        """Download ALL required models automatically on the first run (no questions asked, no "quality" button).
+    def start_prefetch(self, hook: Optional[Callable[[Any], None]] = None,
+                       everything: Optional[bool] = None) -> Optional[PrefetchWorker]:
+        """Download models on the first run. ``everything=False`` is the required set only.
 
         ``hook(worker)`` runs before the worker starts (the Components window connects its live line there, so no signal is
         lost).  Returns the worker, or None if a task is running."""
         if self.busy:
             return None
-        w = PrefetchWorker(self.prefetch_fn, parent=self)
+        w = PrefetchWorker(self.prefetch_fn, parent=self, everything=everything)
         self.prefetch_worker = w
         self.lbl_status.setText(tr("ui.prefetch_start"))
 

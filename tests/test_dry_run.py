@@ -162,3 +162,21 @@ def test_dry_run_exit_codes_for_bad_input_and_settings_do_not_persist(tmp_path, 
     assert not list(home.rglob("ace-step*"))
     again = _payload(_run(home, ["--dry-run", "--json", "settings", "get", "narration.ordinals"]))
     assert again["value"] is True
+
+
+def test_narrate_dry_run_json_ends_with_the_result(tmp_path, book):
+    path, out = book
+    home = tmp_path / "home"
+    home.mkdir()
+    proc = _run(home, ["--dry-run", "--json", "narrate", str(path), "--voice", "narrator", "--out", str(out)])
+    lines = [line for line in proc.stdout.splitlines() if line.strip()]
+    assert lines, proc.stderr
+    for line in lines:
+        json.loads(line)
+    last = json.loads(lines[-1])
+    assert last["type"] == "result" and last["command"] == "narrate"
+    assert last["exit_code"] == proc.returncode == 0
+    assert last["outputs"] == []
+    assert last["durations"] == {"audio_s": None}
+    assert "duration_s" in last
+    assert "flash-attn" not in proc.stdout

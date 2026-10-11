@@ -70,6 +70,69 @@ class ExternalTorch:
             return (Version("0"), self.site)
 
 
+_LOCAL_TAG = re.compile(r"^(\d+(?:\.\d+)+)_(cu\d+|cpu|rocm\d+)$", re.I)
+
+
+def normalize_torch_version(version: str) -> str:
+    """``2.11.0+cu130`` stays; a wheel filename that escaped ``+`` as ``_`` (``2.11.0_cu130``) becomes ``2.11.0+cu130``."""
+    text = (version or "").strip()
+    match = _LOCAL_TAG.fullmatch(text)
+    if match:
+        return f"{match.group(1)}+{match.group(2)}"
+    return text
+
+
+def _version_of(dist: Path, folder_version: str) -> str:
+    """Version from METADATA, keeping a local tag that lives only on the dist-info folder name."""
+    folder = normalize_torch_version(folder_version)
+    meta = ""
+    try:
+        meta = (dist / "METADATA").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return folder
+    recorded = ""
+    for line in meta.splitlines():
+        if line.startswith("Version:"):
+            recorded = normalize_torch_version(line.split(":", 1)[1].strip())
+            break
+        if line == "":
+            break
+    if recorded and "+" not in recorded and "+" in folder:
+        return folder
+    return recorded or folder
+
+
+def _running_python_tag() -> str:
+    """``cp314`` for this interpreter, plus ``t`` when it is free-threaded."""
+    flags = getattr(sys, "abiflags", "") or ""
+    return f"cp{sys.version_info.major}{sys.version_info.minor}{flags}"
+
+
+def _pick_wheel_tag(tags: List[Tuple[str, str, str]]) -> Tuple[str, str]:
+    """``(python tag, platform)`` of the tag that matches this interpreter.
+
+    A wheel may list ``py3-none-any`` and then ``cp314-cp314-win_amd64``. The generic tag is not a match for a
+    binary torch wheel. A free-threaded tag (``cp314t``) matches only a free-threaded interpreter. ``abi3`` is
+    accepted. When nothing matches, the first specific tag is returned so :func:`assess` can name the mismatch.
+    """
+    exact = _running_python_tag()
+    base = f"cp{sys.version_info.major}{sys.version_info.minor}"
+    ours_free = exact.endswith("t")
+    foreign: Tuple[str, str] = ("", "")
+    for py, abi, plat in tags:
+        if py in ("py3", "py2.py3") and abi == "none":
+            continue
+        theirs_free = py.endswith("t") or (abi.endswith("t") and abi != "abi3")
+        if theirs_free != ours_free and abi not in ("abi3", "none"):
+            shown = abi if abi.endswith("t") else py
+            foreign = foreign if foreign[0] else (shown, plat)
+            continue
+        if py in (exact, base, "py3") and abi in (exact, base, "abi3", "none"):
+            return (exact if py == "py3" else py, plat)
+        foreign = foreign if foreign[0] else (py, plat)
+    return foreign
+
+
 def _read_dist(site: Path, name: str) -> Optional[Tuple[str, str, str]]:
     """(version, python tag, platform) of distribution ``name`` in ``site`` from its dist-info, or None."""
     try:
@@ -81,16 +144,19 @@ def _read_dist(site: Path, name: str) -> Optional[Tuple[str, str, str]]:
         if not m:
             continue
         py = plat = ""
+        tags: List[Tuple[str, str, str]] = []
         try:
             for line in (d / "WHEEL").read_text(encoding="utf-8", errors="replace").splitlines():
-                if line.startswith("Tag:"):
-                    t = line.split(":", 1)[1].strip().split("-")
-                    if len(t) == 3:
-                        py, plat = t[0], t[2]
-                    break
+                if not line.startswith("Tag:"):
+                    continue
+                parts = line.split(":", 1)[1].strip().split("-")
+                if len(parts) >= 3:
+                    tags.append((parts[0], parts[1], parts[-1]))
         except OSError:
             pass
-        return m.group(1), py, plat
+        if tags:
+            py, plat = _pick_wheel_tag(tags)
+        return _version_of(d, m.group(1)), py, plat
     return None
 
 
@@ -122,6 +188,41 @@ def _site_dirs_of(prefix: Path) -> List[Path]:
     return [p for p in out if p.is_dir()]
 
 
+def _suite_runtime_prefixes(env: Dict[str, str], home: Path) -> List[Path]:
+    """Movie Dubber and the shared suite tree, which a project-venv scan does not see.
+
+    Movie Dubber installs a venv at ``%LOCALAPPDATA%\\Voxprint\\runtime-<key>\\env`` (torch in
+    ``env/Lib/site-packages``). The shared suite runtime is ``<Voxprint home>/shared/runtime``.
+    """
+    roots: List[Path] = []
+    if env.get("VOXPRINT_HOME"):
+        roots.append(Path(env["VOXPRINT_HOME"]))
+    if env.get("VOXPRINT_SHARED"):
+        roots.append(Path(env["VOXPRINT_SHARED"]).parent)
+    if env.get("LOCALAPPDATA"):
+        roots.append(Path(env["LOCALAPPDATA"]) / "Voxprint")
+    xdg = env.get("XDG_DATA_HOME", "").strip()
+    if xdg:
+        roots.append(Path(xdg) / "voxprint")
+    roots.append(home / ".local" / "share" / "voxprint")
+    found: List[Path] = []
+    seen = set()
+    for root in roots:
+        key = str(root)
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append(root / "shared" / "runtime")
+        try:
+            children = sorted(p for p in root.glob("runtime-*") if p.is_dir())
+        except OSError:
+            children = []
+        for child in children[:40]:
+            found.append(child / "env")
+            found.append(child)
+    return found
+
+
 def candidate_prefixes(environ: Optional[Dict[str, str]] = None, home: Optional[Path] = None) -> List[Path]:
     """Folders that may be a Python installation / virtual environment (cheap globs, capped; nothing is executed)."""
     env = os.environ if environ is None else environ
@@ -138,6 +239,8 @@ def candidate_prefixes(environ: Optional[Dict[str, str]] = None, home: Optional[
         except OSError:
             pass
 
+    for folder in _suite_runtime_prefixes(dict(env), home):
+        add(folder)
     for var in ("VIRTUAL_ENV", "CONDA_PREFIX", "PYTHONHOME"):
         if env.get(var):
             add(Path(env[var]))
@@ -243,7 +346,7 @@ def find_torch(prefixes: Optional[Iterable[Path]] = None, own_runtime: Optional[
 def assess(ext: ExternalTorch, lock: Dict, wanted_flavor: str, driver_cuda: Optional[Tuple[int, int]],
            py_tag: Optional[str] = None) -> Tuple[bool, str]:
     """Apply the compatibility rules 1-5 (see the module docstring); returns (ok, reason)."""
-    py_tag = py_tag or f"cp{sys.version_info.major}{sys.version_info.minor}"
+    py_tag = py_tag or _running_python_tag()
     if ext.py_tag and ext.py_tag != py_tag:
         return False, f"built for {ext.py_tag}, Voxprint runs {py_tag}"
     if not ext.py_tag:

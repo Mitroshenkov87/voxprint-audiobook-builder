@@ -58,7 +58,7 @@ The flavor we download is `cu130` when the driver supports CUDA 13 (driver 600 o
    afterwards; features that need a module work as soon as it is ready.
 4. Step 2 follows at once: the first-run download of ALL models (TTS, aligner, Qwen3-ASR, SAGE if step 1 could not get it) into the chosen models
    folder, mirrored on the same live line (backup restore and existing copies first; no "maximum quality" button). Closing the window does not stop it.
-5. CLI for scripts and CI: `Voxprint.exe --modules-status`, `--install-modules [ids] [--own-torch]`, `--probe-torch` (results also in `logs\modules.txt`, `logs\probe_torch.txt`).
+5. CLI for scripts and CI: `voxprint-cli.exe --modules-status`, `--install-modules [ids] [--own-torch]`, `--probe-torch` (results also in `logs\modules.txt`, `logs\probe_torch.txt`). `voxprint-cli.exe` is the console build; `Voxprint.exe` is windowed and does not return an exit code to a script.
 
 ## Failure and resume
 

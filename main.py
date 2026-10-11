@@ -14,6 +14,7 @@ User CLI subcommands (see ``cli.py`` / docs/CLI.md): ``narrate``, ``train``, ``v
 """
 from __future__ import annotations
 
+import json
 import logging
 import logging.handlers
 import os
@@ -202,21 +203,30 @@ def _offer_components(win, app, then_prefetch: bool, autostart: bool = True) -> 
 
     from ui.modules_dialog import ModulesDialog, default_extras
 
+    holder: dict[str, ModulesDialog] = {}
+
     def models_start(hook):
         # StudioWindow.start_prefetch delegates to the Train window (it owns the status line and the busy lock).  Before
         # this existed the call raised AttributeError inside the Qt slot and the models never started after the components.
-        return win.start_prefetch(hook) if then_prefetch else None
+        # Optional models start only when the Components window's box is ticked.
+        extra = bool(holder.get("dlg") is not None and holder["dlg"].include_optional())
+        return win.start_prefetch(hook, everything=extra) if then_prefetch else None
 
     offer = 0
-    if not autostart:
-        try:
-            from infra import setup_mode
+    essentials = 0
+    optional = 0
+    try:
+        from infra import setup_mode
 
-            offer = setup_mode.full_sizes()["total"]
-        except Exception:  # noqa: BLE001 - only the size on the line is missing then
-            offer = 0
+        sizes = setup_mode.full_sizes()
+        offer = 0 if autostart else sizes["total"]
+        essentials = sizes["runtime"]
+        optional = max(0, sizes["total"] - sizes["runtime"])
+    except Exception:  # noqa: BLE001 - only the size on the line is missing then
+        offer = 0
     dlg = ModulesDialog(win.styleSheet(), win, extras_fn=default_extras, models_start=models_start if then_prefetch else None,
-                        autostart=autostart, offer_size=offer)
+                        autostart=autostart, offer_size=offer, essentials_bytes=essentials, optional_bytes=optional)
+    holder["dlg"] = dlg
     win._components = dlg                    # keep a reference
 
     def ready() -> None:
@@ -301,6 +311,10 @@ def main(argv=None) -> int:
         from infra import suite_settings
 
         return suite_settings.sync_cli()
+    if "--install-suite" in argv or "--unregister-suite" in argv:
+        from infra import suite_install
+
+        return suite_install.cli(argv)
     if "--register-models-user" in argv or "--unregister-models-user" in argv:
         # installer / uninstaller helper for the shared models\.users.json (infra/models_users.py, agreed with the Movie Dubber)
         from infra import models_users
@@ -367,6 +381,26 @@ def main(argv=None) -> int:
         i = argv.index("--selftest-narrate")
         return selftest_narrate.run(argv[i + 1] if i + 1 < len(argv) and not argv[i + 1].startswith("--") else "")
     selftest = "--selftest" in argv  # start and quit automatically (used for the offscreen smoke check)
+    from infra import suite_install
+
+    def _suite_note(fraction: float, message: str) -> None:
+        if message:
+            print(message, file=sys.stderr, flush=True)
+
+    # A frozen app repairs before the window. --selftest does the same check and prints progress on stderr
+    # so a --json result line on stdout stays one JSON object. The GUI path repairs after the splash exists.
+    if selftest:
+        suite_report = suite_install.launch_check(_suite_note, repair=suite_install.should_repair())
+        if "--json" in argv:
+            print(json.dumps({
+                "type": "result", "ok": bool(suite_report.get("ok")), "command": "selftest",
+                "exit_code": int(suite_report.get("exit_code", 0)),
+                "outputs": [], "warnings": [], "duration_s": 0.0, "error": None, "hint": None,
+                "suite": {"root": suite_report.get("root", ""), "missing": list(suite_report.get("missing") or []),
+                          "repaired": bool(suite_report.get("repaired"))},
+            }, ensure_ascii=False), flush=True)
+    else:
+        suite_report = suite_install.launch_check(repair=False)
     from infra import models_users
 
     models_users.register_quietly()   # this program uses the shared models folder (models\.users.json)
@@ -383,6 +417,13 @@ def main(argv=None) -> int:
 
     splash = splash_mod.show()            # the first thing on screen: before the heavy UI imports below
     splash.loading_ui()
+    if (not selftest) and suite_install.should_repair() and suite_report.get("missing"):
+        def _suite_on_splash(fraction: float, message: str, splash=splash) -> None:
+            if message:
+                print(message, file=sys.stderr, flush=True)
+            splash.status(message or splash.message(), fraction)
+
+        suite_report = suite_install.launch_check(_suite_on_splash, repair=True)
     from ui import screen_fit
     from ui.studio import StudioWindow
 

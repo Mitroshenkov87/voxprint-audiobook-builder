@@ -200,6 +200,9 @@ def wipe_home():
 
     for sub in ("models", "voices", "tools"):
         shutil.rmtree(paths.app_home() / sub, ignore_errors=True)
+    shared = paths.shared_root()
+    for sub in ("models", "tools", "runtime"):
+        shutil.rmtree(shared / sub, ignore_errors=True)
 
 
 def test_restore_rebuilds_models_voices_and_tools_verified(target):
@@ -209,7 +212,8 @@ def test_restore_rebuilds_models_voices_and_tools_verified(target):
     rep = bk.run_restore(target)
     assert snapshot(md.local_dir_for(REPO)) == before and md.verify_local_model(md.local_dir_for(REPO))
     assert (paths.voices_dir() / "anna" / "voice.json").is_file()
-    assert (paths.app_home() / "tools" / "ffmpeg" / "ffmpeg.exe").is_file()
+    from infra import assets
+    assert (assets.tools_dir() / "ffmpeg" / "ffmpeg.exe").is_file()
     assert rep.items == 3 and not rep.conflicts
     assert not list(paths.models_dir().glob("*.restoring")) and not list(paths.models_dir().glob("*.old"))
     # a second restore finds everything in place

@@ -154,7 +154,7 @@ jobs:
           python tools\make_runtime_lock.py --test-requirements | Out-File -Encoding ascii build-req.txt
           Get-Content build-req.txt
           .venv\Scripts\python.exe -m pip install --quiet -r build-req.txt pyinstaller
-      - name: Build number and codename (read from BUILD.json; the file is not changed)
+      - name: Build number and codename (BUILD.json build field or the release tag; BUILD.json is not changed)
         shell: pwsh
         run: |
           $n = python tools\build_number.py --stamp

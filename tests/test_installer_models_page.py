@@ -72,7 +72,7 @@ def test_pascal_blocks_are_balanced():
 def test_models_folder_page_defaults_to_local_validates_and_only_remembers_the_path():
     code = section("Code")
     assert "CreateCustomPage(wpSelectDir" in code and "CreateInputDirPage(wpSelectDir" not in code.split("InitializeWizard")[1].split("end;")[0]   # right after the install folder
-    assert "{localappdata}\\Voxprint\\models" in code                       # default = the app's default_models_dir
+    assert "{localappdata}\\Voxprint\\shared\\models" in code               # default = the app's default_models_dir
     assert "ModelsEdit.Text := InitialModelsDir()" in code and "{param:ModelsFolder|}" in code   # silent: /ModelsFolder=
     assert "models_dir.txt" in code and paths.MODELS_DIR_FILE == "models_dir.txt"
     assert "InProgramFiles(Dir)" in code and "{commonpf64}" in code             # the app could not write there
