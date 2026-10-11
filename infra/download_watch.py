@@ -15,8 +15,6 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
-from infra import mirror_speed
-
 log = logging.getLogger("voxprint.models")
 
 #: No growth of the target folder for this long = the source is stalled (env ``VOXPRINT_STALL_SECONDS``).
@@ -278,6 +276,9 @@ def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threa
                 slow_bps: Optional[float] = None, slow_after: Optional[float] = None) -> Any:
     """Run ``fn`` in a helper thread and watch ``folder``.  Returns its result, re-raises its exception, or raises
     :class:`Stalled` (after setting ``cancel`` so that the helper stops at its next progress call)."""
+    # parallel_download imports Stalled from this module, so the speed check is imported here.
+    from infra.parallel_download import too_slow
+
     stall = STALL_SECONDS if stall is None else stall
     grace = ABORT_GRACE if grace is None else grace
     poll = POLL if poll is None else poll
@@ -315,7 +316,7 @@ def run_watched(fn: Callable[[], Any], folder: Path, meter: Meter, cancel: threa
             total = meter.total
             log.info("download via %s: %s%s, %s/s", meter.source, fmt_bytes(min(meter.done, total) if total else meter.done),
                      f" of {fmt_bytes(total)}" if total else "", fmt_bytes(meter.speed))
-        if mirror_speed.too_slow(meter.speed, now - started, slow_bps, slow_after, last_size > base):
+        if too_slow(meter.speed, now - started, slow_bps, slow_after, last_size > base):
             log.info("download via %s is too slow (%.0f B/s) - switching source", meter.source, meter.speed)
             cancel.set()
             th.join(grace)

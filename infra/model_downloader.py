@@ -32,7 +32,7 @@ from core.errors import ModelDownloadError
 from core.events import ProgressCallback, Stage, noop_progress
 from voxprint_common.download import DEFAULT_MARGIN
 
-from infra import download_watch, mirror_speed, model_mirrors, model_release, modelscope_mirror, netroute, parallel_download, paths
+from infra import download_watch, model_mirrors, model_release, modelscope_mirror, netroute, parallel_download, paths
 
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 netroute.disable_xet()      # plain HTTP: the xet/CAS transfer path stalls on networks that block its host (VOXPRINT_ALLOW_XET=1 keeps it)
@@ -1024,11 +1024,11 @@ def _ensure_model(
         # An injected probe, or a verdict already learned this session, keeps the previous order.
         # Otherwise a short throughput sample prefers Hugging Face over a ~84 KB/s ModelScope feed.
         if hf_probe is None and modelscope_mirror.hf_verdict() is None:
-            hf_bps, ms_bps = mirror_speed.measure(repo_id)
-            ranked = mirror_speed.order_for(hf_bps, ms_bps)
+            hf_bps, ms_bps = parallel_download.measure(repo_id)
+            ranked = parallel_download.order_for(hf_bps, ms_bps)
             if ranked is not None:
                 measured = list(ranked)
-                chosen = mirror_speed.choose_primary(hf_bps, ms_bps)
+                chosen = parallel_download.choose_primary(hf_bps, ms_bps)
                 hf_preferred = chosen == "hf" and hf_bps > ms_bps > 0
                 modelscope_mirror.remember_hf(chosen == "hf")
                 log.info("mirror speeds for %s: Hugging Face %.0f KB/s, ModelScope %.0f KB/s",
@@ -1110,8 +1110,8 @@ def _ensure_model(
             log.info("downloading %s from %s", repo_id, label)
             t_dl = time.monotonic()
             before = download_watch.progress_bytes(partial)
-            slow_bps = mirror_speed.SLOW_BPS if src == "ms" and hf_preferred else None
-            slow_after = mirror_speed.SLOW_AFTER if slow_bps is not None else None
+            slow_bps = parallel_download.SLOW_BPS if src == "ms" and hf_preferred else None
+            slow_after = parallel_download.SLOW_AFTER if slow_bps is not None else None
             download_watch.run_watched(funcs[src], partial, meter, cur["cancel"], on_tick=tick, idle_ok=complete,
                                        slow_bps=slow_bps, slow_after=slow_after)
             ok_source = src

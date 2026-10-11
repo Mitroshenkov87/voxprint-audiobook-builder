@@ -1,4 +1,4 @@
-# Download Voxprint-Setup-online.exe from the official GitHub releases and start it.
+# Download voxprint-audiobook-builder-setup-win-x64.exe from the official GitHub releases and start it.
 # Read this file before you run it. The one-line form is:
 #   irm https://raw.githubusercontent.com/Mitroshenkov87/voxprint-audiobook-builder/main/install.ps1 | iex
 #
@@ -19,7 +19,7 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $OfficialRepo = "Mitroshenkov87/voxprint-audiobook-builder"
-$AssetName = "Voxprint-Setup-online.exe"
+$AssetName = "voxprint-audiobook-builder-setup-win-x64.exe"
 $ScriptUrl = "https://raw.githubusercontent.com/$OfficialRepo/main/install.ps1"
 $ReleaseApi = "https://api.github.com/repos/$OfficialRepo/releases"
 
@@ -31,7 +31,7 @@ function Test-IsAdmin {
 }
 
 function Assert-OfficialAsset([string]$Url) {
-    $pattern = '^https://github\.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/[^/]+/Voxprint-Setup-online\.exe(\.sha256)?$'
+    $pattern = '^https://github\.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/[^/]+/voxprint-audiobook-builder-setup-win-x64\.exe(\.sha256)?$'
     if ($Url -notmatch $pattern) {
         throw "Refusing $Url. This script downloads only $AssetName and its .sha256 file from https://github.com/$OfficialRepo/releases"
     }

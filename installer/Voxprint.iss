@@ -24,7 +24,9 @@
 ; Silent: /ModelsFolder="D:\Voxprint models".  The older /ModelsDir="D:\old\models" (a folder to IMPORT models from, written to
 ; state\existing_models_dir.txt) still works.  Wizard languages: English, Russian, German.
 ;
-; ONLINE variant:  ISCC /DONLINE /DONEDIR /DManifestUrl=<https://.../manifest-beta.json> installer\Voxprint.iss  ->  Output\Voxprint-Setup-online.exe
+; ONLINE variant:  ISCC /DONLINE /DONEDIR /DManifestUrl=<https://.../manifest-beta.json> installer\Voxprint.iss
+;   ->  Output\voxprint-audiobook-builder-setup-<version>-win-x64.exe
+; build_online.ps1 also copies the stable alias voxprint-audiobook-builder-setup-win-x64.exe and writes both .sha256 files.
 ; A small installer (a few MB + vc_redist): it embeds build\online\voxprint-fetch.exe (tools/online_fetch.py), which downloads the
 ; payload parts listed in the manifest (release assets, each < 2 GiB, verified by SHA-256, resumable, parts that are already
 ; installed are skipped) and unpacks them into {app}.  One UAC prompt (PrivilegesRequired=admin) covers everything; the
@@ -35,7 +37,7 @@
 ; (/FromFolder=<dir>, the remembered one, Documents\Voxprint Portable, or next to the installer) and installs without internet; with
 ; internet only the changed parts are fetched.  Silent: /Portable=1 [/PortableDir=<dir>] [/PortableModels=none|auto|all] [/FromFolder=<dir>].
 ; THIN variant (add /DTHIN to the ONLINE command; see docs/THIN-INSTALLER.md): only the components with role "core" (the small
-; UI shell built by build_thin.bat) are fetched in PrepareToInstall -> Output\Voxprint-Setup-thin.exe. ssPostInstall then runs
+; UI shell built by build_thin.bat) are fetched in PrepareToInstall. The setup file uses the same name as the online build. ssPostInstall then runs
 ; voxprint-audiobook-cli.exe --install-suite, which installs the Python runtime, torch/CUDA wheels, ffmpeg and the required models.
 
 #define AppName "Voxprint"
@@ -107,16 +109,13 @@ DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExe}
 SetupIconFile=..\assets\voxprint-setup.ico
 OutputDir=Output
+OutputBaseFilename=voxprint-audiobook-builder-setup-{#AppVersion}-win-x64
 #ifdef ONLINE
 #ifdef THIN
-OutputBaseFilename=Voxprint-Setup-thin
 ExtraDiskSpaceRequired=800000000
 #else
-OutputBaseFilename=Voxprint-Setup-online
 ExtraDiskSpaceRequired=4500000000
 #endif
-#else
-OutputBaseFilename=Voxprint-Setup
 #endif
 Compression=lzma2/max
 SolidCompression=yes

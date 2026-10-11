@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from infra import download_retry, download_watch, install_layout, mirror_speed, model_downloader, suite_install, suite_shared
+from infra import download_watch, install_layout, model_downloader, parallel_download, suite_install, suite_shared
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -145,14 +145,14 @@ def test_linux_launcher_name_and_compatibility_link():
 
 
 def test_choose_primary_prefers_a_fast_hugging_face_over_a_slow_modelscope():
-    assert mirror_speed.choose_primary(500 * 1024, 84 * 1024) == "hf"
-    assert mirror_speed.choose_primary(90 * 1024, 84 * 1024) == "hf"
-    assert mirror_speed.choose_primary(100 * 1024, 2 * 1024 * 1024) == "ms"
-    assert mirror_speed.choose_primary(0, 0) is None
-    assert mirror_speed.choose_primary(0, 84 * 1024) == "ms"
-    assert mirror_speed.order_for(500 * 1024, 84 * 1024)[0] == "hf"
-    assert mirror_speed.too_slow(84 * 1024, 4.0, mirror_speed.SLOW_BPS, mirror_speed.SLOW_AFTER, True)
-    assert not mirror_speed.too_slow(84 * 1024, 1.0, mirror_speed.SLOW_BPS, mirror_speed.SLOW_AFTER, True)
+    assert parallel_download.choose_primary(500 * 1024, 84 * 1024) == "hf"
+    assert parallel_download.choose_primary(90 * 1024, 84 * 1024) == "hf"
+    assert parallel_download.choose_primary(100 * 1024, 2 * 1024 * 1024) == "ms"
+    assert parallel_download.choose_primary(0, 0) is None
+    assert parallel_download.choose_primary(0, 84 * 1024) == "ms"
+    assert parallel_download.order_for(500 * 1024, 84 * 1024)[0] == "hf"
+    assert parallel_download.too_slow(84 * 1024, 4.0, parallel_download.SLOW_BPS, parallel_download.SLOW_AFTER, True)
+    assert not parallel_download.too_slow(84 * 1024, 1.0, parallel_download.SLOW_BPS, parallel_download.SLOW_AFTER, True)
 
 
 def test_a_slow_stall_is_not_retried_on_the_same_source():
@@ -164,7 +164,7 @@ def test_a_slow_stall_is_not_retried_on_the_same_source():
 
 
 def test_download_retries_a_transient_error_and_keeps_the_partial(tmp_path, monkeypatch):
-    monkeypatch.setattr(download_retry, "_sleep", lambda _s: None)
+    monkeypatch.setattr(parallel_download, "_retry_sleep", lambda _s: None)
     dest = tmp_path / "weights.bin"
     calls = {"n": 0}
 
@@ -177,15 +177,15 @@ def test_download_retries_a_transient_error_and_keeps_the_partial(tmp_path, monk
         destination.write_bytes(b"ok")
         return destination
 
-    got = download_retry.download_with_retry(dest, ["https://example.invalid/a"], sha256="a" * 64, download=fetch)
+    got = parallel_download.download_with_retry(dest, ["https://example.invalid/a"], sha256="a" * 64, download=fetch)
     assert got.read_bytes() == b"ok" and calls["n"] == 3
     assert (tmp_path / "weights.bin.partial").read_bytes() == b"part"
 
     def full(destination, sources, *, sha256, size=None, **kwargs):
-        raise download_retry.DiskSpaceError(destination, 10, 1)
+        raise parallel_download.DiskSpaceError(destination, 10, 1)
 
-    with pytest.raises(download_retry.DiskSpaceError):
-        download_retry.download_with_retry(dest, ["https://example.invalid/a"], sha256="b" * 64, download=full, tries=5)
+    with pytest.raises(parallel_download.DiskSpaceError):
+        parallel_download.download_with_retry(dest, ["https://example.invalid/a"], sha256="b" * 64, download=full, tries=5)
 
 
 def test_suite_status_is_utf8_with_a_bom_on_windows(tmp_path, monkeypatch):
@@ -204,7 +204,7 @@ def test_suite_status_is_utf8_with_a_bom_on_windows(tmp_path, monkeypatch):
 def test_faster_hugging_face_is_tried_before_modelscope(tmp_path, monkeypatch):
     monkeypatch.delenv("VOXPRINT_NO_MIRROR", raising=False)
     monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "home"))
-    monkeypatch.setattr(mirror_speed, "measure", lambda _repo: (500 * 1024, 84 * 1024))
+    monkeypatch.setattr(parallel_download, "measure", lambda _repo: (500 * 1024, 84 * 1024))
     order = []
 
     def snap(repo_id, local_dir, **kwargs):

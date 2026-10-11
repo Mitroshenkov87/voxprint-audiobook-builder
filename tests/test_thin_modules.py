@@ -287,7 +287,9 @@ def test_settings_has_the_components_button_only_in_a_thin_build(app, lib, thin,
 
 # ------------------------------------------------------------------------------------------------ the Inno script
 def test_inno_thin_switch_and_vc_redist_exit_codes():
-    assert "#ifdef THIN" in ISS and "' --role core'" in ISS and "Voxprint-Setup-thin" in ISS
+    assert "#ifdef THIN" in ISS and "' --role core'" in ISS
+    assert "OutputBaseFilename=voxprint-audiobook-builder-setup-{#AppVersion}-win-x64" in ISS
+    assert "ExtraDiskSpaceRequired=800000000" in ISS
     assert not re.search(r"^Filename: \"\{tmp\}\\vc_redist", ISS, re.M)                  # no [Run] entry any more
     body = ISS[ISS.index("procedure InstallVcRedist"):ISS.index("function AppLanguageCode")]
     for code in ("1638", "3010", "1641"):

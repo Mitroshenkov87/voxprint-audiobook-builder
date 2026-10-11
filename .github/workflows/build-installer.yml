@@ -2,7 +2,7 @@ name: build-installer
 
 # workflow_dispatch builds the installer. Pull requests run only the cheap jobs (install-script, online-smoke,
 # thin-smoke) so a smoke assertion cannot stay red until a release dispatch. Job "build-thin" builds the ONLINE
-# installer Voxprint-Setup-online.exe: our small shell (Qt + program) and a manifest that points to the libraries at
+# installer voxprint-audiobook-builder-setup-<version>-win-x64.exe: our small shell (Qt + program) and a manifest that points to the libraries at
 # their upstream sites (docs/THIN-INSTALLER.md). The quick jobs "online-smoke" and "thin-smoke" test the installer
 # chain with a fake program folder in a few minutes (smoke_only=true). The former heavy job "build" (full installer
 # + multi-GB payload parts, also run on every "v*" tag push) was REMOVED on purpose: those assets were deleted from
@@ -59,9 +59,9 @@ jobs:
           if (Test-Path $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
           New-Item -ItemType Directory -Force $dir | Out-Null
           $bytes = [byte[]](1, 2, 3, 4, 5)
-          [IO.File]::WriteAllBytes((Join-Path $dir "Voxprint-Setup-online.exe"), $bytes)
-          $hash = (Get-FileHash (Join-Path $dir "Voxprint-Setup-online.exe") -Algorithm SHA256).Hash.ToLower()
-          "$hash  Voxprint-Setup-online.exe" | Set-Content -Encoding ascii (Join-Path $dir "Voxprint-Setup-online.exe.sha256")
+          [IO.File]::WriteAllBytes((Join-Path $dir "voxprint-audiobook-builder-setup-win-x64.exe"), $bytes)
+          $hash = (Get-FileHash (Join-Path $dir "voxprint-audiobook-builder-setup-win-x64.exe") -Algorithm SHA256).Hash.ToLower()
+          "$hash  voxprint-audiobook-builder-setup-win-x64.exe" | Set-Content -Encoding ascii (Join-Path $dir "voxprint-audiobook-builder-setup-win-x64.exe.sha256")
           $server = Start-Process python -ArgumentList "-m","http.server","8765","--bind","127.0.0.1","--directory",$dir -PassThru -WindowStyle Hidden
           $script = (Resolve-Path .\install.ps1).Path
           function Invoke-Install([string[]]$ArgList) {
@@ -74,7 +74,7 @@ jobs:
             $ready = $false
             foreach ($i in 1..50) {
               try {
-                $probe = Invoke-WebRequest "http://127.0.0.1:8765/Voxprint-Setup-online.exe.sha256" -UseBasicParsing
+                $probe = Invoke-WebRequest "http://127.0.0.1:8765/voxprint-audiobook-builder-setup-win-x64.exe.sha256" -UseBasicParsing
                 $text = $probe.Content
                 if ($text -is [byte[]]) { $text = [Text.Encoding]::ASCII.GetString($text) }
                 if ($probe.StatusCode -eq 200 -and $text.StartsWith($hash)) { $ready = $true; break }
@@ -83,10 +83,10 @@ jobs:
             if (-not $ready) { throw "local release server did not serve the matching hash" }
             $code = Invoke-Install @("-DryRun", "-SourceUrl", "http://127.0.0.1:8765/")
             if ($code -ne 0) { throw "matching dry run failed: $code" }
-            "0000000000000000000000000000000000000000000000000000000000000000  Voxprint-Setup-online.exe" | Set-Content -Encoding ascii (Join-Path $dir "Voxprint-Setup-online.exe.sha256")
+            "0000000000000000000000000000000000000000000000000000000000000000  voxprint-audiobook-builder-setup-win-x64.exe" | Set-Content -Encoding ascii (Join-Path $dir "voxprint-audiobook-builder-setup-win-x64.exe.sha256")
             $code = Invoke-Install @("-DryRun", "-SourceUrl", "http://127.0.0.1:8765/")
             if ($code -eq 0) { throw "a bad SHA-256 was accepted" }
-            $code = Invoke-Install @("-DryRun", "-SourceUrl", "https://example.com/Voxprint-Setup-online.exe")
+            $code = Invoke-Install @("-DryRun", "-SourceUrl", "https://example.com/voxprint-audiobook-builder-setup-win-x64.exe")
             if ($code -eq 0) { throw "a non-local source was accepted" }
             $code = Invoke-Install @("-SourceUrl", "http://127.0.0.1:8765/")
             if ($code -eq 0) { throw "-SourceUrl was accepted without -DryRun" }
@@ -152,7 +152,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $setup = "build\online-release\Voxprint-Setup-online.exe"
+          $setup = "build\online-release\voxprint-audiobook-builder-setup-win-x64.exe"
           Write-Host ("setup size: {0:N0} bytes" -f (Get-Item $setup).Length)
           $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke1.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxsmoke1.log -Tail 60; throw "install exit code $($p.ExitCode)" }
@@ -241,7 +241,7 @@ jobs:
           New-Item -ItemType Directory -Force (Join-Path $data "voices"), (Join-Path $data "state") | Out-Null
           "keep-me" | Set-Content -Encoding utf8 (Join-Path $data "migration-marker.txt")
           "narrator" | Set-Content -Encoding utf8 (Join-Path $data "voices\narrator.txt")
-          $setup = "build\online-release\Voxprint-Setup-online.exe"
+          $setup = "build\online-release\voxprint-audiobook-builder-setup-win-x64.exe"
           # Start-Process splits an unquoted /DIR on spaces, so the suite path would become C:\Program.
           $psi = New-Object System.Diagnostics.ProcessStartInfo
           $psi.FileName = (Resolve-Path -LiteralPath $setup).Path
@@ -378,7 +378,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $p = Start-Process build\online-release\Voxprint-Setup-thin.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxthin","/LOG=C:\vxthin.log" -Wait -PassThru
+          $p = Start-Process build\online-release\voxprint-audiobook-builder-setup-win-x64.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxthin","/LOG=C:\vxthin.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxthin.log -Tail 60; throw "install exit code $($p.ExitCode)" }
           if (-not (Test-Path -LiteralPath "C:\vxthin\voxprint-audiobook-builder.exe")) { throw "the shell is missing" }
           if (-not (Test-Path C:\vxthin\_internal\modules.json)) { throw "modules.json is missing" }
@@ -493,7 +493,7 @@ jobs:
           (exe.parent / "patch.json").write_text(json.dumps(patch) + "\n", encoding="ascii")
           print(json.dumps(patch))
           '@
-      - name: Online installer = shell zip + manifest (libraries stay upstream) + Voxprint-Setup-online.exe
+      - name: Online installer = shell zip + manifest (libraries stay upstream) + voxprint-audiobook-builder-setup-win-x64.exe
         shell: pwsh
         run: |
           $tag = if ($env:REL_TAG) { $env:REL_TAG } else { "v0.0.0-dev" }
@@ -565,10 +565,10 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "the reused PyTorch does not work" }
       - uses: actions/upload-artifact@v4
         with:
-          name: Voxprint-Setup-online
+          name: voxprint-audiobook-builder-setup
           path: |
-            build/online-release/Voxprint-Setup-online*.exe
-            build/online-release/Voxprint-Setup-online*.exe.sha256
+            build/online-release/voxprint-audiobook-builder-setup*.exe
+            build/online-release/voxprint-audiobook-builder-setup*.exe.sha256
             build/online-release/manifest-thin-*.json
           retention-days: 14
       - uses: actions/upload-artifact@v4

@@ -156,7 +156,7 @@ set ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe
 if not exist "%ISCC%" set ISCC=%ProgramFiles%\Inno Setup 6\ISCC.exe
 if exist "%ISCC%" (
     if /I "%~1"=="onedir" ( "%ISCC%" /DONEDIR installer\Voxprint.iss ) else ( "%ISCC%" installer\Voxprint.iss )
-    echo Installer: installer\Output\Voxprint-Setup.exe
+    echo Installer: installer\Output\voxprint-audiobook-builder-setup-<version>-win-x64.exe
 ) else (
     echo [i] Inno Setup 6 not found - the installer was not built. Exe: dist\voxprint-audiobook-builder.exe
 )

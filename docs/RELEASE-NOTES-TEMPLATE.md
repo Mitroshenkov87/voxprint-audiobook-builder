@@ -4,14 +4,14 @@ Copy this into the GitHub release. Replace the version line and the New / Fixed 
 
 **VOXPrint VERSION · build N "CODENAME"** - one sentence on what changed.
 
-Install: download `Voxprint-Setup-online.exe` from this release only. Check its SHA-256 against the `.sha256` file, then run it.
+Install: download `voxprint-audiobook-builder-setup-<version>-win-x64.exe` from this release only (the same file is also attached as `voxprint-audiobook-builder-setup-win-x64.exe`). Check its SHA-256 against the `.sha256` file, then run it.
 
 ## Windows security warnings
 
 The installer is not code-signed yet, so a new download has no reputation. Download it only from this GitHub releases page. Check the hash first:
 
 ```powershell
-Get-FileHash .\Voxprint-Setup-online.exe -Algorithm SHA256
+Get-FileHash .\voxprint-audiobook-builder-setup-win-x64.exe -Algorithm SHA256
 ```
 
 Edge is the strictest. Its download bar offers **Delete** for a file that is rarely downloaded, and the file can be removed before you run it. Do not click Delete. Hover the download, then **... -> Keep -> Show more -> Keep anyway**.

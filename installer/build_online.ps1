@@ -1,7 +1,8 @@
 # Builds the ONLINE installer from a PyInstaller --onedir folder:
 #   1. voxprint-fetch.exe  (tools/online_fetch.py, standard library only)  -> build\online\
 #   2. the payload zips + manifest-<channel>.json                           -> build\online-release\
-#   3. Voxprint-Setup-online.exe (installer\Voxprint.iss /DONLINE) + its .sha256 -> build\online-release\
+#   3. voxprint-audiobook-builder-setup-<version>-win-x64.exe and the alias
+#      voxprint-audiobook-builder-setup-win-x64.exe, each with a .sha256 -> build\online-release\
 # Used by .github/workflows/build-installer.yml (job "build-thin" with -RuntimeLock, and the quick smoke jobs with a local -BaseUrl).
 param(
     [string]$Dist = "dist\Voxprint",
@@ -14,10 +15,10 @@ param(
     [switch]$Thin,                  # THIN installer: $Dist is the thin shell (build_thin.bat); the heavy libraries become runtime modules
     [string]$RuntimeSite = "",      # site-packages with those libraries (default: that of $Python's environment)
     [string]$RuntimeLock = "",      # THIN v2: infra\runtime_lock.json - the libraries stay at their upstream sites (PyPI, download.pytorch.org);
-                                    #   the release gets only the shell + manifest-thin-<channel>.json; the installer is named Voxprint-Setup-online.exe
+                                    #   the release gets only the shell + manifest-thin-<channel>.json; the installer uses the versioned setup name
     [switch]$Portable,              # compile the wizard page "Keep a portable setup folder" (installer\Voxprint.iss /DPORTABLE; not in the default build yet)
     [string]$MirrorBase = "",       # optional fallback address prefix for the locked files (our mirror)
-    [string]$Build = $env:VOXPRINT_BUILD,      # CI build number (tools/build_number.py); also in the file name of a copy of the installer
+    [string]$Build = $env:VOXPRINT_BUILD,      # CI build number (tools/build_number.py); written into the installer's version resource
     [string]$Codename = $env:VOXPRINT_CODENAME,
     [switch]$LegacyPayload          # allow the OLD multi-GB payload parts for a real release (deleted on purpose; never needed now)
 )
@@ -83,8 +84,9 @@ $LatestManifestUrl = if ($ManifestUrl -like "https://github.com/*") { "https://g
 
 $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $iscc)) { $iscc = "$env:ProgramFiles\Inno Setup 6\ISCC.exe" }
-$setupName = if ($Thin) { "Voxprint-Setup-thin.exe" } else { "Voxprint-Setup-online.exe" }
-$finalName = if ($RuntimeLock) { "Voxprint-Setup-online.exe" } else { $setupName }
+$ver = (Get-Content credits.json -Raw | ConvertFrom-Json).app.version
+$setupName = "voxprint-audiobook-builder-setup-$ver-win-x64.exe"
+$aliasName = "voxprint-audiobook-builder-setup-win-x64.exe"
 $isArgs = @("/DONLINE", "/DONEDIR", "/DManifestUrl=$ManifestUrl")
 if ($LatestManifestUrl) { $isArgs += "/DLatestManifestUrl=$LatestManifestUrl" }
 if ($Thin) { $isArgs += "/DTHIN" }
@@ -96,15 +98,10 @@ Check "Inno Setup (online)"
 
 $setupMb = (Get-Item "installer\Output\$setupName").Length / 1MB
 if ($setupMb -gt 200) { throw "$setupName is $([int]$setupMb) MB (expected a few tens of MB)" }
-Move-Item "installer\Output\$setupName" "build\online-release\$finalName" -Force
-$h = (Get-FileHash "build\online-release\$finalName" -Algorithm SHA256).Hash.ToLower()
-"$h  $finalName" | Out-File -Encoding ascii "build\online-release\$finalName.sha256"
-if ($Build -match '^\d+$' -and [int]$Build -gt 0) {
-    # the same installer under a name with the version and build number (the plain name stays for stable links)
-    $ver = (Get-Content credits.json -Raw | ConvertFrom-Json).app.version
-    $numbered = "Voxprint-Setup-online-$ver-build$Build.exe"
-    Copy-Item "build\online-release\$finalName" "build\online-release\$numbered" -Force
-    "$h  $numbered" | Out-File -Encoding ascii "build\online-release\$numbered.sha256"
-}
+Move-Item "installer\Output\$setupName" "build\online-release\$setupName" -Force
+$h = (Get-FileHash "build\online-release\$setupName" -Algorithm SHA256).Hash.ToLower()
+"$h  $setupName" | Out-File -Encoding ascii "build\online-release\$setupName.sha256"
+Copy-Item "build\online-release\$setupName" "build\online-release\$aliasName" -Force
+"$h  $aliasName" | Out-File -Encoding ascii "build\online-release\$aliasName.sha256"
 Get-ChildItem build\online-release | Format-Table Name, Length
 "manifest: $manifest   installer manifest url: $ManifestUrl"

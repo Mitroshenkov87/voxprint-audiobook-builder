@@ -37,13 +37,13 @@ Supported systems: current and previous year OS releases (Windows 11 24H2 and ne
 
 ## The installer
 
-Run **Voxprint-Setup-online.exe** (Inno Setup, per-machine installation, about 34 MB; build 667 has 35,235,971 bytes and the SHA-256 `c145a9fc84c736d655fbbe9bfd5c1cc94794b1be7fb8e9a5eec293e6f1578e42`). It is an *online* installer: the libraries (PyTorch and the rest) are downloaded from PyTorch/PyPI during setup. The installer is not code-signed, so Windows SmartScreen warns – choose *More info → Run anyway* only after the SHA-256 matches the one on the release page. The wizard is available in English, Russian and German; the language you pick there becomes the program's interface language.
+Run **voxprint-audiobook-builder-setup-win-x64.exe** (the same bytes are also attached as `voxprint-audiobook-builder-setup-<version>-win-x64.exe`; check the `.sha256` file on the release). Inno Setup, per-machine installation, about 34 MB. Build 667 was published as `Voxprint-Setup-online.exe` (35,235,971 bytes, SHA-256 `c145a9fc84c736d655fbbe9bfd5c1cc94794b1be7fb8e9a5eec293e6f1578e42`). It is an *online* installer: the libraries (PyTorch and the rest) are downloaded from PyTorch/PyPI during setup. The installer is not code-signed, so Windows SmartScreen warns – choose *More info → Run anyway* only after the SHA-256 matches the one on the release page. The wizard is available in English, Russian and German; the language you pick there becomes the program's interface language.
 
 The page **Setup type** offers two choices. **Full** (default) downloads everything on the first start without another click – the components and all models, about 28 GB; the wizard shows the total and checks the free space first. **Quick** installs only the program; the first start opens the **{{modules.title}}** window, which offers the same complete download and starts it when you press Download. Nothing is left out in either mode.
 
 After the install-folder page there is an optional page **Existing models (optional)**: if you already have downloaded models from an earlier installation or from a backup, choose that folder; otherwise leave the field empty. The installer copies nothing – it only remembers the folder, and the first start of the program imports the models from there instead of downloading them.
 
-Silent installation for administrators: `Voxprint-Setup-online.exe /VERYSILENT /Mode=full /ModelsDir="D:\old\models"` (`/Mode=quick` for the Quick type).
+Silent installation for administrators: `voxprint-audiobook-builder-setup-win-x64.exe /VERYSILENT /Mode=full /ModelsDir="D:\old\models"` (`/Mode=quick` for the Quick type).
 
 > If the administrator account that runs the installer differs from the account that uses Voxprint, the data folder belongs to the administrator. In that case set the existing-models folder later in {{ui.settings_title}} (chapter 8).
 

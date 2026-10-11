@@ -1,4 +1,4 @@
-"""voxprint-fetch: the downloader inside the ONLINE installer (``Voxprint-Setup-online.exe``).  Standard library only.
+"""voxprint-fetch: the downloader inside the ONLINE installer (``voxprint-audiobook-builder-setup-<version>-win-x64.exe``).  Standard library only.
 
 The installer (Inno Setup) hands over a *manifest* (JSON, see ``tools/make_online_payload.py``) and the install folder.
 For every component of the manifest this program

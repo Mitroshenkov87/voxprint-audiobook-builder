@@ -1,11 +1,11 @@
 # Building, running from source and contributing
 
 ## Build the installer locally
-`build.bat` produces `installer\Output\Voxprint-Setup.exe` (Inno Setup 6, per-machine install, Windows 11 x64; about 1.8 GB because PyTorch is inside).
+`build.bat` produces `installer\Output\voxprint-audiobook-builder-setup-<version>-win-x64.exe` (Inno Setup 6, per-machine install, Windows 11 x64; about 1.8 GB because PyTorch is inside).
 The installer does not contain the models: on first start Voxprint downloads about 7 GB once (internet needed).
 The wizard is available in **English, Russian and German** and has a page **"Models folder"** (right after the install folder): default = the current location `%LOCALAPPDATA%\Voxprint\models`, or any other folder / drive (Program Files is refused: the app runs without admin rights).
 The installer **copies nothing**; it only writes the chosen path to `%LOCALAPPDATA%\Voxprint\state\models_dir.txt` (UTF-8; removed when the default is kept). The app then keeps using models already complete in the default folder, picks up models the chosen folder already holds
-(Voxprint layout, Hugging Face cache) and downloads the rest into the chosen folder ([details](MODELS.md#models-folder)). A folder with a **Voxprint backup** (`voxprint-backup.json`) is not a models folder: it is written to `state\existing_models_dir.txt` instead, the default folder stays the live store, and the app restores models and voices from the backup on its first start. Voices and settings stay in `%LOCALAPPDATA%\Voxprint`. Silent install: `Voxprint-Setup.exe /VERYSILENT /ModelsFolder="D:\Voxprint models"`; the older `/ModelsDir="D:\old\models"` (a folder to import models from) still works.
+(Voxprint layout, Hugging Face cache) and downloads the rest into the chosen folder ([details](MODELS.md#models-folder)). A folder with a **Voxprint backup** (`voxprint-backup.json`) is not a models folder: it is written to `state\existing_models_dir.txt` instead, the default folder stays the live store, and the app restores models and voices from the backup on its first start. Voices and settings stay in `%LOCALAPPDATA%\Voxprint`. Silent install: `voxprint-audiobook-builder-setup-<version>-win-x64.exe /VERYSILENT /ModelsFolder="D:\Voxprint models"`; the older `/ModelsDir="D:\old\models"` (a folder to import models from) still works.
 Caveat: the installer runs elevated (per-machine); if the administrator account differs from the account that uses the program, `%LOCALAPPDATA%` is the administrator's - then set the folder in *Settings* instead.
 
 ## Run from source (Windows)
@@ -72,7 +72,7 @@ does not consume a number. `BUILD.json` also holds the **codename**: one Biblica
 number, codename and commit into `credits.json` before the Windows shell and the Linux package are built;
 `tools/embed_build_stamp.py` reads the same number onto `voxprint-audiobook-builder.exe`. The app shows `1.0.0 RC5 · build 1003 "Amud"`
 once that stamp is in the build (About, splash, Settings, diagnostic report), the installer gets `VersionInfoVersion`
-`1.0.0.1003` and a numbered copy `Voxprint-Setup-online-<version>-build<N>.exe` (the plain `Voxprint-Setup-online.exe`
+`1.0.0.1003`. The setup file is `voxprint-audiobook-builder-setup-<version>-win-x64.exe` (the plain `voxprint-audiobook-builder-setup-win-x64.exe`
 stays for stable links), and the components manifest records `build`, so the Components window offers a same-version
 build only when its number is higher. `VOXPRINT_BUILD=0` leaves a local executable unstamped. The next codename must be
 unique in this repository and in the suite codename registry. See [RELEASING.md](RELEASING.md).

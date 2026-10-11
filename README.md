@@ -42,9 +42,9 @@ More: [all features and screenshots](docs/FEATURES.md) · [how it works](docs/HO
 ## Download
 | Build | File | Size |
 |---|---|---|
-| **Online installer (Windows 11 x64, NVIDIA GPU)** | [`Voxprint-Setup-online.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.2.4-beta/Voxprint-Setup-online.exe) | 35,409,166 bytes (about 34 MB, build 704 "Achim"; downloads the libraries from PyTorch/PyPI during setup) |
+| **Online installer (Windows 11 x64, NVIDIA GPU)** | [`voxprint-audiobook-builder-setup-<version>-win-x64.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases) | about 34 MB; downloads the libraries from PyTorch/PyPI during setup |
 
-SHA-256: `c7dd024b4917ba128b064c12d8373182b76f9c10e77fb49f6c06fc8fac0e636d` - release page: [v0.2.4-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.2.4-beta) (pre-release, the latest ready build). Setup installs the Python runtime, PyTorch, ffmpeg and the required models into `%LOCALAPPDATA%\Voxprint\shared\` while it runs, including a silent install. Optional models are offered in the Components window and are not all started at once. Scripts should call `voxprint-audiobook-cli.exe` (installed under `VOXPrint AI Suite\Audiobook Builder`).
+The same bytes are also attached as `voxprint-audiobook-builder-setup-win-x64.exe` (the name [install.ps1](install.ps1) downloads), each with a `.sha256` file. The published [v0.2.4-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.2.4-beta) installer is `Voxprint-Setup-online.exe` (35,409,166 bytes, build 704 "Achim"), SHA-256 `c7dd024b4917ba128b064c12d8373182b76f9c10e77fb49f6c06fc8fac0e636d`. Setup installs the Python runtime, PyTorch, ffmpeg and the required models into `%LOCALAPPDATA%\Voxprint\shared\` while it runs, including a silent install. Optional models are offered in the Components window and are not all started at once. Scripts should call `voxprint-audiobook-cli.exe` (installed under `VOXPrint AI Suite\Audiobook Builder`).
 
 <p align="center"><img src="docs/screenshots/rc2/abb-01-main-components-first-run.png" alt="Components window on first start: program components and models, with sizes shown and free space checked before a download" width="720"></p>
 A full offline installer may return later; the Linux version is temporarily unavailable.
@@ -53,7 +53,7 @@ A full offline installer may return later; the Linux version is temporarily unav
 The installer is not code-signed yet, so a new download has no reputation. Download it only from the [GitHub releases page](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases). Check the SHA-256 against the `.sha256` file next to the installer, and only then keep or run the file ([details](docs/DOWNLOADS.md)):
 
 ```powershell
-Get-FileHash .\Voxprint-Setup-online.exe -Algorithm SHA256
+Get-FileHash .\voxprint-audiobook-builder-setup-win-x64.exe -Algorithm SHA256
 ```
 
 Edge is the strictest. Its download bar offers **Delete** for a file that is rarely downloaded, and the file can be removed before you run it. Do not click Delete. Hover the download, then **... -> Keep -> Show more -> Keep anyway**.
@@ -62,7 +62,7 @@ Chrome and other browsers may show a similar download warning. When you start th
 
 Code signing is being applied for (SignPath Foundation). The warning will go away later.
 
-**Option 1.** Download `Voxprint-Setup-online.exe` from the table above and run it.
+**Option 1.** Download `voxprint-audiobook-builder-setup-win-x64.exe` from the [releases page](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases) and run it. Releases through v0.2.4-beta used `Voxprint-Setup-online.exe`.
 
 **Option 2: one command in PowerShell (as Administrator).** Read [install.ps1](install.ps1) first. It downloads the installer and its `.sha256` file only from the official GitHub releases, checks the hash, then starts setup. `-Silent` passes `/VERYSILENT`. `-Version v0.2.4-beta` picks that tag; otherwise the latest pre-release is used.
 

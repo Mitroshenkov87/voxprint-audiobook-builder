@@ -222,15 +222,21 @@ def test_manifest_validation(tmp_path):
 
 def test_inno_script_has_the_online_variant():
     iss = (ROOT / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
-    assert "#ifdef ONLINE" in iss and "voxprint-fetch.exe" in iss and "Voxprint-Setup-online" in iss
+    assert "#ifdef ONLINE" in iss and "voxprint-fetch.exe" in iss
+    assert "OutputBaseFilename=voxprint-audiobook-builder-setup-{#AppVersion}-win-x64" in iss
     assert "{param:Manifest|" in iss and "procedure DeleteProgramFolder" in iss     # uninstall: program files, never a sibling
     assert "PrivilegesRequired=admin" in iss                  # one UAC prompt for the whole install
     assert "PrepareToInstall" in iss and "ExtractTemporaryFile" in iss      # a failure stops the setup (non-zero exit)
     wf = (ROOT / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")
-    for needle in ("build_online.ps1", "Voxprint-Setup-online.exe", "online-smoke", "manifest-", "release upload"):
+    for needle in ("build_online.ps1", "voxprint-audiobook-builder-setup-win-x64.exe", "online-smoke", "manifest-", "release upload"):
         assert needle in wf or needle in wf.replace("gh release upload", "release upload")
     ps1 = (ROOT / "installer" / "build_online.ps1").read_text(encoding="utf-8")
     assert "make_online_payload.py" in ps1 and "/DONLINE" in ps1 and "online_fetch.py" in ps1
+    assert 'voxprint-audiobook-builder-setup-$ver-win-x64.exe' in ps1
+    assert "voxprint-audiobook-builder-setup-win-x64.exe" in ps1
+    assert "Voxprint-Setup" not in ps1
+    install = (ROOT / "install.ps1").read_text(encoding="utf-8")
+    assert '$AssetName = "voxprint-audiobook-builder-setup-win-x64.exe"' in install
 
 
 def test_status_file_has_a_heartbeat(tmp_path):

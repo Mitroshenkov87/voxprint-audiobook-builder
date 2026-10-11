@@ -178,7 +178,7 @@ if [ "$MODE" = gpu-check ]; then
   exit 0
 fi
 
-[ "$(uname -s)" = Linux ] || die "this installer is for Linux (Windows has Voxprint-Setup-*.exe)"
+[ "$(uname -s)" = Linux ] || die "this installer is for Linux (Windows has voxprint-audiobook-builder-setup-*-win-x64.exe)"
 ARCH="$(uname -m)"
 case "$ARCH" in
   x86_64) ;;

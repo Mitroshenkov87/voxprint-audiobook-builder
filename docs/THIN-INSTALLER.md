@@ -1,6 +1,6 @@
 # Online installer (thin): design and status
 
-**Goal.** `Voxprint-Setup-online.exe` is a small file (a few tens of MB). It installs only our own program shell (Qt + the Voxprint code)
+**Goal.** `voxprint-audiobook-builder-setup-<version>-win-x64.exe` is a small file (a few tens of MB). The same bytes are also copied as `voxprint-audiobook-builder-setup-win-x64.exe`. It installs only our own program shell (Qt + the Voxprint code)
 and then downloads whatever is missing **from the developers' own sites** — PyTorch from `download.pytorch.org`, every other library from
 PyPI — pinned by version and SHA-256. Before downloading anything it looks at what the PC already has and reuses it. Nothing third-party
 is repacked or uploaded by us, so a CI build takes minutes instead of an hour and the release holds only the shell and a manifest.
@@ -49,7 +49,7 @@ The flavor we download is `cu130` when the driver supports CUDA 13 (driver 600 o
 
 ## Start-up flow
 
-1. `Voxprint-Setup-online.exe` (Inno, `/DONLINE /DTHIN`) runs `voxprint-fetch --role core`: downloads the shell, writes `_internal\modules.json`
+1. `voxprint-audiobook-builder-setup-<version>-win-x64.exe` (Inno, `/DONLINE /DTHIN`) runs `voxprint-fetch --role core`: downloads the shell, writes `_internal\modules.json`
    (manifest address `manifest-thin-<channel>.json`), installs the Visual C++ runtime if needed.
 2. The app starts, activates what is in the runtime folder (`infra/modules.activate()`), and opens the **Components** window (also Settings → Components).
 3. The window reads the manifest (last good copy cached offline), looks for a reusable PyTorch, and downloads the missing modules (`libs`, `text`,
@@ -85,7 +85,7 @@ Every release's manifest is *pinned*: the exact files (size + SHA-256) this rele
 ## CI (`build-thin` job of `.github/workflows/build-installer.yml`)
 
 Installs only the pinned shell packages (Qt, numpy, soundfile ...) into a venv, runs the unit tests that need no PyTorch, builds the shell with
-PyInstaller (`build_thin.bat`), writes `Voxprint-shell-01.zip` + `manifest-thin-<channel>.json` and compiles `Voxprint-Setup-online.exe`
+PyInstaller (`build_thin.bat`), writes `Voxprint-shell-01.zip` + `manifest-thin-<channel>.json` and compiles `voxprint-audiobook-builder-setup-<version>-win-x64.exe`
 (`installer/build_online.ps1 -RuntimeLock infra\runtime_lock.json`). It then **really runs the product on the runner**: the frozen shell downloads the whole
 runtime from upstream (a CPU PyTorch wheel, internal to this job), imports it, and a second run proves that a PyTorch lying around on the PC is found, checked and reused instead of
 downloaded. Only then are the installer, its hash and the manifest attached to the release (older assets are never touched).
