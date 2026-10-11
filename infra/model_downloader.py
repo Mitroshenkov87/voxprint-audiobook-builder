@@ -1,17 +1,12 @@
-"""Automatic download of the models from Hugging Face (with a ModelScope fallback) into the app's model folder.
+"""Locate models that VOXPrint MDL has already installed.
 
-Resumable and hash-checked. Depends on the app path and mirror tables in this package. Licence: Apache-2.0.
+The weights are downloaded by ``voxprint-mdl`` (segmented Range, mirror switch,
+SHA-256). This module only finds a complete copy: the models folder, an imported
+folder, or another program's copy (:mod:`core.model_locator`). A missing model
+raises :class:`core.errors.ModelDownloadError` and names ``voxprint-mdl``.
+Licence: Apache-2.0.
 
 Credit: VOXPrint AI Audiobook Builder https://github.com/Mitroshenkov87/voxprint-audiobook-builder
-
-
-A download goes into ``<name>.partial``; only after verification is the folder renamed, so a partially downloaded
-model is never considered ready, and the next run resumes from the ``.partial`` data.  Heavy weight files use the
-multi-connection Range path (:mod:`infra.parallel_download`); ``huggingface_hub.snapshot_download`` remains the
-fallback for listing failures and small / unknown trees.  After the transfer the UI shows a distinct
-"verifying checksum" status (not "downloading") while size + SHA-256 are checked against ``model_mirrors.json``.
-The commit sha of the downloaded revision is stored in the ``.revision`` file.  Copies that other programs already
-downloaded (HF cache, Pinokio/Alexandria, ModelScope ...) are reused in place, read-only - see :mod:`core.model_locator`.
 """
 from __future__ import annotations
 
@@ -26,13 +21,13 @@ import stat
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, cast
+from typing import Any, Callable, Dict, List, Optional
 
 from core.errors import ModelDownloadError
 from core.events import ProgressCallback, Stage, noop_progress
-from voxprint_common.download import DEFAULT_MARGIN
 
-from infra import download_watch, model_mirrors, model_release, modelscope_mirror, netroute, parallel_download, paths
+from infra import download_watch, model_mirrors, model_release, modelscope_mirror, netroute, paths
+from infra.mdl_gate import MDL_HINT
 
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 netroute.disable_xet()      # plain HTTP: the xet/CAS transfer path stalls on networks that block its host (VOXPRINT_ALLOW_XET=1 keeps it)
@@ -803,32 +798,19 @@ def _ensure_model(
     release_manifest: Optional[Path] = None,
     release_opener: Optional[Callable[..., Any]] = None,
 ) -> Path:
-    """Return the path of the local model, downloading it on first use (automatically).
+    """Return a model that is already on disk.
 
-    Before downloading we look for a complete copy left by another program (HF cache, Pinokio/Alexandria, ModelScope ...);
-    it is used in place, read-only (:mod:`core.model_locator`).  This applies only to the main models folder
-    (``root=None``): an update through a staging folder always downloads its own copy.
-
-    ``revision`` is the HF commit; by default the verified revision from the "verified by Voxprint" manifest is used.
-    If the pinned revision is unavailable the latest one is tried once (and logged).  Sources are tried in order
-    Hugging Face -> the project's Hugging Face backup mirror (:mod:`infra.model_mirrors`, every file verified by SHA-256)
-    -> ModelScope (ModelScope first when Hugging Face is slow/unreachable).  SMALL models (the release manifest
-    :mod:`infra.model_release`) are taken from the GitHub release assets FIRST, with the same fallbacks.  The result lands
-    in ``<name>.partial`` first and is renamed only after verification.
-
-    The progress line shows a STABLE total (the sum of the file sizes known up front: pinned sizes, the mirror /
-    release manifest, the Hugging Face API or the ModelScope file list), a counter that never goes backwards and the
-    current source.
-
-    ``allow_patterns`` (glob list) restricts the Hugging Face download to some files (a repository that also holds TF / Rust /
-    Flax copies of the weights); ModelScope, which copies whole repositories, is not used then, but the backup mirror is (it
-    fetches only the files matching the patterns, each checked by SHA-256).  ``mirror_only`` skips the original sources and
-    goes straight to the backup mirror (used when a download from the original failed the caller's hash check).
+    VOXPrint MDL downloads the weights (segmented Range, mirror switch, hashes).
+    This function reuses a complete local copy, an imported folder or another
+    program's copy. A missing model raises :class:`ModelDownloadError` and names
+    ``voxprint-mdl``. ``snapshot_download`` is only a test double: production
+    never passes it, and it is not a network client of this program.
     """
+    del mirror_download, hf_probe, hf_mirror_fetch, mirror_manifest, mirror_only
+    del get_remote_sizes, release_manifest, release_opener
     target = local_dir_for(repo_id, root)
     if verify_local_model(target):
         return target
-
     short = repo_id.split("/")[-1]
     if root is None:
         imported = _import_existing(repo_id, revision, progress, stage, short)
@@ -839,324 +821,48 @@ def _ensure_model(
         if found is not None:
             progress(stage, 1.0, tr("progress.model_reused", short=short, where=str(found.location)))
             return found.path
-    # who asked for this download (the log answers "why is it downloading X?" - e.g. the speech-recognition model is
-    # fetched on first use by the voice check, the A/B comparison, the spoken-consent reading or the audio-only mode)
-    log.info("download of %s requested by %s", repo_id, _caller())
-    if partial_dir_has_data(repo_id, root):
-        progress(stage, 0.0, tr("progress.model_resume", short=short))
-    else:
-        progress(stage, 0.0, tr("progress.first_download", short=short))
-    need_gb = APPROX_SIZE_GB.get(repo_id, 3.0)
-    try:
-        free_gb = shutil.disk_usage(target.parent).free / 1024 ** 3
-    except OSError:
-        free_gb = None
-    if free_gb is not None and free_gb < need_gb * DEFAULT_MARGIN:
-        raise ModelDownloadError(
-            tr("err.disk_model", short=short, need=f"{need_gb:.0f}", free=f"{free_gb:.1f}"),
-            url=hf_url(repo_id))
-
-    if snapshot_download is None and modelscope_mirror.hf_verdict() is not False:   # "slow" is remembered: no more route searching
-        _prepare_network()
     if revision is None:
         revision = pinned_revision(repo_id)
     sha: Optional[str] = revision
-    if not revision:
+    if not revision and get_remote_sha is not None:
         try:
-            if get_remote_sha is not None:
-                sha = get_remote_sha(repo_id)
-            else:
-                from huggingface_hub import HfApi
-
-                sha = HfApi().model_info(repo_id).sha
-        except Exception as exc:  # noqa: BLE001 - the network may be down; the real error surfaces below
+            sha = get_remote_sha(repo_id)
+        except Exception as exc:  # noqa: BLE001 - the test double reports the real failure below
             log.warning("remote sha unavailable: %s", exc)
-
-    _merge_partials(target)                                # files of a fresh .partial-N folder of an earlier run are resumed too
-    partial = target.with_name(target.name + ".partial")   # survives between runs: the download resumes where it stopped
-    cur: Dict[str, Any] = {"f": 0.0, "meter": None, "cancel": threading.Event()}
-
-    tracker = _ByteProgress(lambda f: report(f))
-    state = {"sha": sha}
-
-    def _download(rev: Optional[str]) -> None:
-        """Fetch the repository into the ``.partial`` folder (``rev`` None = latest).
-
-        Prefer the multi-connection Range path (:mod:`infra.parallel_download`) for listed
-        files; fall back to ``huggingface_hub.snapshot_download`` when sizes are unknown,
-        parallel downloads are disabled, or the fast path fails.  An injected
-        ``snapshot_download`` (tests) always wins so existing fakes keep working.
-        """
-        if snapshot_download is not None:
-            kwargs: Dict[str, Any] = {"repo_id": repo_id, "local_dir": str(partial)}
-            if rev:
-                kwargs["revision"] = rev
-            if allow_patterns:
-                kwargs["allow_patterns"] = list(allow_patterns)
-            try:
-                snapshot_download(tqdm_class=tracker.make_tqdm_class(), **kwargs)
-            except TypeError:
-                snapshot_download(**kwargs)
-            return
-        sizes = None
-        if get_remote_sizes is not None or modelscope_mirror.hf_verdict() is not False:
-            try:
-                sizes = (get_remote_sizes or _hf_sizes)(repo_id, rev, allow_patterns)
-            except Exception as exc:  # noqa: BLE001 - listing is optional; hub path remains
-                log.debug("HF file list of %s unavailable: %s", repo_id, exc)
-        if not sizes:
-            sizes = _expected_sizes(repo_id, rev, mirror_manifest, allow_patterns)
-        if sizes and parallel_download.enabled():
-            def url_for(name: str, _rev=rev) -> str:
-                return parallel_download.hf_file_url(repo_id, name, _rev)
-
-            try:
-                parallel_download.download_listed(
-                    sizes, partial, url_for, progress=report, cancel=cur["cancel"],
-                    patterns=allow_patterns)
-                return
-            except download_watch.Stalled:
-                raise
-            except parallel_download.ParallelError as exc:
-                log.warning("parallel HF download of %s failed (%s) - falling back to huggingface_hub",
-                            repo_id, exc)
+            sha = None
+    if snapshot_download is None:
+        raise ModelDownloadError(
+            tr("err.download_failed", short=short, url=MDL_HINT),
+            url=hf_url(repo_id), details=MDL_HINT)
+    partial = target.with_name(target.name + ".partial")
+    partial.mkdir(parents=True, exist_ok=True)
+    progress(stage, 0.0, tr("progress.first_download", short=short))
+    kwargs: Dict[str, Any] = {"repo_id": repo_id, "local_dir": str(partial)}
+    if sha:
+        kwargs["revision"] = sha
+    if allow_patterns:
+        kwargs["allow_patterns"] = list(allow_patterns)
+    try:
         try:
-            from huggingface_hub import snapshot_download as sd
-        except ImportError as exc:
-            raise ModelDownloadError(tr("err.hub_missing"), url=hf_url(repo_id), details=str(exc)) from exc
-        netroute.ensure_hub_session()              # bounded connect / read timeouts: no thread blocks for ever in a read
-        kwargs = {"repo_id": repo_id, "local_dir": str(partial)}
-        if rev:
-            kwargs["revision"] = rev
-        if allow_patterns:
-            kwargs["allow_patterns"] = list(allow_patterns)
-        if sizes:
-            # the hub fetches only what is not finished yet (it would re-download files the parallel path wrote: it has
-            # no metadata for them), and our unfinished pieces of those files go (they would be counted twice)
-            todo = parallel_download.remaining(sizes, partial)
-            if not todo:
-                return
-            parallel_download.discard_partials(partial, todo)
-            kwargs["allow_patterns"] = [_exact_pattern(n) for n in todo]
-        try:
-            sd(tqdm_class=tracker.make_tqdm_class(), **kwargs)  # nosec B615 - pinned revision when known; files verified after
+            snapshot_download(tqdm_class=None, **kwargs)
         except TypeError:
-            sd(**kwargs)  # nosec B615
-
-    def _from_hf() -> None:
-        """Download from Hugging Face; fall back once to the latest revision if the pinned one is unavailable."""
-        try:
-            _download(revision)
-        except download_watch.Stalled:
-            raise                       # the watchdog gave up on this source: the caller switches to the next one
-        except Exception as exc:  # noqa: BLE001
-            if not revision or _locked(exc):
-                raise                       # a locked file is not a revision problem
-            log.warning("pinned revision %s of %s unavailable (%s) - trying latest", revision[:8], repo_id, exc)
-            if not isinstance(exc, OSError):    # network failure: the files are still good for resuming; a revision error: discard them
-                shutil.rmtree(partial, ignore_errors=True)
-            state["sha"] = None
-            _download(None)
-            try:
-                state["sha"] = (get_remote_sha(repo_id) if get_remote_sha is not None else None)
-            except Exception:  # noqa: BLE001
-                state["sha"] = None
-
-    def _from_modelscope() -> None:
-        """Download from the ModelScope mirror, accepting the pinned revision only if all file sizes matched."""
-        from core import model_locator
-
-        known = model_locator.KNOWN_SIZES.get(repo_id)
-        expected = known[1] if known and revision and known[0] == revision else None
-        progress(stage, cur["f"], tr("progress.mirror_modelscope", short=short))
-        chosen = mirror_download if mirror_download is not None else _default_mirror_download
-        if chosen is _default_mirror_download:
-            _default_mirror_download(repo_id, partial, report, expected, on_total=meter.set_total)
-        else:
-            chosen(repo_id, partial, report, expected)
-        # ModelScope has no commit sha: the revision is confirmed only when the sizes matched the pinned commit
-        state["sha"] = revision if expected else None
-
-    def _from_hf_mirror() -> None:
-        """Last resort: the project's own backup mirror on Hugging Face; every file is verified against the SHA-256 manifest."""
-        entry = model_mirrors.entry_for(repo_id, mirror_manifest)
-        if entry is None:
-            raise ModelDownloadError("no backup mirror for this model", url=hf_url(repo_id))
-        if revision and revision != entry.source_revision:
-            raise ModelDownloadError(f"the backup mirror holds {entry.source_revision[:8]}, not the requested {revision[:8]}",
-                                     url=hf_url(repo_id))
-        progress(stage, cur["f"], tr("progress.mirror_hf", short=short))
-        state["sha"] = model_mirrors.download(
-            entry, partial, report, hf_mirror_fetch, allow_patterns)
-
-    def _from_github() -> None:
-        """Small models: the release assets of the project repository (every file verified by SHA-256)."""
-        progress(stage, cur["f"], tr("progress.mirror_github", short=short))
-        state["sha"] = model_release.download(
-            cast(model_release.ReleaseEntry, rel), partial, report, allow_patterns, release_opener)
-
-    def complete() -> bool:
-        return partial_is_complete(partial, repo_id, revision, mirror_manifest, allow_patterns)
-
-    finished = False
-    if partial.is_dir() and complete():
-        # an earlier run downloaded everything but could not rename the folder: nothing to download, only finish
-        log.info("%s: the .partial folder is already complete - finishing without a download", repo_id)
-        finished = True
-        state["sha"] = revision
-    mirror_ok = mirror_enabled() and root is None and not allow_patterns and not finished   # updates through the staging folder always go straight to Hugging Face
-    use_hfm = root is None and not finished and model_mirrors.entry_for(repo_id, mirror_manifest) is not None
-    rel = None
-    if root is None and not finished and not mirror_only:
-        rel = model_release.entry_for(repo_id, revision, release_manifest)      # small models: GitHub release assets first
-        if rel is not None:
-            try:
-                rel.selected(allow_patterns)
-            except model_release.ReleaseError as exc:
-                log.warning("GitHub release copy of %s unusable: %s", repo_id, exc)
-                rel = None
-    hf_preferred = False
-    measured: Optional[List[str]] = None
-    if mirror_only or finished:
-        order: List[str] = []
-    elif mirror_ok:
-        mirror_download = mirror_download or _default_mirror_download
-        # An injected probe, or a verdict already learned this session, keeps the previous order.
-        # Otherwise a short throughput sample prefers Hugging Face over a ~84 KB/s ModelScope feed.
-        if hf_probe is None and modelscope_mirror.hf_verdict() is None:
-            hf_bps, ms_bps = parallel_download.measure(repo_id)
-            ranked = parallel_download.order_for(hf_bps, ms_bps)
-            if ranked is not None:
-                measured = list(ranked)
-                chosen = parallel_download.choose_primary(hf_bps, ms_bps)
-                hf_preferred = chosen == "hf" and hf_bps > ms_bps > 0
-                modelscope_mirror.remember_hf(chosen == "hf")
-                log.info("mirror speeds for %s: Hugging Face %.0f KB/s, ModelScope %.0f KB/s",
-                         repo_id, hf_bps / 1024, ms_bps / 1024)
-        if measured is None:
-            fast = _hf_fast(repo_id, hf_probe)
-            order = ["hf", "hfm", "ms"] if fast else ["ms", "hf", "hfm"]
-            if not fast:
-                log.warning("Hugging Face is slow or unreachable - trying ModelScope first for %s", repo_id)
-        else:
-            order = measured
-    else:
-        order = ["hf", "hfm"]
-    if mirror_only:
-        order = ["hfm"]
-    if not use_hfm:
-        order = [o for o in order if o != "hfm"]
-    if rel is not None:
-        order.insert(0, "gh")                  # the stall watchdog abandons a slow GitHub; the others follow
-    errors: List[str] = []
-    ok_source = "partial" if finished else ""
-    funcs = {"gh": _from_github, "hf": _from_hf, "hfm": _from_hf_mirror, "ms": _from_modelscope}
-
-    # ONE meter for the whole model: the counter never goes backwards and the total is the sum of the file sizes known up
-    # front, so neither jumps when the download changes the source or a retry re-reads a file
-    meter = download_watch.Meter(_SOURCE_NAMES[order[0]] if order else "")
-    cur["meter"] = meter
-
-    def _frac(source_fraction: float) -> float:
-        """Overall fraction: from the byte counter when the total is known (the sources count differently), else the
-        source's own report; never backwards."""
-        total = meter.total
-        f = min(0.99, meter.done / total) if total > 0 else source_fraction
-        return max(cur["f"], f)
-
-    def report(f: float) -> None:
-        """One progress report of the running source: records it, aborts an abandoned download, shows the detail line."""
-        if cur["cancel"].is_set():
-            raise download_watch.Stalled("download abandoned (no data)")
-        cur["f"] = _frac(f)
-        progress(stage, cur["f"], meter.text(tr, short, int(cur["f"] * 100)))
-
-    def known_total(src: str) -> int:
-        """Total size of this download from what is known without a transfer (pinned sizes, release / mirror manifests)."""
-        sizes = _expected_sizes(repo_id, revision, mirror_manifest, allow_patterns)
-        if not sizes and rel is not None:
-            sizes = rel.sizes(allow_patterns)
-        if not sizes and src == "hf" and (get_remote_sizes is not None or (
-                snapshot_download is None and modelscope_mirror.hf_verdict() is not False)):
-            sizes = (get_remote_sizes or _hf_sizes)(repo_id, revision, allow_patterns)
-        return sum(sizes.values()) if sizes else 0
-
-    def tick(m: "download_watch.Meter") -> None:
-        cur["f"] = _frac(cur["f"])
-        progress(stage, cur["f"], m.text(tr, short, int(cur["f"] * 100)))
-
-    attempts = [(src, 0) for src in order]
-    t_start = time.monotonic()
-    while attempts and not ok_source:
-        src, retry = attempts.pop(0)
-        label = _SOURCE_NAMES[src]
-        meter.set_source(label)
-        if download_watch.busy(partial) and not download_watch.wait_released(partial, FRESH_PARTIAL_AFTER):
-            # a thread of an abandoned attempt still sits in a read and holds the hub's lock / .incomplete files here:
-            # writing into the same folder would fail (and so would renaming it) - continue in a fresh folder
-            partial = _fresh_partial(target, partial)
-        cur["cancel"] = threading.Event()
-        tracker.cancel = cur["cancel"]
-        tracker.total = tracker.done = 0
-        try:
-            if not meter.total:
-                meter.set_total(known_total(src))
-            if retry:
-                log.info("resuming %s from %s (retry %d of %d)", repo_id, label, retry, STALL_RETRIES)
-            elif src == "hfm":
-                log.warning("download of %s from the original sources failed - trying the Hugging Face backup mirror", repo_id)
-            elif src == "ms" and errors:
-                log.warning("download of %s from Hugging Face failed - trying ModelScope", repo_id)
-            log.info("downloading %s from %s", repo_id, label)
-            t_dl = time.monotonic()
-            before = download_watch.progress_bytes(partial)
-            slow_bps = parallel_download.SLOW_BPS if src == "ms" and hf_preferred else None
-            slow_after = parallel_download.SLOW_AFTER if slow_bps is not None else None
-            download_watch.run_watched(funcs[src], partial, meter, cur["cancel"], on_tick=tick, idle_ok=complete,
-                                       slow_bps=slow_bps, slow_after=slow_after)
-            ok_source = src
-            # speed of THIS attempt: the bytes it fetched over the time it ran (earlier attempts' files are not counted)
-            spent = time.monotonic() - t_dl
-            got = max(0, download_watch.progress_bytes(partial) - before)
-            log.info("%s from %s: %.0f MB in %.0f s (%.1f MB/s); %.0f s since the download started", repo_id, label,
-                     got / 1e6, spent, got / 1e6 / max(spent, 0.1), time.monotonic() - t_start)
-            if src == "hf" and mirror_ok:
-                modelscope_mirror.remember_hf(True)
-        except Exception as exc:  # noqa: BLE001
-            errors.append(f"{src}: {type(exc).__name__}: {exc}")
-            log.warning("download of %s from %s failed: %s", repo_id, src, exc)
-            if _retry_same_source(exc, retry):
-                # the source delivered data and then stalled: resume it from the partial files before switching
-                attempts.insert(0, (src, retry + 1))
-                _sleep(STALL_PAUSE)
-                continue
-            if src == "hf" and mirror_ok and _is_network_failure(exc) and not complete():
-                modelscope_mirror.remember_hf(False)      # measured: no data / network error; later models go to ModelScope first
-    if not ok_source:
-        # the .partial folder stays on disk: the next attempt continues where this one stopped
+            snapshot_download(**kwargs)
+    except ModelDownloadError:
+        shutil.rmtree(partial, ignore_errors=True)
+        raise
+    except Exception as exc:  # noqa: BLE001 - the test double failed; nothing is left half-installed
+        shutil.rmtree(partial, ignore_errors=True)
         raise ModelDownloadError(
             tr("err.download_failed", short=short, url=hf_url(repo_id)),
-            url=hf_url(repo_id), details=" | ".join(errors))
-    sha = state["sha"]
+            url=hf_url(repo_id), details=f"{type(exc).__name__}: {exc}") from exc
     if not verify_local_model(partial):
-        shutil.rmtree(partial, ignore_errors=True)
-        raise ModelDownloadError(tr("err.model_partial", short=short),
-                                 url=hf_url(repo_id))
-    # Distinct post-download status: the UI must not keep looking like a transfer.
-    progress(stage, max(cur["f"], 0.99), tr("progress.model_verifying", short=short))
-    if ok_source not in ("gh", "hfm"):        # GitHub release and backup mirror already check every file by SHA-256
-        _verify_or_repair(partial, repo_id, sha or revision, mirror_manifest, allow_patterns, short,
-                          funcs["hfm"] if use_hfm else None, meter, cur)
+        raise ModelDownloadError(tr("err.model_partial", short=short), url=hf_url(repo_id))
     if sha:
-        (partial / ".revision").write_text(sha, encoding="utf-8")
-    try:
-        finalize_download(partial, target)
-    except OSError as exc:
-        log.error("could not finish %s: %s", repo_id, exc)
-        msg = tr("err.model_finalize_busy", short=short) if isinstance(exc, HeldByUs) else tr("err.model_finalize", short=short)
-        raise ModelDownloadError(msg, url=hf_url(repo_id), details=str(exc)) from exc
-    cleanup_partials(target)
-    progress(stage, 1.0, tr("progress.model_done", short=short))
+        (partial / ".revision").write_text(str(sha), encoding="utf-8")
+    if target.exists():
+        shutil.rmtree(target, ignore_errors=True)
+    partial.rename(target)
+    progress(stage, 1.0, tr("progress.first_download", short=short))
     return target
 
 

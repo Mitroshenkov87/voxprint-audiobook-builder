@@ -18,18 +18,23 @@ def test_voxprint_common_is_pinned_by_the_released_wheel_and_its_sha256():
     lock = json.loads((ROOT / "infra" / "runtime_lock.json").read_text(encoding="utf-8"))
     suite = lock["suite"]
     assert suite == mrl.suite_record()
-    assert suite["version"] == "0.1.1"
-    assert suite["sha256"] == "c9361d5d00913faf39497fc55124e682ba15b2098c775068c49582c0520cd4d1"
-    assert suite["size"] == 53842
+    assert suite["version"] == "0.2.4"
+    assert suite["sha256"] == "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+    assert suite["size"] == 182510
     pin = mrl.suite_requirement(suite)
     assert pin in req
+    assert pin == (
+        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/"
+        "voxprint_common-0.2.4-py3-none-any.whl --hash=sha256:3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+    )
     assert "git+" not in req
     assert "git" not in lock
     assert all(row["dist"] != "voxprint-common" for row in lock["wheels"])
     assert lock["python"] == "3.14"
-    parsed = Requirement(pin)
+    parsed = Requirement(pin.split(" --hash=", 1)[0])
     assert parsed.name == "voxprint-common"
-    assert parsed.url is not None and suite["sha256"] in parsed.url
+    assert parsed.url == suite["url"]
+    assert pin.endswith(" --hash=sha256:" + suite["sha256"])
 
 
 def test_test_requirements_emit_the_wheel_pin_and_shell_requirements_do_not(capsys):
@@ -56,7 +61,7 @@ def test_an_apps_manifest_migrates_into_schema_1_components(tmp_path, monkeypatc
     data = suite_shared.load_manifest()
     torch = data["components"]["torch-2.11.0-cu130"]
     assert set(torch["refs"]) == {"audiobook-builder", "movie-dubber"}
-    assert set(data["components"]["shared-models"]["refs"]) == {"audiobook-builder", "movie-dubber"}
+    assert "shared-models" not in data["components"]
     assert data["components"]["ffmpeg-8"]["refs"] == ["audiobook-builder"]
     assert "apps" in json.loads((shared / "manifest.json").read_text(encoding="utf-8"))
 
@@ -89,24 +94,22 @@ def test_a_runtime_ref_is_deleted_only_when_nobody_else_holds_it(tmp_path, monke
     suite_shared.register("movie-dubber", ["runtime"])
     marker = suite_shared.torch_dir() / "torch"
     marker.mkdir(parents=True)
+    assert "shared-models" not in suite_shared.load_manifest()["components"]
     assert suite_shared.release_runtime("audiobook-builder") == []
     assert marker.is_dir() and suite_shared.apps_using("runtime") == ["movie-dubber"]
     assert suite_shared.release_runtime("movie-dubber") == ["runtime"]
     assert not suite_shared.torch_dir().exists()
-    assert suite_shared.component_dir("models").is_dir()
 
 
-def test_the_models_component_is_an_absolute_path_under_the_suite_models_root(tmp_path, monkeypatch):
+def test_registering_models_does_not_record_the_models_root(tmp_path, monkeypatch):
     home = tmp_path / "home"
     monkeypatch.setenv("VOXPRINT_HOME", str(home))
     monkeypatch.setenv("VOXPRINT_SHARED", str(tmp_path / "shared"))
     monkeypatch.delenv("VOXPRINT_MODELS_DIR", raising=False)
     suite_shared.register("audiobook-builder", ["models"])
-    data = json.loads(suite_shared.manifest_path().read_text(encoding="utf-8"))
-    recorded = data["components"]["shared-models"]["path"]
-    assert Path(recorded).is_absolute()
-    assert Path(recorded).resolve() == (home / "models").resolve()
-    assert suite_shared.component_dir("models").resolve() == (home / "models").resolve()
+    data = suite_shared.load_manifest()
+    assert data["components"] == {}
+    assert not suite_shared.manifest_path().is_file()
 
 
 def test_another_apps_torch_tree_is_not_where_we_write(tmp_path, monkeypatch):

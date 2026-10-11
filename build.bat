@@ -147,6 +147,8 @@ pyinstaller %MODE% --console --noconfirm --clean --name voxprint-audiobook-cli -
 if errorlevel 1 (echo [ERROR] Console PyInstaller failed. & exit /b 1)
 if /I "%~1"=="onedir" (
     copy /Y "dist\voxprint-audiobook-cli\voxprint-audiobook-cli.exe" "dist\voxprint-audiobook-builder\voxprint-audiobook-cli.exe" || exit /b 1
+    copy /Y "voxprint-app-models.json" "dist\voxprint-audiobook-builder\voxprint-app-models.json" || exit /b 1
+    copy /Y "installer\voxprint-mdl.cmd" "dist\voxprint-audiobook-builder\voxprint-mdl.cmd" || exit /b 1
     rmdir /s /q "dist\voxprint-audiobook-cli"
 )
 

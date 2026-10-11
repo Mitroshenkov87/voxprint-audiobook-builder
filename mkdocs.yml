@@ -121,6 +121,7 @@ nav:
       - Template: legal/EULA-TEMPLATE.md
   - Release notes:
       - Template: RELEASE-NOTES-TEMPLATE.md
+      - 1.0.0 Shomer: RELEASE-NOTES-1004-SHOMER.md
       - 1.0.0 Amud: RELEASE-NOTES-1003-AMUD.md
       - 1.0.0 Ometz: RELEASE-NOTES-1002-OMETZ.md
       - 1.0.0 Tamim: RELEASE-NOTES-1001-TAMIM.md
@@ -229,6 +230,7 @@ nav:
           - install_state: api/infra.install_state.md
           - keep_awake: api/infra.keep_awake.md
           - llm_tool: api/infra.llm_tool.md
+          - mdl_gate: api/infra.mdl_gate.md
           - model_downloader: api/infra.model_downloader.md
           - model_mirrors: api/infra.model_mirrors.md
           - model_release: api/infra.model_release.md
@@ -237,7 +239,6 @@ nav:
           - modules: api/infra.modules.md
           - net: api/infra.net.md
           - netroute: api/infra.netroute.md
-          - parallel_download: api/infra.parallel_download.md
           - paths: api/infra.paths.md
           - platform_win: api/infra.platform_win.md
           - portable: api/infra.portable.md

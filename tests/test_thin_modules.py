@@ -271,16 +271,20 @@ def test_components_window_shows_a_failure_and_can_retry(app, monkeypatch):     
     d.shutdown()
 
 
-def test_settings_has_the_components_button_only_in_a_thin_build(app, lib, thin, monkeypatch):    # noqa: F811
+def test_settings_offers_manage_models_and_hides_the_components_button(app, lib, thin, monkeypatch):    # noqa: F811
     s = make_studio(lib)
     try:
-        assert s.settings_dialog().btn_components.isHidden() is False
+        dialog = s.settings_dialog()
+        assert dialog.btn_mdl.isHidden() is False
+        assert dialog.btn_components.isHidden() is True
     finally:
         s.shutdown()
     monkeypatch.delenv("VOXPRINT_MODULES_CONFIG")
     s = make_studio(lib)
     try:
-        assert s.settings_dialog().btn_components.isHidden() is True
+        dialog = s.settings_dialog()
+        assert dialog.btn_mdl.isHidden() is False
+        assert dialog.btn_components.isHidden() is True
     finally:
         s.shutdown()
 

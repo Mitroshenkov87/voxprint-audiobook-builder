@@ -1,8 +1,8 @@
 """Build number and codename of an installer build.
 
-The number is the explicit ``build`` field in ``BUILD.json`` (1003 for this RC), unless the release tag
-ends in ``+<number>`` or ``-build<number>`` (``v1.0.0-rc.5+1005``, ``v1.0.0-rc.5-build1003``). A plain version
-tag such as ``v1.0.0-rc.5`` does not carry a number. ``VOXPRINT_BUILD`` overrides both. ``GITHUB_RUN_NUMBER``
+The number is the explicit ``build`` field in ``BUILD.json`` (1004 for this RC), unless the release tag
+ends in ``+<number>`` or ``-build<number>`` (``v1.0.0-rc.6+1005``, ``v1.0.0-rc.6-build1004``). A plain version
+tag such as ``v1.0.0-rc.6`` does not carry a number. ``VOXPRINT_BUILD`` overrides both. ``GITHUB_RUN_NUMBER``
 is ignored, so a failed run does not consume a number. ``offset`` stays in ``BUILD.json`` as history only.
 
 ``codename`` in ``BUILD.json`` is one Biblical Hebrew word (Latin transliteration, ASCII) describing the

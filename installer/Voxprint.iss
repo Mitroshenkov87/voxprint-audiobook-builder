@@ -48,7 +48,7 @@
 #define AppFolder "Audiobook Builder"
 #define StartMenu "VOXPrint AI Suite"
 #define AppDisplayName "VOXPrint AI Audiobook Builder"
-#define AppVersion "1.0.0-rc.5"
+#define AppVersion "1.0.0-rc.6"
 ; Windows version resources are four numbers. The pre-release suffix stays in AppVersion.
 #define AppVersionInfo "1.0.0"
 #define AppExe "voxprint-audiobook-builder.exe"
@@ -236,9 +236,6 @@ german.PortableBadFolder=Der Ordner %1 kann nicht verwendet werden (er kann nich
 english.ModelsSiblingFound=VOXPrint AI Movie Dubber is installed on this PC. Both programs use one models folder, so every model is downloaded only once.
 russian.ModelsSiblingFound=На этом ПК установлен VOXPrint AI Movie Dubber. Обе программы используют одну папку моделей, поэтому каждая модель скачивается только один раз.
 german.ModelsSiblingFound=VOXPrint AI Movie Dubber ist auf diesem PC installiert. Beide Programme nutzen einen Modellordner, daher wird jedes Modell nur einmal geladen.
-english.UninstallModelsQuestion=No other VOXPrint program uses the models in%n%1%n%nDelete these models too (about 15-28 GB)? Choose No to keep them for a later install.
-russian.UninstallModelsQuestion=Модели в папке%n%1%nбольше не использует ни одна программа VOXPrint.%n%nУдалить и их (около 15-28 ГБ)? Нажмите «Нет», чтобы оставить их для следующей установки.
-german.UninstallModelsQuestion=Kein anderes VOXPrint-Programm verwendet die Modelle in%n%1%n%nDiese Modelle ebenfalls löschen (etwa 15-28 GB)? Wählen Sie Nein, um sie für eine spätere Installation zu behalten.
 english.PortableMissing=The setup folder %1 (from /FromFolder) was not found or has no manifest.json.
 russian.PortableMissing=Папка установки %1 (из /FromFolder) не найдена или в ней нет manifest.json.
 german.PortableMissing=Der Setup-Ordner %1 (aus /FromFolder) wurde nicht gefunden oder enthält keine manifest.json.
@@ -303,6 +300,8 @@ Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\NOTICE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\credits.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\voxprint-app-models.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "voxprint-mdl.cmd"; DestDir: "{app}"; Flags: ignoreversion
 ; Optional: put vc_redist.x64.exe into installer\redist and it will be installed silently (PyTorch needs it).
 #ifexist "redist\vc_redist.x64.exe"
 Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -314,7 +313,7 @@ Name: "{group}\{#AppDisplayName}"; Filename: "{app}\{#AppExe}"
 
 [Run]
 ; (the Visual C++ runtime is installed from [Code]: InstallVcRedist)
-Filename: "{app}\{#AppExe}"; Parameters: "--prefetch"; Description: "{cm:RunPrefetch,{#AppDisplayName}}"; Flags: nowait postinstall skipifsilent
+; Models are downloaded by RunSuiteInstall (voxprint-mdl), which waits and aborts on failure.
 
 [Code]
 var
@@ -1510,19 +1509,43 @@ begin
   Result := ParamSwitch('SKIPSUITE') or (V = '1') or (V = 'YES') or (V = 'TRUE');
 end;
 
-{ After the program files are in place: install the shared runtime, ffmpeg and required models.
-  A progress form stays visible under /VERYSILENT (wizard pages are hidden). The status file is four lines
-  (state, permille, message, heartbeat). No status within 15 s means the helper is not our program (smoke);
-  a heartbeat that stops for 120 s is a stall. The process handle from ewNoWait is not closed here. }
+{ After the program files are in place: install the shared runtime and ffmpeg, then download the
+  required models. Both steps run as the installing user (so files land in that user's profile)
+  and setup waits for each process. A non-zero exit, including a silent install, aborts setup.
+  /SkipSuite skips both (CI smoke). Otherwise the download always runs. It is idempotent
+  and refills gaps, including when a status file already says ready. }
+function RunChecked(const FileName, Params: String; Show: Integer): Boolean;
+var
+  Rc: Integer;
+begin
+  Result := False;
+  if not ExecAsOriginalUser(FileName, Params, ExpandConstant('{app}'), Show, ewWaitUntilTerminated, Rc) then
+  begin
+    Log('could not start ' + FileName + ': ' + SysErrorMessage(Rc));
+    Exit;
+  end;
+  if Rc <> 0 then
+  begin
+    Log(FileName + ' exited ' + IntToStr(Rc));
+    Exit;
+  end;
+  Result := True;
+end;
+
+{ Defined before RunSuiteInstall. The Inno compiler resolves a name only after its procedure. }
+procedure UnregisterSuite();
+var
+  Rc: Integer;
+begin
+  if FileExists(ProgramExe()) then
+    if not Exec(ProgramExe(), '--unregister-suite', ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Rc) then
+      Log('shared suite manifest was not updated');
+end;
+
 procedure RunSuiteInstall();
 var
-  Exe, StatusFile, Params, State, Msg, Beat, LastBeat: String;
-  Pm, Rc: Integer;
-  Form: TSetupForm;
-  Bar: TNewProgressBar;
-  Lbl: TNewStaticText;
-  LastChange, Started: Cardinal;
-  Finished, SawStatus: Boolean;
+  Exe, Mdl, Params: String;
+  Show: Integer;
 begin
   if SkipSuiteInstall() then
   begin
@@ -1532,85 +1555,35 @@ begin
   Exe := ProgramExe();
   if not FileExists(Exe) then
   begin
-    Log('Suite install skipped: no program executable');
-    Exit;
+    Log('Suite install failed: no program executable');
+    SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['program']), mbError, MB_OK, IDOK);
+    Abort;
   end;
-  StatusFile := ExpandConstant('{tmp}\suite-status.txt');
-  DeleteFile(StatusFile);
-  Params := '--install-suite --status ' + AddQuotes(StatusFile);
-  { Inno Setup 6.6+: width and height are arguments; ClientWidth is read-only afterwards. }
-  Form := CreateCustomForm(ScaleX(460), ScaleY(100), False, False);
-  try
-    Form.Caption := '{#AppDisplayName}';
-    Form.BorderStyle := bsDialog;
-    Form.Position := poScreenCenter;
-    Lbl := TNewStaticText.Create(Form);
-    Lbl.Parent := Form;
-    Lbl.Left := ScaleX(16);
-    Lbl.Top := ScaleY(14);
-    Lbl.Width := Form.ClientWidth - ScaleX(32);
-    Lbl.Height := ScaleY(36);
-    Lbl.AutoSize := False;
-    Lbl.Caption := CustomMessage('SuiteStatus');
-    Bar := TNewProgressBar.Create(Form);
-    Bar.Parent := Form;
-    Bar.Left := ScaleX(16);
-    Bar.Top := ScaleY(60);
-    Bar.Width := Form.ClientWidth - ScaleX(32);
-    Bar.Height := ScaleY(18);
-    Bar.Min := 0;
-    Bar.Max := 1000;
-    Bar.Position := 0;
-    Form.Show;
-    if not ExecAsOriginalUser(Exe, Params, ExpandConstant('{app}'), SW_HIDE, ewNoWait, Rc) then
-    begin
-      Log('suite install could not start: ' + SysErrorMessage(Rc));
-      Exit;
-    end;
-    Finished := False;
-    SawStatus := False;
-    LastBeat := '';
-    Started := VxTick();
-    LastChange := Started;
-    while not Finished do
-    begin
-      Sleep(300);
-      if ReadFetchStatus(StatusFile, State, Pm, Msg, Beat) then
-      begin
-        SawStatus := True;
-        Lbl.Caption := Msg;
-        Bar.Position := Pm;
-        WizardForm.StatusLabel.Caption := Msg;
-        WizardForm.ProgressGauge.Position := Pm;
-        if Beat <> LastBeat then
-        begin
-          LastBeat := Beat;
-          LastChange := VxTick();
-        end;
-        if State = 'done' then
-          Finished := True
-        else if State = 'error' then
-        begin
-          SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), [Msg]), mbError, MB_OK, IDOK);
-          Abort;
-        end;
-      end;
-      if not Finished then
-      begin
-        if (not SawStatus) and ((VxTick() - Started) > 15000) then
-        begin
-          Log('Suite install wrote no status; continuing');
-          Finished := True;
-        end
-        else if SawStatus and ((VxTick() - LastChange) > 120000) then
-        begin
-          SuppressibleMsgBox(CustomMessage('SuiteStalled'), mbError, MB_OK, IDOK);
-          Abort;
-        end;
-      end;
-    end;
-  finally
-    Form.Hide;
+  if not RunChecked(Exe, '--install-suite', SW_HIDE) then
+  begin
+    UnregisterSuite();
+    SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['runtime']), mbError, MB_OK, IDOK);
+    Abort;
+  end;
+  Mdl := ExpandConstant('{app}\voxprint-mdl.cmd');
+  if not FileExists(Mdl) then
+  begin
+    Log('Suite install failed: voxprint-mdl.cmd is missing');
+    UnregisterSuite();
+    SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['voxprint-mdl']), mbError, MB_OK, IDOK);
+    Abort;
+  end;
+  Params := '/d /c ' + AddQuotes(Mdl) + ' download --app audiobook-builder --manifest '
+    + AddQuotes(ExpandConstant('{app}\voxprint-app-models.json')) + ' --json';
+  { CLI progress. The MDL window arrives in voxprint-common 0.2.2. }
+  Show := SW_HIDE;
+  if not WizardSilent() then
+    Show := SW_SHOWNORMAL;
+  if not RunChecked(ExpandConstant('{cmd}'), Params, Show) then
+  begin
+    UnregisterSuite();
+    SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['models']), mbError, MB_OK, IDOK);
+    Abort;
   end;
 end;
 
@@ -1783,37 +1756,18 @@ begin
   end;
 end;
 
-{ Uninstall: remove our key with the program itself (ProgramExe --unregister-models-user --out FILE).  FILE gets the number of
-  OTHER programs still using the models and the models folder.  -1 (helper failed) means: never offer to delete. }
-var
-  OtherModelUsers: Integer;
-  SharedModelsDir: String;
-
+{ Uninstall: drop our key in models\.users.json. The models root itself is never deleted. }
 procedure UnregisterModelsUser;
 var
   Rc: Integer;
-  OutFile: String;
-  Lines: TArrayOfString;
 begin
-  OtherModelUsers := -1;
-  SharedModelsDir := '';
-  OutFile := AddBackslash(GetTempDir()) + 'voxprint-models-users.txt';
-  DeleteFile(OutFile);
-  if not FileExists(ProgramExe()) then Exit;
-  if Exec(ProgramExe(), '--unregister-models-user --out "' + OutFile + '"', ExpandConstant('{app}'),
-          SW_HIDE, ewWaitUntilTerminated, Rc) and (Rc = 0) then
-    if LoadStringsFromFile(OutFile, Lines) and (GetArrayLength(Lines) >= 2) then
-    begin
-      OtherModelUsers := StrToIntDef(Trim(Lines[0]), -1);
-      SharedModelsDir := RemoveBackslash(Trim(Lines[1]));
-    end;
-  DeleteFile(OutFile);
+  if FileExists(ProgramExe()) then
+    if not Exec(ProgramExe(), '--unregister-models-user', ExpandConstant('{app}'), SW_HIDE,
+                ewWaitUntilTerminated, Rc) then
+      Log('models users file not updated');
 end;
 
-{ The models are deleted only when no other Voxprint program uses them AND the user says yes (default: keep; a silent uninstall
-  with /SUPPRESSMSGBOXES keeps them).  Only the default folder is ever offered: a folder the user chose stays untouched. Voices,
-  settings and projects in %LOCALAPPDATA%\Voxprint are never deleted here. }
-{ runtime\.users.json: remove our key. The same flag drops our ref in shared\manifest.json and deletes the torch component only when no other app still lists it. }
+{ runtime\.users.json: remove our key. The same flag drops our runtime ref and deletes that version directory only when no other app still lists it. A shared root is never deleted. }
 procedure UnregisterRuntimeUser;
 var
   Rc: Integer;
@@ -1822,16 +1776,6 @@ begin
     if not Exec(ProgramExe(), '--unregister-runtime-user', ExpandConstant('{app}'), SW_HIDE,
                 ewWaitUntilTerminated, Rc) then
       Log('runtime users file not updated');
-end;
-
-{ Drop our app from the shared manifest and delete resources no other Voxprint app still lists. }
-procedure UnregisterSuite();
-var
-  Rc: Integer;
-begin
-  if FileExists(ProgramExe()) then
-    if not Exec(ProgramExe(), '--unregister-suite', ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, Rc) then
-      Log('shared suite manifest was not updated');
 end;
 
 #ifdef ONLINE
@@ -1897,10 +1841,4 @@ begin
 #endif
   if CurUninstallStep = usPostUninstall then
     RemoveDir(ExtractFileDir(RemoveBackslash(ExpandConstant('{app}'))));
-  if CurUninstallStep = usPostUninstall then
-    if (OtherModelUsers = 0) and (SharedModelsDir <> '') and DirExists(SharedModelsDir) and
-       (CompareText(SharedModelsDir, DefaultModelsDir()) = 0) then
-      if SuppressibleMsgBox(FmtMessage(CustomMessage('UninstallModelsQuestion'), [SharedModelsDir]),
-         mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES then
-        DelTree(SharedModelsDir, True, True, True);
 end;

@@ -28,6 +28,8 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from infra.download_watch import Stalled
+
 log = logging.getLogger("voxprint.models")
 
 BASE_URL = os.environ.get("VOXPRINT_MODELSCOPE_URL", "https://modelscope.cn").rstrip("/")
@@ -120,6 +122,33 @@ def list_files(repo_id: str, opener: Opener = _open, timeout: float = 20.0) -> L
     return out
 
 
+def _open_retry(path: Path, mode: str):
+    """Open ``path``, retrying a brief lock."""
+    last: Optional[BaseException] = None
+    for _ in range(8):
+        try:
+            return open(path, mode)
+        except PermissionError as exc:
+            last = exc
+            _sleep(0.05)
+    assert last is not None
+    raise last
+
+
+def _replace_retry(src: Path, dst: Path) -> None:
+    """Rename ``src`` onto ``dst``, retrying a brief lock."""
+    last: Optional[BaseException] = None
+    for _ in range(8):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError as exc:
+            last = exc
+            _sleep(0.05)
+    assert last is not None
+    raise last
+
+
 def _safe_rel(rel: str) -> bool:
     """True for a relative path that cannot escape the destination folder (no absolute path, ``..`` or drive letter)."""
     parts = rel.replace("\\", "/").split("/")
@@ -134,8 +163,6 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
     ``expected_sizes`` are the sizes of the verified revision; every one of those files that exists on the mirror must
     have exactly that size, otherwise :class:`MirrorError` is raised.
     """
-    from infra import parallel_download
-
     files = list_files(repo_id, opener)
     sizes = dict(files)
     if expected_sizes:
@@ -163,20 +190,6 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
         if have < size:
             url = f"{BASE_URL}/api/v1/models/{repo_id}/repo?" + urllib.parse.urlencode(
                 {"Revision": REVISION, "FilePath": rel})
-            if (parallel_download.enabled() and size >= parallel_download.parallel_min()
-                    and have == 0 and opener is _open):
-                # multi-connection Range into ``target`` directly (parts dir beside it)
-                try:
-                    def on_bytes(n: int, _b=[0]) -> None:  # noqa: B006
-                        _b[0] += n
-                        progress(min(1.0, (done + _b[0]) / total))  # noqa: B023 - called within this iteration
-                    parallel_download.download_file(url, target, size, opener=opener, on_bytes=on_bytes,
-                                                    timeout=timeout)
-                    done += size
-                    progress(min(1.0, done / total))
-                    continue
-                except parallel_download.ParallelError as exc:
-                    log.info("ModelScope parallel download of %s failed (%s) - single stream", rel, exc)
             last_exc: Optional[BaseException] = None
             for attempt in range(STREAM_RETRIES):
                 have = part.stat().st_size if part.exists() else 0
@@ -193,7 +206,7 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
                         status = getattr(r, "status", 200)
                         if have and status != 206:       # server ignored Range (no 206 Partial Content): start over
                             have = 0
-                        with parallel_download.open_retry(part, "ab" if have else "wb") as f:
+                        with _open_retry(part, "ab" if have else "wb") as f:
                             while True:
                                 chunk = r.read(CHUNK)
                                 if not chunk:
@@ -204,7 +217,7 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
                     if got < size:
                         raise OSError(f"incomplete ({got} of {size})")
                     break
-                except parallel_download.Stalled:
+                except Stalled:
                     raise                                           # abandoned by the watchdog: not a mirror error
                 except (OSError, urllib.error.URLError) as exc:
                     last_exc = exc
@@ -219,7 +232,7 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
                     raise MirrorError(f"{rel}: {last_exc}") from last_exc
         if part.stat().st_size != size:
             raise MirrorError(f"{rel}: incomplete ({part.stat().st_size} of {size} bytes)")
-        parallel_download.replace_retry(part, target)
+        _replace_retry(part, target)
         done += size
         progress(min(1.0, done / total))
     return sizes

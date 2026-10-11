@@ -422,15 +422,14 @@ def test_opus_download_order_cache_then_original_then_mirror(tmp_path, monkeypat
     assert seen == [text_models.OPUS_FILES] and text_models.state(model) == text_models.STATE_READY
     # the cache comes first: nothing is fetched at all
     assert text_models.ensure(model, snapshot_download=broken, mirror_manifest=man) == path
-    # original down -> the mirror, only the app's files, every one hash-checked
+    # a missing original is not fetched here; VOXPrint MDL owns the download
     import shutil
     shutil.rmtree(path)
     calls = []
-    path = text_models.ensure(model, snapshot_download=lambda *a, **k: broken(), get_remote_sha=lambda r: None, mirror_manifest=man,
-                              hf_mirror_fetch=fetcher(calls))
-    assert {c[1] for c in calls} == set(text_models.OPUS_FILES) and "README.md" not in {c[1] for c in calls}
-    assert {c[0] for c in calls} == {"Me/voxprint-mirror-opus-mt-xx-yy"} and (path / "pytorch_model.bin").read_bytes() == content["pytorch_model.bin"]
-    assert text_models.state(model) == text_models.STATE_READY
+    with pytest.raises(ModelDownloadError):
+        text_models.ensure(model, snapshot_download=lambda *a, **k: broken(), get_remote_sha=lambda r: None, mirror_manifest=man,
+                           hf_mirror_fetch=fetcher(calls))
+    assert calls == [] and text_models.state(model) == text_models.STATE_NEEDS_DOWNLOAD
 
 
 def test_opus_original_with_wrong_hash_is_replaced_by_the_mirror_copy(tmp_path, monkeypatch):
@@ -439,9 +438,10 @@ def test_opus_original_with_wrong_hash_is_replaced_by_the_mirror_copy(tmp_path, 
 
     def tampered(repo_id, local_dir, **kw):
         writer(local_dir, {**content, "pytorch_model.bin": b"EVIL" * 10})
-    path = text_models.ensure(model, snapshot_download=tampered, get_remote_sha=lambda r: None, mirror_manifest=man,
-                              hf_mirror_fetch=fetcher(calls))
-    assert calls and (path / "pytorch_model.bin").read_bytes() == content["pytorch_model.bin"]
+    with pytest.raises(ModelDownloadError):
+        text_models.ensure(model, snapshot_download=tampered, get_remote_sha=lambda r: None, mirror_manifest=man,
+                           hf_mirror_fetch=fetcher(calls))
+    assert calls == [] and not model.local_dir.exists()
 
 
 def test_opus_tampered_mirror_is_rejected_and_nothing_is_kept(tmp_path, monkeypatch):

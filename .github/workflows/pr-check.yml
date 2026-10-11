@@ -66,6 +66,8 @@ jobs:
         run: |
           .app/bin/python main.py --selftest-text
           .app/bin/python main.py --selftest-speech
+      - name: Shared models root survives uninstall
+        run: .app/bin/python -m pytest -q tests/test_suite_roots.py --tb=short
 
   windows:
     runs-on: windows-latest
@@ -122,6 +124,9 @@ jobs:
         run: |
           .app\Scripts\python.exe main.py --selftest-text
           .app\Scripts\python.exe main.py --selftest-speech
+      - name: Shared models root survives uninstall
+        shell: pwsh
+        run: .app\Scripts\python.exe -m pytest -q tests\test_suite_roots.py --tb=short
 
   windows-installer:
     runs-on: windows-latest
@@ -151,9 +156,11 @@ jobs:
         shell: pwsh
         run: |
           python -m venv .venv
+          python -m pip install -q uv
           python tools\make_runtime_lock.py --test-requirements | Out-File -Encoding ascii build-req.txt
           Get-Content build-req.txt
-          .venv\Scripts\python.exe -m pip install --quiet -r build-req.txt pyinstaller
+          # The suite pin carries --hash. pip then requires a hash on every package in the command, including PyInstaller.
+          uv pip install --python .venv\Scripts\python.exe -r build-req.txt pyinstaller
       - name: Build number and codename (BUILD.json build field or the release tag; BUILD.json is not changed)
         shell: pwsh
         run: |
@@ -166,16 +173,56 @@ jobs:
       - name: Thin shell (PyInstaller)
         shell: cmd
         run: build_thin.bat
-      - name: Online installer (Inno, not published)
+      - name: Online installer (Inno, local manifest, then a silent install)
         shell: pwsh
         run: |
-          ./installer/build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag v0.0.0-dev -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
+          $ErrorActionPreference = "Stop"
+          ./installer/build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag v0.0.0-beta -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json -BaseUrl http://127.0.0.1:8097 -ManifestUrl http://127.0.0.1:8097/manifest-thin-beta.json
+          python tools\check_manifest_tags.py build\online-release
+          if ($LASTEXITCODE -ne 0) { throw "a manifest URL names a GitHub tag that does not exist" }
+          if (Select-String -Path build\online-release\*.json -Pattern "v0.0.0-dev" -Quiet) { throw "manifest still points at v0.0.0-dev" }
           Get-ChildItem build\online-release | Format-Table Name, Length
           $setup = Get-Item build\online-release\voxprint-audiobook-builder-setup-win-x64.exe
           $versioned = @(Get-ChildItem build\online-release\voxprint-audiobook-builder-setup-*-win-x64.exe)
           if ($versioned.Count -lt 1) { throw "versioned setup file was not written" }
           "installer bytes: $($setup.Length)"
           "installer MiB: $([math]::Round($setup.Length / 1MB, 1))"
+          Start-Process python -ArgumentList "-m","http.server","8097","--bind","127.0.0.1","--directory","build\online-release" -WindowStyle Hidden
+          Start-Sleep 3
+          (Invoke-WebRequest http://127.0.0.1:8097/manifest-thin-beta.json -UseBasicParsing).StatusCode
+          $p = Start-Process $setup.FullName -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxmdl","/LOG=C:\vxmdl.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content C:\vxmdl.log -Tail 80; throw "install exit code $($p.ExitCode)" }
+          if (-not (Test-Path C:\vxmdl\voxprint-audiobook-builder.exe)) { throw "the shell was not installed" }
+          $env:VOXPRINT_HOME = "C:\vxmdl-home"
+          $cli = "C:\vxmdl\voxprint-audiobook-cli.exe"
+          if (-not (Test-Path $cli)) { throw "cli missing: $cli" }
+          $models = "C:\vxmdl-home\models"
+          New-Item -ItemType Directory -Force (Join-Path $models "movie-dubber") | Out-Null
+          $marker = Join-Path $models "movie-dubber\weights.bin"
+          Set-Content -Path $marker -Value "other-app" -Encoding ascii
+          $shared = "C:\vxmdl-home\shared"
+          New-Item -ItemType Directory -Force $shared | Out-Null
+          $stored = ($models -replace '\\', '/')
+          $sha = "ab" * 32
+          $manifest = @{
+            schema = 1
+            components = @{
+              "shared-models" = @{
+                kind = "model"
+                version = "1"
+                path = $stored
+                sha256 = $sha
+                installed_at = "2026-01-01T00:00:00+00:00"
+                refs = @("audiobook-builder")
+              }
+            }
+          } | ConvertTo-Json -Depth 5
+          Set-Content -Encoding utf8 -Path (Join-Path $shared "manifest.json") -Value $manifest
+          & $cli --unregister-suite
+          if ($LASTEXITCODE -ne 0) { throw "unregister-suite exited $LASTEXITCODE" }
+          & $cli --unregister-runtime-user
+          if ($LASTEXITCODE -ne 0) { throw "unregister-runtime-user exited $LASTEXITCODE" }
+          if (-not (Test-Path -LiteralPath $marker)) { throw "uninstall deleted another app's models" }
       - uses: actions/upload-artifact@v4
         with:
           name: voxprint-audiobook-builder-setup

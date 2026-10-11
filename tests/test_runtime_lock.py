@@ -69,7 +69,8 @@ def test_the_lock_covers_requirements_txt():
         line = line.split("#")[0].strip()
         if not line:
             continue
-        r = Requirement(line)
+        # pip's --hash option is not part of a PEP 508 requirement.
+        r = Requirement(line.split(" --hash=", 1)[0])
         if r.marker is not None and not r.marker.evaluate({"python_version": "3.14"}):
             continue
         assert mk.norm(r.name) in have, f"{r.name} is in requirements.txt but not in runtime_lock.json (run tools/make_runtime_lock.py)"

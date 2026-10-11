@@ -11,7 +11,7 @@ Driving the installed program (commands, JSON, exit codes, where the executable 
 * `docs/` - all long documentation (map: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)); `docs/legal/` - End User Agreements; `docs/manual/`, `docs/recording-scripts/` - PDFs/texts built by scripts
 
 ## Run tests
-`pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt && pip install --no-deps -r requirements-nodeps.txt`, then `QT_QPA_PLATFORM=offscreen python -m pytest` (no GPU, no network; tests are isolated by `tests/conftest.py`). Add a test with every change. Setup details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+`uv pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt && uv pip install --no-deps -r requirements-nodeps.txt`, then `QT_QPA_PLATFORM=offscreen python -m pytest` (no GPU, no network; tests are isolated by `tests/conftest.py`). Add a test with every change. Setup details: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). The suite pin uses `--hash`, which makes `pip install -r requirements.txt` refuse the file; uv checks that hash and leaves the other lines alone.
 
 ## Build installers
 Windows (Inno Setup, online/full/thin) and the Linux package: see [docs/BUILDING.md](docs/BUILDING.md) and [docs/DOWNLOADS.md](docs/DOWNLOADS.md). Do not rebuild or re-tag releases unless asked.

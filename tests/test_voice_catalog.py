@@ -242,6 +242,10 @@ def test_locally_trained_voice_counts_as_the_catalog_voice_with_the_same_id_or_n
     lib = VoiceLibrary(tmp_path / "lib")
     lib.add_from_adapter(make_adapter(tmp_path / "g", name="Gideon"))      # folder id "gideon", no repo_id
     lib.add_from_adapter(make_adapter(tmp_path / "n", name="NOA"))         # same name, other case
+    # created is second-resolution; a slow disk can put the two adds in different seconds and newest-first then swaps them
+    for rec in lib.list_voices():
+        rec.info["created"] = "2026-01-01T00:00:00Z"
+        voice_info.write_voice_json(rec.path, rec.info)
     items = cat.build(lib, entries)
     assert [(i.key, i.installed) for i in items] == [("gideon", True), ("noa", True), ("repo:levi", False)]  # boaz: retired
     assert repo.installed_entry_ids(entries, lib.list_voices()) == {"gideon", "noa"}

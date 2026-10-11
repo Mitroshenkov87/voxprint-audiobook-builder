@@ -76,6 +76,8 @@ from infra.asr_choice import LARGE as ASR_LARGE
 from infra.asr_choice import SMALL as ASR_SMALL
 from infra.asr_choice import preferred_repo
 from infra.asr_choice import ready as asr_ready
+from infra.mdl_gate import MDL_HINT
+from infra.mdl_gate import models_ready as _models_ready
 from infra.model_downloader import ALIGNER_REPO
 from infra.model_release import ReleaseError
 from infra.vram_optimizer import MODEL_0_6B, MODEL_1_7B, detect_gpu, plan_training
@@ -97,6 +99,12 @@ EXIT_INPUT = 3
 EXIT_MISSING = 4
 EXIT_GPU = 5
 EXIT_CANCELLED = 6
+
+#: Commands that load speech, translation or the optional text model. They exit 4 until MDL is ready.
+_NEEDS_MODELS = frozenset({
+    "narrate", "train", "prepare", "translate", "speakers", "bench", "revoice",
+    "models_download", "check",
+})
 
 _INPUT_KINDS = {"audio_read", "text_read", "book", "voice", "mismatch"}
 _MISSING_KINDS = {"download", "update"}
@@ -256,15 +264,30 @@ _json_stdout = None
 _saved_showwarning = None
 
 
+def _reconfigure_utf8(stream) -> None:
+    """Ask a text stream for UTF-8. A console that cannot change encoding is left as it is."""
+    reconfigure = getattr(stream, "reconfigure", None)
+    if reconfigure is None:
+        return
+    try:
+        reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError, ValueError):
+        return
+
+
 def begin_json_stdout() -> None:
     """Send library prints, warnings and logging that target stdout to stderr.
 
-    ``--json`` keeps the real stdout for JSON lines only. Call :func:`end_json_stdout` when the command returns.
+    ``--json`` keeps the real stdout for JSON lines only, encoded as UTF-8 (so a Windows
+    console does not replace Cyrillic with ``?`` or ``\\u`` escapes). Call :func:`end_json_stdout`
+    when the command returns.
     """
     global _json_stdout, _saved_showwarning
     if _json_stdout is not None:
         return
     real = sys.stdout
+    _reconfigure_utf8(real)
+    _reconfigure_utf8(sys.stderr)
     _json_stdout = real
     _saved_showwarning = warnings.showwarning
     sys.stdout = sys.stderr
@@ -2809,6 +2832,17 @@ def _dispatch(argv: Optional[Sequence[str]], *, run_narration_fn, run_task_fn, l
     handler = getattr(args, "_handler", "")
     if getattr(args, "dry_run", False):
         return run_dry(args)
+    if handler in _NEEDS_MODELS and not _models_ready():
+        return _error(
+            CliError(
+                EXIT_MISSING,
+                "required models are not installed",
+                hint=MDL_HINT,
+            ),
+            json_mode=bool(getattr(args, "json_output", False)),
+            command=handler,
+            started=time.perf_counter(),
+        )
     if handler == "narrate":
         return cmd_narrate(args, run_fn=run_narration_fn, library=library, plan_fn=plan_fn)
     if handler == "train":

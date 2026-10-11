@@ -61,13 +61,13 @@ TEST_EXTRAS = {"huggingface-hub", "requests", "scipy", "pyyaml", "tqdm", "urllib
 COMPAT = {"torch": ">=2.11,<2.12", "python_minor_must_match": True}
 #: Released suite wheel. The thin shell bundles it. It is not a PyPI runtime download.
 SUITE_DIST = "voxprint-common"
-SUITE_VERSION = "0.1.1"
-SUITE_FILE = "voxprint_common-0.1.1-py3-none-any.whl"
+SUITE_VERSION = "0.2.4"
+SUITE_FILE = "voxprint_common-0.2.4-py3-none-any.whl"
 SUITE_URL = (
-    "https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.1.1/" + SUITE_FILE
+    "https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/" + SUITE_FILE
 )
-SUITE_SHA256 = "c9361d5d00913faf39497fc55124e682ba15b2098c775068c49582c0520cd4d1"
-SUITE_SIZE = 53842
+SUITE_SHA256 = "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+SUITE_SIZE = 182510
 
 
 def norm(n: str) -> str:
@@ -201,9 +201,9 @@ def suite_record() -> dict:
 
 
 def suite_requirement(row: Optional[dict] = None) -> str:
-    """pip requirement. The ``#sha256=`` fragment is checked when the wheel is downloaded."""
+    """pip requirement. ``--hash`` is checked when the wheel is downloaded."""
     item = suite_record() if row is None else row
-    return f"{item['dist']} @ {item['url']}#sha256={item['sha256']}"
+    return f"{item['dist']} @ {item['url']} --hash=sha256:{item['sha256']}"
 
 
 def git_dist_names(lock: dict) -> List[str]:

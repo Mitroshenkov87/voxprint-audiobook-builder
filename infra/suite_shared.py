@@ -7,16 +7,18 @@ One tree, one ``manifest.json`` (schema 1, :mod:`voxprint_common.runtime_manifes
 
     runtime/py314-torch2.11-cu130   torch 2.11.0+cu130 (reused, not downloaded again)
     wheels/audiobook-builder        this app's other wheels (CPU onnxruntime never sits beside torch)
-    <home>/models                   required base models (the suite models root; an absolute component path)
     tools/                          ffmpeg and other pinned tools
     manifest.json
 
-``refs`` lists the apps that still use a component. Uninstalling drops only this app's ref and
-deletes the component when the list is empty. ``VOXPRINT_SHARED`` overrides the folder (tests).
+Model files stay in the suite models root. VOXPrint MDL records each file. This module
+never registers that root, ``shared/runtime``, the voices root or a cache root as one
+component. ``refs`` lists the apps that still use a component. Uninstalling drops only
+this app's ref and deletes a directory only when this app was the last ref and the path
+is not one of those roots. ``VOXPRINT_SHARED`` overrides the shared folder (tests).
 
     from infra.suite_shared import register, unregister
 
-    register("audiobook-builder", ["runtime", "models", "tools"])
+    register("audiobook-builder", ["runtime", "tools"])
     left = unregister("audiobook-builder")
 
 Licence: Apache-2.0
@@ -27,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import Dict, Iterable, List, NamedTuple
@@ -42,7 +45,7 @@ log = logging.getLogger("voxprint.suite")
 APP_ID = "audiobook-builder"
 MANIFEST_NAME = "manifest.json"
 SCHEMA = 1
-RESOURCES = ("runtime", "models", "tools")
+RESOURCES = ("runtime", "tools")
 TORCH_ID = "torch-2.11.0-cu130"
 TORCH_VERSION = "2.11.0+cu130"
 TORCH_REL = "runtime/py314-torch2.11-cu130"
@@ -63,7 +66,6 @@ class _Spec(NamedTuple):
 
 _SPECS = {
     "runtime": _Spec(TORCH_ID, "runtime", TORCH_VERSION, TORCH_REL, ""),
-    "models": _Spec("shared-models", "model", "1", "", "shared-models"),
     "tools": _Spec("ffmpeg-8", "tool", "8", "tools", "ffmpeg-8"),
 }
 
@@ -88,55 +90,16 @@ def wheels_dir() -> Path:
     return root() / WHEELS_REL
 
 
-def _under(folder: Path, base: Path) -> bool:
-    try:
-        folder.resolve().relative_to(base.resolve())
-    except (OSError, ValueError):
-        return False
-    return True
-
-
-def model_component_path() -> str:
-    """Absolute path of the models component, under the suite models root or the shared tree.
-
-    The live store (:func:`infra.paths.models_dir`) is recorded when it sits in one of those
-    roots. Otherwise the suite models root itself is recorded.
-    """
-    live = paths.models_dir().absolute()
-    library = suite_paths.models_dir().absolute()
-    if _under(live, library) or _under(live, root()):
-        return live.as_posix()
-    return library.as_posix()
-
-
-def _recorded_path(component_id: str) -> str:
-    if not manifest_path().is_file():
-        return ""
-    try:
-        current = _manifest().components.get(component_id)
-    except (OSError, ValueError, runtime_manifest.ManifestError):
-        return ""
-    if current is None:
-        return ""
-    return str(current.path or "")
-
-
 def component_dir(name: str) -> Path:
     """Directory of a resource. Does not create it."""
     spec = _SPECS.get(name)
     if spec is None:
         raise ValueError(name)
-    if name == "models":
-        recorded = _recorded_path(spec.id)
-        if recorded:
-            path = Path(recorded)
-            return path if path.is_absolute() else root() / path
-        return Path(model_component_path())
     return root() / spec.path
 
 
 def resource_dir(name: str) -> Path:
-    """``runtime``, ``models`` or ``tools`` (created on demand)."""
+    """``runtime`` or ``tools`` (created on demand). Models are not a component."""
     folder = component_dir(name)
     folder.mkdir(parents=True, exist_ok=True)
     return folder
@@ -181,9 +144,8 @@ def load_manifest() -> Dict:
 
 
 def _add(spec: _Spec, app: str) -> None:
-    path = model_component_path() if spec.kind == "model" else spec.path
     runtime_manifest.add_ref(
-        spec.id, app, kind=spec.kind, version=spec.version, path=path,
+        spec.id, app, kind=spec.kind, version=spec.version, path=spec.path,
         sha256=_sha_of(spec), manifest=manifest_path(),
     )
 
@@ -214,15 +176,29 @@ def apps_using(name: str, data: Dict | None = None) -> List[str]:
 
 
 def unregister(app: str) -> List[str]:
-    """Drop ``app``. Returns resource names whose component was deleted (no refs left)."""
+    """Drop ``app`` from every component.
+
+    Returns the component ids whose ref list became empty. A directory is removed
+    only when this app was the last ref, the component is not a model (MDL owns
+    those files) and the path is not a shared root.
+    """
     _migrate_apps_manifest()
-    gone: List[str] = []
-    for name in sorted(RESOURCES):
-        if runtime_manifest.remove_ref(_SPECS[name].id, str(app), manifest=manifest_path()):
-            gone.append(name)
-    if runtime_manifest.remove_ref(WHEELS_ID, str(app), manifest=manifest_path()):
-        _delete_tree(wheels_dir())
-    return gone
+    app_id = str(app)
+    emptied: List[str] = []
+    for cid, kind, rel in _component_rows():
+        folder = _folder_of(rel)
+        try:
+            removed = runtime_manifest.remove_ref(cid, app_id, manifest=manifest_path())
+        except runtime_manifest.ManifestError:
+            log.warning("could not drop %s from %s", app_id, cid, exc_info=True)
+            continue
+        if not removed:
+            continue
+        emptied.append(cid)
+        if kind == "model" or folder is None:
+            continue
+        _delete_owned(folder)
+    return emptied
 
 
 def release_runtime(app: str = APP_ID) -> List[str]:
@@ -240,23 +216,26 @@ def unregister_names(app: str, names: Iterable[str]) -> List[str]:
         if runtime_manifest.remove_ref(_SPECS[name].id, str(app), manifest=manifest_path()):
             gone.append(name)
     if "runtime" in names and runtime_manifest.remove_ref(WHEELS_ID, str(app), manifest=manifest_path()):
-        _delete_tree(wheels_dir())
+        _delete_owned(wheels_dir())
     delete_resources(gone)
     return gone
 
 
 def delete_resources(names: Iterable[str]) -> List[str]:
-    """Delete component directories that no app still references."""
+    """Delete component directories that no app still references.
+
+    A shared root is left in place even when its ref list is empty.
+    """
     removed = []
     for name in names:
         if name not in _SPECS or apps_using(name):
             continue
-        _delete_tree(component_dir(name))
-        removed.append(name)
+        if _delete_owned(component_dir(name)):
+            removed.append(name)
         if name == "runtime":
             current = _manifest().components.get(WHEELS_ID)
             if current is None or not current.refs:
-                _delete_tree(wheels_dir())
+                _delete_owned(wheels_dir())
     return removed
 
 
@@ -443,6 +422,124 @@ def _contains(child: Path, dest: Path) -> bool:
     return True
 
 
+class SharedRootError(RuntimeError):
+    """Deleting this path would remove a shared suite root or a folder that contains one."""
+
+
+def _protected_roots() -> List[Path]:
+    """Models, runtime, voices, cache, and the suite home. Not their private subdirectories."""
+    home = paths.app_home()
+    library = suite_paths.home()
+    shared = root()
+    found = [
+        home,
+        library,
+        home / "models",
+        library / "models",
+        shared / "models",
+        shared / "runtime",
+        home / "runtime",
+        home / "voices",
+        library / "voices",
+        shared / "voices",
+        home / "cache",
+        library / "cache",
+        home / "setup-cache",
+        library / "setup-cache",
+        home / "trt-cache",
+        library / "trt-cache",
+        suite_paths.trt_cache_dir(),
+    ]
+    try:
+        found.append(paths.models_dir())
+    except OSError:
+        pass
+    cache = os.environ.get("VOXPRINT_MODEL_CACHE", "").strip()
+    if cache:
+        found.append(Path(os.path.expandvars(os.path.expanduser(cache))))
+    return found
+
+
+def _norm(folder: Path) -> Path:
+    try:
+        text = str(Path(folder).resolve(strict=False))
+    except OSError:
+        text = str(Path(folder).absolute())
+    return Path(os.path.normcase(text))
+
+
+def refuse_shared_root(folder: Path) -> None:
+    """Raise when ``folder`` is a shared root or a parent of one.
+
+    The models root, ``shared/runtime``, the voices root, the cache roots and
+    the suite home (``%LOCALAPPDATA%\\Voxprint`` on Windows) are never deleted,
+    even when no app still lists them. A version directory inside ``shared/runtime``
+    is not a root.
+    """
+    candidate = _norm(folder)
+    for protected in _protected_roots():
+        try:
+            _norm(protected).relative_to(candidate)
+        except ValueError:
+            continue
+        raise SharedRootError(f"refusing to delete {folder}: it is a shared root or contains one")
+
+
+def _is_shared_root(folder: Path) -> bool:
+    try:
+        refuse_shared_root(folder)
+    except SharedRootError:
+        return True
+    return False
+
+
+def _component_rows() -> List[tuple]:
+    """``(id, kind, path)`` from the manifest. An unreadable file is empty."""
+    path = manifest_path()
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    components = data.get("components") if isinstance(data, dict) else None
+    if not isinstance(components, dict):
+        return []
+    rows = []
+    for cid, row in components.items():
+        if not isinstance(row, dict):
+            continue
+        rows.append((str(cid), str(row.get("kind") or ""), str(row.get("path") or "")))
+    return rows
+
+
+def _folder_of(rel: str) -> Path | None:
+    text = (rel or "").strip()
+    if not text:
+        return None
+    candidate = Path(text)
+    return candidate if candidate.is_absolute() else root() / candidate
+
+
+def rollback(app: str = APP_ID) -> List[str]:
+    """Drop ``app`` after a failed setup or an uninstall.
+
+    Same rules as :func:`unregister`: our ref goes, and a directory is removed
+    only when this app exclusively owned it and it is not a shared root.
+    """
+    return unregister(app)
+
+
+def _delete_owned(folder: Path) -> bool:
+    """Delete ``folder`` when it is not a shared root. Returns whether it was removed."""
+    if _is_shared_root(folder):
+        log.error("not deleting %s: it is a shared root", folder)
+        return False
+    _delete_tree(folder)
+    return True
+
+
 def _delete_tree(folder: Path) -> None:
+    refuse_shared_root(folder)
     if folder.is_dir():
         shutil.rmtree(folder, ignore_errors=True)

@@ -50,10 +50,10 @@ def test_six_clicks_open_the_egg_through_on_click_and_another_click_closes_it():
         assert screen.width() in (1016, min(1016, work.width()))
         assert screen.height() in (596, min(596, work.height()))
         info = splash.build_info()
-        assert info.version == "1.0.0" and info.rc == 5 and info.build == 1003
+        assert info.version == "1.0.0" and info.rc == 6 and info.build == 1004
         assert info.app == "VOXPrint AI Audiobook Builder"
-        assert info.codename == "Amud"
-        assert info.label() == '1.0.0 RC 5 build 1003 "Amud"'
+        assert info.codename == "Shomer"
+        assert info.label() == '1.0.0 RC 6 build 1004 "Shomer"'
         assert not screen.egg_visible()
         for _ in range(5):
             screen._on_click(SplashEvent(1, 1, "left"))

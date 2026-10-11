@@ -70,7 +70,7 @@ def test_embed_tool_stamps_the_module_and_the_exe_then_restores(tmp_path, monkey
     assert exe.read_bytes() == before
     monkeypatch.delenv("VOXPRINT_BUILD")
     assert emb.main(["--exe", str(exe), "--credits", str(credits)]) == 0
-    assert build_stamp.read_trailer(exe) == (1003, "Amud")
+    assert build_stamp.read_trailer(exe) == (1004, "Shomer")
 
 
 def test_build_thin_runs_the_stamp_script_as_a_file(tmp_path):

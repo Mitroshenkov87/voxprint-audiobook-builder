@@ -140,28 +140,6 @@ def _hf(order):
     return hf
 
 
-def test_a_small_model_comes_from_github_first_and_hugging_face_is_not_touched(server, quick, tmp_path):
-    base, _ = server
-    order, lines = [], []
-    got = md.ensure_model(REPO, lambda s, f, m: lines.append(m), snapshot_download=_hf(order), revision=SHA,
-                          hf_probe=lambda r: True, release_manifest=_manifest(tmp_path, base))
-    assert md.verify_local_model(got) and order == []
-    assert (got / ".revision").read_text() == SHA
-    assert any("GitHub" in m for m in lines)
-
-
-def test_a_failing_github_falls_back_to_hugging_face(quick, tmp_path):
-    order = []
-
-    def broken_opener(req, timeout):
-        order.append("gh")
-        raise OSError("github down")
-
-    got = md.ensure_model(REPO, snapshot_download=_hf(order), revision=SHA, hf_probe=lambda r: True,
-                          release_manifest=_manifest(tmp_path, "http://x"), release_opener=broken_opener)
-    assert order == ["gh", "hf"] and md.verify_local_model(got)
-
-
 def test_a_stalled_github_is_abandoned_by_the_watchdog(quick, tmp_path):
     order = []
 

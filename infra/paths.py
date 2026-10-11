@@ -23,6 +23,7 @@ Every function creates its directory on demand, except :func:`packages_dir` (it 
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Optional
@@ -211,8 +212,47 @@ def models_dir() -> Path:
 
 
 def voices_dir() -> Path:
-    """Directory of the voice library (``voices/<id>/`` = LoRA adapter + ``voice.json``)."""
-    return _sub("voices")
+    """Shared voice library (``<home>/voices/<id>/`` = LoRA adapter + ``voice.json``).
+
+    This is :func:`voxprint_common.paths.home` plus ``voices``. The CLI and the GUI both
+    read it. Voices found in an earlier data folder, or under ``shared/voices``, are
+    moved here when that id is not already present.
+    """
+    target = _sub("voices")
+    _migrate_voices(target)
+    return target
+
+
+def _migrate_voices(target: Path) -> None:
+    """Move voice folders into ``target``. An id that is already there is left in place."""
+    sources = [app_home() / "shared" / "voices"]
+    for home in previous_homes():
+        sources.append(home / "voices")
+    seen: set[Path] = set()
+    for src in sources:
+        try:
+            resolved = src.resolve()
+        except OSError:
+            continue
+        if resolved in seen or resolved == target.resolve():
+            continue
+        seen.add(resolved)
+        if not src.is_dir():
+            continue
+        try:
+            children = list(src.iterdir())
+        except OSError:
+            continue
+        for child in children:
+            if not (child / "voice.json").is_file():
+                continue
+            dest = target / child.name
+            if dest.exists():
+                continue
+            try:
+                shutil.move(str(child), str(dest))
+            except OSError:
+                continue
 
 
 def logs_dir() -> Path:

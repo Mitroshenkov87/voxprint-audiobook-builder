@@ -132,6 +132,17 @@ def _objects(proc: subprocess.CompletedProcess) -> list:
     return [json.loads(line) for line in proc.stdout.splitlines() if line.strip()]
 
 
+def test_windows_smoke_downloads_before_the_other_steps():
+    ps = PS1.read_text(encoding="utf-8")
+    body = ps[ps.index("function Step-Download"):ps.index("function Step-Version")]
+    assert "Test-Skipped" not in body and "Mark-Done" not in body
+    assert "--run-mdl" in body and "download" in body and "audiobook-builder" in body
+    assert "--manifest" in body and "--json" in body
+    calls = ps[ps.rindex("Step-Download"):]
+    assert calls.index("Step-Download") < calls.index("Step-Version")
+    assert calls.index("Step-Download") < calls.index("Step-SmokeNarrate")
+
+
 def test_scripts_are_noninteractive_and_share_the_contract():
     sh = SCRIPT.read_text(encoding="utf-8")
     ps = PS1.read_text(encoding="utf-8")

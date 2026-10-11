@@ -5,6 +5,7 @@
 #
 # Exit codes: 0 pass, 1 a test failed, 2 setup error, 3 no NVIDIA GPU.
 # Successful steps leave a marker in $env:USERPROFILE\.done\<step> (or $env:VOXPRINT_VM_DONE).
+# The model download at the start always runs and does not write a marker.
 # Results land in .\vm-results\audiobook-builder\<tag>\ unless --results or $env:VOXPRINT_VM_RESULTS is set.
 # Sync that folder to /workspace/vm-results/audiobook-builder/<tag>/.
 
@@ -173,6 +174,30 @@ function Sample-Vram {
 function Test-Skipped([string]$Id) { Test-Path -LiteralPath (Join-Path $Done $Id) }
 function Mark-Done([string]$Id) {
     Set-Content -LiteralPath (Join-Path $Done $Id) -Value ((Get-Date).ToUniversalTime().ToString("o")) -Encoding ascii
+}
+
+function Get-AppManifest {
+    $beside = if ($script:Vox.Count -eq 1) {
+        Join-Path (Split-Path -Parent $script:Vox[0]) "voxprint-app-models.json"
+    } else {
+        Join-Path $Root "voxprint-app-models.json"
+    }
+    if (Test-Path -LiteralPath $beside) { return $beside }
+    return (Join-Path $Root "voxprint-app-models.json")
+}
+
+function Step-Download {
+    # Unconditional. mdl.ready() may trust a status file; download refills gaps and is not skipped.
+    $manifest = Get-AppManifest
+    $log = Join-Path $Results "download.log"
+    $err = Join-Path $Results "download.err"
+    Invoke-Vox @(
+        "--run-mdl", "download", "--app", "audiobook-builder",
+        "--manifest", $manifest, "--json"
+    ) 1> $log 2> $err
+    $rc = $LASTEXITCODE
+    if ($rc -ne 0) { Write-Note "download" "fail" $rc; Finish 1 "model download failed" }
+    Write-Note "download" "pass" 0
 }
 
 function Step-Version {
@@ -375,6 +400,7 @@ sys.exit(0 if found else 1)
     Write-Note "mp3-labels" "pass" 0
 }
 
+Step-Download
 Step-Version
 Step-Selftest
 Step-DryRun

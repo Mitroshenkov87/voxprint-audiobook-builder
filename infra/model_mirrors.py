@@ -27,7 +27,7 @@ from voxprint_common.download import huggingface_url
 from voxprint_common.hashing import sha256_file as _sha256_file
 
 from infra import netroute
-from infra.parallel_download import download_with_retry as download_file
+from voxprint_common.download import download as download_file
 
 log = logging.getLogger("voxprint.models")
 

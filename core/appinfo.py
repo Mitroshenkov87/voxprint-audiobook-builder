@@ -104,7 +104,7 @@ def shown_version(version: Optional[str] = None, channel: Optional[str] = None) 
 
 
 def version_label() -> str:
-    """``1.0.0 RC5 · build 1003 "Amud"`` (an older beta: ``0.1.1-beta · build 665 "Tikkun"``).
+    """``1.0.0 RC6 · build 1004 "Shomer"`` (an older beta: ``0.1.1-beta · build 665 "Tikkun"``).
 
     A local build with no CI number shows the version without ``build 0``.
     """

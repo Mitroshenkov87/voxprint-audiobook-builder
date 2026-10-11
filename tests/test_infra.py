@@ -301,16 +301,11 @@ def test_pinned_model_revision_is_requested(tmp_path):
         return _fake_snapshot()(repo_id, local_dir, tqdm_class)
     md.ensure_model("Org/M2", root=tmp_path, snapshot_download=sd, revision="b" * 40)
     assert seen["revision"] == "b" * 40 and md.local_revision("Org/M2", tmp_path) == "b" * 40
-    # the pinned revision is unavailable -> one retry without a revision
-    calls = []
-
+    # a missing revision is not retried here; VOXPrint MDL owns the download
     def sd2(repo_id, local_dir, tqdm_class=None, **kw):
-        calls.append(kw.get("revision"))
-        if kw.get("revision"):
-            raise ConnectionError("revision gone")
-        return _fake_snapshot()(repo_id, local_dir, tqdm_class)
-    md.ensure_model("Org/M3", root=tmp_path, snapshot_download=sd2, revision="c" * 40, get_remote_sha=lambda r: "HEADSHA")
-    assert calls == ["c" * 40, None] and md.verify_local_model(md.local_dir_for("Org/M3", tmp_path))
+        raise ConnectionError("revision gone")
+    with pytest.raises(ModelDownloadError):
+        md.ensure_model("Org/M3", root=tmp_path, snapshot_download=sd2, revision="c" * 40)
 
 
 def test_update_rolls_back_on_failed_compat(tmp_path):

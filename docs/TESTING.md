@@ -84,11 +84,11 @@ powershell -File scripts/vm_test.ps1 --full --json
 | 2 | Setup error: missing program, bad arguments, or the `.vxbook` could not be written |
 | 3 | `nvidia-smi` is missing or fails. These codes are the script's, not the program's own exit codes |
 
-`--smoke` is the short run (about 10 minutes on a 4090): `--version`, `--selftest`, `--dry-run --json` for `narrate` and `prepare` (stdout is JSON, `durations.audio_s` is null, `outputs` is `[]`), one short Russian narration with the default voice Levi as MP3, and the peak `memory.used` from `nvidia-smi` while that narration runs.
+`--smoke` is the short run (about 10 minutes on a 4090). It starts with `voxprint-mdl download --app audiobook-builder --json` (through `--run-mdl`, with the app manifest). That download always runs, including when a status file already says ready, and it does not write a `.done` marker. Then `--version`, `--selftest`, `--dry-run --json` for `narrate` and `prepare` (stdout is JSON, `durations.audio_s` is null, `outputs` is `[]`), one short Russian narration with the default voice Levi as MP3, and the peak `memory.used` from `nvidia-smi` while that narration runs. `--full` runs that download first as well.
 
 `--full` adds the multi-voice dialogue (`speakers`, then `narrate --speaker-marks` with Levi, Natan, Shimon and Miriam), a `prepare --steps yo` check that the letter ё was restored, a `.vxbook` that declares `sound/1` (narrated with `--no-soundscape`, so a missing soundscape model still passes), and labelled chapter MP3s (`01 - Title.mp3`).
 
-A step that exits 0 writes `~/.done/<step>` (`$env:USERPROFILE\.done\<step>` on Windows, or `$VOXPRINT_VM_DONE`). The next run skips a step whose marker exists. Delete one marker to repeat that step. A failed step does not write a marker.
+A step that exits 0 writes `~/.done/<step>` (`$env:USERPROFILE\.done\<step>` on Windows, or `$VOXPRINT_VM_DONE`). The next run skips a step whose marker exists. Delete one marker to repeat that step. A failed step does not write a marker. The model download is not one of those steps: `scripts/vm_test.ps1` runs it every time, before the other steps.
 
 Results are written to `./vm-results/audiobook-builder/<tag>/` (or `--results`, or `$VOXPRINT_VM_RESULTS`). `<tag>` is `--tag`, otherwise the version the program reports. `result.json` is the same object `--json` prints last. Copy that folder to the workspace with:
 

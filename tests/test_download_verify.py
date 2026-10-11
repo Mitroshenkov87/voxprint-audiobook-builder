@@ -44,36 +44,6 @@ def test_a_correct_download_passes_and_git_metadata_is_not_checked(manifest):
     assert md.manifest_bad_files(got, REPO, SHA_A, manifest) == []
 
 
-def test_a_corrupt_download_is_never_marked_done(manifest):
-    evil = dict(FILES, **{"model.safetensors": b"X" * 64})                    # same size, other content
-    with pytest.raises(ModelDownloadError) as ei:
-        md.ensure_model(REPO, snapshot_download=_hf(evil), revision=SHA_A, mirror_manifest=manifest)
-    assert "model.safetensors" in ei.value.details
-    target = md.local_dir_for(REPO)
-    partial = target.with_name(target.name + ".partial")
-    assert not target.exists()                                                  # not renamed into place
-    assert partial.is_dir() and not (partial / "model.safetensors").exists()   # only the bad file is gone: the rest resumes
-    assert (partial / "config.json").is_file()
-
-
-def test_a_truncated_file_is_repaired_from_the_backup_mirror(manifest, monkeypatch):
-    monkeypatch.delenv("VOXPRINT_NO_MIRROR", raising=False)
-    monkeypatch.delenv("VOXPRINT_NO_HF_MIRROR", raising=False)
-    calls = []
-
-    def fetch(repo, name, rev, local_dir):
-        calls.append(name)
-        t = Path(local_dir).joinpath(*name.split("/"))
-        t.parent.mkdir(parents=True, exist_ok=True)
-        t.write_bytes(FILES[name])
-
-    short = dict(FILES, **{"model.safetensors": b"W" * 10})
-    got = md.ensure_model(REPO, snapshot_download=_hf(short), revision=SHA_A, mirror_manifest=manifest,
-                          hf_mirror_fetch=fetch, hf_probe=lambda r: True, mirror_download=lambda *a, **k: None)
-    assert (got / "model.safetensors").read_bytes() == FILES["model.safetensors"]
-    assert calls == ["model.safetensors"]                                       # only the bad file came from the mirror
-
-
 def test_unknown_revision_or_repository_means_structural_check_only(manifest, tmp_path):
     d = tmp_path / "m"
     d.mkdir()
@@ -81,15 +51,6 @@ def test_unknown_revision_or_repository_means_structural_check_only(manifest, tm
     assert md.manifest_bad_files(d, "Other/Repo", SHA_A, manifest) is None
     assert md.manifest_bad_files(d, REPO, None, manifest) is None
     assert md.manifest_bad_files(d, REPO, SHA_A, manifest) == ["config.json", "model.safetensors"]
-
-
-def test_the_log_names_who_asked_for_a_download(manifest, caplog):
-    import logging
-
-    with caplog.at_level(logging.INFO, logger="voxprint.models"):
-        md.ensure_model(REPO, snapshot_download=_hf(FILES), revision=SHA_A, mirror_manifest=manifest)
-    line = next(r.getMessage() for r in caplog.records if "requested by" in r.getMessage())
-    assert REPO in line and "test_the_log_names_who_asked_for_a_download" in line
 
 
 def test_ready_model_path_never_downloads(tmp_path, monkeypatch):

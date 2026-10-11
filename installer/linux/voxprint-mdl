@@ -1,0 +1,4 @@
+#!/bin/sh
+# VOXPrint MDL for this app: voxprint-mdl download --app audiobook-builder
+APP=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
+exec "${VOXPRINT_PYTHON:-python3}" "$APP/main.py" --run-mdl "$@"

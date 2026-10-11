@@ -37,11 +37,11 @@
  },
  "suite": {
   "dist": "voxprint-common",
-  "version": "0.1.1",
-  "file": "voxprint_common-0.1.1-py3-none-any.whl",
-  "url": "https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.1.1/voxprint_common-0.1.1-py3-none-any.whl",
-  "size": 53842,
-  "sha256": "c9361d5d00913faf39497fc55124e682ba15b2098c775068c49582c0520cd4d1"
+  "version": "0.2.4",
+  "file": "voxprint_common-0.2.4-py3-none-any.whl",
+  "url": "https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/voxprint_common-0.2.4-py3-none-any.whl",
+  "size": 182510,
+  "sha256": "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
  },
  "wheels": [
   {

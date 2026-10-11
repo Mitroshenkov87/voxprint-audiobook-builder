@@ -60,6 +60,7 @@ jobs:
           sleep 1
           export VOXPRINT_BASE_URL=http://127.0.0.1:8099
           export VOXPRINT_PYTHON="$(python -c 'import sys; print(sys.executable)')"
+          export VOXPRINT_SKIP_SUITE=1
           bash build/linux-test/install-voxprint-linux.sh --check || true
           bash build/linux-test/install-voxprint-linux.sh --install-deps --yes --skip-gpu-check --torch-backend cpu
           test -x /usr/local/bin/voxprint-audiobook-cli
@@ -86,7 +87,7 @@ jobs:
           sudo apt-get install -y desktop-file-utils
           desktop-file-validate /usr/share/applications/voxprint-audiobook-builder.desktop
           # update path: running the installer again keeps the environment and succeeds quickly
-          VOXPRINT_BASE_URL=http://127.0.0.1:8099 bash build/linux-test/install-voxprint-linux.sh --yes --skip-check --skip-gpu-check
+          VOXPRINT_SKIP_SUITE=1 VOXPRINT_BASE_URL=http://127.0.0.1:8099 bash build/linux-test/install-voxprint-linux.sh --yes --skip-check --skip-gpu-check
           # the one-file archive installs from its own tree (no network for the program itself)
           mkdir -p /tmp/tarcheck && tar xzf build/linux/Voxprint-linux-experimental.tar.gz -C /tmp/tarcheck
           test -f /tmp/tarcheck/voxprint-linux/app/main.py

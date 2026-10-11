@@ -1,11 +1,9 @@
 """Build 667 fixes from the clean install of build 666 (fake downloads only, no network, no models)."""
 import hashlib
-import io
 import json
 import logging
 import re
 import threading
-import urllib.error
 from pathlib import Path
 
 import pytest
@@ -14,7 +12,6 @@ from core import i18n
 from core.errors import CancelledByUser, ModelDownloadError
 from infra import download_watch as dw
 from infra import model_downloader as md
-from infra import parallel_download as pd
 from tests.test_download_watch import fast_watch  # noqa: F401  (fixture)
 from tests.test_model_mirrors import FILES, REPO, SHA_A, manifest  # noqa: F401  (fixture)
 
@@ -96,39 +93,6 @@ def test_hub_requests_always_have_connect_and_read_timeouts(monkeypatch):
         nr.reset_memory()
 
 
-def test_a_retry_while_the_abandoned_thread_lives_continues_in_a_fresh_folder(manifest, fast_watch, monkeypatch, held):  # noqa: F811
-    monkeypatch.setattr(md, "FRESH_PARTIAL_AFTER", 0.05)
-    part = _partial_of(REPO)
-    part.mkdir(parents=True)
-    (part / "config.json").write_bytes(FILES["config.json"])                 # finished before the stall
-    (part / "model.safetensors.incomplete").write_bytes(b"W" * 10)            # the stuck thread's file
-    _hub_leftovers(part)
-    release = held(part)
-    seen = {}
-
-    def hub(repo_id, local_dir, **kw):
-        seen["dir"] = Path(local_dir).name
-        seen["had_config"] = (Path(local_dir) / "config.json").is_file()      # the finished file was taken over
-        for n, b in FILES.items():
-            t = Path(local_dir).joinpath(*n.split("/"))
-            t.parent.mkdir(parents=True, exist_ok=True)
-            if not t.exists():
-                t.write_bytes(b)
-
-    # Hugging Face first. A slow probe would try ModelScope, whose socket read is abandoned while still
-    # alive and the retry would continue in ``.partial-2`` instead of the one fresh folder this test checks.
-    got = md.ensure_model(REPO, snapshot_download=hub, revision=SHA_A, mirror_manifest=manifest,
-                          hf_probe=lambda r: True)
-    assert md.verify_local_model(got) and not (got / ".cache").exists()
-    assert seen == {"dir": part.name + "-1", "had_config": True}
-    assert part.is_dir()                                                      # still held: left alone
-    release.set()
-    dw.wait_released(part, 2.0)
-    md.ensure_model(REPO, snapshot_download=hub, revision=SHA_A, mirror_manifest=manifest,
-                    hf_probe=lambda r: True)
-    assert not part.exists()                                                  # cleaned once nobody holds it
-
-
 def test_finalize_moves_finished_files_when_our_own_thread_holds_the_folder(tmp_path, monkeypatch, held):
     part, target = tmp_path / "M.partial", tmp_path / "M"
     for n, b in FILES.items():
@@ -161,40 +125,6 @@ def test_fallback_copy_skips_the_hub_cache_and_unfinished_pieces(tmp_path, monke
     md.finalize_download(part, target)
     names = {p.relative_to(target).as_posix() for p in target.rglob("*") if p.is_file()}
     assert names == set(FILES)
-
-
-def test_the_error_does_not_blame_an_antivirus_when_the_holder_is_our_own_thread(manifest, fast_watch, monkeypatch, held):  # noqa: F811
-    monkeypatch.setattr(md, "_move_finished", lambda *a: (_ for _ in ()).throw(PermissionError(5, "move denied")))
-    monkeypatch.setattr(md.shutil, "copytree", lambda *a, **k: (_ for _ in ()).throw(PermissionError(13, "copy denied")))
-    part = _partial_of(REPO)
-    for n, b in FILES.items():
-        (part / n).parent.mkdir(parents=True, exist_ok=True)
-        (part / n).write_bytes(b)
-    held(part)
-    with pytest.raises(ModelDownloadError) as ei:
-        md.ensure_model(REPO, snapshot_download=lambda **k: None, revision=SHA_A, mirror_manifest=manifest)
-    assert ei.value.user_message == i18n.tr("err.model_finalize_busy", short="Tiny-1.7B")
-    for lang in ("en", "de", "ru", "uk", "lv"):
-        text = i18n.tr_lang("err.model_finalize_busy", lang, short="X").lower()
-        assert "antivir" not in text and "virenscanner" not in text and "антивір" not in text and "антивир" not in text
-
-
-def test_fresh_folders_of_an_earlier_run_are_resumed(manifest, fast_watch):  # noqa: F811
-    target = md.local_dir_for(REPO)
-    extra = target.with_name(target.name + ".partial-1")
-    extra.mkdir(parents=True)
-    (extra / "config.json").write_bytes(FILES["config.json"])
-    seen = []
-
-    def hub(repo_id, local_dir, **kw):
-        seen.append((Path(local_dir).name, (Path(local_dir) / "config.json").is_file()))
-        for n, b in FILES.items():
-            t = Path(local_dir).joinpath(*n.split("/"))
-            t.parent.mkdir(parents=True, exist_ok=True)
-            t.write_bytes(b)
-
-    md.ensure_model(REPO, snapshot_download=hub, revision=SHA_A, mirror_manifest=manifest)
-    assert seen == [(target.name + ".partial", True)] and not extra.exists()
 
 
 def test_check_and_repair_covers_translators_and_the_single_file_models(monkeypatch):
@@ -287,110 +217,7 @@ def test_the_progress_log_never_shows_more_than_the_total(tmp_path, caplog):
         assert "180" not in line
 
 
-def test_the_hub_fallback_fetches_only_unfinished_files_without_our_pieces(fast_watch, monkeypatch):  # noqa: F811
-    hub = pytest.importorskip("huggingface_hub")
-    from infra import netroute
-
-    repo = "Org/Fallback"
-    sizes = {"config.json": len(FILES["config.json"]), "model.safetensors": len(FILES["model.safetensors"])}
-    part = _partial_of(repo)
-    seen = {}
-
-    def parallel(files, dest, url_for, **kw):
-        Path(dest).mkdir(parents=True, exist_ok=True)
-        Path(dest, "config.json").write_bytes(FILES["config.json"])
-        Path(dest, "model.safetensors.incomplete.parts").mkdir(parents=True)
-        Path(dest, "model.safetensors.incomplete.parts", "0000").write_bytes(b"W" * 10)
-        raise pd.ParallelError("TLS handshake timed out")
-
-    def snapshot(repo_id, local_dir, **kw):
-        seen["patterns"] = kw.get("allow_patterns")
-        seen["parts_left"] = Path(local_dir, "model.safetensors.incomplete.parts").exists()
-        Path(local_dir, "model.safetensors").write_bytes(FILES["model.safetensors"])
-
-    monkeypatch.setattr(pd, "download_listed", parallel)
-    monkeypatch.setattr(hub, "snapshot_download", snapshot)
-    monkeypatch.setattr(md, "_prepare_network", lambda: None)
-    monkeypatch.setattr(netroute, "ensure_hub_session", lambda: None)
-    got = md.ensure_model(repo, get_remote_sha=lambda r: SHA_A, get_remote_sizes=lambda r, rev, p: dict(sizes))
-    assert md.verify_local_model(got) and seen == {"patterns": ["model.safetensors"], "parts_left": False}
-    assert not part.exists()
-
-
-# ------------------------------------------------------------------------------------------------ 3. one failed file is retried
-class _Resp(io.BytesIO):
-    def __init__(self, data, status=200):
-        super().__init__(data)
-        self.status = status
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *a):
-        self.close()
-
-
-def test_a_failed_small_file_is_retried_before_the_model_falls_back(tmp_path, monkeypatch):
-    monkeypatch.setattr(pd, "_sleep", lambda s: None)
-    monkeypatch.setenv(pd.ENV_CONNECTIONS, "1")                              # one request per attempt
-    calls = {"a.json": 0, "b.json": 0}
-    data = {"a.json": b"A" * 7, "b.json": b"B" * 5}
-
-    def opener(req, timeout):
-        name = req.full_url.rsplit("/", 1)[-1]
-        calls[name] += 1
-        if name == "b.json" and calls[name] <= 2:
-            raise urllib.error.URLError("_ssl.c:989: The handshake operation timed out")
-        return _Resp(data[name])
-
-    fractions = []
-    pd.download_listed({"a.json": 7, "b.json": 5}, tmp_path, lambda n: "https://x/" + n, opener=opener,
-                       progress=fractions.append, timeout=1)
-    assert (tmp_path / "b.json").read_bytes() == data["b.json"] and calls["b.json"] == 3
-    assert max(fractions) <= 1.0 and fractions[-1] == 1.0
-
-
-def test_a_file_that_always_fails_or_is_missing_ends_the_parallel_path(tmp_path, monkeypatch):
-    monkeypatch.setattr(pd, "_sleep", lambda s: None)
-    monkeypatch.setenv(pd.ENV_CONNECTIONS, "1")
-    n = [0]
-
-    def always(req, timeout):
-        n[0] += 1
-        raise urllib.error.URLError("timed out")
-
-    with pytest.raises(pd.ParallelError):
-        pd.download_listed({"a.json": 3}, tmp_path, lambda x: "https://x/" + x, opener=always, timeout=1)
-    assert n[0] == pd.FILE_RETRIES + 1
-    n[0] = 0
-
-    def missing(req, timeout):
-        n[0] += 1
-        raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, None)
-
-    with pytest.raises(pd.ParallelError):
-        pd.download_listed({"a.json": 3}, tmp_path, lambda x: "https://x/" + x, opener=missing, timeout=1)
-    assert n[0] == 1                                                          # a 404 is not asked again
-
-
-def test_the_speed_log_counts_only_the_bytes_of_this_attempt(manifest, fast_watch, caplog):  # noqa: F811
-    part = _partial_of(REPO)
-    part.mkdir(parents=True)
-    (part / "old-attempt.bin").write_bytes(b"o" * 3_000_000)                 # fetched by an earlier attempt
-
-    def hub(repo_id, local_dir, **kw):
-        for n, b in FILES.items():
-            t = Path(local_dir).joinpath(*n.split("/"))
-            t.parent.mkdir(parents=True, exist_ok=True)
-            t.write_bytes(b)
-
-    with caplog.at_level(logging.INFO, logger="voxprint.models"):
-        md.ensure_model(REPO, snapshot_download=hub, revision=SHA_A, mirror_manifest=manifest)
-    line = re.search(r"from Hugging Face: (\d+) MB in .* since the download started", caplog.text)
-    assert line and line.group(1) == "0"
-
-
-# ------------------------------------------------------------------------------------------------ 4. translators one by one
+# ------------------------------------------------------------------------------------------------ translators one by one
 def test_one_failed_translator_does_not_skip_the_others(monkeypatch):
     from infra import text_models
 

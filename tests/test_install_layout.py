@@ -2,9 +2,7 @@
 import json
 from pathlib import Path
 
-import pytest
-
-from infra import download_watch, install_layout, model_downloader, parallel_download, suite_install, suite_shared
+from infra import install_layout, suite_shared
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -144,84 +142,25 @@ def test_linux_launcher_name_and_compatibility_link():
     assert "~/.local/share/voxprint/app" in script
 
 
-def test_choose_primary_prefers_a_fast_hugging_face_over_a_slow_modelscope():
-    assert parallel_download.choose_primary(500 * 1024, 84 * 1024) == "hf"
-    assert parallel_download.choose_primary(90 * 1024, 84 * 1024) == "hf"
-    assert parallel_download.choose_primary(100 * 1024, 2 * 1024 * 1024) == "ms"
-    assert parallel_download.choose_primary(0, 0) is None
-    assert parallel_download.choose_primary(0, 84 * 1024) == "ms"
-    assert parallel_download.order_for(500 * 1024, 84 * 1024)[0] == "hf"
-    assert parallel_download.too_slow(84 * 1024, 4.0, parallel_download.SLOW_BPS, parallel_download.SLOW_AFTER, True)
-    assert not parallel_download.too_slow(84 * 1024, 1.0, parallel_download.SLOW_BPS, parallel_download.SLOW_AFTER, True)
+def test_json_stdout_is_utf8_and_keeps_cyrillic(monkeypatch):
+    import io
 
+    import cli
 
-def test_a_slow_stall_is_not_retried_on_the_same_source():
-    slow = download_watch.Stalled("slow", progressed=True, slow=True)
-    stalled = download_watch.Stalled("stalled", progressed=True)
-    assert model_downloader._retry_same_source(slow, 0) is False
-    assert model_downloader._retry_same_source(stalled, 0) is True
-    assert model_downloader._retry_same_source(stalled, model_downloader.STALL_RETRIES) is False
-
-
-def test_download_retries_a_transient_error_and_keeps_the_partial(tmp_path, monkeypatch):
-    monkeypatch.setattr(parallel_download, "_retry_sleep", lambda _s: None)
-    dest = tmp_path / "weights.bin"
-    calls = {"n": 0}
-
-    def fetch(destination, sources, *, sha256, size=None, **kwargs):
-        calls["n"] += 1
-        partial = Path(str(destination) + ".partial")
-        partial.write_bytes(b"part")
-        if calls["n"] < 3:
-            raise TimeoutError("reset")
-        destination.write_bytes(b"ok")
-        return destination
-
-    got = parallel_download.download_with_retry(dest, ["https://example.invalid/a"], sha256="a" * 64, download=fetch)
-    assert got.read_bytes() == b"ok" and calls["n"] == 3
-    assert (tmp_path / "weights.bin.partial").read_bytes() == b"part"
-
-    def full(destination, sources, *, sha256, size=None, **kwargs):
-        raise parallel_download.DiskSpaceError(destination, 10, 1)
-
-    with pytest.raises(parallel_download.DiskSpaceError):
-        parallel_download.download_with_retry(dest, ["https://example.invalid/a"], sha256="b" * 64, download=full, tries=5)
-
-
-def test_suite_status_is_utf8_with_a_bom_on_windows(tmp_path, monkeypatch):
-    path = tmp_path / "suite-status.txt"
-    monkeypatch.setattr(suite_install.sys, "platform", "win32")
-    suite_install.write_status(path, "done", 1000, "Готово", 2)
-    raw = path.read_bytes()
-    assert raw.startswith(b"\xef\xbb\xbf")
-    assert raw.decode("utf-8-sig").splitlines()[2] == "Готово"
-    monkeypatch.setattr(suite_install.sys, "platform", "linux")
-    suite_install.write_status(path, "done", 1000, "ok", 3)
-    assert not path.read_bytes().startswith(b"\xef\xbb\xbf")
-    assert path.read_text(encoding="utf-8").splitlines()[0] == "done"
-
-
-def test_faster_hugging_face_is_tried_before_modelscope(tmp_path, monkeypatch):
-    monkeypatch.delenv("VOXPRINT_NO_MIRROR", raising=False)
-    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "home"))
-    monkeypatch.setattr(parallel_download, "measure", lambda _repo: (500 * 1024, 84 * 1024))
-    order = []
-
-    def snap(repo_id, local_dir, **kwargs):
-        order.append("hf")
-        folder = Path(local_dir)
-        folder.mkdir(parents=True, exist_ok=True)
-        (folder / "config.json").write_text("{}", encoding="utf-8")
-        (folder / "model.bin").write_bytes(b"weights")
-
-    def ms_download(repo, dest, progress, expected):
-        order.append("ms")
-        progress(1.0)
-
-    from infra import modelscope_mirror
-
-    modelscope_mirror.reset_verdict()
-    model_downloader.ensure_model(
-        "Org/Speed", snapshot_download=snap, revision="a" * 40, mirror_download=ms_download,
+    buf = io.BytesIO()
+    wrapper = io.TextIOWrapper(buf, encoding="cp1252", newline="\n")
+    monkeypatch.setattr(cli.sys, "stdout", wrapper)
+    monkeypatch.setattr(cli.sys, "stderr", io.StringIO())
+    cli._json_stdout = None
+    cli.begin_json_stdout()
+    cli._emit_result(
+        ok=True, command="status", exit_code=0, outputs=[], warnings=[], duration_s=0.0,
+        error=None, hint=None, extra={"message": "Готово"},
     )
-    assert order[0] == "hf"
+    wrapper.flush()
+    raw = buf.getvalue()
+    text = raw.decode("utf-8")
+    assert "Готово" in text
+    assert "\\u0413" not in text
+    cli.end_json_stdout()
+

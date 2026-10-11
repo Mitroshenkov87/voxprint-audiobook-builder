@@ -80,9 +80,12 @@ def test_models_folder_page_defaults_to_local_validates_and_only_remembers_the_p
     assert "DeleteFile(StateDir + '\\models_dir.txt')" in code                  # the default: the app follows its own default
     assert "{param:ModelsDir|}" in code and existing_models.CONFIG_NAME in code # the older import folder still works silently
     assert "ssPostInstall" in code and "SaveStringsToUTF8File" in code and "{localappdata}\\Voxprint\\state" in code
-    # the installer must not copy gigabytes: no model files / folders in [Files], no copy helpers in [Code]
+    # the installer must not copy gigabytes: no model files / folders in [Files], no copy helpers in [Code].
+    # voxprint-app-models.json is the catalog MDL reads; it is not a weight file.
     files = section("Files")
-    assert "models" not in files.lower() and ".safetensors" not in files.lower()
+    payload = files.lower().replace("voxprint-app-models.json", "")
+    assert "voxprint-app-models.json" in files.lower()
+    assert "models" not in payload and ".safetensors" not in payload
     assert not re.search(r"FileCopy|CopyFile|xcopy|robocopy", code, re.I)
 
 
