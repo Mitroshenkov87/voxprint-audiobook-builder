@@ -133,33 +133,34 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
 
     from tools import build_number as bn
 
-    # offset is history. The number is BUILD.json "build" (1003) or a tag that ends in +N / -buildN.
+    # offset is history. The number is BUILD.json "build" (1004) or a tag that ends in +N / -buildN.
     # GITHUB_RUN_NUMBER is ignored, including the runs that used to move the offset.
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "57"}) == 1003
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "56"}) == 1003
-    assert bn.build_number({}) == 1003
-    assert bn.build_number({"GITHUB_REF": "refs/tags/v1.0.0-rc.4", "GITHUB_REF_NAME": "v1.0.0-rc.4"}) == 1003
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "57"}) == 1004
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "56"}) == 1004
+    assert bn.build_number({}) == 1004
+    assert bn.build_number({"GITHUB_REF": "refs/tags/v1.0.0-rc.4", "GITHUB_REF_NAME": "v1.0.0-rc.4"}) == 1004
     assert bn.build_number({"REL_TAG": "v1.0.0-rc.5+1005", "GITHUB_RUN_NUMBER": "99"}) == 1005
     assert bn.build_number({"GITHUB_REF": "refs/tags/v1.0.0-rc.5-build1003",
                             "GITHUB_REF_NAME": "v1.0.0-rc.5-build1003"}) == 1003
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34", "REL_TAG": "v1.0.0-rc.5+1005"}) == 700
     assert bn.build_number({"VOXPRINT_BUILD": "0"}) == 0
-    assert bn.info()["build"] == 1003
+    assert bn.info()["build"] == 1004
     assert bn.info()["offset"] == 944
     note = bn.info()["offset_note"]
     assert "946" in note and "run 53" in note and "Nachon" in note and "run 55 + 945 = 1000" in note and "Chazak" in note
     assert "run 56 + 945 = 1001" in note and "run 57 + 944 = 1001" in note and "Tamim" in note
     assert "1002" in note and "Ometz" in note and "v1.0.0-rc.4" in note
     assert "1003" in note and "Amud" in note and "v1.0.0-rc.5" in note
+    assert "1004" in note and "Shomer" in note and "v1.0.0-rc.6" in note
     name = bn.info()["codename"]
-    assert name == "Amud" and name.isascii() and name.isalpha()
+    assert name == "Shomer" and name.isascii() and name.isalpha()
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     credits = json.loads((root / "credits.json").read_text(encoding="utf-8"))
-    assert credits["app"]["version"] == "1.0.0-rc.5" and credits["app"]["channel"] == "rc"
-    assert credits["app"]["codename"] == "Amud"
+    assert credits["app"]["version"] == "1.0.0-rc.6" and credits["app"]["channel"] == "rc"
+    assert credits["app"]["codename"] == "Shomer"
     iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8")
-    assert '#define AppVersion "1.0.0-rc.5"' in iss
+    assert '#define AppVersion "1.0.0-rc.6"' in iss
     assert '#define AppVersionInfo "1.0.0"' in iss
     assert "VersionInfoVersion={#AppVersionInfo}.{#AppBuild}" in iss
     log = (root / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -173,6 +174,12 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     assert heading4 in log and log.index("## [Unreleased]") < log.index(heading4) < log.index(heading3)
     heading5 = '## [1.0.0-rc.5] - 2026-10-11 - build 1003 "Amud"'
     assert heading5 in log and log.index("## [Unreleased]") < log.index(heading5) < log.index(heading4)
+    heading6 = '## [1.0.0-rc.6] - 2026-10-11 - build 1004 "Shomer"'
+    assert heading6 in log and log.index("## [Unreleased]") < log.index(heading6) < log.index(heading5)
+    notes = (root / "docs" / "RELEASE-NOTES-1004-SHOMER.md").read_text(encoding="utf-8")
+    assert notes.startswith("**VOXPrint 1.0.0 RC6")
+    assert "Shomer" in notes and "v1.0.0-rc.6" in notes and "1004" in notes
+    assert "Tehillim" not in notes
     notes = (root / "docs" / "RELEASE-NOTES-1003-AMUD.md").read_text(encoding="utf-8")
     assert notes.startswith("**VOXPrint 1.0.0 RC5")
     assert "Amud" in notes and "v1.0.0-rc.5" in notes and "1003" in notes
@@ -226,6 +233,11 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.5")
     assert appinfo.release_version() == "1.0.0-rc.5"
     assert appinfo.version_label() == '1.0.0 RC5 \u00b7 build 1003 "Amud"'
+    monkeypatch.setattr(appinfo, "APP_BUILD", 1004)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Shomer")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.6")
+    assert appinfo.release_version() == "1.0.0-rc.6"
+    assert appinfo.version_label() == '1.0.0 RC6 \u00b7 build 1004 "Shomer"'
     monkeypatch.setattr(appinfo, "APP_BUILD", 665)
     monkeypatch.setattr(appinfo, "APP_CODENAME", "Tikkun")
     monkeypatch.setattr(appinfo, "APP_CHANNEL", "beta")

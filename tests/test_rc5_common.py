@@ -18,14 +18,14 @@ def test_voxprint_common_is_pinned_by_the_released_wheel_and_its_sha256():
     lock = json.loads((ROOT / "infra" / "runtime_lock.json").read_text(encoding="utf-8"))
     suite = lock["suite"]
     assert suite == mrl.suite_record()
-    assert suite["version"] == "0.2.1"
-    assert suite["sha256"] == "7a5a41284a74fc8eb2ad724647c05575d16c42881d30dba461fddf15b96a3d2f"
-    assert suite["size"] == 125199
+    assert suite["version"] == "0.2.4"
+    assert suite["sha256"] == "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+    assert suite["size"] == 182510
     pin = mrl.suite_requirement(suite)
     assert pin in req
     assert pin == (
-        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.1/"
-        "voxprint_common-0.2.1-py3-none-any.whl --hash=sha256:7a5a41284a74fc8eb2ad724647c05575d16c42881d30dba461fddf15b96a3d2f"
+        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/"
+        "voxprint_common-0.2.4-py3-none-any.whl --hash=sha256:3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
     )
     assert "git+" not in req
     assert "git" not in lock

@@ -183,8 +183,8 @@ def test_installer_uninstall_never_touches_the_sibling():
     assert "'dubber'" in sib and "'unins*.exe'" in sib
     body = t.split("procedure DeleteProgramFolder")[1].split("\nend;")[0]
     assert "if not IsSiblingFolder(Path) then" in body and "RemoveDir(Dir)" in body
-    # the models are still only offered for deletion when no other program uses them
-    assert "(OtherModelUsers = 0)" in t
+    # Shared models stay with MDL. Uninstall does not offer to delete that folder.
+    assert "OtherModelUsers" not in t and "DelTree(SharedModelsDir" not in t
 
 
 def test_pascal_strings_have_no_python_escapes():

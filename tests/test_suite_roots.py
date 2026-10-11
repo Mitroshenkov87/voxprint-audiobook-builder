@@ -1,4 +1,5 @@
 """Uninstall and a failed setup must not delete another app's models."""
+import json
 from pathlib import Path
 
 import pytest
@@ -16,11 +17,26 @@ def _marker() -> Path:
 
 
 def _plant_models_root(models: Path) -> None:
-    """The rc.5 mistake: one component whose path is the whole models root."""
-    add_ref(
-        "shared-models", "audiobook-builder", kind="model", version="1",
-        path=str(models.resolve()), sha256="ab" * 32, manifest=suite_shared.manifest_path(),
-    )
+    """A leftover rc.5 component whose path is the whole models root.
+
+    voxprint-common 0.2.4 refuses to register that path. The file can still be
+    on disk from an older installer, so this writes it directly.
+    """
+    target = suite_shared.manifest_path()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_file():
+        data = json.loads(target.read_text(encoding="utf-8"))
+    else:
+        data = {"schema": 1, "components": {}}
+    data.setdefault("components", {})["shared-models"] = {
+        "kind": "model",
+        "version": "1",
+        "path": str(models.resolve()),
+        "sha256": "ab" * 32,
+        "installed_at": "2026-01-01T00:00:00+00:00",
+        "refs": ["audiobook-builder"],
+    }
+    target.write_text(json.dumps(data), encoding="utf-8")
 
 
 def test_another_apps_models_survive_uninstall_rollback_and_a_failed_setup(monkeypatch):

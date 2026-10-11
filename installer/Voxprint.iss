@@ -48,7 +48,7 @@
 #define AppFolder "Audiobook Builder"
 #define StartMenu "VOXPrint AI Suite"
 #define AppDisplayName "VOXPrint AI Audiobook Builder"
-#define AppVersion "1.0.0-rc.5"
+#define AppVersion "1.0.0-rc.6"
 ; Windows version resources are four numbers. The pre-release suffix stays in AppVersion.
 #define AppVersionInfo "1.0.0"
 #define AppExe "voxprint-audiobook-builder.exe"
@@ -1512,8 +1512,8 @@ end;
 { After the program files are in place: install the shared runtime and ffmpeg, then download the
   required models. Both steps run as the installing user (so files land in that user's profile)
   and setup waits for each process. A non-zero exit, including a silent install, aborts setup.
-  /SkipSuite skips both (CI smoke). Otherwise the download always runs: voxprint-common 0.2.1
-  mdl.ready() can trust a status file, and download is idempotent and refills gaps. }
+  /SkipSuite skips both (CI smoke). Otherwise the download always runs. It is idempotent
+  and refills gaps, including when a status file already says ready. }
 function RunChecked(const FileName, Params: String; Show: Integer): Boolean;
 var
   Rc: Integer;

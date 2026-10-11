@@ -2,9 +2,9 @@
  "app": {
   "name": "Voxprint",
   "display_name": "VOXPrint AI Audiobook Builder",
-  "version": "1.0.0-rc.5",
+  "version": "1.0.0-rc.6",
   "channel": "rc",
-  "codename": "Amud",
+  "codename": "Shomer",
   "author": "Aleksandr Mitroshenkov"
  },
  "repo_url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder",

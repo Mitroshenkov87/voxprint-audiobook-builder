@@ -261,7 +261,7 @@ class SettingsDialog(GlassDialog):
         self.btn_data = QPushButton()
         self.btn_about = QPushButton()
         self.btn_components = QPushButton()          # thin build only: the runtime modules (infra/modules.py)
-        self.btn_mdl = QPushButton()                 # VOXPrint MDL: on-demand models (voxprint-mdl download --gui)
+        self.btn_mdl = QPushButton()                 # VOXPrint MDL: on-demand models (voxprint-mdl --gui)
         self.btn_diag = QPushButton()                # logs + system information as one zip (infra/diagnostics.py)
         for b in (self.btn_update, self.btn_models, self.btn_data, self.btn_diag, self.btn_mdl, self.btn_components):
             left.addWidget(b)

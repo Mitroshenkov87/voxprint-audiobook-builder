@@ -61,13 +61,13 @@ TEST_EXTRAS = {"huggingface-hub", "requests", "scipy", "pyyaml", "tqdm", "urllib
 COMPAT = {"torch": ">=2.11,<2.12", "python_minor_must_match": True}
 #: Released suite wheel. The thin shell bundles it. It is not a PyPI runtime download.
 SUITE_DIST = "voxprint-common"
-SUITE_VERSION = "0.2.1"
-SUITE_FILE = "voxprint_common-0.2.1-py3-none-any.whl"
+SUITE_VERSION = "0.2.4"
+SUITE_FILE = "voxprint_common-0.2.4-py3-none-any.whl"
 SUITE_URL = (
-    "https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.1/" + SUITE_FILE
+    "https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/" + SUITE_FILE
 )
-SUITE_SHA256 = "7a5a41284a74fc8eb2ad724647c05575d16c42881d30dba461fddf15b96a3d2f"
-SUITE_SIZE = 125199
+SUITE_SHA256 = "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+SUITE_SIZE = 182510
 
 
 def norm(n: str) -> str:

@@ -121,6 +121,7 @@ nav:
       - Template: legal/EULA-TEMPLATE.md
   - Release notes:
       - Template: RELEASE-NOTES-TEMPLATE.md
+      - 1.0.0 Shomer: RELEASE-NOTES-1004-SHOMER.md
       - 1.0.0 Amud: RELEASE-NOTES-1003-AMUD.md
       - 1.0.0 Ometz: RELEASE-NOTES-1002-OMETZ.md
       - 1.0.0 Tamim: RELEASE-NOTES-1001-TAMIM.md
