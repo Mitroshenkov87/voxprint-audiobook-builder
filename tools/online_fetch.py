@@ -81,8 +81,11 @@ class Status:
             state, permille, text = self._cur
             tmp = self.path.with_name(self.path.name + ".tmp")
             try:
+                # UTF-8, with a BOM on Windows: Inno Setup reads UTF-8 only when the BOM is present,
+                # and Notepad on Windows does the same. ASCII-with-replace dropped every non-ASCII message.
+                encoding = "utf-8-sig" if sys.platform == "win32" else "utf-8"
                 tmp.write_text(f"{state}\n{permille}\n{text.replace(chr(10), ' ')[:300]}\n{self._beat}\n",
-                               encoding="ascii", errors="replace")
+                               encoding=encoding)
                 os.replace(tmp, self.path)
             except OSError:
                 pass

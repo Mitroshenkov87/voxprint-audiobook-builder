@@ -22,10 +22,10 @@ python main.py
 
 ## Build options
 ```bat
-build.bat              :: venv + torch (uv, CUDA auto-detect) + dependencies + notices + tests + dist\Voxprint.exe (--onefile) + installer if Inno Setup 6 exists
-build.bat onedir       :: dist\Voxprint\ folder (preferred: faster start, and Qt/PySide6 stay replaceable - see Licences)
+build.bat              :: venv + torch (uv, CUDA auto-detect) + dependencies + notices + tests + dist\Voxprint AI Audiobook Builder.exe and dist\voxprint-audiobook-cli.exe (--onefile) + installer if Inno Setup 6 exists
+build.bat onedir       :: dist\Voxprint AI Audiobook Builder\ folder (preferred: faster start, and Qt/PySide6 stay replaceable - see Licences)
 :: quick rebuild:  set VOX_SKIP_TESTS=1 & set VOX_SKIP_INSTALLER=1 & build.bat onedir
-:: verify a frozen build contains every library:  dist\Voxprint\Voxprint.exe --selftest-imports   (result in <app home>\logs\selftest_imports.txt)
+:: verify a frozen build contains every library:  "dist\Voxprint AI Audiobook Builder\Voxprint AI Audiobook Builder.exe" --selftest-imports   (result in <app home>\logs\selftest_imports.txt)
 ```
 Experimental thin installer (shell only, modules downloaded by the app): `build_thin.bat`, then `installer\build_online.ps1 -Thin` - see [THIN-INSTALLER.md](THIN-INSTALLER.md).
 Command-line maintenance flags of `main.py`: `--prefetch` (download models now), `--selftest`, `--selftest-imports`, `--selftest-speech` (model-free TTS / ASR smoke), `--selftest-narrate [voice]` (headless: narrates two sentences with the first voice, result in `<app home>\logs\selftest_narrate.txt`, exit code 0 / 1 / 2 = no voice), `--verify-install`, `--repair`.

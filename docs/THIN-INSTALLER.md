@@ -27,10 +27,10 @@ every file is still at its address with the pinned size). CI only reads the comm
 1. **Our own runtime folder** (`%LOCALAPPDATA%\Voxprint\runtime`, survives uninstall/reinstall): every component whose SHA-256 is recorded is skipped.
 2. **PyTorch of another program** (system Python, conda, a project venv, a Pinokio app, `VIRTUAL_ENV`): `infra/runtime_reuse.py` reads the
    `torch-*.dist-info` folders it finds (nothing is executed from foreign environments), applies the rules below and then **runs a check in a child
-   process of Voxprint** (`Voxprint.exe --probe-torch`: import torch/torchaudio, a tensor computation, a NumPy round trip, and a CUDA computation if
+   process of Voxprint** (`Voxprint AI Audiobook Builder.exe --probe-torch`: import torch/torchaudio, a tensor computation, a NumPy round trip, and a CUDA computation if
    the PC has an NVIDIA GPU). Only if it passes is that `site-packages` appended to the **end** of `sys.path` (our own pinned libraries always win; the
    foreign environment only supplies `torch` and `torchaudio`) and remembered in `runtime\reuse.json`. If a remembered copy changes or disappears it is
-   forgotten and the module is downloaded. `Voxprint.exe --install-modules --own-torch` forces our own copy; `VOXPRINT_NO_REUSE=1` switches the search off.
+   forgotten and the module is downloaded. `Voxprint AI Audiobook Builder.exe --install-modules --own-torch` forces our own copy; `VOXPRINT_NO_REUSE=1` switches the search off.
 3. **ffmpeg** on `PATH` (smoke-tested) is used before the pinned download (`core/audio_utils.ensure_ffmpeg`, `infra/assets.py`).
 4. **Visual C++ runtime**: the setup reads `HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64` and skips the redistributable when 14.29+ is present.
 
@@ -58,7 +58,7 @@ The flavor we download is `cu130` when the driver supports CUDA 13 (driver 600 o
    afterwards; features that need a module work as soon as it is ready.
 4. Step 2 follows at once: the first-run download of ALL models (TTS, aligner, Qwen3-ASR, SAGE if step 1 could not get it) into the chosen models
    folder, mirrored on the same live line (backup restore and existing copies first; no "maximum quality" button). Closing the window does not stop it.
-5. CLI for scripts and CI: `voxprint-cli.exe --modules-status`, `--install-modules [ids] [--own-torch]`, `--probe-torch` (results also in `logs\modules.txt`, `logs\probe_torch.txt`). `voxprint-cli.exe` is the console build; `Voxprint.exe` is windowed and does not return an exit code to a script.
+5. CLI for scripts and CI: `voxprint-audiobook-cli.exe --modules-status`, `--install-modules [ids] [--own-torch]`, `--probe-torch` (results also in `logs\modules.txt`, `logs\probe_torch.txt`). `voxprint-audiobook-cli.exe` is the console build; `Voxprint AI Audiobook Builder.exe` is windowed and does not return an exit code to a script.
 
 ## Failure and resume
 

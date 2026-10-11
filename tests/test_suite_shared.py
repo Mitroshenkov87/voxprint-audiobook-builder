@@ -100,18 +100,18 @@ def test_cli_status_file_reports_done(tmp_path, monkeypatch):
 
     monkeypatch.setattr(suite_install, "install_suite", fake_install)
     code = suite_install.cli(["--install-suite", "--status", str(status), "--force"])
-    lines = status.read_text(encoding="utf-8").splitlines()
+    lines = status.read_text(encoding="utf-8-sig").splitlines()
     assert code == 0 and lines[0] == "done" and lines[1] == "1000" and lines[2] == "installed"
 
 
 def test_installer_installs_the_suite_and_ships_the_console_exe():
     root = Path(__file__).resolve().parents[1]
     iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
-    assert "voxprint-cli.exe" in iss and "--install-suite" in iss and "SkipSuite" in iss
+    assert "voxprint-audiobook-cli.exe" in iss and "--install-suite" in iss and "SkipSuite" in iss
     assert "--unregister-suite" in iss and "ChangesEnvironment=yes" in iss
     bat = (root / "build_thin.bat").read_text(encoding="utf-8")
-    assert "--console" in bat and "--name voxprint-cli" in bat
-    assert bat.index("\npyinstaller ") < bat.index("embed_build_stamp.py --exe") < bat.index("--name voxprint-cli")
+    assert "--console" in bat and "--name voxprint-audiobook-cli" in bat
+    assert bat.index("\npyinstaller ") < bat.index("embed_build_stamp.py --exe") < bat.index("--name voxprint-audiobook-cli")
     wf = (root / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")
     assert "pytest-timeout" in wf and "--timeout=180" in wf and "--timeout-method=thread" in wf
     assert "VOXPRINT_TEST_TRACEBACK_S" in wf and "timeout-minutes: 25" in wf

@@ -10,6 +10,7 @@ Flags: ``--prefetch`` (force-download the models; used by the installer), ``--se
 ``--register-models-user`` / ``--unregister-models-user --out FILE`` (shared ``models/.users.json``, infra/models_users.py);
 ``--register-runtime-user`` / ``--unregister-runtime-user --out FILE`` (``runtime/.users.json``, same format);
 ``--sync-suite-settings`` (installer: copy the models folder / UI language into the shared ``state/suite.json``).
+``--register-install`` / ``--unregister-install`` record or drop the suite discovery entry (install path and CLI path).
 User CLI subcommands (see ``cli.py`` / docs/CLI.md): ``narrate``, ``train``, ``voices``.
 """
 from __future__ import annotations
@@ -318,6 +319,14 @@ def main(argv=None) -> int:
         from infra import suite_settings
 
         return suite_settings.sync_cli()
+    if "--register-install" in argv or "--unregister-install" in argv:
+        from infra import install_layout
+
+        if "--unregister-install" in argv:
+            install_layout.unregister_install()
+        else:
+            install_layout.register_current()
+        return 0
     if "--install-suite" in argv or "--unregister-suite" in argv:
         from infra import suite_install
 
@@ -412,6 +421,9 @@ def main(argv=None) -> int:
 
     models_users.register_quietly()   # this program uses the shared models folder (models\.users.json)
     models_users.register_runtime_quietly()   # runtime\.users.json, created here on the first GUI start
+    from infra import install_layout
+
+    install_layout.register_quietly()  # frozen install: manifest installs + the current-user registry key
     from infra import suite_settings
 
     suite_settings.migrate_quietly()  # earlier choices (models folder, UI language) into the shared state\suite.json

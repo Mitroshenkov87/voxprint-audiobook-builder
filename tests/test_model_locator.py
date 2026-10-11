@@ -448,20 +448,36 @@ def _tiny_files():
     return {"config.json": b'{"a": 1}', "model.safetensors": st, "sub/tok.json": b"{}"}
 
 
-def test_mirror_download_resumes_and_verifies(tmp_path):
+def test_mirror_download_retries_a_drop_and_keeps_a_partial_when_every_try_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(mm, "_sleep", lambda _s: None)
     files = _tiny_files()
     srv = FakeModelScope(files, broken_after={"model.safetensors": 30})
     dest = tmp_path / "x.partial"
-    with pytest.raises(mm.MirrorError):
-        mm.download_repo(REPO, dest, opener=srv)
-    assert (dest / "model.safetensors.incomplete").stat().st_size == 30       # kept for resuming
-    assert not (dest / "model.safetensors").exists()
     seen = []
     sizes = mm.download_repo(REPO, dest, progress=seen.append, opener=srv)
-    assert srv.requests[-1][1] == "bytes=30-" or any(r[1] == "bytes=30-" for r in srv.requests)
+    assert any(r[1] == "bytes=30-" for r in srv.requests)
     assert (dest / "model.safetensors").read_bytes() == files["model.safetensors"]
     assert not list(dest.rglob("*.incomplete")) and seen[-1] == 1.0 and sizes["sub/tok.json"] == 2
     assert md.verify_local_model(dest)
+
+    class AlwaysDrop(FakeModelScope):
+        def __call__(self, req, timeout):
+            url = req.full_url
+            self.requests.append((url, req.headers.get("Range")))
+            if "/repo/files" in url:
+                return super().__call__(req, timeout)
+            from urllib.parse import parse_qs, urlparse
+            rel = parse_qs(urlparse(url).query)["FilePath"][0]
+            if rel == "model.safetensors":
+                return _Dropping(self.files[rel][:30])
+            return super().__call__(req, timeout)
+
+    stuck = tmp_path / "stuck.partial"
+    huge = {"config.json": b"{}", "model.safetensors": b"W" * 10000}
+    with pytest.raises(mm.MirrorError):
+        mm.download_repo(REPO, stuck, opener=AlwaysDrop(huge))
+    assert (stuck / "model.safetensors.incomplete").is_file()
+    assert not (stuck / "model.safetensors").exists()
 
 
 def test_mirror_rejects_other_revision_by_size_and_unsafe_paths(tmp_path):

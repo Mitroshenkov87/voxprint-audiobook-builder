@@ -36,17 +36,24 @@
 ; internet only the changed parts are fetched.  Silent: /Portable=1 [/PortableDir=<dir>] [/PortableModels=none|auto|all] [/FromFolder=<dir>].
 ; THIN variant (add /DTHIN to the ONLINE command; see docs/THIN-INSTALLER.md): only the components with role "core" (the small
 ; UI shell built by build_thin.bat) are fetched in PrepareToInstall -> Output\Voxprint-Setup-thin.exe. ssPostInstall then runs
-; voxprint-cli.exe --install-suite, which installs the Python runtime, torch/CUDA wheels, ffmpeg and the required models.
+; voxprint-audiobook-cli.exe --install-suite, which installs the Python runtime, torch/CUDA wheels, ffmpeg and the required models.
 
 #define AppName "Voxprint"
-; Name shown to the user (wizard, Start menu, Apps list). AppName stays technical: it is the install folder and the data folder name.
+; AppName stays the data-folder name (%LOCALAPPDATA%\Voxprint). It is not the install folder.
+; The program installs under {autopf}\Voxprint AI Suite\Audiobook Builder.
+#define SuiteDir "Voxprint AI Suite"
+#define AppFolder "Audiobook Builder"
 #define AppDisplayName "Voxprint AI Audiobook Builder"
 #define AppVersion "1.0.0-rc.5"
 ; Windows version resources are four numbers. The pre-release suffix stays in AppVersion.
 #define AppVersionInfo "1.0.0"
-#define AppExe "Voxprint.exe"
+#define AppExe "Voxprint AI Audiobook Builder.exe"
 ; Console companion (PyInstaller --console). Scripts use this so the process exit code is the command's code.
-#define CliExe "voxprint-cli.exe"
+#define CliExe "voxprint-audiobook-cli.exe"
+; Previous install (up to the suite layout). Removed on upgrade. User data under %LOCALAPPDATA%\Voxprint is kept.
+#define LegacyDir "Voxprint"
+#define LegacyGui "Voxprint.exe"
+#define LegacyCli "voxprint-cli.exe"
 ; CI build number and codename (tools/build_number.py; build_online.ps1 passes /DAppBuild= /DAppCodename=); 0 = local build
 #ifndef AppBuild
 #define AppBuild "0"
@@ -76,11 +83,12 @@ VersionInfoProductVersion={#AppVersionInfo}.{#AppBuild}
 AppVerName={#AppDisplayName} {#AppVersion} build {#AppBuild} {#AppCodename}
 #endif
 AppPublisher=Voxprint
-DefaultDirName={autopf}\{#AppName}
-; One Start menu folder "Voxprint" for every Voxprint program (Audiobook Builder, Movie Dubber); each program removes only its
-; own shortcut on uninstall, and Windows / Inno remove the folder only when it is empty.  UsePreviousGroup=no moves the entry of
-; builds up to 703 (folder "Voxprint AI Audiobook Builder") into it; [InstallDelete] removes the old one.
-DefaultGroupName=Voxprint
+DefaultDirName={autopf}\{#SuiteDir}\{#AppFolder}
+; An upgrade must not stay in C:\Program Files\Voxprint. /DIR= still wins.
+UsePreviousAppDir=no
+; Start menu folder "Voxprint AI Suite", shortcut "Audiobook Builder". No desktop shortcut.
+; UsePreviousGroup=no moves an older "Voxprint" or "Voxprint AI Audiobook Builder" folder. [InstallDelete] removes the old shortcut.
+DefaultGroupName={#SuiteDir}
 UsePreviousGroup=no
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#AppExe}
@@ -109,7 +117,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; InitializeSetup again with the detected build number (English, Russian, German).
 MinVersion=10.0.26100
 CloseApplications=yes
-; {app} is added to the user PATH so voxprint-cli.exe is found after a scripted install.
+; {app} is added to the user PATH so voxprint-audiobook-cli.exe is found after a scripted install.
 ChangesEnvironment=yes
 
 [Languages]
@@ -239,11 +247,21 @@ Type: files; Name: "{commondesktop}\{#AppDisplayName}.lnk"
 Type: files; Name: "{userdesktop}\{#AppDisplayName}.lnk"
 Type: files; Name: "{commondesktop}\{#AppName}.lnk"
 Type: files; Name: "{userdesktop}\{#AppName}.lnk"
-; builds up to 703 had their own Start menu folder; from 704 on the entry is in the shared "Voxprint" folder
+; builds up to 703 had their own Start menu folder; the shared "Voxprint" folder was the next layout.
+; Both are cleared of this program's shortcuts. dirifempty leaves a sibling program's shortcut in place.
 Type: files; Name: "{commonprograms}\{#AppDisplayName}\{#AppDisplayName}.lnk"
 Type: dirifempty; Name: "{commonprograms}\{#AppDisplayName}"
 Type: files; Name: "{userprograms}\{#AppDisplayName}\{#AppDisplayName}.lnk"
 Type: dirifempty; Name: "{userprograms}\{#AppDisplayName}"
+Type: files; Name: "{commonprograms}\{#LegacyDir}\{#AppDisplayName}.lnk"
+Type: files; Name: "{commonprograms}\{#LegacyDir}\{#LegacyGui}.lnk"
+Type: files; Name: "{commonprograms}\{#LegacyDir}\Voxprint.lnk"
+Type: files; Name: "{commonprograms}\{#LegacyDir}\{#AppFolder}.lnk"
+Type: files; Name: "{userprograms}\{#LegacyDir}\{#AppDisplayName}.lnk"
+Type: files; Name: "{userprograms}\{#LegacyDir}\Voxprint.lnk"
+Type: files; Name: "{userprograms}\{#LegacyDir}\{#AppFolder}.lnk"
+Type: dirifempty; Name: "{commonprograms}\{#LegacyDir}"
+Type: dirifempty; Name: "{userprograms}\{#LegacyDir}"
 
 [Files]
 #ifdef ONLINE
@@ -251,9 +269,10 @@ Type: dirifempty; Name: "{userprograms}\{#AppDisplayName}"
 Source: "..\build\online\voxprint-fetch.exe"; DestDir: "{tmp}"; Flags: dontcopy
 #else
 #ifdef ONEDIR
-Source: "..\dist\Voxprint\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\Voxprint AI Audiobook Builder\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 #else
 Source: "..\dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\{#CliExe}"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 #endif
 #endif
 ; Third-party licences (LGPL/GPL/Apache etc.): the component list and the full licence texts.
@@ -269,7 +288,7 @@ Source: "redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 
 [Icons]
-Name: "{group}\{#AppDisplayName}"; Filename: "{app}\{#AppExe}"
+Name: "{group}\{#AppFolder}"; Filename: "{app}\{#AppExe}"
 
 [Run]
 ; (the Visual C++ runtime is installed from [Code]: InstallVcRedist)
@@ -956,6 +975,127 @@ begin
 #endif
 end;
 
+{ Old install: C:\Program Files\Voxprint with Voxprint.exe or voxprint-cli.exe.
+  Removed on upgrade: that folder, its shortcuts, its user PATH entry, and the uninstall key when it still
+  points there. Never run that uninstaller (it would drop model and runtime refcounts). Never delete
+  {localappdata}\Voxprint. }
+function LegacyInstallDir(): String;
+begin
+  Result := RemoveBackslash(AddBackslash(ExpandConstant('{autopf}')) + '{#LegacyDir}');
+end;
+
+function IsLegacyProgramDir(const Dir: String): Boolean;
+begin
+  Result := FileExists(AddBackslash(Dir) + '{#LegacyGui}') or FileExists(AddBackslash(Dir) + '{#LegacyCli}');
+end;
+
+procedure RemoveDirFromUserPath(const Dir: String);
+var
+  OldPath, NewPath, Piece, Rest: String;
+  P: Integer;
+begin
+  if Dir = '' then Exit;
+  if not RegQueryStringValue(HKCU, 'Environment', 'Path', OldPath) then Exit;
+  NewPath := '';
+  Rest := OldPath;
+  while Rest <> '' do
+  begin
+    P := Pos(';', Rest);
+    if P = 0 then
+    begin
+      Piece := Rest;
+      Rest := '';
+    end
+    else
+    begin
+      Piece := Copy(Rest, 1, P - 1);
+      Rest := Copy(Rest, P + 1, Length(Rest));
+    end;
+    if CompareText(RemoveBackslash(Trim(Piece)), Dir) <> 0 then
+    begin
+      if (NewPath = '') and (Piece <> '') then
+        NewPath := Piece
+      else if Piece <> '' then
+        NewPath := NewPath + ';' + Piece;
+    end;
+  end;
+  RegWriteExpandStringValue(HKCU, 'Environment', 'Path', NewPath);
+end;
+
+{ Delete the uninstall key only while InstallLocation is still the old folder, and not {app}.
+  Called from PrepareToInstall, before Inno rewrites the same key for the new directory. }
+procedure DropLegacyUninstallKey();
+var
+  Key, Loc, Legacy, App: String;
+  Roots: array[0..1] of Integer;
+  I: Integer;
+begin
+  Legacy := LegacyInstallDir();
+  App := RemoveBackslash(ExpandConstant('{app}'));
+  if CompareText(Legacy, App) = 0 then Exit;
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F1D2B7A-3C54-4E0B-9A41-7B5E0C9D2F18}_is1';
+  Roots[0] := HKLM;
+  Roots[1] := HKCU;
+  for I := 0 to 1 do
+    if RegQueryStringValue(Roots[I], Key, 'InstallLocation', Loc) then
+      if CompareText(RemoveBackslash(Loc), Legacy) = 0 then
+        RegDeleteKeyIncludingSubkeys(Roots[I], Key);
+end;
+
+procedure RemoveLegacyInstall();
+var
+  Legacy, App: String;
+begin
+  Legacy := LegacyInstallDir();
+  App := RemoveBackslash(ExpandConstant('{app}'));
+  if CompareText(Legacy, App) = 0 then Exit;
+  if DirExists(Legacy) and IsLegacyProgramDir(Legacy) then
+  begin
+    Log('Removing the previous install at ' + Legacy);
+    DelTree(Legacy, True, True, True);
+  end;
+  RemoveDirFromUserPath(Legacy);
+end;
+
+procedure RegisterSuiteDiscovery();
+var
+  Key, InstallPath, CliPath: String;
+  Rc: Integer;
+begin
+  Key := 'Software\Voxprint\Apps\audiobook-builder';
+  InstallPath := RemoveBackslash(ExpandConstant('{app}'));
+  if FileExists(ExpandConstant('{app}\{#CliExe}')) then
+    CliPath := ExpandConstant('{app}\{#CliExe}')
+  else
+    CliPath := ExpandConstant('{app}\{#AppExe}');
+  RegWriteStringValue(HKLM, Key, 'InstallPath', InstallPath);
+  RegWriteStringValue(HKLM, Key, 'CliPath', CliPath);
+  RegWriteStringValue(HKCU, Key, 'InstallPath', InstallPath);
+  RegWriteStringValue(HKCU, Key, 'CliPath', CliPath);
+  if FileExists(CliPath) then
+    if not ExecAsOriginalUser(CliPath, '--register-install', ExpandConstant('{app}'), SW_HIDE,
+                              ewWaitUntilTerminated, Rc) then
+      Log('suite discovery manifest was not written; the app writes it at its next start');
+end;
+
+procedure UnregisterSuiteDiscovery();
+var
+  Rc: Integer;
+  Key, Exe: String;
+begin
+  Key := 'Software\Voxprint\Apps\audiobook-builder';
+  if FileExists(ExpandConstant('{app}\{#CliExe}')) then
+    Exe := ExpandConstant('{app}\{#CliExe}')
+  else
+    Exe := ExpandConstant('{app}\{#AppExe}');
+  if FileExists(Exe) then
+    if not Exec(Exe, '--unregister-install', ExpandConstant('{app}'), SW_HIDE,
+                ewWaitUntilTerminated, Rc) then
+      Log('suite discovery manifest was not updated');
+  RegDeleteKeyIncludingSubkeys(HKLM, Key);
+  RegDeleteKeyIncludingSubkeys(HKCU, Key);
+end;
+
 #ifdef ONLINE
 function VxTick(): Cardinal;
 external 'GetTickCount@kernel32.dll stdcall';
@@ -971,6 +1111,9 @@ begin
   if FileExists(StatusFile) and LoadStringsFromFile(StatusFile, Lines) and (GetArrayLength(Lines) >= 3) then
   begin
     State := Trim(Lines[0]);
+    if (Length(State) >= 1) and (Ord(State[1]) = $FEFF) then
+      Delete(State, 1, 1);
+    State := Trim(State);
     Permille := StrToIntDef(Trim(Lines[1]), 0);
     Msg := Trim(Lines[2]);
     if GetArrayLength(Lines) >= 4 then Beat := Trim(Lines[3]) else Beat := '';
@@ -1077,7 +1220,14 @@ end;
   silent) and the wizard goes back, so that the user can retry; the cache keeps the finished parts for the next try. }
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
+  DropLegacyUninstallKey();
   Result := RunOnlineDownload();
+end;
+#else
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  DropLegacyUninstallKey();
+  Result := '';
 end;
 #endif
 
@@ -1167,7 +1317,7 @@ begin
   SaveStringToFile(F, AnsiString(S), False);
 end;
 
-{ voxprint-cli.exe when the console companion was packed; otherwise the windowed exe (smoke copies whoami.exe there). }
+{ voxprint-audiobook-cli.exe when the console companion was packed; otherwise the windowed exe. }
 function ProgramExe(): String;
 begin
   if FileExists(ExpandConstant('{app}\{#CliExe}')) then
@@ -1177,7 +1327,7 @@ begin
 end;
 
 { The shared settings file (state\suite.json) gets the models folder chosen above (null = default) and the UI language if it has
-  none yet: voxprint-cli.exe --sync-suite-settings (infra/suite_settings.py) - run as the user who started the setup, so it is that
+  none yet: voxprint-audiobook-cli.exe --sync-suite-settings (infra/suite_settings.py) - run as the user who started the setup, so it is that
   user's %LOCALAPPDATA%.  A failure is harmless: the app copies the same values at its next start. }
 procedure SyncSuiteSettings();
 var
@@ -1202,6 +1352,9 @@ begin
   if FileExists(StatusFile) and LoadStringsFromFile(StatusFile, Lines) and (GetArrayLength(Lines) >= 3) then
   begin
     State := Trim(Lines[0]);
+    if (Length(State) >= 1) and (Ord(State[1]) = $FEFF) then
+      Delete(State, 1, 1);
+    State := Trim(State);
     Permille := StrToIntDef(Trim(Lines[1]), 0);
     Msg := Trim(Lines[2]);
     if GetArrayLength(Lines) >= 4 then Beat := Trim(Lines[3]) else Beat := '';
@@ -1446,6 +1599,8 @@ begin
       SaveStringsToUTF8FileWithoutBOM(StateDir + '\language', Lines, False);
     end;
     RunSuiteInstall();
+    RemoveLegacyInstall();
+    RegisterSuiteDiscovery();
     AddAppToUserPath();
   end;
 end;
@@ -1555,6 +1710,7 @@ begin
     UnregisterModelsUser;
     UnregisterRuntimeUser;
     UnregisterSuite;
+    UnregisterSuiteDiscovery;
     RemoveAppFromUserPath;
   end;
 #ifdef ONLINE

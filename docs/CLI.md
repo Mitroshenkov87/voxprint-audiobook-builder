@@ -6,8 +6,8 @@ The file you can hand to an agent is [AGENTS.md](AGENTS.md) (what the program is
 
 ```
 python main.py narrate|prepare|translate|speakers|train|voices|settings|bench|check|status|models|revoice|diag|backup|restore ...
-voxprint-cli.exe narrate|prepare|translate|speakers|train|voices|settings|bench|check|status|models|revoice|diag|backup|restore ...    # packaged Windows build (console; the exit code is the command's code)
-voxprint ...                                                         # Linux launcher, when installed
+voxprint-audiobook-cli.exe narrate|prepare|translate|speakers|train|voices|settings|bench|check|status|models|revoice|diag|backup|restore ...    # packaged Windows build (console; the exit code is the command's code)
+voxprint-audiobook-cli ...                                           # Linux launcher, when installed (voxprint is the same program)
 ```
 
 Every command is non-interactive. Nothing waits for a prompt. `--yes` / `-y` is accepted on every command and skips a confirmation if one is ever added; today no command asks.
@@ -26,7 +26,7 @@ Maintenance flags (`--selftest`, `--auto-repair`, `--modules-status`, `--install
 
 `--json`, `--yes` and `--dry-run` may sit before the command or after it. `--version` exits before the command runs.
 
-A packaged `Voxprint.exe` is a windowed program, so a script that starts it does not receive the process exit code. `voxprint-cli.exe` is the same program built for the console and is placed on PATH by the installer. Scripts and agents should call that. Stdout reaches a caller that redirects it (a pipe or a file). Every line is flushed. When nothing is attached, or the handle is invalid (Windows error 22, which PowerShell can leave on a windowed exe), the write is skipped and the process still exits with the command's code. It does not open a traceback window.
+A packaged `Voxprint AI Audiobook Builder.exe` is a windowed program, so a script that starts it does not receive the process exit code. `voxprint-audiobook-cli.exe` is the same program built for the console and is placed on PATH by the installer. Scripts and agents should call that. Stdout reaches a caller that redirects it (a pipe or a file). Every line is flushed. When nothing is attached, or the handle is invalid (Windows error 22, which PowerShell can leave on a windowed exe), the write is skipped and the process still exits with the command's code. It does not open a traceback window.
 
 With `--json`, stdout is only JSON lines. Library banners and warnings, including the flash-attn note, go to stderr.
 
@@ -450,3 +450,26 @@ voxprint --dry-run --json settings set narration.ordinals off
 ```
 
 A missing book, an unreadable `.vxbook`, or an output folder that does not exist is exit code 3. An unknown `--format`, an unknown prepare step, the same language on both sides of `translate`, or an unknown setting is exit code 2. `settings set` in a dry-run returns the value that would be stored and leaves the settings files unchanged.
+
+## Calling from other apps
+
+Plotweaver and the other Voxprint programs find this install in the shared suite manifest, then in the Windows registry, then at the default path.
+
+The manifest is `%LOCALAPPDATA%\Voxprint\shared\manifest.json` (Linux: `~/.local/share/voxprint/shared/manifest.json`). The record is the `installs` object, key `audiobook-builder`:
+
+```json
+"installs": {
+  "audiobook-builder": {
+    "install_path": "C:\\Program Files\\Voxprint AI Suite\\Audiobook Builder",
+    "cli_path": "C:\\Program Files\\Voxprint AI Suite\\Audiobook Builder\\voxprint-audiobook-cli.exe"
+  }
+}
+```
+
+`installs` is not the old `apps` list. `apps` counted shared resources. `components` still does that. Do not store this path there.
+
+On Windows the same two paths are also under `HKCU\Software\Voxprint\Apps\audiobook-builder` and `HKLM\Software\Voxprint\Apps\audiobook-builder` (`InstallPath`, `CliPath`). The installer writes both. A frozen copy writes the current-user key when it starts.
+
+If neither record exists, use the default path above. On Linux the launcher is `~/.local/bin/voxprint-audiobook-cli` (`voxprint` starts the same program). The program files stay in `~/.local/share/voxprint/app`.
+
+voxprint-common 0.1.1 has no install registry. This record is an extra key on the shared manifest, kept beside `components`. Call `voxprint-audiobook-cli.exe` (or `voxprint-audiobook-cli` on Linux), not the windowed exe and not the old `voxprint-cli.exe`.

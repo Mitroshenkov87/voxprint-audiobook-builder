@@ -33,6 +33,10 @@ log = logging.getLogger("voxprint.models")
 BASE_URL = os.environ.get("VOXPRINT_MODELSCOPE_URL", "https://modelscope.cn").rstrip("/")
 REVISION = "master"   # ModelScope has no commit sha for these files; sizes are verified instead (see module docstring)
 CHUNK = 1024 * 1024
+#: A dropped connection on one file is tried again this many times. The ``.incomplete`` file stays so the next try resumes.
+STREAM_RETRIES = 5
+STREAM_BACKOFF = 0.5
+_sleep = time.sleep
 #: Hugging Face counts as "slow/unreachable" if a tiny API request takes longer than this (seconds).
 HF_PROBE_TIMEOUT = 5.0
 #: How long the "Hugging Face is slow / unreachable" verdict of this session is trusted (seconds).
@@ -173,25 +177,46 @@ def download_repo(repo_id: str, dest: Path, progress: Callable[[float], None] = 
                     continue
                 except parallel_download.ParallelError as exc:
                     log.info("ModelScope parallel download of %s failed (%s) - single stream", rel, exc)
-            headers = {"User-Agent": "Voxprint"}
-            if have:
-                headers["Range"] = f"bytes={have}-"
-            try:
-                with opener(urllib.request.Request(url, headers=headers), timeout) as r:
-                    status = getattr(r, "status", 200)
-                    if have and status != 206:       # server ignored Range (no 206 Partial Content): start over
-                        have = 0
-                    with parallel_download.open_retry(part, "ab" if have else "wb") as f:
-                        while True:
-                            chunk = r.read(CHUNK)
-                            if not chunk:
-                                break
-                            f.write(chunk)
-                            progress(min(1.0, (done + f.tell()) / total))
-            except parallel_download.Stalled:
-                raise                                           # abandoned by the watchdog: not a mirror error
-            except (OSError, urllib.error.URLError) as exc:
-                raise MirrorError(f"{rel}: {exc}") from exc     # keep the .incomplete file: next run resumes
+            last_exc: Optional[BaseException] = None
+            for attempt in range(STREAM_RETRIES):
+                have = part.stat().st_size if part.exists() else 0
+                if have > size:
+                    part.unlink()
+                    have = 0
+                if have >= size:
+                    break
+                headers = {"User-Agent": "Voxprint"}
+                if have:
+                    headers["Range"] = f"bytes={have}-"
+                try:
+                    with opener(urllib.request.Request(url, headers=headers), timeout) as r:
+                        status = getattr(r, "status", 200)
+                        if have and status != 206:       # server ignored Range (no 206 Partial Content): start over
+                            have = 0
+                        with parallel_download.open_retry(part, "ab" if have else "wb") as f:
+                            while True:
+                                chunk = r.read(CHUNK)
+                                if not chunk:
+                                    break
+                                f.write(chunk)
+                                progress(min(1.0, (done + f.tell()) / total))
+                    got = part.stat().st_size if part.exists() else 0
+                    if got < size:
+                        raise OSError(f"incomplete ({got} of {size})")
+                    break
+                except parallel_download.Stalled:
+                    raise                                           # abandoned by the watchdog: not a mirror error
+                except (OSError, urllib.error.URLError) as exc:
+                    last_exc = exc
+                    if attempt + 1 >= STREAM_RETRIES:
+                        raise MirrorError(f"{rel}: {exc}") from exc     # keep the .incomplete file: the next run resumes
+                    wait = STREAM_BACKOFF * (2 ** attempt)
+                    log.warning("%s: connection dropped (%s) - retry %d of %d in %.1f s", rel, exc, attempt + 2,
+                                STREAM_RETRIES, wait)
+                    _sleep(wait)
+            else:
+                if last_exc is not None:
+                    raise MirrorError(f"{rel}: {last_exc}") from last_exc
         if part.stat().st_size != size:
             raise MirrorError(f"{rel}: incomplete ({part.stat().st_size} of {size} bytes)")
         parallel_download.replace_retry(part, target)

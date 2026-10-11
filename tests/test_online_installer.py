@@ -130,7 +130,7 @@ def test_install_reuse_and_update(tmp_path, dist, served):
     for f in dist.rglob("*"):
         if f.is_file():
             assert (dest / f.relative_to(dist)).read_bytes() == f.read_bytes()
-    assert st.read_text(encoding="ascii").split("\n")[0] == "done"
+    assert st.read_text(encoding="utf-8-sig").split("\n")[0] == "done"
     assert list(cache.glob("*.zip")) == [] and list(cache.glob("*.part")) == []
     before = len(srv.requests)
     assert of.run(str(mp), dest, cache, of.Status(None)) == 0          # everything is reused
@@ -182,7 +182,7 @@ def test_corrupt_download_is_rejected(tmp_path, served):
     assert not list((tmp_path / "cache").glob("*.part"))                 # a corrupt file is never resumed on top of
     assert of.main(["--manifest", str(mp), "--dest", str(tmp_path / "app"), "--cache", str(tmp_path / "cache"),
                     "--status", str(st)]) == 1
-    assert st.read_text(encoding="ascii").split("\n")[0] == "error"
+    assert st.read_text(encoding="utf-8-sig").split("\n")[0] == "error"
 
 
 def test_http_404_fails_fast_with_a_message(tmp_path, served):
@@ -237,11 +237,11 @@ def test_status_file_has_a_heartbeat(tmp_path):
     p = tmp_path / "st.txt"
     st = of.Status(p)
     st.write("running", 0.5, "half", force=True)
-    lines = p.read_text(encoding="ascii").split("\n")
+    lines = p.read_text(encoding="utf-8-sig").split("\n")
     assert lines[:3] == ["running", "500", "half"] and lines[3].isdigit()
     st.start_heartbeat()
     import time
     first = int(lines[3])
     time.sleep(1.8)
     st.stop()
-    assert int(p.read_text(encoding="ascii").split("\n")[3]) > first
+    assert int(p.read_text(encoding="utf-8-sig").split("\n")[3]) > first

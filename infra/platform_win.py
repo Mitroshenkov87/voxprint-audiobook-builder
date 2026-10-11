@@ -11,7 +11,12 @@ import subprocess
 import sys
 from ctypes import wintypes
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
+
+try:
+    import winreg
+except ImportError:  # not Windows
+    winreg = None  # type: ignore[assignment]
 
 from core.i18n import tr
 
@@ -324,3 +329,47 @@ def _typeperf_read(paths: list) -> Optional[int]:
     result = subprocess.run(
         ["typeperf", *paths, "-sc", "1"], capture_output=True, text=True, timeout=8, creationflags=_CREATE_NO_WINDOW)
     return parse_typeperf_csv(result.stdout or "")
+
+
+#: Current-user and machine registry. Peers (Plotweaver and the other suite apps) read InstallPath and CliPath.
+DISCOVERY_KEY = r"Software\Voxprint\Apps"
+
+
+def _discovery_path(app_id: str) -> str:
+    return DISCOVERY_KEY + "\\" + app_id
+
+
+def write_install_registry(app_id: str, install_path: str, cli_path: str) -> bool:
+    """Write the current-user discovery key. No-op off Windows."""
+    if not IS_WINDOWS or winreg is None:
+        return False
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, _discovery_path(app_id)) as key:
+        winreg.SetValueEx(key, "InstallPath", 0, winreg.REG_SZ, install_path)
+        winreg.SetValueEx(key, "CliPath", 0, winreg.REG_SZ, cli_path)
+    return True
+
+
+def read_install_registry(app_id: str) -> Optional[Tuple[str, str]]:
+    """``(install_path, cli_path)`` from HKCU, then HKLM. None when the key is absent or this is not Windows."""
+    if not IS_WINDOWS or winreg is None:
+        return None
+    path = _discovery_path(app_id)
+    for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+        try:
+            with winreg.OpenKey(hive, path) as key:
+                install, _kind = winreg.QueryValueEx(key, "InstallPath")
+                cli, _kind = winreg.QueryValueEx(key, "CliPath")
+        except OSError:
+            continue
+        return str(install), str(cli)
+    return None
+
+
+def delete_install_registry(app_id: str) -> None:
+    """Remove the current-user discovery key. The machine key is removed by the uninstaller (it has admin rights)."""
+    if not IS_WINDOWS or winreg is None:
+        return
+    try:
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, _discovery_path(app_id))
+    except OSError:
+        pass

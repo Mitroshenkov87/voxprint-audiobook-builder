@@ -60,7 +60,7 @@ Downloads are checked by size and SHA-256. The speech model, the aligner and the
 
 ## Suite command line
 
-Other programs drive this app with the same commands the windows use: `voxprint` on Linux when the package is installed, `voxprint-cli.exe` on Windows (console; `Voxprint.exe` is the windowed program), or `python main.py` from a source checkout. `--json` prints progress lines and one result object. `--dry-run` checks the inputs and the output path and does not load a model, use the GPU, or download. Exit codes are stable (0 success, 1 internal, 2 bad arguments, 3 bad input, 4 missing model, 5 out of video memory, 6 cancelled, 7 no suitable GPU). The flag list is generated from the parser: [command reference](generated/cli.md). Recipes and JSON fields: [CLI.md](CLI.md) and [AGENTS.md](AGENTS.md).
+Other programs drive this app with the same commands the windows use: `voxprint-audiobook-cli` on Linux when the package is installed (`voxprint` is the same launcher), `voxprint-audiobook-cli.exe` on Windows (console; `Voxprint AI Audiobook Builder.exe` is the windowed program), or `python main.py` from a source checkout. How another app finds the install: [CLI.md](CLI.md), "Calling from other apps". `--json` prints progress lines and one result object. `--dry-run` checks the inputs and the output path and does not load a model, use the GPU, or download. Exit codes are stable (0 success, 1 internal, 2 bad arguments, 3 bad input, 4 missing model, 5 out of video memory, 6 cancelled, 7 no suitable GPU). The flag list is generated from the parser: [command reference](generated/cli.md). Recipes and JSON fields: [CLI.md](CLI.md) and [AGENTS.md](AGENTS.md).
 
 ## 1. Layers
 

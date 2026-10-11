@@ -8,7 +8,8 @@
 #   ~/.local/share/voxprint/app    the program (Python source, same code as the Windows build)
 #   ~/.local/share/voxprint/venv   its Python environment (PySide6, PyTorch, transformers ...)
 #   ~/.local/share/voxprint/       models, voices, settings, logs (created by the program)
-#   ~/.local/bin/voxprint          the launcher;  ~/.local/share/applications/voxprint.desktop  the menu entry
+#   ~/.local/bin/voxprint-audiobook-cli   the launcher (voxprint is a compatibility name)
+#   ~/.local/share/applications/voxprint-audiobook.desktop  the menu entry
 # PyTorch: torch 2.11.0 cu130 (NVIDIA driver 600+) with TorchAudio 2.11.0.
 # An NVIDIA GeForce RTX 40-series or newer GPU (compute capability 8.9+) is required. There is no CPU-only install.
 # Internal CI switches, not shown in --help: --skip-gpu-check, --gpu-check-only, and --torch-backend cpu (only with --skip-gpu-check).
@@ -27,7 +28,8 @@ ICON_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps"
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/voxprint"
 APP="$DATA/app"
 VENV="$DATA/venv"
-LAUNCHER="$BIN_DIR/voxprint"
+LAUNCHER="$BIN_DIR/voxprint-audiobook-cli"
+LAUNCHER_COMPAT="$BIN_DIR/voxprint"
 
 # system packages (Debian / Ubuntu / AnduinOS / Mint names): Qt xcb platform plugin, OpenGL, ffmpeg, venv
 APT_PACKAGES="python3-venv ffmpeg libegl1 libgl1 libdbus-1-3 libfontconfig1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 libpulse0"
@@ -131,7 +133,7 @@ done
 if [ "$MODE" = uninstall ]; then
   say "Removing Voxprint (program, environment, launcher, menu entry)"
   rm -rf "$APP" "$APP.old" "$APP.new" "$VENV" "$DATA/install.json"
-  rm -f "$LAUNCHER" "$APPS_DIR/voxprint.desktop" "$ICON_DIR/voxprint.png"
+  rm -f "$LAUNCHER" "$LAUNCHER_COMPAT" "$APPS_DIR/voxprint-audiobook.desktop" "$APPS_DIR/voxprint.desktop" "$ICON_DIR/voxprint.png"
   command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
   if [ "$PURGE" = 1 ]; then
     say "Deleting $DATA (models, voices, settings, logs)"
@@ -292,18 +294,20 @@ say "Installing the other Python packages (this takes a few minutes)"
 say "Creating the launcher $LAUNCHER"
 cat > "$LAUNCHER" <<LAUNCH
 #!/usr/bin/env bash
-# Voxprint launcher (written by install-voxprint-linux.sh).  Extra Qt hints: QT_QPA_PLATFORM=xcb voxprint
+# Voxprint launcher (written by install-voxprint-linux.sh).  Extra Qt hints: QT_QPA_PLATFORM=xcb voxprint-audiobook-cli
 export VOXPRINT_HOME="\${VOXPRINT_HOME:-$DATA}"
 export PYTHONNOUSERSITE=1
 exec "$VPY" "$APP/main.py" "\$@"
 LAUNCH
 chmod +x "$LAUNCHER"
+ln -sfn "voxprint-audiobook-cli" "$LAUNCHER_COMPAT"
+rm -f "$APPS_DIR/voxprint.desktop"
 if [ "$NO_DESKTOP" = 0 ]; then
   mkdir -p "$APPS_DIR" "$ICON_DIR"
   [ -f "$APP/installer/linux/voxprint-256.png" ] && cp "$APP/installer/linux/voxprint-256.png" "$ICON_DIR/voxprint.png"
   if [ -f "$APP/installer/linux/voxprint.desktop" ]; then
-    sed "s|@LAUNCHER@|$LAUNCHER|g" "$APP/installer/linux/voxprint.desktop" > "$APPS_DIR/voxprint.desktop"
-    chmod 644 "$APPS_DIR/voxprint.desktop"
+    sed "s|@LAUNCHER@|$LAUNCHER|g" "$APP/installer/linux/voxprint.desktop" > "$APPS_DIR/voxprint-audiobook.desktop"
+    chmod 644 "$APPS_DIR/voxprint-audiobook.desktop"
   fi
   command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
   command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -q -t "${ICON_DIR%/hicolor/*}/hicolor" >/dev/null 2>&1 || true
@@ -324,7 +328,7 @@ fi
 
 echo
 if [ "$RC" = 0 ]; then say "Voxprint is installed."; else warn "Voxprint is installed, but a self-test failed - see docs/LINUX-TEST-CHECKLIST.md"; fi
-echo "Start it from the application menu or with:  voxprint"
+echo "Start it from the application menu or with:  voxprint-audiobook-cli"
 case ":$PATH:" in *":$BIN_DIR:"*) ;; *) warn "$BIN_DIR is not in PATH - log out and in again, or run: $LAUNCHER" ;; esac
 echo "Models are downloaded on the first run into $DATA/models.  Update: run this script again.  Remove: install-voxprint-linux.sh --uninstall"
 exit "$RC"

@@ -169,7 +169,7 @@ jobs:
       - name: Online installer (Inno, not published)
         shell: pwsh
         run: |
-          ./installer/build_online.ps1 -Dist dist\thin\Voxprint -Tag v0.0.0-dev -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
+          ./installer/build_online.ps1 -Dist "dist\thin\Voxprint AI Audiobook Builder" -Tag v0.0.0-dev -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
           Get-ChildItem build\online-release | Format-Table Name, Length
           $setup = Get-ChildItem build\online-release\Voxprint-Setup-online*.exe | Select-Object -First 1
           "installer bytes: $($setup.Length)"

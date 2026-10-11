@@ -162,12 +162,17 @@ def launch_check(progress: Callable[[float, str], None] = lambda _f, _m: None, *
     return report
 
 
+def status_encoding() -> str:
+    """UTF-8. Windows gets a BOM so Inno Setup (and Notepad) read non-ASCII status lines."""
+    return "utf-8-sig" if sys.platform == "win32" else "utf-8"
+
+
 def write_status(path: Path, state: str, permille: int, message: str, beat: int) -> None:
     """Four lines the installer polls: state, permille, message, heartbeat."""
     path.parent.mkdir(parents=True, exist_ok=True)
     text = f"{state}\n{int(permille)}\n{message}\n{int(beat)}\n"
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(text, encoding="utf-8")
+    tmp.write_text(text, encoding=status_encoding())
     os.replace(tmp, path)
 
 

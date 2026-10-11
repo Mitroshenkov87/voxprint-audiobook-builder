@@ -5,6 +5,13 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Changed
+- **Install folder.** Windows setup installs into `C:\Program Files\Voxprint AI Suite\Audiobook Builder`. The windowed program is `Voxprint AI Audiobook Builder.exe`. Scripts call `voxprint-audiobook-cli.exe`, which is on PATH. The Start menu folder is `Voxprint AI Suite`, shortcut `Audiobook Builder`. An older `C:\Program Files\Voxprint` install is removed on upgrade. Voices, settings, the shared runtime and models stay in `%LOCALAPPDATA%\Voxprint`. Linux keeps `~/.local/share/voxprint` and adds the launcher `voxprint-audiobook-cli` (`voxprint` still starts it).
+- **Finding this program.** The install path and the CLI path are stored in the shared manifest under `installs` / `audiobook-builder`, and on Windows under `Software\Voxprint\Apps\audiobook-builder`. Peers should read that, then the default path. See [docs/CLI.md](docs/CLI.md).
+
+### Fixed
+- **Downloads.** A dropped connection resumes the partial file and retries with a growing pause. The first seconds of a transfer are timed, and a fast Hugging Face mirror is preferred over a slow ModelScope mirror (about 84 KB/s). `suite-status.txt` is UTF-8, with a BOM on Windows so the installer and Notepad read it. voxprint-common 0.1.1 already resumes a partial file; the retry loop and the speed check live in this program until the library grows them.
+
 ## [1.0.0-rc.5] - 2026-10-11 - build 1003 "Amud"
 
 Codename *Amud* (pillar): the app now stands on the shared suite library. The version is **1.0.0-rc.5**. The release tag for this build is `v1.0.0-rc.5` (a pre-release). People see `1.0.0 RC5 · build 1003 "Amud"`; the Windows file version is `1.0.0.1003`. The build number is the `build` field in `BUILD.json` (**1003**). `offset` is history only and is not added to the CI run number. Release notes: [docs/RELEASE-NOTES-1003-AMUD.md](docs/RELEASE-NOTES-1003-AMUD.md).
