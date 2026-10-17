@@ -53,8 +53,12 @@ def test_earlier_capitalised_linux_folder_is_still_found(monkeypatch, tmp_path):
     cur = paths.app_home()
     assert cur.name == "voxprint-ai-suite"
     old = h / ".local" / "share" / "Voxprint"
-    if not cur.exists() or not old.samefile(cur):             # (a case-insensitive file system would make them one folder)
+    # A case-insensitive disk treats Voxprint as the legacy voxprint folder, so the
+    # suite library moves it. A case-sensitive disk leaves it as an earlier home.
+    if old.exists() and not old.samefile(cur):
         assert old.name in [p.name for p in paths.previous_homes()]
+    else:
+        assert (cur / "models").is_dir()
 
 
 @pytest.fixture
