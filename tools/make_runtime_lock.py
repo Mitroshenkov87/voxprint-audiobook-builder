@@ -206,6 +206,12 @@ def suite_requirement(row: Optional[dict] = None) -> str:
     return f"{item['dist']} @ {item['url']} --hash=sha256:{item['sha256']}"
 
 
+def _dist_name(line: str) -> str:
+    """PEP 503 name in front of ``@``, without an extra such as ``[ui]``."""
+    name = str(line).split("@", 1)[0].strip()
+    return name.split("[", 1)[0].strip()
+
+
 def git_dist_names(lock: dict) -> List[str]:
     """Distribution names bundled with the shell: the suite wheel, and any leftover ``git`` pins."""
     names = []
@@ -213,10 +219,49 @@ def git_dist_names(lock: dict) -> List[str]:
     if isinstance(suite, dict) and str(suite.get("dist") or "").strip():
         names.append(str(suite["dist"]).strip())
     for line in lock.get("git") or []:
-        name = str(line).split("@", 1)[0].strip()
+        name = _dist_name(str(line))
         if name and name not in names:
             names.append(name)
     return names
+
+
+def requirement_lines(lock: dict, *, tests: bool) -> List[str]:
+    """Pinned shell packages, plus the suite install when ``tests`` is true.
+
+    A non-empty ``git`` list replaces the hashed 0.2.4 wheel. An empty list
+    keeps that wheel, so the installer hash check still works.
+    """
+    pins = dict(lock["shell"])
+    if tests:
+        for wheel in lock["wheels"]:
+            if wheel["dist"] in TEST_EXTRAS:
+                pins[wheel["dist"]] = wheel["version"]
+    lines = [f"{name}=={version}" for name, version in pins.items()]
+    if not tests:
+        return lines
+    git = [str(item).strip() for item in (lock.get("git") or []) if str(item).strip()]
+    if git:
+        lines.extend(git)
+        return lines
+    suite = lock.get("suite")
+    if isinstance(suite, dict) and suite.get("url") and suite.get("sha256"):
+        lines.append(suite_requirement(suite))
+    return lines
+
+
+def keep_git(lock: dict, previous: dict) -> dict:
+    """Copy a hand-written ``git`` pin onto a freshly built lock, after ``suite``."""
+    git = previous.get("git")
+    if not isinstance(git, list) or not git:
+        return lock
+    ordered: dict = {}
+    for key, value in lock.items():
+        ordered[key] = value
+        if key == "suite":
+            ordered["git"] = list(git)
+    if "git" not in ordered:
+        ordered["git"] = list(git)
+    return ordered
 
 
 def pyinstaller_metadata_args(lock: dict) -> List[str]:
@@ -247,21 +292,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
     if a.shell_requirements or a.test_requirements:
         lock = json.loads(Path(a.out).read_text(encoding="utf-8"))
-        pins = dict(lock["shell"])
-        if a.test_requirements:
-            for w in lock["wheels"]:
-                if w["dist"] in TEST_EXTRAS:
-                    pins[w["dist"]] = w["version"]
-        lines = [f"{n}=={v}" for n, v in pins.items()]
-        if a.test_requirements:
-            suite = lock.get("suite")
-            if isinstance(suite, dict) and suite.get("url") and suite.get("sha256"):
-                lines.append(suite_requirement(suite))
-            lines.extend(str(item) for item in (lock.get("git") or []))
-        print("\n".join(lines))
+        print("\n".join(requirement_lines(lock, tests=a.test_requirements)))
         return 0
-    lock = build(a.python, a.torch, a.torchaudio)
-    Path(a.out).write_text(json.dumps(lock, indent=1) + "\n", encoding="utf-8")
+    out = Path(a.out)
+    previous: dict = {}
+    if out.is_file():
+        try:
+            loaded = json.loads(out.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            loaded = {}
+        if isinstance(loaded, dict):
+            previous = loaded
+    lock = keep_git(build(a.python, a.torch, a.torchaudio), previous)
+    out.write_text(json.dumps(lock, indent=1) + "\n", encoding="utf-8")
     tot = sum(w["size"] for w in lock["wheels"] if w.get("flavor") in (None, "cu130"))
     print(f"{len(lock['wheels'])} wheels, {tot / 2**20:.0f} MiB for cu130 -> {a.out}")
     return 0

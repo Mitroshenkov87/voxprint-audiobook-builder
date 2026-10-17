@@ -43,6 +43,9 @@
   "size": 182510,
   "sha256": "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
  },
+ "git": [
+  "voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@f4e95ccfa25780abaf50412cb095a7843725102a"
+ ],
  "wheels": [
   {
    "dist": "accelerate",

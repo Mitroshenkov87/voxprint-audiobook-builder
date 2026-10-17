@@ -40,13 +40,24 @@ Remove-Item build\online-release\* -Force -ErrorAction SilentlyContinue
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $infraDir = Join-Path $RepoRoot "infra"
 # The fetch exe imports infra modules that use voxprint-common. Smoke jobs install only PyInstaller.
-# The released wheel is pinned in runtime_lock.json; pip checks the sha256 fragment.
+# A draft UI pin lives in runtime_lock.json "git". With no git pin, pip installs the released
+# wheel and checks the sha256 fragment.
 & $Python -c "import voxprint_common" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    $suite = (Get-Content -Raw -Encoding utf8 (Join-Path $RepoRoot "infra\runtime_lock.json") | ConvertFrom-Json).suite
-    if (-not $suite.url -or -not $suite.sha256) { throw "runtime_lock.json has no suite wheel pin" }
-    & $Python -m pip install --quiet "voxprint-common @ $($suite.url)#sha256=$($suite.sha256)"
-    Check "voxprint-common"
+    $lock = Get-Content -Raw -Encoding utf8 (Join-Path $RepoRoot "infra\runtime_lock.json") | ConvertFrom-Json
+    $git = @()
+    if ($null -ne $lock.git) { $git = @($lock.git) }
+    if ($git.Count -gt 0) {
+        foreach ($line in $git) {
+            & $Python -m pip install --quiet $line
+            Check "voxprint-common"
+        }
+    } else {
+        $suite = $lock.suite
+        if (-not $suite.url -or -not $suite.sha256) { throw "runtime_lock.json has no suite wheel pin" }
+        & $Python -m pip install --quiet "voxprint-common @ $($suite.url)#sha256=$($suite.sha256)"
+        Check "voxprint-common"
+    }
 }
 & $Python -m PyInstaller --onefile --console --name voxprint-fetch --distpath build\online --workpath build\online-work `
     --specpath build\online-work --noconfirm --log-level WARN --paths "$infraDir" --hidden-import netroute `

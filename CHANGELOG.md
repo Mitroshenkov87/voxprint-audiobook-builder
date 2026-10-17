@@ -5,6 +5,9 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Changed
+- **Shared UI shell (draft).** The window is the voxprint-common screen for `audiobook-builder`: Choose a book, a voice, pace, and Create audiobook. The pin is `voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@f4e95ccfa25780abaf50412cb095a7843725102a` (`ui/shell-migration`). It switches to the release tag once that tag is cut. The 0.2.4 wheel and its SHA-256 stay in the lock's `suite` object for an installer that has no git pin. The rc.6 refusal to delete a shared root is unchanged. `docs/ui/FEATURE-MAP.md` lists every old-UI feature and every CLI feature. Nothing is dropped. Sections (Narrate, Voices, Roles, Re-voice) and the 3-step Train voice wizard are designed there; this pin does not have those pieces yet.
+
 ### Fixed
 - A CI installer built without a release tag embeds its manifest and installs the shell zip from the folder next to the setup file. It does not name a `v0.0.0-dev` release.
 - The fetch status file uses a private temporary name and retries a sharing violation. A status write cannot fail a download. When the model step fails, setup ends with exit code 1.
