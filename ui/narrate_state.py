@@ -1,8 +1,10 @@
 """Narration presets on the shared audiobook screen.
 
 The shell's pace group stays. The groups added here write the same settings
-the expert panel shows. Choosing a chip, editing a value, and Reset all go
-through that one state.
+the expert panel shows: voices, format, chapter split, background music, and
+reading manner. Choosing a chip, editing a value, and Reset all go through
+that one state. Language, text preparation, bitrates, and the fine reading
+controls stay expert fields.
 
     from ui.narrate_state import narrate_presets, narrate_settings
     settings = narrate_settings()
@@ -18,6 +20,7 @@ from core.audiobook_export import (
     FORMAT_FLAC_CHAPTERS,
     FORMAT_M4B,
     FORMAT_MP3_CHAPTERS,
+    FORMAT_MP3_SINGLE,
     FORMAT_OPUS_CHAPTERS,
     FORMAT_OPUS_SINGLE,
     FORMAT_WAV_CHAPTERS,
@@ -38,12 +41,34 @@ _PAUSE_FIELDS = tuple(
 
 _FILE_CHOICES = (
     Choice(FORMAT_OPUS_SINGLE, "abb.preset.file.opus"),
-    Choice(FORMAT_MP3_CHAPTERS, "abb.preset.file.mp3"),
-    Choice(FORMAT_M4B, "abb.preset.file.m4b"),
     Choice(FORMAT_OPUS_CHAPTERS, "abb.file.opus_chapters"),
+    Choice(FORMAT_MP3_SINGLE, "abb.file.mp3_single"),
+    Choice(FORMAT_MP3_CHAPTERS, "abb.preset.file.mp3"),
+    Choice(FORMAT_M4B, "abb.preset.format.m4b"),
     Choice(FORMAT_FLAC_CHAPTERS, "abb.file.flac"),
     Choice(FORMAT_WAV_CHAPTERS, "abb.file.wav"),
 )
+_CONTAINER_CHOICES = (
+    Choice("mp3", "abb.preset.format.mp3"),
+    Choice("m4b", "abb.preset.format.m4b"),
+    Choice("opus", "abb.preset.format.opus"),
+)
+# M4B is always one AAC file with chapter markers. Split applies to MP3 and Opus.
+_EXPORT_BY_CHIPS = {
+    ("opus", False): FORMAT_OPUS_SINGLE,
+    ("opus", True): FORMAT_OPUS_CHAPTERS,
+    ("mp3", False): FORMAT_MP3_SINGLE,
+    ("mp3", True): FORMAT_MP3_CHAPTERS,
+    ("m4b", False): FORMAT_M4B,
+    ("m4b", True): FORMAT_M4B,
+}
+_CHIPS_BY_FILE = {
+    FORMAT_OPUS_SINGLE: ("opus", False),
+    FORMAT_OPUS_CHAPTERS: ("opus", True),
+    FORMAT_MP3_SINGLE: ("mp3", False),
+    FORMAT_MP3_CHAPTERS: ("mp3", True),
+    FORMAT_M4B: ("m4b", None),
+}
 _LANGUAGE_CHOICES = (
     Choice("keep", "abb.preset.language.keep"),
     Choice("en", "abb.preset.language.en"),
@@ -78,7 +103,7 @@ def narrate_settings() -> Settings:
 
 
 def narrate_presets(settings: Settings) -> PresetFile:
-    """Pace from the shell, then the Voices chip. Other narration values are expert fields."""
+    """Pace from the shell, then voices, format, chapters, music, and manner."""
     surface = surface_for(SURFACE_ID)
     pace = variant_presets(surface, settings)
     extra = parse_presets(_preset_document(), settings)
@@ -104,12 +129,14 @@ def _narration_specs() -> tuple[SettingSpec, ...]:
     specs.extend((
         _bool("narr.ordinals", True, "prepare"),
         _bool("narr.multi_voice", False, "speakers"),
+        _enum("narr.container", "opus", _CONTAINER_CHOICES, "output"),
+        _bool("narr.split_chapters", False, "output"),
         _enum("narr.file", FORMAT_OPUS_SINGLE, _FILE_CHOICES, "output"),
         _int("narr.opus_kbps", QUALITY_PRESETS[PRESET_STANDARD].opus_kbps, 12, 128, "output"),
         _int("narr.mp3_kbps", QUALITY_PRESETS[PRESET_STANDARD].mp3_kbps, 32, 320, "output"),
         _int("narr.aac_kbps", QUALITY_PRESETS[PRESET_STANDARD].aac_kbps, 24, 256, "output"),
         _bool("narr.check_chunks", False, "output"),
-        _enum("narr.style", AUTO, _STYLE_CHOICES, "reading"),
+        _enum("narr.style", FICTION, _STYLE_CHOICES, "reading"),
         _float("narr.speed", 1.0, 0.7, 1.3, "reading"),
     ))
     specs.extend(
@@ -130,8 +157,46 @@ def _preset_document() -> dict[str, object]:
                 ("one", "abb.preset.voices.one", {"narr.multi_voice": False}),
                 ("each", "abb.preset.voices.each", {"narr.multi_voice": True}),
             )),
+            _group("format", "abb.preset.format", "opus", (
+                ("mp3", "abb.preset.format.mp3", {"narr.container": "mp3"}),
+                ("m4b", "abb.preset.format.m4b", {"narr.container": "m4b"}),
+                ("opus", "abb.preset.format.opus", {"narr.container": "opus"}),
+            )),
+            _group("chapters", "abb.preset.chapters", "off", (
+                ("off", "abb.preset.chapters.off", {"narr.split_chapters": False}),
+                ("on", "abb.preset.chapters.on", {"narr.split_chapters": True}),
+            )),
+            _group("music", "abb.preset.music", "off", (
+                ("off", "abb.preset.sound.off", {"narr.sound": "off"}),
+                ("on", "abb.preset.music.on", {"narr.sound": "when"}),
+            )),
+            _group("manner", "abb.preset.manner", "expressive", (
+                ("calm", "abb.preset.manner.calm", {"narr.style": SCRIPTURE}),
+                ("expressive", "abb.preset.manner.expressive", {"narr.style": FICTION}),
+            )),
         ],
     }
+
+
+def export_format(container: str, split: bool) -> str:
+    """Return the audiobook file key for a format chip and the chapter chip.
+
+    Args:
+        container: ``mp3``, ``m4b``, or ``opus``.
+        split: True saves MP3 or Opus as one file per chapter. M4B stays one file.
+    """
+    return _EXPORT_BY_CHIPS[(container, bool(split))]
+
+
+def chips_for_export(file_format: object) -> tuple[str, bool | None] | None:
+    """Return the chips that produce ``file_format``, or None for an expert-only file.
+
+    Args:
+        file_format: A value of ``narr.file``.
+    """
+    if not isinstance(file_format, str):
+        return None
+    return _CHIPS_BY_FILE.get(file_format)
 
 
 def _group(group_id: str, label_key: str, default: str, options: tuple) -> dict[str, object]:

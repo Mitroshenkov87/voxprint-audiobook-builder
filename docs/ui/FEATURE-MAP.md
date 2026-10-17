@@ -2,7 +2,7 @@
 
 One row per old-UI feature and per CLI feature. Status is `mapped`, `CLI-only`, or `dropped`. Nothing in this table is `dropped`.
 
-The main screen is section Narrate: the audio surface (Choose a book, voice, pace, one voice or each speaker, player, Create audiobook). Other jobs use sections Voices, Roles, and Re-voice. Voice training is a 3-step wizard. Language, text preparation, the file, sound quality, reading style, background sound, and the AI label are expert fields. They keep the defaults the chips used to set.
+The main screen is section Narrate: Choose a book, a full-width voice, and chips for pace, voices, format, split into chapters, background music, and reading manner, then Create audiobook. Those chips and the expert panel share one settings state. Language, text preparation, sound quality, the AI label, and the fine technical parameters stay expert fields. Voice training is three numbered groups on the train window. The Steps wizard is still missing. Quick preview, compare, checks, voice details, and Build a voice for other apps sit under More options.
 
 ## Missing shell pieces
 
@@ -31,7 +31,7 @@ Until Sections and Steps land, the frozen windows (`ui/main_window.py`, `ui/voic
 | My voices | Studio card, My voices | Section: Voices | mapped |
 | Re-voice | Studio card, Re-voice window | Section: Re-voice | mapped |
 | Choose a book (TXT, Markdown, FB2, EPUB, .vxbook) | Narrate, Choose book | Section: Narrate, drop “Choose a book” | mapped |
-| Narrator voice | Narrate voice combo | Section: Narrate, voice combo | mapped |
+| Narrator voice | Narrate voice combo | Section: Narrate, full-width voice dropdown | mapped |
 | Download a catalog voice when narration starts | Narrate voice list | Section: Voices, action Download | mapped |
 | Start narration | Narrate, Start | Section: Narrate, action Create audiobook | mapped |
 | Pause narration | Narrate, Pause | Section: Narrate, action Pause | mapped |
@@ -41,7 +41,7 @@ Until Sections and Steps land, the frozen windows (`ui/main_window.py`, `ui/voic
 | Listen to finished parts | Mini player | Section: Narrate, player | mapped |
 | Chapter list while listening | Narrate player hint | Section: Narrate, player chapters | mapped |
 | Read chapter titles aloud | Narrate checkbox | Expert field: Read chapter titles | mapped |
-| One voice or each speaker | Narrate speakers switch | Section: Narrate, chip Voices | mapped |
+| One voice or each speaker | Narrate speakers switch | Section: Narrate, chip Voices (one voice, or different voices by role) | mapped |
 | Male voice | Narrate speaker card | Section: Roles, male voice | mapped |
 | Female voice | Narrate speaker card | Section: Roles, female voice | mapped |
 | Second male voice | Narrate speaker card | Section: Roles, second male voice | mapped |
@@ -68,17 +68,18 @@ Until Sections and Steps land, the frozen windows (`ui/main_window.py`, `ui/voic
 | Download translation models | Narrate button | Action: Manage models | mapped |
 | Download the text model | Narrate button | Action: Manage models | mapped |
 | Spoken AI disclosure | Narrate checkbox | Expert field: Say this is AI | mapped |
-| One Opus file | Narrate formats | Expert field: Audiobook file | mapped |
-| MP3 chapters | Narrate formats | Expert field: Audiobook file | mapped |
-| Apple Books (M4B) | Narrate formats | Expert field: Audiobook file | mapped |
-| Opus chapters | Narrate, other formats | Expert field: Audiobook file | mapped |
+| One Opus file | Narrate formats | Chip Format Opus with Split into chapters Off; expert Audiobook file follows | mapped |
+| MP3 chapters | Narrate formats | Chip Format MP3 with Split into chapters On; expert Audiobook file follows | mapped |
+| One MP3 file | Narrate formats | Chip Format MP3 with Split into chapters Off; expert Audiobook file follows | mapped |
+| Apple Books (M4B) | Narrate formats | Chip Format “M4B audiobook with chapters”; one AAC file with ffmpeg chapter markers (`FORMAT_M4B`) | mapped |
+| Opus chapters | Narrate, other formats | Chip Format Opus with Split into chapters On; expert Audiobook file follows | mapped |
 | FLAC chapters | Narrate, other formats | Expert field: Audiobook file | mapped |
 | WAV chapters | Narrate, other formats | Expert field: Audiobook file | mapped |
 | Sound quality Compact, Standard, High | Narrate quality | Expert field: Opus bitrate, MP3 bitrate, AAC bitrate (Standard is the live default) | mapped |
 | Opus, MP3, and AAC bitrates | Narrate advanced rates | Expert field: Opus bitrate, MP3 bitrate, AAC bitrate | mapped |
 | Fragment check | Narrate checkbox | Expert field: Fragment check | mapped |
-| Background sound for a .vxbook | Settings soundscape | Expert field: Background sound | mapped |
-| Reading style | Settings and Narrate | Expert field: Reading style | mapped |
+| Background sound for a .vxbook | Settings soundscape | Chip Background music. On writes “when the book asks”; Off writes off. Expert Background sound follows | mapped |
+| Reading style | Settings and Narrate | Chip Reading manner. Calm writes scripture, Expressive writes fiction. Automatic, dialogue, speed, and pauses stay expert fields | mapped |
 | Reading speed | Settings | Expert field: Speed | mapped |
 | Pause after a comma | Settings | Expert field: Comma pause | mapped |
 | Pause mid-sentence | Settings | Expert field: Mid-sentence pause | mapped |
@@ -96,28 +97,28 @@ Until Sections and Steps land, the frozen windows (`ui/main_window.py`, `ui/voic
 | Recording plus a transcript | Train, audio and text | Step 1: The recording | mapped |
 | No transcript (recognise the speech) | Train checkbox and warning | Step 1: The recording, no transcript | mapped |
 | Folder of clips | Train folder button | Step 1: The recording, clip folder | mapped |
-| Voice name | Train field | Step 1: The recording | mapped |
-| Voice type (male, female, child, other) | Train combo | Step 1: The recording | mapped |
-| Age group | Train, more about the voice | Step 1: The recording | mapped |
-| Speaker, organisation, prepared-by, description, link | Train, more about the voice | Step 1: The recording | mapped |
+| Voice name | Train field | Step 3: Consent and name | mapped |
+| Voice type (male, female, child, other) | Train combo | More options | mapped |
+| Age group | Train, more about the voice | More options | mapped |
+| Speaker, organisation, prepared-by, description, link | Train, more about the voice | More options | mapped |
 | Preset Fast | Train presets | Step 2: How to train | mapped |
 | Preset Balanced | Train presets | Step 2: How to train | mapped |
 | Preset Maximum | Train presets | Step 2: How to train | mapped |
-| Preset Manual (epochs, rank, alpha, learning rate, accumulation) | Train advanced | Step 2: How to train, manual fields | mapped |
-| Time estimate | Train label | Step 2: How to train | mapped |
-| Clip length | Train control | Step 2: How to train | mapped |
-| Quick preview | Train, Quick preview | Step 2: How to train, action Quick preview | mapped |
-| Compare two preview variants | Train preview | Step 2: How to train, action Compare | mapped |
-| Use these preview settings | Train preview | Step 2: How to train, action Use these settings | mapped |
-| Check the voice after training | Train checkbox | Step 2: How to train | mapped |
+| Preset Manual (epochs, rank, alpha, learning rate, accumulation) | Train advanced | Step 2 quality choice; the numbers open under More options | mapped |
+| Time estimate | Train label | Step 2: Quality | mapped |
+| Clip length | Train control | More options | mapped |
+| Quick preview | Train, Quick preview | More options, action Quick preview | mapped |
+| Compare two preview variants | Train preview | More options, action Compare | mapped |
+| Use these preview settings | Train preview | More options, action Use these settings | mapped |
+| Check the voice after training | Train checkbox | More options | mapped |
 | Consent read from the spoken statement | Train consent card | Step 3: Consent and save | mapped |
 | Consent chosen by hand | Train consent card | Step 3: Consent and save | mapped |
 | No statement, private use only | Train consent card | Step 3: Consent and save | mapped |
 | Consent scopes (commercial, public non-commercial, private only) | Train consent card | Step 3: Consent and save | mapped |
 | Keep the spoken consent clip | Train checkbox | Step 3: Consent and save | mapped |
-| Create dataset only | Train button | Step 3: Consent and save, action Create dataset | mapped |
-| Create voice (LoRA) | Train button | Step 3: Consent and save, action Create voice | mapped |
-| Build the universal model | Train button; My voices export | Step 3: Consent and save, action Build universal model | mapped |
+| Create dataset only | Train button | More options, action Create dataset | mapped |
+| Create voice (LoRA) | Train button | Step 3: Consent and name, action Train the voice | mapped |
+| Build the universal model | Train button; My voices export | More options, action Build a voice for other apps | mapped |
 | Open the result folder | Train button | Step 3: Consent and save, action Open folder | mapped |
 | Preview a voice | My voices card | Section: Voices, action Preview | mapped |
 | Narrate with this voice | My voices card | Section: Narrate, voice taken from Voices | mapped |

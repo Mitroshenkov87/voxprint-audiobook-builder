@@ -85,6 +85,13 @@ def test_train_title_is_light_on_a_painted_background(app):
         assert word not in visible, word
     assert "adapter" in w.lbl_estimate_detail.text()
     assert not w.adv_box.isVisible()
+    assert w.lbl_step1.text() == "1. Recording and text"
+    assert w.lbl_step2.text() == "2. Quality"
+    assert w.lbl_step3.text() == "3. Consent and name"
+    assert w.more_box.isHidden()
+    assert w.btn_preview.parentWidget() is w.more_box
+    assert w.btn_merge.parentWidget() is w.more_box
+    assert w.edt_voice_name.parentWidget() is not w.more_box
     assert w.lbl_consent.text() == "Voice owner's consent"
     w.close()
 

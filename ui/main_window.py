@@ -496,6 +496,9 @@ class MainWindow(QWidget):
         cl = QVBoxLayout(card)
         cl.setContentsMargins(14, 10, 14, 10)
         cl.setSpacing(10)
+        self.lbl_step1 = QLabel()
+        self.lbl_step1.setObjectName("sectiontitle")
+        cl.addWidget(self.lbl_step1)
         self.btn_audio = QPushButton()
         self.lbl_audio = QLabel()
         self.btn_text = QPushButton()
@@ -532,6 +535,9 @@ class MainWindow(QWidget):
         pl = QVBoxLayout(pcard)
         pl.setContentsMargins(14, 10, 14, 10)
         pl.setSpacing(8)
+        self.lbl_step2 = QLabel()
+        self.lbl_step2.setObjectName("sectiontitle")
+        pl.addWidget(self.lbl_step2)
         prow = QHBoxLayout()
         self.lbl_preset = QLabel()
         self.cmb_preset = QComboBox()
@@ -551,7 +557,6 @@ class MainWindow(QWidget):
         self.btn_adv = QToolButton()
         self.btn_adv.setCheckable(True)
         self.btn_adv.setObjectName("expander")
-        pl.addWidget(self.btn_adv)
         self.adv_box = QWidget()
         self.adv_box.hide()
         gl = QVBoxLayout(self.adv_box)
@@ -584,7 +589,6 @@ class MainWindow(QWidget):
         self.lbl_adv_hint.setObjectName("hint")
         self.lbl_adv_hint.setWordWrap(True)
         gl.addWidget(self.lbl_adv_hint)
-        pl.addWidget(self.adv_box)
         root.addWidget(pcard)
 
         # Voice-owner consent: read from the spoken statement at the end of the recording, or chosen by hand
@@ -592,6 +596,9 @@ class MainWindow(QWidget):
         cl2 = QVBoxLayout(ccard)
         cl2.setContentsMargins(14, 10, 14, 10)
         cl2.setSpacing(8)
+        self.lbl_step3 = QLabel()
+        self.lbl_step3.setObjectName("sectiontitle")
+        cl2.addWidget(self.lbl_step3)
         self.lbl_consent = QLabel()
         self.lbl_consent.setObjectName("sectiontitle")
         cl2.addWidget(self.lbl_consent)
@@ -636,6 +643,10 @@ class MainWindow(QWidget):
         cl2.addWidget(self.consent_result)
         root.addWidget(ccard)
 
+        self.edt_voice_name = QLineEdit()
+        self.edt_voice_name.setMaxLength(80)
+        root.addWidget(self.edt_voice_name)
+
         self.btn_lora = QPushButton()
         self.btn_lora.setObjectName("primary")
         root.addWidget(self.btn_lora)
@@ -643,6 +654,20 @@ class MainWindow(QWidget):
         self.lbl_hint_lora.setObjectName("hint")
         self.lbl_hint_lora.setWordWrap(True)
         root.addWidget(self.lbl_hint_lora)
+
+        self.btn_more = QToolButton()
+        self.btn_more.setCheckable(True)
+        self.btn_more.setObjectName("expander")
+        root.addWidget(self.btn_more)
+        self.more_box = QWidget()
+        self.more_box.hide()
+        more = QVBoxLayout(self.more_box)
+        more.setContentsMargins(0, 0, 0, 0)
+        more.setSpacing(8)
+        more.addWidget(self.btn_adv)
+        more.addWidget(self.adv_box)
+        root.addWidget(self.more_box)
+        self.btn_more.toggled.connect(self._on_more_toggled)
 
         # Quick preview: a short training on a few clips + a ~10 s sample with automatic checks (pitch, WER, does it stop)
         prev = QHBoxLayout()
@@ -658,19 +683,19 @@ class MainWindow(QWidget):
         mark_recommended(self.chk_pick)
         prev.addWidget(self.btn_preview)
         prev.addWidget(self.chk_compare)
-        root.addLayout(prev)
+        more.addLayout(prev)
         # the automatic checks and clip options are pre-set well, so they fold away (height-first layout on small screens);
         # their rows keep their own hidden state inside the folded box
         self.btn_checks = QToolButton()
         self.btn_checks.setCheckable(True)
         self.btn_checks.setObjectName("expander")
-        root.addWidget(self.btn_checks)
+        more.addWidget(self.btn_checks)
         self.checks_box = QWidget()
         self.checks_box.hide()
         chl = QVBoxLayout(self.checks_box)
         chl.setContentsMargins(0, 0, 0, 0)
         chl.setSpacing(6)
-        root.addWidget(self.checks_box)
+        more.addWidget(self.checks_box)
         self.btn_checks.toggled.connect(self._on_checks_toggled)
         chl.addWidget(self.chk_check)
         chl.addWidget(self.chk_pick)
@@ -722,7 +747,7 @@ class MainWindow(QWidget):
         self.denoise_row = QWidget()
         self.denoise_row.setLayout(drow)
         self.denoise_row.setVisible(False)
-        root.addWidget(self.denoise_row)
+        more.addWidget(self.denoise_row)
         self.noise_bak = None
         self._noise_token = 0
         self._denoise_downloading = False
@@ -733,7 +758,7 @@ class MainWindow(QWidget):
         self.lbl_preview_estimate = QLabel()
         self.lbl_preview_estimate.setObjectName("hint")
         self.lbl_preview_estimate.setWordWrap(True)
-        root.addWidget(self.lbl_preview_estimate)
+        more.addWidget(self.lbl_preview_estimate)
         self.preview_box = QWidget()
         self.preview_layout = QVBoxLayout(self.preview_box)
         self.preview_layout.setContentsMargins(0, 0, 0, 0)
@@ -741,14 +766,11 @@ class MainWindow(QWidget):
         self.preview_player = MiniPlayer(backend=getattr(self, "_player_backend", None))    # all samples in one seekable player
         self.preview_player.hide()
         self.preview_player.started.connect(self._stop_previewer)
-        root.addWidget(self.preview_player)
-        root.addWidget(self.preview_box)
+        more.addWidget(self.preview_player)
+        more.addWidget(self.preview_box)
 
-        # Optional fields; they only end up in voice.json next to the adapter (the name also names the folders).
+        # Gender, age, and description stay available. The voice name is in step 3.
         vrow = QHBoxLayout()
-        self.edt_voice_name = QLineEdit()           # voice name -> library folder and file names (empty = from the recording)
-        self.edt_voice_name.setMaxLength(80)
-        vrow.addWidget(self.edt_voice_name, 1)
         self.cmb_voice_type = QComboBox()           # gender ("" / male / female); the name is kept from the older type selector
         for code in ("",) + voice_info.GENDERS:
             self.cmb_voice_type.addItem("", code)
@@ -758,18 +780,18 @@ class MainWindow(QWidget):
         self.edt_voice_desc = QLineEdit()
         self.edt_voice_desc.setMaxLength(voice_info.MAX_DESCRIPTION_CHARS)
         vrow.addWidget(self.edt_voice_desc, 1)
-        root.addLayout(vrow)
+        more.addLayout(vrow)
         grow = QHBoxLayout()                        # gender, age group and the "more" expander share one row
         for combo in (self.cmb_voice_type, self.cmb_voice_age):     # may shrink below the longest item (narrow window)
             combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
             combo.setMinimumContentsLength(10)
         grow.addWidget(self.cmb_voice_type, 1)
         grow.addWidget(self.cmb_voice_age, 1)
-        root.addLayout(grow)
+        more.addLayout(grow)
         self.lbl_voice_type_hint = QLabel()          # "suggested from the pitch ..." / the file-name rule
         self.lbl_voice_type_hint.setObjectName("hint")
         self.lbl_voice_type_hint.setWordWrap(True)
-        root.addWidget(self.lbl_voice_type_hint)
+        more.addWidget(self.lbl_voice_type_hint)
         # Who / where details: folded away by default so the Train window stays short (150 % scaling on small screens)
         self.btn_voice_more = QToolButton()
         self.btn_voice_more.setCheckable(True)
@@ -788,7 +810,7 @@ class MainWindow(QWidget):
                                     (self.edt_voice_url, voice_info.MAX_URL_CHARS))):
             w.setMaxLength(n)
             mg.addWidget(w, i // 2, i % 2)
-        root.addWidget(self.voice_more_box)
+        more.addWidget(self.voice_more_box)
         self.btn_voice_more.toggled.connect(self._on_voice_more_toggled)
         self._voice_type_user_set = False             # the user chose a type: the pitch suggestion must not override it
         self._suggest_token = 0
@@ -796,14 +818,14 @@ class MainWindow(QWidget):
         self.voice_type_suggested.connect(self._apply_voice_type_suggestion)
 
         self.btn_merge = QPushButton()      # universal (merged) model, ~4 GB; only on an explicit click
-        root.addWidget(self.btn_merge)
+        more.addWidget(self.btn_merge)
         self.lbl_hint_merge = QLabel()
         self.lbl_hint_merge.setObjectName("hint")
         self.lbl_hint_merge.setWordWrap(True)
-        root.addWidget(self.lbl_hint_merge)
+        more.addWidget(self.lbl_hint_merge)
 
         self.btn_dataset = QPushButton()
-        root.addWidget(self.btn_dataset)
+        more.addWidget(self.btn_dataset)
 
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
@@ -890,6 +912,10 @@ class MainWindow(QWidget):
         if hasattr(self, "preview_player"):
             self.preview_player.retranslate()
         self.lbl_title.setText(tr("train.title"))
+        self.lbl_step1.setText(tr("train.step.1"))
+        self.lbl_step2.setText(tr("train.step.2"))
+        self.lbl_step3.setText(tr("train.step.3"))
+        self._on_more_toggled(self.btn_more.isChecked())
         self.btn_back.setText(tr("nav.back"))
         if self._in_studio:
             self.setWindowTitle(f"{APP_TITLE} - {tr('train.title')}")
@@ -1137,6 +1163,8 @@ class MainWindow(QWidget):
         else:
             self.lbl_denoise.setText(tr("denoise.hint", bak=f"{bak:.1f}"))
         self.denoise_row.setVisible(show)
+        if show:
+            self.btn_more.setChecked(True)
         self._sync_denoise_controls()
 
     def _sync_denoise_controls(self) -> None:
@@ -1397,6 +1425,10 @@ class MainWindow(QWidget):
             secs = audio_seconds(self.audio) or 0.0
         return (train_presets.clips_from_audio(secs), True) if secs > 0 else (train_presets.clips_from_audio(600), False)
 
+    def _on_more_toggled(self, on: bool) -> None:
+        self.more_box.setVisible(on)
+        self.btn_more.setText(("\u25be " if on else "\u25b8 ") + tr("train.more"))
+
     def _on_adv_toggled(self, on: bool) -> None:
         self.adv_box.setVisible(on)
         self.btn_adv.setText(("\u25be " if on else "\u25b8 ") + tr("preset.advanced"))
@@ -1418,6 +1450,7 @@ class MainWindow(QWidget):
         for sp in (self.sp_epochs, self.sp_rank, self.sp_alpha, self.sp_accum, self.sp_lr):
             sp.setEnabled(self.preset == train_presets.MANUAL)
         if self.preset == train_presets.MANUAL:
+            self.btn_more.setChecked(True)
             self.btn_adv.setChecked(True)
         self.refresh_estimate()
 

@@ -7,7 +7,8 @@ import pytest
 pytest.importorskip("PySide6")
 
 from PySide6.QtGui import QFont, QFontMetrics
-from PySide6.QtWidgets import QApplication, QComboBox, QFrame, QLabel, QPushButton, QScrollArea, QTabBar
+from PySide6.QtCore import QRect
+from PySide6.QtWidgets import QApplication, QComboBox, QFrame, QLabel, QPushButton, QScrollArea, QTabBar, QWidget
 from voxprint_common.i18n import add_catalogs, set_language
 from voxprint_common.i18n import tr as shell_tr
 from voxprint_common.mdl import load_manifest
@@ -15,13 +16,22 @@ from voxprint_common.ui.presets import PresetMatch
 from voxprint_common.ui.simple_image import Phase
 from voxprint_common.ui.tokens import load as load_tokens
 
-from core.audiobook_export import FORMAT_OPUS_SINGLE, PRESET_STANDARD, QUALITY_PRESETS
-from core.pace import AUTO
+from core.audiobook_export import (
+    FORMAT_FLAC_CHAPTERS,
+    FORMAT_M4B,
+    FORMAT_MP3_CHAPTERS,
+    FORMAT_MP3_SINGLE,
+    FORMAT_OPUS_CHAPTERS,
+    FORMAT_OPUS_SINGLE,
+    PRESET_STANDARD,
+    QUALITY_PRESETS,
+)
+from core.pace import AUTO, FICTION, SCRIPTURE
 from core.consent import TEMPLATES
 from core.pauses import DEFAULT_LENGTHS_MS
 from infra.mdl_gate import manifest_path
 from ui.model_slots import choices
-from ui.narrate_state import SURFACE_ID, narrate_presets, narrate_settings
+from ui.narrate_state import SURFACE_ID, export_format, narrate_presets, narrate_settings
 from ui.shell_window import MISSING_SHELL_API, AudiobookShell
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,7 +56,7 @@ def test_narration_groups_share_the_shell_pace_state():
     groups = [group.group_id for group in narrate_presets(settings).groups]
     assert SURFACE_ID == "audiobook-builder"
     assert groups[0] == "pace"
-    assert groups[1:] == ["voices"]
+    assert groups[1:] == ["voices", "format", "chapters", "music", "manner"]
     pauses = settings.get("narr.pause.sentence")
     assert pauses is not None and pauses.default == DEFAULT_LENGTHS_MS["sentence"]
     opus = settings.get("narr.opus_kbps")
@@ -56,7 +66,10 @@ def test_narration_groups_share_the_shell_pace_state():
     assert settings.get("narr.prepare").default is True
     assert settings.get("narr.file").default == FORMAT_OPUS_SINGLE
     assert settings.get("narr.check_chunks").default is False
-    assert settings.get("narr.style").default == AUTO
+    assert settings.get("narr.style").default == FICTION
+    assert any(choice.value == AUTO for choice in settings.get("narr.style").choices)
+    assert settings.get("narr.container").default == "opus"
+    assert settings.get("narr.split_chapters").default is False
     assert settings.get("narr.sound").default == "off"
     assert settings.get("narr.disclosure").default is False
 
@@ -224,14 +237,14 @@ def test_moved_choices_stay_as_live_expert_values(app):
     style = window.widget.findChild(QComboBox, "narr.style")
     saved = window.widget.findChild(QComboBox, "narr.file")
     assert language is not None and language.currentText() == "Keep the book's language"
-    assert style is not None and style.currentText() == "Automatic"
+    assert style is not None and style.currentText() == "Fiction"
     assert saved is not None and saved.currentText() == "One Opus file"
     assert window.layout.get("narr.prepare") is True
     assert window.layout.get("narr.sound") == "off"
     assert window.layout.get("narr.disclosure") is False
     assert window.layout.get("narr.opus_kbps") == QUALITY_PRESETS[PRESET_STANDARD].opus_kbps
     labels = [row.text() for row in window.widget.findChildren(QLabel) if row.objectName().startswith("preset-")]
-    assert labels == ["Pace", "Voices"] or "Pace" in labels and "Voices" in labels
+    assert labels == ["Pace", "Voices", "Format", "Split into chapters", "Background music", "Reading manner"]
     assert "Language" not in labels and "Prepare text" not in labels
     window.widget.close()
 
@@ -280,3 +293,90 @@ def test_chip_text_fits_in_english_russian_and_german(app):
             assert advance + pad <= button.width(), (language, button.text(), advance, button.width())
         assert any("voice" in text.lower() or "голос" in text.lower() or "stimme" in text.lower() for text in seen)
         window.widget.close()
+
+
+def test_export_chips_follow_the_audiobook_file():
+    assert export_format("opus", False) == FORMAT_OPUS_SINGLE
+    assert export_format("opus", True) == FORMAT_OPUS_CHAPTERS
+    assert export_format("mp3", False) == FORMAT_MP3_SINGLE
+    assert export_format("mp3", True) == FORMAT_MP3_CHAPTERS
+    assert export_format("m4b", False) == FORMAT_M4B
+    assert export_format("m4b", True) == FORMAT_M4B
+
+
+def test_format_chips_and_expert_edits_share_one_file_value(app):
+    window = _open("ru")
+    window.screen.set_expert(True)
+    QApplication.processEvents()
+    assert window.layout.get("narr.file") == FORMAT_OPUS_SINGLE
+    window.layout.choose("format", "m4b")
+    window.layout.choose("chapters", "on")
+    assert window.layout.get("narr.file") == FORMAT_M4B
+    assert window.layout.get("narr.split_chapters") is True
+    window.layout.choose("format", "mp3")
+    assert window.layout.get("narr.file") == FORMAT_MP3_CHAPTERS
+    window.layout.choose("chapters", "off")
+    assert window.layout.get("narr.file") == FORMAT_MP3_SINGLE
+    window.layout.choose("music", "on")
+    window.layout.choose("manner", "calm")
+    assert window.layout.get("narr.sound") == "when"
+    assert window.layout.get("narr.style") == SCRIPTURE
+    window.screen.refresh()
+    QApplication.processEvents()
+    assert window.widget.findChild(QComboBox, "narr.style").currentText() == "Писание"
+    assert window.widget.findChild(QComboBox, "narr.file").currentText() == "Один файл MP3"
+    assert window.widget.findChild(QComboBox, "narr.sound").currentText() == "Когда книга просит"
+    window.layout.set_value("narr.file", FORMAT_FLAC_CHAPTERS)
+    window.layout.choose("manner", "expressive")
+    assert window.layout.get("narr.file") == FORMAT_FLAC_CHAPTERS
+    window.layout.choose("format", "opus")
+    assert window.layout.get("narr.file") == FORMAT_OPUS_SINGLE
+    window.layout.set_value("narr.file", FORMAT_OPUS_CHAPTERS)
+    assert window.layout.get("narr.container") == "opus"
+    assert window.layout.get("narr.split_chapters") is True
+    voice = window.widget.findChild(QComboBox, "voicePicker")
+    assert voice is not None and voice.width() >= 400
+    window.widget.close()
+
+
+def _sibling_overlaps(root: QWidget) -> list[tuple[str, str, QRect]]:
+    hits: list[tuple[str, str, QRect]] = []
+    seen: set[int] = set()
+    for parent in [root, *root.findChildren(QWidget)]:
+        if id(parent) in seen:
+            continue
+        seen.add(id(parent))
+        boxes: list[tuple[QWidget, QRect]] = []
+        for child in parent.findChildren(QWidget):
+            if child.parentWidget() is not parent or not child.isVisible():
+                continue
+            rect = child.geometry()
+            if rect.width() <= 2 or rect.height() <= 2:
+                continue
+            boxes.append((child, rect))
+        for index, (left, left_rect) in enumerate(boxes):
+            for right, right_rect in boxes[index + 1:]:
+                shared = left_rect.intersected(right_rect)
+                if shared.width() > 2 and shared.height() > 2:
+                    hits.append((left.objectName() or left.__class__.__name__, right.objectName() or right.__class__.__name__, shared))
+    return hits
+
+
+def test_simple_and_expert_rows_do_not_overlap(app):
+    for language in ("en", "ru", "de"):
+        for width in (960, 1200):
+            window = _open(language)
+            window.widget.resize(width, 900)
+            QApplication.processEvents()
+            hits = _sibling_overlaps(window.widget)
+            assert hits == [], (language, width, "simple", hits[:4])
+            voice = window.widget.findChild(QComboBox, "voicePicker")
+            assert voice is not None and voice.width() >= 200, (language, width, None if voice is None else voice.width())
+            window.screen.set_expert(True)
+            window.widget.resize(width, 900)
+            QApplication.processEvents()
+            hits = _sibling_overlaps(window.widget)
+            assert hits == [], (language, width, "expert", hits[:4])
+            voice = window.widget.findChild(QComboBox, "voicePicker")
+            assert voice is not None and voice.width() >= 200, (language, width, voice.width())
+            window.widget.close()

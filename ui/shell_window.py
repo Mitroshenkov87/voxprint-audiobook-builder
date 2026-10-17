@@ -15,8 +15,19 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from PySide6.QtCore import QEvent, QObject
 from PySide6.QtGui import QFont, QFontMetrics
-from PySide6.QtWidgets import QPushButton, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 from voxprint_common.i18n import add_catalogs
 from voxprint_common.i18n import tr as shell_tr
@@ -30,7 +41,13 @@ from voxprint_common.ui.variants import WINDOW_HEIGHT, WINDOW_WIDTH, state_names
 
 from infra.mdl_gate import manage_argv, models_ready
 from ui.main_window import MainWindow
-from ui.narrate_state import SURFACE_ID, narrate_presets, narrate_settings
+from ui.narrate_state import (
+    SURFACE_ID,
+    chips_for_export,
+    export_format,
+    narrate_presets,
+    narrate_settings,
+)
 
 # Methods the shell does not offer. Callers look them up and do not invent them.
 MISSING_SHELL_API = ("set_voices", "input_path", "open_page", "pause")
@@ -38,6 +55,8 @@ MISSING_SHELL_API = ("set_voices", "input_path", "open_page", "pause")
 # Chip stylesheet padding is 14 px on each side. See QPushButton[chip="true"].
 _CHIP_PAD_X = 14
 _HISTORY_HEIGHT = 104
+_EXPORT_SOURCES = ("narr.container", "narr.split_chapters", "narr.file")
+_EXPORT_ROWS = ("format", "chapters")
 
 _CATALOGS = Path(__file__).resolve().parent.parent / "locales" / "shell"
 
@@ -90,6 +109,11 @@ class AudiobookShell:
             on_refresh=self._after_paint,
             surface=self.surface,
         )
+        self._exporting = False
+        self._painting = False
+        self._export_key: tuple[object, bool] | None = None
+        self._bind_export()
+        self._bind_screen()
         self.screen.refresh()
         self.expert = ExpertMode()
         self._stop_expert = self.expert.subscribe(self.screen.set_expert)
@@ -170,14 +194,239 @@ class AudiobookShell:
         self.widget.move(stored["x"], stored["y"])
 
     def _after_paint(self) -> None:
-        """Size each pill to its bold label, and hide the history row while it is empty.
+        """Size each pill, hide an empty history row, and keep the expert rows from colliding.
 
         The first paint runs inside the screen constructor, before ``self.screen`` exists.
         """
-        if getattr(self, "screen", None) is None:
+        if getattr(self, "screen", None) is None or self._painting:
             return
-        self._fit_pills()
-        self._fit_history()
+        self._painting = True
+        try:
+            self._fit_pills()
+            self._fit_history()
+            self._lift_voice()
+            self._restack_expert()
+            self._activate_voice()
+        finally:
+            self._painting = False
+
+    def _bind_export(self) -> None:
+        """Keep the format chips and the audiobook file on one value."""
+        choose = self.layout.choose
+        reset_group = self.layout.reset_group
+        set_value = self.layout.set_value
+
+        def choose_chip(row_id: str, value: str) -> None:
+            choose(row_id, value)
+            if row_id in _EXPORT_ROWS:
+                self._sync_export("narr.container")
+
+        def reset_chip(group_id: str) -> None:
+            reset_group(group_id)
+            if group_id in _EXPORT_ROWS:
+                self._sync_export("narr.container")
+
+        def edit_value(key: str, value: object) -> None:
+            set_value(key, value)
+            if self._exporting or key not in _EXPORT_SOURCES:
+                return
+            self._sync_export(key)
+
+        self.layout.choose = choose_chip
+        self.layout.reset_group = reset_chip
+        self.layout.set_value = edit_value
+        self._adopt_saved_file()
+
+    def _bind_screen(self) -> None:
+        """Restack after the expert panel is rebuilt, and repaint linked controls."""
+        set_expert = self.screen.set_expert
+        edit = self.screen._on_expert_edit
+
+        def show_expert(enabled: bool) -> None:
+            form = self.screen.root.findChild(QWidget, "expertForm")
+            if form is not None:
+                form.setProperty("stackedRows", False)
+            set_expert(enabled)
+            self._after_paint()
+
+        def on_expert_edit(setting_id: str, value: object) -> None:
+            edit(setting_id, value)
+            if setting_id in _EXPORT_SOURCES:
+                self.screen._paint_expert()
+
+        self.screen.set_expert = show_expert
+        self.screen._on_expert_edit = on_expert_edit
+
+    def _adopt_saved_file(self) -> None:
+        """Point the chips at a saved file when that file is one the chips can name."""
+        mapped = chips_for_export(self.layout.get("narr.file"))
+        self._exporting = True
+        try:
+            if mapped is not None:
+                container, split = mapped
+                if split is None:
+                    split = bool(self.layout.get("narr.split_chapters"))
+                if self.layout.get("narr.container") != container:
+                    self.layout.set_value("narr.container", container)
+                if bool(self.layout.get("narr.split_chapters")) != bool(split):
+                    self.layout.set_value("narr.split_chapters", bool(split))
+            self._export_key = (
+                self.layout.get("narr.container"),
+                bool(self.layout.get("narr.split_chapters")),
+            )
+        finally:
+            self._exporting = False
+
+    def _sync_export(self, source: str) -> None:
+        """Write ``narr.file`` from the chips, or the chips from an expert file edit.
+
+        An expert file the chips cannot name (FLAC, WAV) stays until a format chip changes.
+        """
+        if self._exporting:
+            return
+        self._exporting = True
+        try:
+            container = self.layout.get("narr.container")
+            split = bool(self.layout.get("narr.split_chapters"))
+            current = self.layout.get("narr.file")
+            if source == "narr.file":
+                mapped = chips_for_export(current)
+                if mapped is None:
+                    self._export_key = None
+                    return
+                new_container, new_split = mapped
+                if new_split is None:
+                    new_split = split
+                if container != new_container:
+                    self.layout.set_value("narr.container", new_container)
+                if bool(split) != bool(new_split):
+                    self.layout.set_value("narr.split_chapters", bool(new_split))
+                self._export_key = (new_container, bool(new_split))
+                return
+            key = (container, split)
+            if key == self._export_key:
+                return
+            wanted = export_format(str(container), split)
+            if current != wanted:
+                self.layout.set_value("narr.file", wanted)
+            self._export_key = key
+        finally:
+            self._exporting = False
+
+    def _lift_voice(self) -> None:
+        """Give the voice dropdown the full window width, above the expert split."""
+        root = self.screen.root
+        if root.findChild(QWidget, "voiceRow") is not None:
+            return
+        voice = root.findChild(QComboBox, "voicePicker")
+        label = root.findChild(QLabel, "voiceLabel")
+        layout = root.layout()
+        if voice is None or label is None or layout is None:
+            return
+        row = QWidget(root)
+        row.setObjectName("voiceRow")
+        row.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        box = QHBoxLayout(row)
+        box.setContentsMargins(0, 0, 0, 0)
+        box.setSpacing(8)
+        label.setParent(row)
+        voice.setParent(row)
+        voice.setMinimumWidth(0)
+        voice.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        box.addWidget(label)
+        box.addWidget(voice, 1)
+        layout.insertWidget(2, row)
+
+    def _activate_voice(self) -> None:
+        row = self.screen.root.findChild(QWidget, "voiceRow")
+        if row is not None and row.layout() is not None:
+            row.layout().activate()
+
+    def _restack_expert(self) -> None:
+        """One label, then one control, in each expert row, inside the scroll panel."""
+        form = self.screen.root.findChild(QWidget, "expertForm")
+        if form is None or form.property("stackedRows"):
+            return
+        layout = form.layout()
+        if layout is None:
+            return
+        index = 0
+        while index < layout.count():
+            item = layout.itemAt(index)
+            sub = None if item is None else item.layout()
+            if not isinstance(sub, QHBoxLayout):
+                index += 1
+                continue
+            held: list[QWidget] = []
+            while sub.count():
+                taken = sub.takeAt(0)
+                widget = taken.widget()
+                if widget is not None:
+                    held.append(widget)
+            layout.takeAt(index)
+            sub.deleteLater()
+            for widget in held:
+                widget.setMinimumWidth(0)
+                widget.setMaximumWidth(16777215)
+                if isinstance(widget, QLabel):
+                    widget.setWordWrap(True)
+                else:
+                    widget.setMinimumHeight(max(widget.minimumSizeHint().height(), 1))
+                widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+                layout.insertWidget(index, widget)
+                index += 1
+        layout.setSpacing(8)
+        if form.width() < 80:
+            form.resize(240, max(form.height(), 1))
+        policy = form.sizePolicy()
+        policy.setVerticalPolicy(QSizePolicy.Policy.Minimum)
+        policy.setHorizontalPolicy(QSizePolicy.Policy.Expanding)
+        form.setSizePolicy(policy)
+        form.setProperty("stackedRows", True)
+        # Size hints stay empty until the new rows are polished.
+        QApplication.sendPostedEvents()
+        layout.invalidate()
+        hint = layout.sizeHint().height()
+        if hint <= 0:
+            QApplication.processEvents()
+            hint = layout.sizeHint().height()
+        if hint > 0:
+            form.setMinimumHeight(hint)
+        self._watch_expert_width(form)
+        layout.activate()
+        form.updateGeometry()
+
+    def _watch_expert_width(self, form: QWidget) -> None:
+        """Keep each expert control as wide as the panel after the scroll area resizes it."""
+        if getattr(self, "_expert_width_watch", None) is not None:
+            return
+        host = self
+
+        class _Width(QObject):
+            def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802
+                if event.type() == QEvent.Type.Resize and not host._painting:
+                    host._fill_expert_width(watched)
+                return False
+
+        watcher = _Width(form)
+        form.installEventFilter(watcher)
+        self._expert_width_watch = watcher
+        self._fill_expert_width(form)
+
+    def _fill_expert_width(self, form: QWidget) -> None:
+        layout = form.layout()
+        if layout is None or form.width() < 40:
+            return
+        width = form.width()
+        for index in range(layout.count()):
+            item = layout.itemAt(index)
+            widget = None if item is None else item.widget()
+            if not isinstance(widget, QComboBox):
+                continue
+            widget.setMaximumWidth(16777215)
+            widget.setMinimumWidth(width)
+            widget.setSizePolicy(QSizePolicy.Policy.Expanding, widget.sizePolicy().verticalPolicy())
+        layout.activate()
 
     def _fit_pills(self) -> None:
         density = load_tokens().density
