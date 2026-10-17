@@ -91,7 +91,7 @@ def test_train_title_is_light_on_a_painted_background(app):
     assert w.more_box.isHidden()
     assert w.btn_preview.parentWidget() is w.more_box
     assert w.btn_merge.parentWidget() is w.more_box
-    assert w.edt_voice_name.parentWidget() is not w.more_box
+    assert w.edt_voice_name.parentWidget() is w.lbl_step3.parentWidget()
     assert w.lbl_consent.text() == "Voice owner's consent"
     w.close()
 

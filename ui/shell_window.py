@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -55,10 +56,42 @@ MISSING_SHELL_API = ("set_voices", "input_path", "open_page", "pause")
 # Chip stylesheet padding is 14 px on each side. See QPushButton[chip="true"].
 _CHIP_PAD_X = 14
 _HISTORY_HEIGHT = 104
+_EXPERT_SCROLL_PAD = 18
+_DROP_TEXT_PX = 15
+_DROP_PAD_X = 16
 _EXPORT_SOURCES = ("narr.container", "narr.split_chapters", "narr.file")
 _EXPORT_ROWS = ("format", "chapters")
 
 _CATALOGS = Path(__file__).resolve().parent.parent / "locales" / "shell"
+
+
+def _layout_holding(layout: QLayout | None, widget: QWidget) -> QLayout | None:
+    """Return the nested box that contains ``widget``."""
+    if layout is None:
+        return None
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        if item is None:
+            continue
+        if item.widget() is widget:
+            return layout
+        found = _layout_holding(item.layout(), widget)
+        if found is not None:
+            return found
+    return None
+
+
+def _remove_empty_layouts(layout: QLayout) -> None:
+    """Drop a box that no longer holds a widget. An empty voice row caps the book column."""
+    index = 0
+    while index < layout.count():
+        item = layout.itemAt(index)
+        sub = None if item is None else item.layout()
+        if sub is not None and sub.count() == 0:
+            layout.takeAt(index)
+            sub.deleteLater()
+            continue
+        index += 1
 
 
 class _Allow:
@@ -205,8 +238,14 @@ class AudiobookShell:
             self._fit_pills()
             self._fit_history()
             self._lift_voice()
+            self._fit_source_row()
             self._restack_expert()
             self._activate_voice()
+            self._hide_panel_resets()
+            QApplication.sendPostedEvents()
+            form = self.screen.root.findChild(QWidget, "expertForm")
+            if form is not None:
+                self._fill_expert_width(form)
         finally:
             self._painting = False
 
@@ -254,8 +293,15 @@ class AudiobookShell:
             if setting_id in _EXPORT_SOURCES:
                 self.screen._paint_expert()
 
+        refresh_resets = self.screen._refresh_resets
+
+        def refresh_and_hide() -> None:
+            refresh_resets()
+            self._hide_panel_resets()
+
         self.screen.set_expert = show_expert
         self.screen._on_expert_edit = on_expert_edit
+        self.screen._refresh_resets = refresh_and_hide
 
     def _adopt_saved_file(self) -> None:
         """Point the chips at a saved file when that file is one the chips can name."""
@@ -338,9 +384,70 @@ class AudiobookShell:
         layout.insertWidget(2, row)
 
     def _activate_voice(self) -> None:
+        """Hold the voice list to the free width of its row, and release that width when the window shrinks."""
         row = self.screen.root.findChild(QWidget, "voiceRow")
-        if row is not None and row.layout() is not None:
-            row.layout().activate()
+        if row is None or row.layout() is None:
+            return
+        layout = row.layout()
+        layout.activate()
+        voice = row.findChild(QComboBox, "voicePicker")
+        label = row.findChild(QLabel, "voiceLabel")
+        if voice is None:
+            return
+        label_width = 0 if label is None else label.sizeHint().width()
+        margins = layout.contentsMargins()
+        available = row.width() - label_width - layout.spacing() - margins.left() - margins.right()
+        if available < 80:
+            return
+        voice.setMaximumWidth(16777215)
+        voice.setMinimumWidth(available)
+        layout.activate()
+
+    def _fit_source_row(self) -> None:
+        """Give the book drop one line of text and the spare width beside Create audiobook."""
+        root = self.screen.root
+        drop = root.findChild(QLabel, "fileDrop")
+        if drop is None or root.layout() is None:
+            return
+        column = _layout_holding(root.layout(), drop)
+        if column is not None:
+            _remove_empty_layouts(column)
+            column.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+            column.invalidate()
+        drop.setWordWrap(False)
+        font = QFont(drop.font())
+        font.setPixelSize(_DROP_TEXT_PX)
+        advance = QFontMetrics(font).horizontalAdvance(drop.text())
+        density = load_tokens().density
+        text_width = advance + _DROP_PAD_X * 2 + density.border_px * 2
+        button = root.findChild(QPushButton, "generate")
+        button_width = 148
+        if button is not None:
+            label = QFont(button.font())
+            label.setPixelSize(16)
+            label.setWeight(QFont.Weight.DemiBold)
+            button_width = max(QFontMetrics(label).horizontalAdvance(button.text()) + 40, 148)
+            button.setMinimumWidth(button_width)
+            button.setMaximumWidth(button_width)
+            policy = button.sizePolicy()
+            policy.setHorizontalPolicy(QSizePolicy.Policy.Maximum)
+            button.setSizePolicy(policy)
+        room = root.width() - button_width - 48
+        wanted = max(text_width, int(root.width() * 0.40))
+        if room >= text_width:
+            wanted = min(wanted, room)
+        drop.setMaximumWidth(16777215)
+        drop.setMinimumWidth(max(wanted, text_width))
+        drop.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        root.layout().activate()
+
+    def _hide_panel_resets(self) -> None:
+        """Keep the one reset that already sits beside the pace chips."""
+        host = self.screen.root.findChild(QWidget, "expertResets")
+        if host is None:
+            return
+        host.hide()
+        host.setMaximumHeight(0)
 
     def _restack_expert(self) -> None:
         """One label, then one control, in each expert row, inside the scroll panel."""
@@ -376,6 +483,7 @@ class AudiobookShell:
                 layout.insertWidget(index, widget)
                 index += 1
         layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, _EXPERT_SCROLL_PAD, 0)
         if form.width() < 80:
             form.resize(240, max(form.height(), 1))
         policy = form.sizePolicy()
@@ -393,6 +501,7 @@ class AudiobookShell:
         if hint > 0:
             form.setMinimumHeight(hint)
         self._watch_expert_width(form)
+        self._fill_expert_width(form)
         layout.activate()
         form.updateGeometry()
 
@@ -417,7 +526,10 @@ class AudiobookShell:
         layout = form.layout()
         if layout is None or form.width() < 40:
             return
-        width = form.width()
+        margins = layout.contentsMargins()
+        width = form.width() - margins.left() - margins.right()
+        if width < 40:
+            return
         for index in range(layout.count()):
             item = layout.itemAt(index)
             widget = None if item is None else item.widget()
@@ -425,6 +537,7 @@ class AudiobookShell:
                 continue
             widget.setMaximumWidth(16777215)
             widget.setMinimumWidth(width)
+            widget.setMaximumWidth(width)
             widget.setSizePolicy(QSizePolicy.Policy.Expanding, widget.sizePolicy().verticalPolicy())
         layout.activate()
 
@@ -432,7 +545,8 @@ class AudiobookShell:
         density = load_tokens().density
         pad = _CHIP_PAD_X * 2 + density.border_px * 2 + 8
         for button in self.screen.root.findChildren(QPushButton):
-            if button.property("chip") != "true" and not str(button.objectName()).startswith("reset-"):
+            name = str(button.objectName())
+            if button.property("chip") != "true" and not name.startswith("reset-") and name != "expertToggle":
                 continue
             text = button.text()
             if not text:
@@ -442,6 +556,9 @@ class AudiobookShell:
             font.setWeight(QFont.Weight.DemiBold)
             advance = QFontMetrics(font).horizontalAdvance(text)
             button.setMinimumWidth(max(advance + pad, 36))
+            hint = button.sizeHint().width()
+            if hint > button.minimumWidth():
+                button.setMinimumWidth(hint)
 
     def _fit_history(self) -> None:
         strip = self.screen.root.findChild(QScrollArea, "historyStrip")

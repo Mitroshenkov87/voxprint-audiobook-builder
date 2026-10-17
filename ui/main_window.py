@@ -625,6 +625,9 @@ class MainWindow(QWidget):
         self.chk_consent_clip = QCheckBox()
         self.chk_consent_clip.setChecked(True)
         cl2.addWidget(self.chk_consent_clip)
+        self.edt_voice_name = QLineEdit()
+        self.edt_voice_name.setMaxLength(80)
+        cl2.addWidget(self.edt_voice_name)
         self.consent_result = QWidget()           # shown after training: the detected scope for one-click confirmation
         rl = QVBoxLayout(self.consent_result)
         rl.setContentsMargins(0, 0, 0, 0)
@@ -642,10 +645,6 @@ class MainWindow(QWidget):
         self.consent_result.hide()
         cl2.addWidget(self.consent_result)
         root.addWidget(ccard)
-
-        self.edt_voice_name = QLineEdit()
-        self.edt_voice_name.setMaxLength(80)
-        root.addWidget(self.edt_voice_name)
 
         self.btn_lora = QPushButton()
         self.btn_lora.setObjectName("primary")

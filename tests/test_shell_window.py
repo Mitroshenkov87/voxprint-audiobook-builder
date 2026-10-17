@@ -362,6 +362,39 @@ def _sibling_overlaps(root: QWidget) -> list[tuple[str, str, QRect]]:
     return hits
 
 
+def _assert_labels_fit(root: QWidget, language: str, width: int, mode: str) -> None:
+    density = load_tokens().density
+    pad = 14 * 2 + density.border_px * 2 + 8
+    for button in root.findChildren(QPushButton):
+        name = button.objectName()
+        chip = button.property("chip") == "true" or name.startswith("reset-") or name == "expertToggle"
+        if not chip or not button.isVisible() or not button.text():
+            continue
+        assert button.width() + 1 >= button.sizeHint().width(), (
+            language, width, mode, name, button.text(), button.width(), button.sizeHint().width(),
+        )
+        font = QFont(button.font())
+        font.setPixelSize(density.body_px)
+        font.setWeight(QFont.Weight.DemiBold)
+        needed = QFontMetrics(font).horizontalAdvance(button.text()) + pad
+        assert button.width() >= needed, (language, width, mode, name, button.text(), button.width(), needed)
+
+
+def _assert_source_row(window: AudiobookShell, language: str, width: int, mode: str) -> None:
+    drop = window.widget.findChild(QLabel, "fileDrop")
+    assert drop is not None and drop.isVisible()
+    assert drop.wordWrap() is False
+    assert drop.width() >= int(width * 0.35), (language, width, mode, drop.width())
+    font = QFont(drop.font())
+    font.setPixelSize(15)
+    advance = QFontMetrics(font).horizontalAdvance(drop.text())
+    assert drop.width() >= advance + 32, (language, width, mode, drop.text(), drop.width(), advance)
+    voice = window.widget.findChild(QComboBox, "voicePicker")
+    assert voice is not None and voice.width() >= int(width * 0.55), (
+        language, width, mode, None if voice is None else voice.width(),
+    )
+
+
 def test_simple_and_expert_rows_do_not_overlap(app):
     for language in ("en", "ru", "de"):
         for width in (960, 1200):
@@ -370,13 +403,35 @@ def test_simple_and_expert_rows_do_not_overlap(app):
             QApplication.processEvents()
             hits = _sibling_overlaps(window.widget)
             assert hits == [], (language, width, "simple", hits[:4])
-            voice = window.widget.findChild(QComboBox, "voicePicker")
-            assert voice is not None and voice.width() >= 200, (language, width, None if voice is None else voice.width())
+            _assert_labels_fit(window.widget, language, width, "simple")
+            _assert_source_row(window, language, width, "simple")
             window.screen.set_expert(True)
+            window.layout.set_value("audio.loudness", -14.0)
+            window.screen.refresh()
             window.widget.resize(width, 900)
             QApplication.processEvents()
             hits = _sibling_overlaps(window.widget)
             assert hits == [], (language, width, "expert", hits[:4])
-            voice = window.widget.findChild(QComboBox, "voicePicker")
-            assert voice is not None and voice.width() >= 200, (language, width, voice.width())
+            _assert_labels_fit(window.widget, language, width, "expert")
+            _assert_source_row(window, language, width, "expert")
+            form = window.widget.findChild(QWidget, "expertForm")
+            assert form is not None and form.layout() is not None
+            assert form.layout().contentsMargins().right() >= 16
+            rightmost = 0
+            for child in form.findChildren(QWidget):
+                if child.parentWidget() is not form or not child.isVisible() or child.width() <= 2:
+                    continue
+                rightmost = max(rightmost, child.geometry().right())
+            assert rightmost <= form.width() - 12, (language, width, rightmost, form.width())
+            expert_voice = form.findChild(QComboBox, "narr.tts")
+            assert expert_voice is not None
+            assert expert_voice.width() >= form.width() - 40, (
+                language, width, expert_voice.width(), form.width(),
+            )
+            panel_resets = [
+                button for button in window.widget.findChildren(QPushButton, "expertReset") if button.isVisible()
+            ]
+            assert panel_resets == [], (language, width, [button.text() for button in panel_resets])
+            pace = window.widget.findChild(QPushButton, "reset-pace")
+            assert pace is not None and pace.isVisible()
             window.widget.close()
