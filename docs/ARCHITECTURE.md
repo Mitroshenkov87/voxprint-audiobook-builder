@@ -54,7 +54,7 @@ A further plan, not built yet, is to place parts of these models in system memor
 
 ## Models folder
 
-Heavy model files live in the models folder. The default is `%LOCALAPPDATA%\Voxprint\models` on Windows and `~/.local/share/voxprint/models` on Linux (`$XDG_DATA_HOME/voxprint/models` when that variable is set). The installer page "Models folder", `VOXPRINT_MODELS_DIR`, or the shared `models_dir` in `state/suite.json` can point somewhere else. A folder that is a Voxprint backup is restored into the normal folders; it is never used as the live models folder. Voices and settings stay beside the models folder, under the application home, not inside it.
+Heavy model files live in the models folder. The default is `%LOCALAPPDATA%\VOXPrint AI Suite\models` on Windows and `~/.local/share/voxprint-ai-suite/models` on Linux (`$XDG_DATA_HOME/voxprint-ai-suite/models` when that variable is set). The installer page "Models folder", `VOXPRINT_MODELS_DIR`, or the shared `models_dir` in `state/suite.json` can point somewhere else. A folder that is a Voxprint backup is restored into the normal folders; it is never used as the live models folder. Voices and settings stay beside the models folder, under the application home, not inside it.
 
 Downloads are checked by size and SHA-256. The speech model, the aligner and the recogniser are the usual first-run set. Gemma 4 12B (GGUF) and llama.cpp live under `models/llm` and are fetched only when a text feature needs them. The soundscape model lives under `models/ace-step-1.5` and is fetched only when the soundscape is turned on. Check & repair verifies the known files and fetches a damaged one again.
 
@@ -125,7 +125,7 @@ Root `cli.py` (next to `main.py`) is the user-facing headless CLI (`narrate` / `
 ### `infra/`
 | Module | Purpose |
 |---|---|
-| `paths.py` | application folders (`%LOCALAPPDATA%\Voxprint`, override `VOXPRINT_HOME`): `models/`, `packages/`, `voices/`, `state/`, `logs/`, `.staging/` |
+| `paths.py` | application folders (`%LOCALAPPDATA%\VOXPrint AI Suite`, override `VOXPRINT_HOME`): `models/`, `packages/`, `voices/`, `state/`, `logs/`, `.staging/` |
 | `projects.py` | the projects folder (`<app home>/Projects`, changeable in Settings): `Audiobooks/`, `Voices/`, `Re-voice/`; real Documents via the Known Folder API, OneDrive check, *VOXPrint Projects* shortcut |
 | `voice_repository.py` | online voice index (`index.json`, URL configurable, placeholder default) and verified downloads (HTTPS, size cap, SHA-256); never raises to the UI |
 | `voice_catalog.py` | the voices the user sees: local library + index voices that are not installed (`repo:<id>` keys, matched by `repo_id`), `ensure_local` (download on first use), scope derived from the licence |

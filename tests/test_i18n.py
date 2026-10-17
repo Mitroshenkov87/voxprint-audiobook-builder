@@ -103,7 +103,7 @@ def test_no_cyrillic_user_literals_left_in_code():
 
 def test_tr_fallbacks(monkeypatch):
     i18n.set_language("de")
-    assert tr("ui.btn_dataset") == "Datensatz erstellen"
+    assert tr("ui.btn_dataset") == "Aufnahmen vorbereiten"
     assert tr("no.such.key") == "no.such.key"
     assert tr("progress.pieces") == _cat("de")["progress.pieces"]            # missing parameter - no exception
     assert tr("progress.pieces", n=3) == "Erhaltene Fragmente: 3"
@@ -130,7 +130,7 @@ def test_detection_order(monkeypatch, tmp_path):
     monkeypatch.setattr(i18n.sys, "platform", "linux")      # on Windows the OS language comes from GetUserDefaultLocaleName, not from LANG
     assert i18n.detect_language() == "en"                       # the default is English
     i18n.reset()
-    assert tr("ui.btn_lora") == "Create voice (LoRA)"
+    assert tr("ui.btn_lora") == "Train the voice"
     monkeypatch.setenv("LANG", "fr_FR.UTF-8")
     assert i18n.detect_language() == "en"                       # unsupported system language -> English
     monkeypatch.setenv("LANG", "uk_UA.UTF-8")
@@ -172,7 +172,7 @@ def test_stage_labels_follow_language():
     i18n.set_language("en")
     assert Stage.ALIGN.label == "Alignment"
     i18n.set_language("de")
-    assert Stage.TRAIN.label == "LoRA-Training"
+    assert Stage.TRAIN.label == "Stimme trainieren"
 
 
 def test_errors_use_current_language():
@@ -199,13 +199,13 @@ def test_ui_language_switcher_retranslates_and_persists(app):
     assert cmb.count() == len(i18n.LANGS) and cmb.currentData() == "ru"
     assert [cmb.itemText(i) for i in range(cmb.count())] == ["English", "Deutsch", "Русский", "Українська", "Latviešu"]
     w.set_language("en")
-    assert w.btn_lora.text() == "Create voice (LoRA)" and w.btn_merge.text() == "Build universal model (~4 GB)"
+    assert w.btn_lora.text() == "Train the voice" and w.btn_merge.text() == "Build a voice for other apps"
     assert w.lbl_status.text() == "Choose the audio and the text - I will do the rest."
     assert w.lbl_audio.text().startswith("No file chosen")
     assert w._chips[next(iter(w._chips))].text() == "Updates"
     assert i18n.saved_language() == "en"
     w.set_language("de")
-    assert w.btn_dataset.text() == "Datensatz erstellen"
+    assert w.btn_dataset.text() == "Aufnahmen vorbereiten"
     w.set_language("ru")
     assert w.settings_dialog().btn_update.text() == _cat("ru")["ui.btn_update"]
     w.set_language("uk")

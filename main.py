@@ -450,7 +450,7 @@ def main(argv=None) -> int:
 
         suite_report = suite_install.launch_check(_suite_on_splash, repair=True)
     from ui import screen_fit
-    from ui.studio import StudioWindow
+    from ui.shell_window import AudiobookShell
 
 
     screen_fit.install(app)               # every window / dialog clamped to the screen's work area when shown
@@ -495,14 +495,14 @@ def main(argv=None) -> int:
             if not mdl_prompt():
                 return 4
         mdl_gate.materialize()
-    win = StudioWindow(autocheck=not selftest, prefetch=False)
+    win = AudiobookShell()
     app.aboutToQuit.connect(win.shutdown)
     if not selftest:
         from infra import hard_exit
 
         hard_exit.arm()          # closing the main window kills every helper process at once (docs/BUILDING.md)
-    win.show_studio()
-    splash.finish(win)                    # closes once the Studio window is on screen
+    win.show()
+    splash.finish(win.widget)             # closes once the shell window is on screen
     if not selftest:   # "VOXPrint Projects" shortcut in the real Documents folder (infra/projects.py); never blocks the start
         from infra import projects
 

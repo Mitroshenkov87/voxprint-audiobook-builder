@@ -1,10 +1,10 @@
-"""Application directories (Windows: ``%LOCALAPPDATA%\\Voxprint``; Linux: ``~/.local/share/voxprint``;
+"""Application directories (Windows: ``%LOCALAPPDATA%\\VOXPrint AI Suite``; Linux: ``~/.local/share/voxprint-ai-suite``;
 overridable with ``VOXPRINT_HOME``).
 
 Layout under :func:`app_home`::
 
     shared/      suite-wide runtime and tools (``runtime/``, ``tools/``, ``manifest.json``).
-                 Windows: ``%LOCALAPPDATA%\\Voxprint\\shared``. Linux: ``~/.local/share/voxprint/shared``.
+                 Windows: ``%LOCALAPPDATA%\\VOXPrint AI Suite\\shared``. Linux: ``~/.local/share/voxprint-ai-suite/shared``.
                  Override with ``VOXPRINT_SHARED``. See :mod:`infra.suite_shared`.
                  ``shared/models`` is the previous models default. It is still read when it already holds models and
                  ``<home>/models`` does not.
@@ -34,9 +34,12 @@ APP_NAME = "Voxprint"
 
 
 def app_home() -> Path:
-    """Root data directory: ``$VOXPRINT_HOME``, else ``%LOCALAPPDATA%\\Voxprint`` (Windows) / ``$XDG_DATA_HOME/voxprint``
-    (Linux and others, default ``~/.local/share/voxprint`` - lower case by XDG habit; the Linux installer keeps ``app/`` and
-    ``venv/`` there too)."""
+    """Root data directory: ``$VOXPRINT_HOME``, else the suite home.
+
+    Windows: ``%LOCALAPPDATA%\\VOXPrint AI Suite``. Linux: ``$XDG_DATA_HOME/voxprint-ai-suite``
+    (default ``~/.local/share/voxprint-ai-suite``). A legacy ``Voxprint`` / ``voxprint`` folder
+    is moved there on first use.
+    """
     p = suite_paths.home()
     p.mkdir(parents=True, exist_ok=True)
     return p
@@ -57,7 +60,7 @@ MODELS_DIR_FILE = "models_dir.txt"
 def shared_root() -> Path:
     """Suite-wide folder: ``$VOXPRINT_SHARED``, else ``<app home>/shared``.
 
-    Windows: ``%LOCALAPPDATA%\\Voxprint\\shared``. Linux: ``~/.local/share/voxprint/shared``.
+    Windows: ``%LOCALAPPDATA%\\VOXPrint AI Suite\\shared``. Linux: ``~/.local/share/voxprint-ai-suite/shared``.
     """
     env = os.environ.get("VOXPRINT_SHARED", "").strip()
     p = Path(env) if env else suite_paths.shared_dir()

@@ -13,38 +13,57 @@ from tools import make_runtime_lock as mrl
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_voxprint_common_is_pinned_by_the_released_wheel_and_its_sha256():
+UI_PIN = (
+    "voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common"
+    "@v0.2.5"
+)
+
+
+def test_voxprint_common_keeps_the_released_wheel_and_pins_the_ui_shell():
     req = (ROOT / "requirements.txt").read_text(encoding="utf-8")
     lock = json.loads((ROOT / "infra" / "runtime_lock.json").read_text(encoding="utf-8"))
     suite = lock["suite"]
     assert suite == mrl.suite_record()
-    assert suite["version"] == "0.2.4"
-    assert suite["sha256"] == "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
-    assert suite["size"] == 182510
+    assert suite["version"] == "0.2.5"
+    assert suite["sha256"] == "4980c1ab5a75b22dec1a16b16474ccb350110c8d3d056f25b5ed74a623fe6a9b"
+    assert suite["size"] == 326999
     pin = mrl.suite_requirement(suite)
-    assert pin in req
+    assert pin not in req
     assert pin == (
-        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/"
-        "voxprint_common-0.2.4-py3-none-any.whl --hash=sha256:3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.5/"
+        "voxprint_common-0.2.5-py3-none-any.whl --hash=sha256:4980c1ab5a75b22dec1a16b16474ccb350110c8d3d056f25b5ed74a623fe6a9b"
     )
-    assert "git+" not in req
-    assert "git" not in lock
+    assert UI_PIN in req
+    assert lock["git"] == [UI_PIN]
     assert all(row["dist"] != "voxprint-common" for row in lock["wheels"])
     assert lock["python"] == "3.14"
     parsed = Requirement(pin.split(" --hash=", 1)[0])
     assert parsed.name == "voxprint-common"
     assert parsed.url == suite["url"]
     assert pin.endswith(" --hash=sha256:" + suite["sha256"])
+    assert Requirement(UI_PIN).name == "voxprint-common"
+    assert mrl.git_dist_names(lock) == ["voxprint-common"]
 
 
-def test_test_requirements_emit_the_wheel_pin_and_shell_requirements_do_not(capsys):
-    pin = mrl.suite_requirement()
+def test_test_requirements_emit_the_git_pin_and_shell_requirements_do_not(capsys):
+    wheel = mrl.suite_requirement()
     assert mrl.main(["--test-requirements"]) == 0
     out = capsys.readouterr().out
-    assert pin in out and "pyside6==" in out
+    assert UI_PIN in out and wheel not in out and "pyside6==" in out
     assert mrl.main(["--shell-requirements"]) == 0
     shell = capsys.readouterr().out
     assert "voxprint-common" not in shell and "pyside6==" in shell
+
+
+def test_an_empty_git_list_keeps_the_hashed_wheel():
+    lock = json.loads((ROOT / "infra" / "runtime_lock.json").read_text(encoding="utf-8"))
+    lock["git"] = []
+    lines = mrl.requirement_lines(lock, tests=True)
+    assert mrl.suite_requirement() in lines
+    assert UI_PIN not in lines
+    rebuilt = mrl.keep_git({"suite": lock["suite"], "wheels": []}, {"git": [UI_PIN]})
+    assert list(rebuilt)[:2] == ["suite", "git"]
+    assert rebuilt["git"] == [UI_PIN]
 
 
 def test_an_apps_manifest_migrates_into_schema_1_components(tmp_path, monkeypatch):
