@@ -6,20 +6,15 @@ The main screen is section Narrate: Choose a book, a full-width voice, and chips
 
 ## Missing shell pieces
 
-Pinned commit `f4e95ccfa25780abaf50412cb095a7843725102a` does not include these. They are not rebuilt in this app.
+Pinned tag `v0.2.5` (Yitro, commit `8a94b531cb4f3526425a80a86a1e64624b5de606`) includes Sections (a tab row), Steps (a wizard), `set_voices`, full `input_path`, Pause and resume, a player with a chapter list, a light theme, and `ui.geometry`. UI freeze (Aleksandr, 15:15): do not wire new polish yet. Still not in this pin:
 
 | Piece | Designed use |
 | --- | --- |
-| Sections (a tab row) | Narrate, Voices, Roles, Re-voice. Hidden only when an app has one section |
-| Steps (a wizard) | Train voice, three steps: the recording, how to train, consent and save |
-| `set_voices` | Narrate voice combo is Warm, Clear, and Low, not the voice library |
-| `input_path` | A drop stores the file name, so Create audiobook cannot see the book path |
-| Pause and resume | The busy screen has Cancel only |
-| A player that plays audio, and a chapter list | The result is painted bars |
-| A light theme | Tokens are dark only (`voxprint-dark`) |
-| `ui.geometry` with maximized and fullscreen | The shell stores `ui.window` in `suite.json` |
+| `set_voices` groups | Male and female groups in the voice list |
+| Voice preview | A short preview button on a voice row |
+| Download-on-pick badge | Mark voices that download the first time they are chosen |
 
-Until Sections and Steps land, the frozen windows (`ui/main_window.py`, `ui/voices_window.py`, `ui/narrate_window.py`, `ui/revoice_window.py`, `ui/settings_dialog.py`) still implement those rows. The shell Settings command opens that settings dialog. Voice-consent sentences stay the plain `consent.*` text.
+Until Sections and Steps are wired in this app, the frozen windows (`ui/main_window.py`, `ui/voices_window.py`, `ui/narrate_window.py`, `ui/revoice_window.py`, `ui/settings_dialog.py`) still implement those rows. The shell Settings command opens that settings dialog. Voice-consent sentences stay the plain `consent.*` text. Use a flat voice list for now.
 
 ## Old UI
 

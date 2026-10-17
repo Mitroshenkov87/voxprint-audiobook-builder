@@ -1,8 +1,8 @@
-# Suite library, draft UI shell (branch ui/shell-migration, commit f4e95cc).
-# Switch this line to the release tag once it is cut. The 0.2.4 wheel and its
-# SHA-256 stay in infra/runtime_lock.json (suite) for an installer with no git pin.
+# Suite library Yitro (voxprint-common v0.2.5).
+# The matching wheel and its SHA-256 stay in infra/runtime_lock.json (suite)
+# for an installer with no git pin.
 # pip turns on hash-checking mode for the whole file, so install this file with uv.
-voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@f4e95ccfa25780abaf50412cb095a7843725102a
+voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@v0.2.5
 
 # Voxprint - dependencies (no hard pins here; only lower bounds and the upper bounds that are needed).
 # Installation order on Windows (done by build.bat):

@@ -31,7 +31,7 @@ def _rows(text: str) -> list[list[str]]:
 def test_every_row_is_mapped_or_cli_only_and_names_a_shell_place():
     text = MAP.read_text(encoding="utf-8")
     assert HEADER in text
-    assert "f4e95ccfa25780abaf50412cb095a7843725102a" in text
+    assert "v0.2.5" in text
     assert "Sections (a tab row)" in text and "Steps (a wizard)" in text
     rows = _rows(text)
     assert len(rows) > 80
