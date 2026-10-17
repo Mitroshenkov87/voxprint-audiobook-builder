@@ -111,6 +111,7 @@ nav:
       - Releasing: RELEASING.md
       - Linux test checklist: LINUX-TEST-CHECKLIST.md
       - Recording scripts: recording-scripts/README.md
+      - Fish Drama 3 plan: plans/FISH-DRAMA-3.md
   - Manuals:
       - English: manual/src/manual_en.md
       - Deutsch: manual/src/manual_de.md
