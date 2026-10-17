@@ -137,8 +137,8 @@ def test_the_guard_raises_on_shared_roots_and_their_parents():
 def test_setup_rolls_back_our_ref_and_never_deletes_the_models_root():
     root = Path(__file__).resolve().parents[1]
     iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
-    body = iss[iss.index("procedure RunSuiteInstall"):iss.index("procedure AddAppToUserPath")]
-    assert body.count("UnregisterSuite();") >= 3
+    body = iss[iss.index("procedure FailSuite"):iss.index("procedure AddAppToUserPath")]
+    assert "UnregisterSuite();" in body and body.count("FailSuite('") >= 3
     assert "DelTree(SharedModelsDir" not in iss
     linux = (root / "installer" / "linux" / "install-voxprint-linux.sh").read_text(encoding="utf-8")
     failed = linux[linux.index("voxprint-mdl"):linux.index("Creating the launcher")]

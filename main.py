@@ -23,6 +23,7 @@ import sys
 from typing import Sequence
 
 from infra.gpu_requirement import enforce, startup_is_gui, startup_requires_gpu
+from infra.stdio_guard import write_utf8
 from infra.qwen_tf_compat import install as install_qwen_tf
 
 
@@ -413,13 +414,13 @@ def main(argv=None) -> int:
     if selftest:
         suite_report = suite_install.launch_check(_suite_note, repair=suite_install.should_repair())
         if "--json" in argv:
-            print(json.dumps({
+            write_utf8(sys.stdout, json.dumps({
                 "type": "result", "ok": bool(suite_report.get("ok")), "command": "selftest",
                 "exit_code": int(suite_report.get("exit_code", 0)),
                 "outputs": [], "warnings": [], "duration_s": 0.0, "error": None, "hint": None,
                 "suite": {"root": suite_report.get("root", ""), "missing": list(suite_report.get("missing") or []),
                           "repaired": bool(suite_report.get("repaired"))},
-            }, ensure_ascii=False), flush=True)
+            }, ensure_ascii=False))
     else:
         suite_report = suite_install.launch_check(repair=False)
     from infra import models_users

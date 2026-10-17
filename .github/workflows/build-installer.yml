@@ -498,9 +498,14 @@ jobs:
       - name: Online installer = shell zip + manifest (libraries stay upstream) + voxprint-audiobook-builder-setup-win-x64.exe
         shell: pwsh
         run: |
-          if (-not $env:REL_TAG) { throw "REL_TAG is required; refusing to bake a manifest for a tag that does not exist" }
-          $tag = $env:REL_TAG
-          ./installer/build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag $tag -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
+          if ($env:REL_TAG) {
+            ./installer/build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag $env:REL_TAG -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
+          } else {
+            ./installer/build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag v0.0.0-ci -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json -LocalAssets
+          }
+          python tools\check_manifest_tags.py build\online-release
+          if ($LASTEXITCODE -ne 0) { throw "a manifest URL names a GitHub tag that does not exist" }
+          if (Select-String -Path build\online-release\*.json -Pattern "v0.0.0-dev" -Quiet) { throw "manifest still points at v0.0.0-dev" }
           Get-ChildItem build\online-release | Format-Table Name, Length
       - name: End to end with the frozen shell - download the runtime from upstream (CPU PyTorch, internal CI only) and import it
         shell: pwsh
@@ -510,15 +515,19 @@ jobs:
           VOXPRINT_HOME: C:\vxhome1
         run: |
           $ErrorActionPreference = "Stop"
-          # the few files we ship ourselves (the shell, wheels built from sdists) are not on the release yet: serve them from localhost
-          if (-not $env:REL_TAG) { throw "REL_TAG is required; refusing to bake a manifest for a tag that does not exist" }
-          $tag = $env:REL_TAG
           $src = (Resolve-Path build\online-release\manifest-thin-*.json).Path
-          $man = "C:\vx-manifest.json"
-          (Get-Content $src -Raw).Replace("https://github.com/${{ github.repository }}/releases/download/$tag", "http://127.0.0.1:8099") | Out-File -Encoding ascii $man
-          Start-Process python -ArgumentList "-m","http.server","8099","--bind","127.0.0.1","--directory","build\online-release" -WindowStyle Hidden
-          Start-Sleep 3
-          @{ schema = 1; manifest_url = $man } | ConvertTo-Json | Out-File -Encoding ascii C:\vx-modules.json
+          if ($env:REL_TAG) {
+            # the few files we ship ourselves (the shell, wheels built from sdists) are not on the release yet: serve them from localhost
+            $tag = $env:REL_TAG
+            $man = "C:\vx-manifest.json"
+            (Get-Content $src -Raw).Replace("https://github.com/${{ github.repository }}/releases/download/$tag", "http://127.0.0.1:8099") | Out-File -Encoding ascii $man
+            Start-Process python -ArgumentList "-m","http.server","8099","--bind","127.0.0.1","--directory","build\online-release" -WindowStyle Hidden
+            Start-Sleep 3
+            @{ schema = 1; manifest_url = $man } | ConvertTo-Json | Out-File -Encoding ascii C:\vx-modules.json
+          } else {
+            # file-name components resolve beside this manifest; upstream https URLs stay
+            @{ schema = 1; manifest_url = $src } | ConvertTo-Json | Out-File -Encoding ascii C:\vx-modules.json
+          }
           $env:VOXPRINT_MODULES_CONFIG = "C:\vx-modules.json"
           $exe = (Resolve-Path "dist\thin\voxprint-audiobook-builder\voxprint-audiobook-builder.exe").Path
           $sw = [Diagnostics.Stopwatch]::StartNew()
@@ -574,7 +583,11 @@ jobs:
             build/online-release/voxprint-audiobook-builder-setup*.exe
             build/online-release/voxprint-audiobook-builder-setup*.exe.sha256
             build/online-release/manifest-thin-*.json
+            build/online-release/embedded-manifest.json
+            build/online-release/Voxprint-shell-*.zip
+            build/online-release/*.whl
           retention-days: 14
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         with:
           name: Voxprint-patch

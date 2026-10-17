@@ -110,7 +110,9 @@ def test_installer_installs_the_suite_and_ships_the_console_exe():
     suite = iss[iss.index("procedure RunSuiteInstall"):iss.index("procedure AddAppToUserPath")]
     assert "--gui" not in suite and "--json" in suite
     assert "ewWaitUntilTerminated" in iss and "wrote no status" not in iss
-    assert "Abort;" in iss[iss.index("procedure RunSuiteInstall"):iss.index("procedure AddAppToUserPath")]
+    suite = iss[iss.index("procedure FailSuite"):iss.index("procedure AddAppToUserPath")]
+    assert "VxExitProcess(1)" in suite and "SuiteStepFailed" in suite and "Abort;" in suite
+    assert "FailSuite('models')" in suite
     assert "--unregister-suite" in iss and "ChangesEnvironment=yes" in iss
     bat = (root / "build_thin.bat").read_text(encoding="utf-8")
     assert "--console" in bat and "--name voxprint-audiobook-cli" in bat

@@ -239,6 +239,157 @@ def test_inno_script_has_the_online_variant():
     assert '$AssetName = "voxprint-audiobook-builder-setup-win-x64.exe"' in install
 
 
+def test_local_assets_install_from_the_folder_next_to_the_setup(tmp_path, dist, monkeypatch):
+    """An artifact with no release tag names files, not https://github.com/.../v0.0.0-dev/."""
+    from tools import runtime_manifest as rm
+
+    def fake_builder(spec, work, out, fetch=None, run=None):
+        whl = Path(out) / "docopt-0.6.2-py3-none-any.whl"
+        whl.write_bytes(b"wheel-bytes-not-a-real-wheel")
+        return whl
+
+    monkeypatch.setattr(rm, "build_sdist_wheel", fake_builder)
+    lock = {
+        "wheels": [
+            {"dist": "docopt", "version": "0.6.2", "file": "docopt-0.6.2.tar.gz",
+             "url": "https://files.pythonhosted.org/packages/x/docopt-0.6.2.tar.gz",
+             "sha256": "aa" * 32, "group": "libs", "sdist": True},
+            {"dist": "numpy", "version": "2.0.0", "file": "numpy-2.0.0-py3-none-any.whl",
+             "url": "https://files.pythonhosted.org/packages/y/numpy-2.0.0-py3-none-any.whl",
+             "size": 12, "sha256": "bb" * 32, "group": "libs"},
+        ],
+        "group_titles": {"libs": "Libraries"},
+        "flavors": ["cpu"],
+        "compat": {},
+    }
+    lock_path = tmp_path / "lock.json"
+    lock_path.write_text(json.dumps(lock), encoding="utf-8")
+    out = tmp_path / "release"
+    mp = mk.build(dist, out, "v0.0.0-ci", "Mitroshenkov87/voxprint-audiobook-builder",
+                  runtime_lock=lock_path, local_assets=True)
+    text = mp.read_text(encoding="utf-8")
+    assert "v0.0.0-dev" not in text
+    man = json.loads(text)
+    shell = next(c for c in man["components"] if c.get("role") == "core")
+    blob = (out / shell["file"]).read_bytes()
+    assert shell["url"] == shell["file"] and "/" not in shell["url"]
+    assert shell["sha256"] == hashlib.sha256(blob).hexdigest() and shell["size"] == len(blob)
+    docopt = next(c for c in man["components"] if c["file"].startswith("docopt-"))
+    numpy = next(c for c in man["components"] if c["file"].startswith("numpy-"))
+    assert docopt["url"] == docopt["file"] and numpy["url"].startswith("https://files.pythonhosted.org/")
+    assert (out / "embedded-manifest.json").read_text(encoding="utf-8") == text
+    modules_json = json.loads((dist / "_internal" / "modules.json").read_text(encoding="utf-8"))
+    assert modules_json["manifest_url"] == mp.name and modules_json["latest_manifest_url"] == ""
+    with zipfile.ZipFile(out / shell["file"]) as archive:
+        names = [name.replace("\\", "/") for name in archive.namelist()]
+    assert any(name.endswith("modules.json") for name in names)
+    assert any(name.endswith(docopt["file"]) for name in names)
+    assert any(name.endswith(mp.name) for name in names)
+    dest = tmp_path / "app"
+    fetched = of.run(str(mp), dest, tmp_path / "cache", of.Status(None), sleep=lambda _s: None,
+                     roles=["core"], payload_dir=out)
+    assert fetched == 1 and (dest / "Voxprint.exe").is_file()
+    of.check_url("Voxprint-shell-01.zip")
+    for refused in ("..", "a/b.zip", "file:///etc/passwd", "http://example.org/a.zip"):
+        with pytest.raises(of.FetchError):
+            of.check_url(refused)
+
+
+def test_artifact_only_workflow_embeds_a_local_manifest():
+    wf = (ROOT / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")
+    pr = (ROOT / ".github" / "workflows" / "pr-check.yml").read_text(encoding="utf-8")
+    assert "REL_TAG is required" not in wf
+    assert "-LocalAssets" in wf and "v0.0.0-ci" in wf and "Voxprint-shell-*.zip" in wf
+    assert "-LocalAssets" in pr and "v0.0.0-ci" in pr and "Voxprint-shell-*.zip" in pr
+    iss = (ROOT / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
+    assert "EMBEDMANIFEST" in iss and "--payload-dir" in iss
+    assert "$LocalAssets" in (ROOT / "installer" / "build_online.ps1").read_text(encoding="utf-8")
+
+
+def test_status_writes_survive_a_sharing_violation(tmp_path, monkeypatch):
+    p = tmp_path / "status.txt"
+    calls = {"n": 0}
+    real = of.os.replace
+
+    def flaky(src, dst):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise PermissionError(5, "sharing violation")
+        return real(src, dst)
+
+    monkeypatch.setattr(of.os, "replace", flaky)
+    of.Status(p).write("running", 1.0, "Готово", force=True)
+    assert calls["n"] >= 2
+    text = p.read_text(encoding="utf-8-sig")
+    assert text.startswith("running\n") and "Готово" in text
+    assert not (tmp_path / "status.txt.tmp").exists()
+
+
+def test_status_writers_do_not_share_one_temp_file(tmp_path):
+    p = tmp_path / "status.txt"
+    st = of.Status(p)
+    errors = []
+
+    def worker(i):
+        try:
+            for _ in range(15):
+                st.write("running", i / 15, f"step {i}", force=True)
+        except Exception as exc:  # noqa: BLE001 - the assertion below reports it
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert errors == []
+    assert p.read_text(encoding="utf-8-sig").startswith("running\n")
+    assert not (tmp_path / "status.txt.tmp").exists()
+
+
+def test_a_manifest_name_cannot_climb_out_of_the_install_folder(tmp_path, monkeypatch):
+    from infra import modules as mods
+
+    secret = tmp_path / "secret.json"
+    secret.write_text('{"schema": 1, "components": []}', encoding="utf-8")
+    app = tmp_path / "app"
+    app.mkdir()
+    (app / "modules.json").write_text(
+        json.dumps({"schema": 1, "manifest_url": "../secret.json"}), encoding="utf-8")
+    monkeypatch.setenv("VOXPRINT_MODULES_CONFIG", str(app / "modules.json"))
+    resolved = mods._resolve_manifest_source("../secret.json")
+    assert Path(resolved).resolve() != secret.resolve()
+    with pytest.raises(mods.ModulesError):
+        mods.load_manifest(offline_ok=False)
+
+
+def test_a_relative_manifest_next_to_modules_json_is_used(tmp_path, monkeypatch):
+    from infra import modules as mods
+
+    wheel = tmp_path / "demo-1.0.0-py3-none-any.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("demo-1.0.0.dist-info/METADATA", "Name: demo\nVersion: 1.0.0\n")
+    raw = wheel.read_bytes()
+    man = {
+        "schema": 1,
+        "components": [{
+            "id": "whl-demo-1.0.0", "file": wheel.name, "url": wheel.name, "size": len(raw),
+            "sha256": hashlib.sha256(raw).hexdigest(), "kind": "wheel", "role": "runtime",
+            "markers": ["demo-1.0.0.dist-info/METADATA"],
+        }],
+    }
+    manifest = tmp_path / "manifest-thin-beta.json"
+    manifest.write_text(json.dumps(man), encoding="utf-8")
+    (tmp_path / "modules.json").write_text(
+        json.dumps({"schema": 1, "manifest_url": manifest.name}), encoding="utf-8")
+    monkeypatch.setenv("VOXPRINT_MODULES_CONFIG", str(tmp_path / "modules.json"))
+    loaded = mods.load_manifest()
+    assert loaded["components"][0]["sha256"] == man["components"][0]["sha256"]
+    dest = tmp_path / "runtime"
+    of.run(str(manifest), dest, tmp_path / "cache", of.Status(None), sleep=lambda _s: None)
+    assert (dest / "demo-1.0.0.dist-info" / "METADATA").is_file()
+
+
 def test_status_file_has_a_heartbeat(tmp_path):
     p = tmp_path / "st.txt"
     st = of.Status(p)

@@ -1,12 +1,16 @@
 """VOXPrint MDL: the app manifest, the ready gate, voice migration, and release-tag checks."""
+import hashlib
+import importlib.util
 import io
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
 
 import cli
 from infra import mdl_gate, paths
+from infra.stdio_guard import write_utf8
 from tools import check_manifest_tags as tags
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -109,6 +113,31 @@ def test_json_result_writes_cyrillic_as_utf8(monkeypatch):
     assert "Готово" in text and "\\u" not in text
 
 
+def test_json_is_utf8_when_the_console_cannot_change_code_page(monkeypatch):
+    buf = io.BytesIO()
+
+    class Stuck(io.TextIOWrapper):
+        def reconfigure(self, **kwargs):
+            raise OSError("code page")
+
+    wrapper = Stuck(buf, encoding="cp1252", newline="\n")
+    monkeypatch.setattr(cli.sys, "stdout", wrapper)
+    monkeypatch.setattr(cli.sys, "stderr", io.StringIO())
+    cli._json_stdout = None
+    cli.begin_json_stdout()
+    try:
+        cli._emit_result(
+            ok=False, command="status", exit_code=1, outputs=[], warnings=[], duration_s=0.1,
+            error="Готово", hint=None,
+        )
+    finally:
+        cli.end_json_stdout()
+    text = buf.getvalue().decode("utf-8")
+    assert "Готово" in text and "\\u" not in text
+    write_utf8(wrapper, "ещё")
+    assert "ещё" in buf.getvalue().decode("utf-8")
+
+
 def test_existing_voices_move_into_the_shared_folder(tmp_path, monkeypatch):
     home = tmp_path / "home"
     monkeypatch.setenv("VOXPRINT_HOME", str(home))
@@ -131,11 +160,16 @@ def test_a_missing_model_is_not_downloaded_here(tmp_path, monkeypatch):
     from core.errors import ModelDownloadError
     from infra import model_downloader as md
 
+    called = []
     monkeypatch.setattr(md.paths, "models_dir", lambda: tmp_path)
     monkeypatch.setattr(md, "pinned_revision", lambda _repo: None)
+    monkeypatch.setattr(md.modelscope_mirror, "download_repo", lambda *args, **kwargs: called.append("download"))
+    monkeypatch.setattr(md.modelscope_mirror, "remember_hf", lambda *args, **kwargs: called.append("remember"))
     with pytest.raises(ModelDownloadError) as ei:
         md.ensure_model("Org/Missing", root=tmp_path)
     assert "voxprint-mdl" in ei.value.user_message
+    assert called == []
+    assert importlib.util.find_spec("infra.parallel_download") is None
     assert [p.name for p in tmp_path.iterdir() if not p.name.startswith(".")] == []
 
 
@@ -164,3 +198,68 @@ def test_a_manifest_url_for_a_missing_tag_fails(tmp_path):
     ]
     assert seen == [("Mitroshenkov87/voxprint-audiobook-builder", "v0.0.0-dev")]
     assert tags.check([good], exists=exists) == []
+
+
+def test_cli_imports_the_stock_voice_into_the_shared_folder(tmp_path, monkeypatch, capsys):
+    """The window and the CLI both read ``<home>/voices``. A full install leaves the zip in an MDL blob."""
+    from core.voice_library import VoiceLibrary
+
+    blob = io.BytesIO()
+    with zipfile.ZipFile(blob, "w") as archive:
+        archive.writestr("adapter_model.safetensors", b"adapter")
+        archive.writestr("adapter_config.json", b"{}")
+        archive.writestr("voice.json", json.dumps({"schema": 3, "name": "Levi", "language": "en", "license": "CC-BY-4.0"}))
+    raw = blob.getvalue()
+    digest = hashlib.sha256(raw).hexdigest()
+    models = tmp_path / "suite-models"
+    (models / "blobs").mkdir(parents=True)
+    (models / "blobs" / digest).write_bytes(raw)
+    (tmp_path / "voxprint-app-models.json").write_text("{}", encoding="utf-8")
+
+    class _Item:
+        def __init__(self, sha256, path, size):
+            self.sha256, self.path, self.size = sha256, path, size
+
+    class _Model:
+        def __init__(self, files):
+            self.files = files
+
+    class _Doc:
+        def __init__(self, models):
+            self.models = models
+
+    monkeypatch.delenv("VOXPRINT_SKIP_SUITE", raising=False)
+    monkeypatch.setattr(mdl_gate, "_reported_ready", lambda: True)
+    monkeypatch.setattr(mdl_gate, "manifest_path", lambda: tmp_path / "voxprint-app-models.json")
+    monkeypatch.setattr(mdl_gate, "load_manifest", lambda path: _Doc([_Model([_Item(digest, "voices/levi.zip", len(raw))])]))
+    monkeypatch.setattr(mdl_gate, "suite_models_dir", lambda: models)
+    assert cli.main(["voices", "list"]) == 0
+    listed = capsys.readouterr().out
+    assert listed.split("\t", 1)[0] == "levi"
+    folder = paths.voices_dir() / "levi"
+    assert (folder / "voice.json").is_file()
+    assert VoiceLibrary().root == paths.voices_dir()
+    assert [voice.id for voice in VoiceLibrary().list_voices()] == ["levi"]
+
+
+def test_pydub_syntaxwarning_and_the_flash_attn_note_stay_quiet():
+    import sys
+    import warnings
+
+    from infra import diagnostics
+
+    out, err = sys.stdout, sys.stderr
+    try:
+        diagnostics.silence_library_notes()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.warn_explicit(
+                r"invalid escape sequence '\.'", SyntaxWarning, filename="pydub/utils.py", lineno=1, module="pydub.utils",
+            )
+            warnings.warn_explicit("keep me", SyntaxWarning, filename="other.py", lineno=1, module="other")
+        assert [item.message.args[0] for item in caught] == ["keep me"]
+    finally:
+        sys.stdout, sys.stderr = out, err
+    buf = io.StringIO()
+    quiet = diagnostics._QuietNotes(buf)
+    quiet.write("Warning: flash-attn is not installed\nkept line\n")
+    assert buf.getvalue() == "kept line\n"

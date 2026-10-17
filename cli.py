@@ -53,7 +53,7 @@ from core.translate import TranslateError, detect_book_language, route
 from core import workspace as ws
 from core import appinfo
 from core.build_stamp import read_trailer
-from infra.stdio_guard import guard_stdio, install_cli_excepthook
+from infra.stdio_guard import guard_stdio, install_cli_excepthook, write_utf8
 from core.asr import make_default_asr
 from core.book_parsers import load_book
 from core.dry_run import DryRunFailure, check_output, existing_input, load_book_input, schema_error
@@ -77,6 +77,7 @@ from infra.asr_choice import SMALL as ASR_SMALL
 from infra.asr_choice import preferred_repo
 from infra.asr_choice import ready as asr_ready
 from infra.mdl_gate import MDL_HINT
+from infra.mdl_gate import materialize as materialize_models
 from infra.mdl_gate import models_ready as _models_ready
 from infra.model_downloader import ALIGNER_REPO
 from infra.model_release import ReleaseError
@@ -289,6 +290,7 @@ def begin_json_stdout() -> None:
     _reconfigure_utf8(real)
     _reconfigure_utf8(sys.stderr)
     _json_stdout = real
+    diagnostics.silence_library_notes()
     _saved_showwarning = warnings.showwarning
     sys.stdout = sys.stderr
 
@@ -335,8 +337,7 @@ def _write_stream(stream, text: str) -> None:
     the exit code must still be the command's code, and the error must not escape into a traceback window.
     """
     try:
-        stream.write(text if str(text).endswith("\n") else str(text) + "\n")
-        stream.flush()
+        write_utf8(stream, text if str(text).endswith("\n") else str(text) + "\n")
     except Exception:  # noqa: BLE001 - a dead console, including errno 22, must not escape
         pass
 
@@ -2802,6 +2803,12 @@ def _dispatch(argv: Optional[Sequence[str]], *, run_narration_fn, run_task_fn, l
     raw = list(sys.argv[1:] if argv is None else argv)
     if "--json" in raw:
         begin_json_stdout()
+    else:
+        diagnostics.silence_library_notes()
+    try:
+        materialize_models()
+    except Exception:  # noqa: BLE001 - importing a stock voice must not block the command
+        logging.getLogger("voxprint.cli").debug("stock voices were not imported", exc_info=True)
     try:
         reconfigure = getattr(sys.stdout, "reconfigure", None)
         if reconfigure is not None:

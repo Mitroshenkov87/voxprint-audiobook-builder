@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 import os
 import sys
+import warnings
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -66,10 +67,9 @@ def ensure_ffmpeg() -> Optional[str]:
         if folder not in os.environ.get("PATH", "").split(os.pathsep):
             os.environ["PATH"] = folder + os.pathsep + os.environ.get("PATH", "")
         try:
-            import warnings
-
             with warnings.catch_warnings():   # pydub warns at import when PATH had no ffmpeg; it is set right below
                 warnings.simplefilter("ignore", RuntimeWarning)
+                warnings.simplefilter("ignore", SyntaxWarning)
                 from pydub import AudioSegment
 
             AudioSegment.converter = path
@@ -124,6 +124,7 @@ def _read_with_ffmpeg(path: Path) -> Tuple[np.ndarray, int]:
 def _read_with_pydub(path: Path) -> Tuple[np.ndarray, int]:
     """Decode with pydub (needs ffmpeg); returns ``(mono float32, sample_rate)``."""
     ensure_ffmpeg()
+    warnings.filterwarnings("ignore", category=SyntaxWarning, module=r"pydub(\.|$)")
     from pydub import AudioSegment
 
     seg = AudioSegment.from_file(str(path))

@@ -5,6 +5,13 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Fixed
+- A CI installer built without a release tag embeds its manifest and installs the shell zip from the folder next to the setup file. It does not name a `v0.0.0-dev` release.
+- The fetch status file uses a private temporary name and retries a sharing violation. A status write cannot fail a download. When the model step fails, setup ends with exit code 1.
+- `--json` and the self-test result are UTF-8 even when Windows cannot change the console code page.
+- The command line imports the stock voices into the same `<home>/voices` folder the window reads, so they are present after a full install.
+- pydub's `SyntaxWarning` and the flash-attn note are not printed.
+
 ## [1.0.0-rc.6] - 2026-10-11 - build 1004 "Shomer"
 
 Codename *Shomer*: a build that keeps shared files safe. The version is **1.0.0-rc.6**. The release tag for this build is `v1.0.0-rc.6` (a pre-release). People see `1.0.0 RC6 · build 1004 "Shomer"`; the Windows file version is `1.0.0.1004`. The build number is the `build` field in `BUILD.json` (**1004**). `offset` is history only and is not added to the CI run number. Release notes: [docs/RELEASE-NOTES-1004-SHOMER.md](docs/RELEASE-NOTES-1004-SHOMER.md).

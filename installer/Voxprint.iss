@@ -286,6 +286,10 @@ Type: files; Name: "{userprograms}\{#LegacySuiteDir}\{#AppDisplayName}.lnk"
 #ifdef ONLINE
 ; the program itself is downloaded by voxprint-fetch.exe (see [Code]); only the downloader and the notices are inside
 Source: "..\build\online\voxprint-fetch.exe"; DestDir: "{tmp}"; Flags: dontcopy
+#ifdef EMBEDMANIFEST
+; Artifact-only build: the manifest is inside the setup exe. The shell zip sits next to it ({src}).
+Source: "..\build\online-release\embedded-manifest.json"; DestDir: "{tmp}"; Flags: dontcopy
+#endif
 #else
 #ifdef ONEDIR
 Source: "..\dist\voxprint-audiobook-builder\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -330,6 +334,7 @@ var
   PortableBrowse: TNewButton;
   PortableFound: String;
 #endif
+  SuiteStepFailed: Boolean;
 
 { Hidden CI switch: /SKIPGPUCHECK. Not shown in the wizard. Smoke jobs pass it; users do not. }
 function ParamSwitch(const Name: String): Boolean;
@@ -1269,7 +1274,15 @@ begin
   Result := '';
   ExtractTemporaryFile('voxprint-fetch.exe');
   Manifest := Trim(ExpandConstant('{param:Manifest|}'));
-  if Manifest = '' then Manifest := '{#ManifestUrl}';
+  if Manifest = '' then
+  begin
+#ifdef EMBEDMANIFEST
+    ExtractTemporaryFile('embedded-manifest.json');
+    Manifest := ExpandConstant('{tmp}\embedded-manifest.json');
+#else
+    Manifest := '{#ManifestUrl}';
+#endif
+  end;
   Cache := ExpandConstant('{localappdata}\Voxprint\setup-cache');
   ForceDirectories(Cache);
   StatusFile := Cache + '\status.txt';
@@ -1277,6 +1290,9 @@ begin
   Exe := ExpandConstant('{tmp}\voxprint-fetch.exe');
   Params := '--manifest ' + AddQuotes(Manifest) + ' --dest ' + AddQuotes(ExpandConstant('{app}')) +
             ' --cache ' + AddQuotes(Cache) + ' --status ' + AddQuotes(StatusFile);
+#ifdef EMBEDMANIFEST
+  Params := Params + ' --payload-dir ' + AddQuotes(ExpandConstant('{src}'));
+#endif
   if '{#LatestManifestUrl}' <> '' then
   begin
     { pinned first (default) with the newest release as the fallback, or the other way round when the box is ticked }
@@ -1542,6 +1558,26 @@ begin
       Log('shared suite manifest was not updated');
 end;
 
+procedure VxExitProcess(uExitCode: Cardinal);
+external 'ExitProcess@kernel32.dll stdcall';
+
+{ Abort in ssPostInstall can still leave a silent setup at exit code 0. ExitProcess makes the failure stick. }
+procedure FailSuite(const What: String);
+begin
+  SuiteStepFailed := True;
+  Log('Suite install failed: ' + What);
+  UnregisterSuite();
+  SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), [What]), mbError, MB_OK, IDOK);
+  VxExitProcess(1);
+  Abort;
+end;
+
+procedure DeinitializeSetup();
+begin
+  if SuiteStepFailed then
+    VxExitProcess(1);
+end;
+
 procedure RunSuiteInstall();
 var
   Exe, Mdl, Params: String;
@@ -1555,23 +1591,19 @@ begin
   Exe := ProgramExe();
   if not FileExists(Exe) then
   begin
-    Log('Suite install failed: no program executable');
-    SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['program']), mbError, MB_OK, IDOK);
-    Abort;
+    FailSuite('program');
+    Exit;
   end;
   if not RunChecked(Exe, '--install-suite', SW_HIDE) then
   begin
-    UnregisterSuite();
-    SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['runtime']), mbError, MB_OK, IDOK);
-    Abort;
+    FailSuite('runtime');
+    Exit;
   end;
   Mdl := ExpandConstant('{app}\voxprint-mdl.cmd');
   if not FileExists(Mdl) then
   begin
-    Log('Suite install failed: voxprint-mdl.cmd is missing');
-    UnregisterSuite();
-    SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['voxprint-mdl']), mbError, MB_OK, IDOK);
-    Abort;
+    FailSuite('voxprint-mdl');
+    Exit;
   end;
   Params := '/d /c ' + AddQuotes(Mdl) + ' download --app audiobook-builder --manifest '
     + AddQuotes(ExpandConstant('{app}\voxprint-app-models.json')) + ' --json';
@@ -1580,11 +1612,7 @@ begin
   if not WizardSilent() then
     Show := SW_SHOWNORMAL;
   if not RunChecked(ExpandConstant('{cmd}'), Params, Show) then
-  begin
-    UnregisterSuite();
-    SuppressibleMsgBox(FmtMessage(CustomMessage('SuiteFailed'), ['models']), mbError, MB_OK, IDOK);
-    Abort;
-  end;
+    FailSuite('models');
 end;
 
 { Append the program folder to the user PATH once, keeping REG_EXPAND_SZ so %SystemRoot% stays unexpanded. }

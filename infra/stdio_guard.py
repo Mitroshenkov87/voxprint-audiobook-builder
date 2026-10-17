@@ -45,6 +45,31 @@ class GuardedStream:
         return getattr(self._inner, name)
 
 
+def write_utf8(stream, text: str) -> None:
+    """Write ``text`` as UTF-8, even when the console code page cannot be changed.
+
+    A Windows redirect (cp1251, cp1252) replaces Cyrillic with ``?`` once ``reconfigure`` fails.
+    The bytes then go to the underlying buffer. A stream that is already UTF-8 is written as text.
+    """
+    line = text if str(text).endswith("\n") else str(text) + "\n"
+    encoding = (getattr(stream, "encoding", None) or "").lower().replace("_", "").replace("-", "")
+    if encoding not in ("utf8", "utf8sig"):
+        buf = getattr(stream, "buffer", None)
+        if buf is not None and hasattr(buf, "write"):
+            try:
+                buf.write(line.encode("utf-8", errors="replace"))
+                flush = getattr(buf, "flush", None)
+                if flush is not None:
+                    flush()
+                return
+            except Exception:  # noqa: BLE001 - fall through to the text write
+                pass
+    stream.write(line)
+    flush = getattr(stream, "flush", None)
+    if flush is not None:
+        flush()
+
+
 def guard_stdio() -> None:
     """Wrap ``sys.stdout`` and ``sys.stderr`` once. A later flush of a dead handle does not raise."""
     if not isinstance(sys.stdout, GuardedStream):

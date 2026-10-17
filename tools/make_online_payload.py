@@ -14,6 +14,7 @@ import argparse
 import datetime
 import json
 import os
+import re
 import sys
 import zipfile
 from pathlib import Path
@@ -24,6 +25,22 @@ from voxprint_common.hashing import sha256_file
 SCHEMA = 1
 DEFAULT_LIMIT_MIB = 1800
 PREFIX = "Voxprint-payload"
+# A release asset that travels beside the setup exe. No scheme, no slash, no parent segment.
+_LOCAL_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,199}$")
+
+
+def is_local_asset_name(url: str) -> bool:
+    """True when ``url`` is one file name, not an address."""
+    return bool(url) and "/" not in url and "\\" not in url and ":" not in url and ".." not in url and _LOCAL_NAME.fullmatch(url) is not None
+
+
+def publish_url(base: str, filename: str, local_assets: bool) -> str:
+    """Download address of one file we ship: the release URL, or the file name when ``local_assets``."""
+    if local_assets:
+        if not is_local_asset_name(filename):
+            raise SystemExit(f"local asset name is not a single file name: {filename}")
+        return filename
+    return f"{base.rstrip('/')}/{filename}"
 
 
 def channel_for(tag: str) -> str:
@@ -45,7 +62,8 @@ def list_files(dist: Path) -> List[Path]:
 
 def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = None, base_url: str = "",
           limit_mib: int = DEFAULT_LIMIT_MIB, app_version: str = "", runtime_site: Optional[Path] = None,
-          runtime_lock: Optional[Path] = None, mirror_base: str = "", prefix: str = "") -> Path:
+          runtime_lock: Optional[Path] = None, mirror_base: str = "", prefix: str = "",
+          local_assets: bool = False) -> Path:
     """Write the zips and the manifest into ``out``; returns the manifest path.
 
     ``runtime_lock`` (THIN installer v2, ``docs/THIN-INSTALLER.md``): ``infra/runtime_lock.json``.  ``dist`` is the thin shell (the only
@@ -70,8 +88,12 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
         mj = (dist / "_internal" if (dist / "_internal").is_dir() else dist) / "modules.json"
         # manifest_url = pinned (this release); latest_manifest_url = the newest release's (try-latest option and fallback;
         # only for GitHub release assets - a custom base_url has no "latest" alias)
-        latest = "" if base_url else f"https://github.com/{repo}/releases/latest/download/{mname}"
-        mj.write_text(json.dumps({"schema": 1, "manifest_url": f"{base}/{mname}", "latest_manifest_url": latest, "tag": tag},
+        if local_assets:
+            manifest_url, latest = mname, ""
+        else:
+            latest = "" if base_url else f"https://github.com/{repo}/releases/latest/download/{mname}"
+            manifest_url = f"{base}/{mname}"
+        mj.write_text(json.dumps({"schema": 1, "manifest_url": manifest_url, "latest_manifest_url": latest, "tag": tag},
                                  indent=1), encoding="utf-8")
     parts: List[dict] = []
     cur: Optional[zipfile.ZipFile] = None
@@ -105,7 +127,8 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
         path = p["path"]
         if path.stat().st_size >= 2 * 1024 ** 3:
             raise SystemExit(f"{path.name} is {path.stat().st_size} bytes: over the 2 GiB asset limit, lower --limit-mib")
-        comps.append({"id": f"{'shell' if runtime_lock is not None else 'payload'}-{i:02d}", "file": path.name, "url": f"{base}/{path.name}", "size": path.stat().st_size,
+        comps.append({"id": f"{'shell' if runtime_lock is not None else 'payload'}-{i:02d}", "file": path.name,
+                      "url": publish_url(base, path.name, local_assets), "size": path.stat().st_size,
                       "sha256": sha256_of(path), "unpacked_bytes": p["raw"], "markers": p["markers"]})
     modules: List[dict] = []
     meta: dict = {}
@@ -118,6 +141,13 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
             import runtime_manifest as rm                 # type: ignore[no-redef]
 
         rt_comps, modules, meta = rm.components(json.loads(Path(runtime_lock).read_text(encoding="utf-8")), base, out, mirror_base)
+        if local_assets:
+            prefix_url = base.rstrip("/") + "/"
+            for entry in rt_comps:
+                url = str(entry.get("url") or "")
+                # Wheels we built (sdist) use ``base``. Upstream addresses stay as they are.
+                if url.startswith(prefix_url) or is_local_asset_name(url):
+                    entry["url"] = entry["file"]
         comps += rt_comps
     elif runtime_site is not None:
         for c in comps:
@@ -144,9 +174,79 @@ def build(dist: Path, out: Path, tag: str, repo: str, channel: Optional[str] = N
         manifest["modules"] = modules
         if meta:
             manifest["runtime"] = meta
+    if local_assets:
+        _seal_local_shell(out, mname, manifest)
     mp = out / mname
-    mp.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+    text = json.dumps(manifest, indent=1)
+    mp.write_text(text, encoding="utf-8")
+    if local_assets:
+        (out / "embedded-manifest.json").write_text(text, encoding="utf-8")
     return mp
+
+
+def _zip_contains(path: Path, suffix: str) -> bool:
+    with zipfile.ZipFile(path) as archive:
+        return any(name.replace("\\", "/").endswith(suffix) for name in archive.namelist())
+
+
+def _arc_dir(path: Path) -> str:
+    """Directory inside ``path`` that holds ``modules.json`` (``_internal`` or the zip root)."""
+    with zipfile.ZipFile(path) as archive:
+        for name in archive.namelist():
+            norm = name.replace("\\", "/")
+            if norm.endswith("modules.json"):
+                parent = str(Path(norm).parent).replace("\\", "/")
+                return "" if parent == "." else parent
+    return ""
+
+
+def _append_files(zip_path: Path, arc_dir: str, files: List[Path], names: Optional[dict] = None) -> None:
+    """Add ``files`` next to ``modules.json``. ``names`` maps a source path to the archive file name."""
+    names = names or {}
+    with zipfile.ZipFile(zip_path, "a", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+        existing = {name.replace("\\", "/") for name in archive.namelist()}
+        for src in files:
+            arc_name = names.get(src, src.name)
+            arc = f"{arc_dir}/{arc_name}" if arc_dir else arc_name
+            if arc not in existing:
+                archive.write(src, arc)
+
+
+def _refresh_component(comp: dict, path: Path) -> None:
+    comp["size"] = path.stat().st_size
+    comp["sha256"] = sha256_of(path)
+
+
+def _seal_local_shell(out: Path, mname: str, manifest: dict) -> None:
+    """Put local wheels and a manifest copy in the shell zip, then record that zip's final hash.
+
+    The copy inside the zip is written before the hash is refreshed, so the installer uses the
+    manifest beside the setup exe (the hash matches the zip). The copy inside the shell is what
+    the app reads after extract; its wheel addresses are file names next to that copy.
+    """
+    holder = None
+    for comp in manifest["components"]:
+        if comp.get("role", "core") != "core":
+            continue
+        path = out / comp["file"]
+        if path.is_file() and _zip_contains(path, "modules.json"):
+            holder = comp
+            break
+    if holder is None:
+        return
+    zpath = out / holder["file"]
+    arc = _arc_dir(zpath)
+    wheels = [out / comp["file"] for comp in manifest["components"]
+              if comp.get("kind") == "wheel" and is_local_asset_name(str(comp.get("url") or "")) and (out / comp["file"]).is_file()]
+    _append_files(zpath, arc, wheels)
+    _refresh_component(holder, zpath)
+    snapshot = out / (mname + ".inject")
+    snapshot.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
+    try:
+        _append_files(zpath, arc, [snapshot], {snapshot: mname})
+    finally:
+        snapshot.unlink(missing_ok=True)
+    _refresh_component(holder, zpath)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -161,10 +261,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--runtime-site", help="THIN installer: site-packages of the build environment (heavy libraries become runtime modules)")
     ap.add_argument("--runtime-lock", help="THIN installer v2: infra/runtime_lock.json (libraries come from their upstream sites)")
     ap.add_argument("--mirror-base", default="", help="optional fallback address prefix for the lock's files (our mirror)")
+    ap.add_argument("--local-assets", action="store_true",
+                    help="shell and sdist wheels are file names next to the setup exe (no GitHub release URL)")
     a = ap.parse_args(argv)
     mp = build(Path(a.dist), Path(a.out), a.tag, a.repo, a.channel, a.base_url, a.limit_mib,
                runtime_site=Path(a.runtime_site) if a.runtime_site else None,
-               runtime_lock=Path(a.runtime_lock) if a.runtime_lock else None, mirror_base=a.mirror_base)
+               runtime_lock=Path(a.runtime_lock) if a.runtime_lock else None, mirror_base=a.mirror_base,
+               local_assets=a.local_assets)
     m = json.loads(mp.read_text(encoding="utf-8"))
     for c in m["components"]:
         print(f"{c['file']}  {c['size']:>12}  {c['sha256']}  {c.get('role', 'core')}")
