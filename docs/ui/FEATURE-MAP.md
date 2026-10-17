@@ -2,7 +2,7 @@
 
 One row per old-UI feature and per CLI feature. Status is `mapped`, `CLI-only`, or `dropped`. Nothing in this table is `dropped`.
 
-The main screen is section Narrate: the audio surface (Choose a book, voice, pace, player, Create audiobook). Other jobs use sections Voices, Roles, and Re-voice. Voice training is a 3-step wizard. Expert fields are the live values behind the Narrate chips.
+The main screen is section Narrate: the audio surface (Choose a book, voice, pace, one voice or each speaker, player, Create audiobook). Other jobs use sections Voices, Roles, and Re-voice. Voice training is a 3-step wizard. Language, text preparation, the file, sound quality, reading style, background sound, and the AI label are expert fields. They keep the defaults the chips used to set.
 
 ## Missing shell pieces
 
@@ -51,7 +51,7 @@ Until Sections and Steps land, the frozen windows (`ui/main_window.py`, `ui/voic
 | Edit speaker-mark prompt files | Narrate, edit prompts | Section: Roles, action Edit prompts | mapped |
 | .vxbook roles and cast | Narrate opens the archive | Section: Roles, book cast | mapped |
 | Keep an author stress mark (U+0301) | Prepare text leaves it in place | Expert field: Prepare text (no stress step is added; the speech model does not read marks) | mapped |
-| Prepare text | Narrate, Prepare the text | Section: Narrate, chip Prepare text | mapped |
+| Prepare text | Narrate, Prepare the text | Expert field: Prepare the text | mapped |
 | Prepare step: layout | Narrate prepare | Expert field: Fix the layout | mapped |
 | Prepare step: page noise | Narrate prepare | Expert field: Remove page noise | mapped |
 | Prepare step: quotes | Narrate prepare | Expert field: Fix quotes | mapped |
@@ -63,29 +63,29 @@ Until Sections and Steps land, the frozen windows (`ui/main_window.py`, `ui/voic
 | Russian typo model | Narrate prepare path | Expert field: Typo cleanup | mapped |
 | AI text preparation (markup) | Narrate, AI text model | Expert field: AI text preparation | mapped |
 | Sample of the prepared text | Narrate sample pane | Section: Narrate, prepared-text sample | mapped |
-| Translate, or keep the book’s language | Narrate translate row | Section: Narrate, chip Language | mapped |
+| Translate, or keep the book’s language | Narrate translate row | Expert field: Language | mapped |
 | Literary translation | Narrate checkbox | Expert field: Literary translation | mapped |
 | Download translation models | Narrate button | Action: Manage models | mapped |
 | Download the text model | Narrate button | Action: Manage models | mapped |
-| Spoken AI disclosure | Narrate checkbox | Section: Narrate, chip AI disclosure | mapped |
-| One Opus file | Narrate formats | Section: Narrate, chip File | mapped |
-| MP3 chapters | Narrate formats | Section: Narrate, chip File | mapped |
-| Apple Books (M4B) | Narrate formats | Section: Narrate, chip File | mapped |
+| Spoken AI disclosure | Narrate checkbox | Expert field: Say this is AI | mapped |
+| One Opus file | Narrate formats | Expert field: Audiobook file | mapped |
+| MP3 chapters | Narrate formats | Expert field: Audiobook file | mapped |
+| Apple Books (M4B) | Narrate formats | Expert field: Audiobook file | mapped |
 | Opus chapters | Narrate, other formats | Expert field: Audiobook file | mapped |
 | FLAC chapters | Narrate, other formats | Expert field: Audiobook file | mapped |
 | WAV chapters | Narrate, other formats | Expert field: Audiobook file | mapped |
-| Sound quality Compact, Standard, High | Narrate quality | Section: Narrate, chip Sound quality | mapped |
+| Sound quality Compact, Standard, High | Narrate quality | Expert field: Opus bitrate, MP3 bitrate, AAC bitrate (Standard is the live default) | mapped |
 | Opus, MP3, and AAC bitrates | Narrate advanced rates | Expert field: Opus bitrate, MP3 bitrate, AAC bitrate | mapped |
 | Fragment check | Narrate checkbox | Expert field: Fragment check | mapped |
-| Background sound for a .vxbook | Settings soundscape | Section: Narrate, chip Background sound | mapped |
-| Reading style | Settings and Narrate | Section: Narrate, chip Reading style | mapped |
+| Background sound for a .vxbook | Settings soundscape | Expert field: Background sound | mapped |
+| Reading style | Settings and Narrate | Expert field: Reading style | mapped |
 | Reading speed | Settings | Expert field: Speed | mapped |
 | Pause after a comma | Settings | Expert field: Comma pause | mapped |
 | Pause mid-sentence | Settings | Expert field: Mid-sentence pause | mapped |
 | Pause after a sentence | Settings | Expert field: Sentence pause | mapped |
 | Pause after a paragraph | Settings | Expert field: Paragraph pause | mapped |
 | Pause after a chapter | Settings | Expert field: Chapter pause | mapped |
-| Reset narration defaults | Settings button | Expert field: Reset on the owning chip | mapped |
+| Reset narration defaults | Settings button | Expert field: Reset on Pace or Voices | mapped |
 | Read ordinals | Settings checkbox | Expert field: Read ordinals | mapped |
 | Working folder | Narrate | Expert field: Working folder | mapped |
 | Speech model | Narrate model row | Expert field: Speech model | mapped |

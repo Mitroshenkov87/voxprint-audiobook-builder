@@ -15,7 +15,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from PySide6.QtWidgets import QVBoxLayout, QWidget
+from PySide6.QtGui import QFont, QFontMetrics
+from PySide6.QtWidgets import QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 from voxprint_common.i18n import add_catalogs
 from voxprint_common.i18n import tr as shell_tr
@@ -24,6 +25,7 @@ from voxprint_common.suite_settings import set_window_geometry, window_geometry
 from voxprint_common.ui.expert import ExpertMode
 from voxprint_common.ui.simple_image import Phase, SimpleLayout, SimpleWidget
 from voxprint_common.ui.theme import build_shell_style
+from voxprint_common.ui.tokens import load as load_tokens
 from voxprint_common.ui.variants import WINDOW_HEIGHT, WINDOW_WIDTH, state_names, surface_for
 
 from infra.mdl_gate import manage_argv, models_ready
@@ -32,6 +34,10 @@ from ui.narrate_state import SURFACE_ID, narrate_presets, narrate_settings
 
 # Methods the shell does not offer. Callers look them up and do not invent them.
 MISSING_SHELL_API = ("set_voices", "input_path", "open_page", "pause")
+
+# Chip stylesheet padding is 14 px on each side. See QPushButton[chip="true"].
+_CHIP_PAD_X = 14
+_HISTORY_HEIGHT = 104
 
 _CATALOGS = Path(__file__).resolve().parent.parent / "locales" / "shell"
 
@@ -81,8 +87,10 @@ class AudiobookShell:
             self.settings,
             on_generate=self._on_generate,
             on_command=self._on_command,
+            on_refresh=self._after_paint,
             surface=self.surface,
         )
+        self.screen.refresh()
         self.expert = ExpertMode()
         self._stop_expert = self.expert.subscribe(self.screen.set_expert)
         self._book = ""
@@ -160,6 +168,42 @@ class AudiobookShell:
             max(self.surface.min_height, stored["height"]),
         )
         self.widget.move(stored["x"], stored["y"])
+
+    def _after_paint(self) -> None:
+        """Size each pill to its bold label, and hide the history row while it is empty.
+
+        The first paint runs inside the screen constructor, before ``self.screen`` exists.
+        """
+        if getattr(self, "screen", None) is None:
+            return
+        self._fit_pills()
+        self._fit_history()
+
+    def _fit_pills(self) -> None:
+        density = load_tokens().density
+        pad = _CHIP_PAD_X * 2 + density.border_px * 2 + 8
+        for button in self.screen.root.findChildren(QPushButton):
+            if button.property("chip") != "true" and not str(button.objectName()).startswith("reset-"):
+                continue
+            text = button.text()
+            if not text:
+                continue
+            font = QFont(button.font())
+            font.setPixelSize(density.body_px)
+            font.setWeight(QFont.Weight.DemiBold)
+            advance = QFontMetrics(font).horizontalAdvance(text)
+            button.setMinimumWidth(max(advance + pad, 36))
+
+    def _fit_history(self) -> None:
+        strip = self.screen.root.findChild(QScrollArea, "historyStrip")
+        if strip is None:
+            return
+        if self.layout.history:
+            strip.setFixedHeight(_HISTORY_HEIGHT)
+            strip.show()
+            return
+        strip.hide()
+        strip.setFixedHeight(0)
 
     def _on_generate(self) -> None:
         if self.book_path():

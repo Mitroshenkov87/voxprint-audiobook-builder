@@ -6,8 +6,8 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtGui import QFontMetrics
-from PySide6.QtWidgets import QApplication, QComboBox, QFrame, QLabel, QPushButton, QTabBar
+from PySide6.QtGui import QFont, QFontMetrics
+from PySide6.QtWidgets import QApplication, QComboBox, QFrame, QLabel, QPushButton, QScrollArea, QTabBar
 from voxprint_common.i18n import add_catalogs, set_language
 from voxprint_common.i18n import tr as shell_tr
 from voxprint_common.mdl import load_manifest
@@ -15,7 +15,8 @@ from voxprint_common.ui.presets import PresetMatch
 from voxprint_common.ui.simple_image import Phase
 from voxprint_common.ui.tokens import load as load_tokens
 
-from core.audiobook_export import PRESET_HIGH, PRESET_STANDARD, QUALITY_PRESETS
+from core.audiobook_export import FORMAT_OPUS_SINGLE, PRESET_STANDARD, QUALITY_PRESETS
+from core.pace import AUTO
 from core.consent import TEMPLATES
 from core.pauses import DEFAULT_LENGTHS_MS
 from infra.mdl_gate import manifest_path
@@ -45,16 +46,19 @@ def test_narration_groups_share_the_shell_pace_state():
     groups = [group.group_id for group in narrate_presets(settings).groups]
     assert SURFACE_ID == "audiobook-builder"
     assert groups[0] == "pace"
-    assert groups[1:] == [
-        "voices", "language", "prepare", "file", "quality", "style", "sound", "disclosure",
-    ]
+    assert groups[1:] == ["voices"]
     pauses = settings.get("narr.pause.sentence")
     assert pauses is not None and pauses.default == DEFAULT_LENGTHS_MS["sentence"]
     opus = settings.get("narr.opus_kbps")
     assert opus is not None
     assert opus.default == QUALITY_PRESETS[PRESET_STANDARD].opus_kbps
-    high = narrate_presets(settings).group("quality").option(PRESET_HIGH)
-    assert high is not None and dict(high.values)["narr.check_chunks"] is True
+    assert settings.get("narr.language").default == "keep"
+    assert settings.get("narr.prepare").default is True
+    assert settings.get("narr.file").default == FORMAT_OPUS_SINGLE
+    assert settings.get("narr.check_chunks").default is False
+    assert settings.get("narr.style").default == AUTO
+    assert settings.get("narr.sound").default == "off"
+    assert settings.get("narr.disclosure").default is False
 
 
 def test_model_choices_come_from_the_manifest_and_every_catalog_names_them():
@@ -212,17 +216,67 @@ def test_this_pin_has_no_section_row_or_step_wizard(app):
         assert not callable(getattr(window.screen, name, None)), name
 
 
-def test_chip_text_fits_in_english_and_russian(app):
+def test_moved_choices_stay_as_live_expert_values(app):
+    window = _open("en")
+    window.screen.set_expert(True)
+    QApplication.processEvents()
+    language = window.widget.findChild(QComboBox, "narr.language")
+    style = window.widget.findChild(QComboBox, "narr.style")
+    saved = window.widget.findChild(QComboBox, "narr.file")
+    assert language is not None and language.currentText() == "Keep the book's language"
+    assert style is not None and style.currentText() == "Automatic"
+    assert saved is not None and saved.currentText() == "One Opus file"
+    assert window.layout.get("narr.prepare") is True
+    assert window.layout.get("narr.sound") == "off"
+    assert window.layout.get("narr.disclosure") is False
+    assert window.layout.get("narr.opus_kbps") == QUALITY_PRESETS[PRESET_STANDARD].opus_kbps
+    labels = [row.text() for row in window.widget.findChildren(QLabel) if row.objectName().startswith("preset-")]
+    assert labels == ["Pace", "Voices"] or "Pace" in labels and "Voices" in labels
+    assert "Language" not in labels and "Prepare text" not in labels
+    window.widget.close()
+
+
+def test_russian_reading_style_says_avto():
+    set_language("ru")
+    add_catalogs(SHELL_LOCALES)
+    catalog = json.loads((SHELL_LOCALES / "ru.json").read_text(encoding="utf-8"))
+    assert shell_tr("abb.preset.style.auto") == "Авто"
+    assert shell_tr("setting.narr.vram.auto") == "Авто"
+    assert "Само" not in catalog.values()
+
+
+def test_empty_history_strip_stays_hidden_until_a_job_finishes(app):
+    window = _open("en")
+    strip = window.widget.findChild(QScrollArea, "historyStrip")
+    assert strip is not None and not strip.isVisible()
+    window.show_progress(1, 2, "Reading", eta_seconds=10)
+    QApplication.processEvents()
+    assert not strip.isVisible()
+    window.layout.finish("chapter-1")
+    window.screen.refresh()
+    QApplication.processEvents()
+    assert strip.isVisible() and strip.height() == 104
+    window.widget.close()
+
+
+def test_chip_text_fits_in_english_russian_and_german(app):
+    density = load_tokens().density
+    pad = 14 * 2 + density.border_px * 2
     for language in ("en", "ru", "de"):
         window = _open(language)
         window.widget.resize(1200, 900)
         window.layout.set_value("audio.loudness", -14.0)
         window.screen.refresh()
-        window.screen.set_expert(True)
         QApplication.processEvents()
+        seen = []
         for button in window.widget.findChildren(QPushButton):
-            if not button.isVisible() or not button.text():
+            if button.property("chip") != "true" or not button.isVisible() or not button.text():
                 continue
-            advance = QFontMetrics(button.font()).horizontalAdvance(button.text())
-            assert advance <= button.contentsRect().width(), (language, button.text())
+            seen.append(button.text())
+            font = QFont(button.font())
+            font.setPixelSize(density.body_px)
+            font.setWeight(QFont.Weight.DemiBold)
+            advance = QFontMetrics(font).horizontalAdvance(button.text())
+            assert advance + pad <= button.width(), (language, button.text(), advance, button.width())
+        assert any("voice" in text.lower() or "голос" in text.lower() or "stimme" in text.lower() for text in seen)
         window.widget.close()

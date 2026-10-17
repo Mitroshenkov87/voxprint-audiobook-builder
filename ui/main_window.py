@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, List, Optional
 
 from PySide6.QtCore import Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
+from PySide6.QtGui import QColor, QDesktopServices, QDragEnterEvent, QDropEvent, QPalette
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -418,8 +418,14 @@ class MainWindow(QWidget):
         self.setWindowTitle(APP_TITLE)
         self.setObjectName("root")
         self.setAcceptDrops(True)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        # Acrylic needs a translucent window on Windows. Elsewhere the solid root must paint,
+        # or the title sits on an empty black grab.
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, sys.platform == "win32")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAutoFillBackground(True)
+        palette = self.palette()
+        palette.setColor(QPalette.ColorRole.Window, QColor(ROOT_PLAIN))
+        self.setPalette(palette)
         self._build()
         self.setStyleSheet(build_style(False))
         self._fit_to_screen()
@@ -474,6 +480,7 @@ class MainWindow(QWidget):
         head.addWidget(self.btn_back)
         self.lbl_title = QLabel()
         self.lbl_title.setObjectName("title")
+        self.lbl_title.setStyleSheet(f"color: {TEXT}; background: transparent;")
         head.addWidget(self.lbl_title)
         head.addStretch(1)
         self.btn_settings = QPushButton("\u2699")          # gear: opens the Settings dialog
@@ -565,6 +572,14 @@ class MainWindow(QWidget):
             row.addWidget(sp)
             gl.addLayout(row)
             self.adv_rows.append(lab)
+        self.lbl_estimate_detail = QLabel()
+        self.lbl_estimate_detail.setObjectName("hint")
+        self.lbl_estimate_detail.setWordWrap(True)
+        gl.addWidget(self.lbl_estimate_detail)
+        self.lbl_expert_note = QLabel()
+        self.lbl_expert_note.setObjectName("hint")
+        self.lbl_expert_note.setWordWrap(True)
+        gl.addWidget(self.lbl_expert_note)
         self.lbl_adv_hint = QLabel()
         self.lbl_adv_hint.setObjectName("hint")
         self.lbl_adv_hint.setWordWrap(True)
@@ -899,6 +914,7 @@ class MainWindow(QWidget):
         for lab, key in zip(self.adv_rows, ("epochs", "rank", "alpha", "lr", "accum")):
             lab.setText(tr("preset.adv_" + key))
         self.lbl_adv_hint.setText(tr("preset.adv_hint"))
+        self.lbl_expert_note.setText(tr("preset.expert_note"))
         self.refresh_estimate()
         self.chk_no_text.setText(tr("asr.checkbox"))
         self.btn_folder.setText(tr("asr.choose_folder"))
@@ -1424,6 +1440,7 @@ class MainWindow(QWidget):
             quick, tr("preset.unit_min"), tr("preset.unit_sec"), tr("preset.unit_hour")), n=len(vs)))
         fmt = dict(time=dur, epochs=plan.epochs, rank=plan.lora_r, n=n, gpu=where)
         self.lbl_estimate.setText(tr("preset.estimate", **fmt) if real else tr("preset.estimate_example", **fmt))
+        self.lbl_estimate_detail.setText(tr("preset.estimate_detail", **fmt))
 
     @property
     def no_transcript(self) -> bool:

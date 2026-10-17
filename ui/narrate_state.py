@@ -21,8 +21,6 @@ from core.audiobook_export import (
     FORMAT_OPUS_CHAPTERS,
     FORMAT_OPUS_SINGLE,
     FORMAT_WAV_CHAPTERS,
-    PRESET_COMPACT,
-    PRESET_HIGH,
     PRESET_STANDARD,
     QUALITY_PRESETS,
 )
@@ -80,7 +78,7 @@ def narrate_settings() -> Settings:
 
 
 def narrate_presets(settings: Settings) -> PresetFile:
-    """Pace from the shell, then the audiobook chips, in one preset file."""
+    """Pace from the shell, then the Voices chip. Other narration values are expert fields."""
     surface = surface_for(SURFACE_ID)
     pace = variant_presets(surface, settings)
     extra = parse_presets(_preset_document(), settings)
@@ -132,36 +130,6 @@ def _preset_document() -> dict[str, object]:
                 ("one", "abb.preset.voices.one", {"narr.multi_voice": False}),
                 ("each", "abb.preset.voices.each", {"narr.multi_voice": True}),
             )),
-            _group("language", "abb.preset.language", "keep", tuple(
-                (code, f"abb.preset.language.{code}", {"narr.language": code, "narr.literary": False})
-                for code in ("keep", "en", "ru", "de")
-            )),
-            _group("prepare", "abb.preset.prepare", "on", (
-                ("on", "abb.preset.prepare.on", _prepare(True)),
-                ("off", "abb.preset.prepare.off", _prepare(False)),
-            )),
-            _group("file", "abb.preset.file", FORMAT_OPUS_SINGLE, (
-                (FORMAT_OPUS_SINGLE, "abb.preset.file.opus", {"narr.file": FORMAT_OPUS_SINGLE}),
-                (FORMAT_MP3_CHAPTERS, "abb.preset.file.mp3", {"narr.file": FORMAT_MP3_CHAPTERS}),
-                (FORMAT_M4B, "abb.preset.file.m4b", {"narr.file": FORMAT_M4B}),
-            )),
-            _group("quality", "abb.preset.quality", PRESET_STANDARD, (
-                (PRESET_COMPACT, "abb.preset.quality.compact", _quality(PRESET_COMPACT, False)),
-                (PRESET_STANDARD, "abb.preset.quality.standard", _quality(PRESET_STANDARD, False)),
-                (PRESET_HIGH, "abb.preset.quality.high", _quality(PRESET_HIGH, True)),
-            )),
-            _group("style", "abb.preset.style", AUTO, tuple(
-                (style, f"abb.preset.style.{style}", _style(style))
-                for style in (AUTO, SCRIPTURE, FICTION, DIALOGUE)
-            )),
-            _group("sound", "abb.preset.sound", "off", (
-                ("off", "abb.preset.sound.off", {"narr.sound": "off"}),
-                ("when", "abb.preset.sound.when", {"narr.sound": "when"}),
-            )),
-            _group("disclosure", "abb.preset.disclosure", "off", (
-                ("off", "abb.preset.disclosure.off", {"narr.disclosure": False}),
-                ("on", "abb.preset.disclosure.on", {"narr.disclosure": True}),
-            )),
         ],
     }
 
@@ -176,30 +144,6 @@ def _group(group_id: str, label_key: str, default: str, options: tuple) -> dict[
             for option_id, label_key, values in options
         ],
     }
-
-
-def _prepare(enabled: bool) -> dict[str, bool]:
-    values = {"narr.prepare": enabled}
-    for step in STEP_KEYS:
-        values[f"narr.step.{step}"] = enabled
-    return values
-
-
-def _quality(name: str, check_chunks: bool) -> dict[str, object]:
-    rates = QUALITY_PRESETS[name]
-    return {
-        "narr.opus_kbps": rates.opus_kbps,
-        "narr.mp3_kbps": rates.mp3_kbps,
-        "narr.aac_kbps": rates.aac_kbps,
-        "narr.check_chunks": check_chunks,
-    }
-
-
-def _style(style: str) -> dict[str, object]:
-    values: dict[str, object] = {"narr.style": style, "narr.speed": 1.0}
-    for key, kind in _PAUSE_FIELDS:
-        values[key] = int(DEFAULT_LENGTHS_MS[kind])
-    return values
 
 
 def _enum(setting_id: str, default: str, items: tuple[Choice, ...], group: str) -> SettingSpec:
