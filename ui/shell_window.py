@@ -543,7 +543,7 @@ class AudiobookShell:
 
     def _fit_pills(self) -> None:
         density = load_tokens().density
-        pad = _CHIP_PAD_X * 2 + density.border_px * 2 + 8
+        pad = _CHIP_PAD_X * 2 + density.border_px * 2
         for button in self.screen.root.findChildren(QPushButton):
             name = str(button.objectName())
             if button.property("chip") != "true" and not name.startswith("reset-") and name != "expertToggle":
@@ -555,10 +555,8 @@ class AudiobookShell:
             font.setPixelSize(density.body_px)
             font.setWeight(QFont.Weight.DemiBold)
             advance = QFontMetrics(font).horizontalAdvance(text)
-            button.setMinimumWidth(max(advance + pad, 36))
-            hint = button.sizeHint().width()
-            if hint > button.minimumWidth():
-                button.setMinimumWidth(hint)
+            extra = 8 if name == "expertToggle" else 0
+            button.setMinimumWidth(max(advance + pad + extra, 36))
 
     def _fit_history(self) -> None:
         strip = self.screen.root.findChild(QScrollArea, "historyStrip")

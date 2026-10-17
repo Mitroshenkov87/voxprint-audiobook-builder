@@ -364,7 +364,7 @@ def _sibling_overlaps(root: QWidget) -> list[tuple[str, str, QRect]]:
 
 def _assert_labels_fit(root: QWidget, language: str, width: int, mode: str) -> None:
     density = load_tokens().density
-    pad = 14 * 2 + density.border_px * 2 + 8
+    pad = 14 * 2 + density.border_px * 2
     for button in root.findChildren(QPushButton):
         name = button.objectName()
         chip = button.property("chip") == "true" or name.startswith("reset-") or name == "expertToggle"
