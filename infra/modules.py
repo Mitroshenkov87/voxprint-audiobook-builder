@@ -197,12 +197,38 @@ def _fetch_module():
 
 
 # ------------------------------------------------------------------------------------------------ manifest and state
+def _resolve_manifest_source(src: str) -> str:
+    """Turn a file name from ``modules.json`` into a path next to that file.
+
+    An https URL and a path that already exists are unchanged. A relative name such as
+    ``manifest-thin-beta.json`` is the manifest shipped beside ``modules.json`` (an artifact-only installer).
+    Only that one file name is joined onto the install folder. ``../`` stays a path the caller named,
+    and is not resolved by climbing out of the folder.
+    """
+    text = str(src or "").strip()
+    if not text or "://" in text:
+        return text
+    path = Path(text)
+    if path.is_file():
+        return str(path.resolve())
+    name = path.name
+    if not name or name in (".", "..") or name != text or "/" in text or "\\" in text or ".." in text:
+        return text
+    cfg = config_path()
+    if cfg is not None:
+        root = cfg.parent.resolve()
+        beside = (root / name).resolve()
+        if beside.is_file() and root in beside.parents:
+            return str(beside)
+    return text
+
+
 def load_manifest(source: Optional[str] = None, offline_ok: bool = True) -> Dict[str, Any]:
     """The release manifest (downloaded; the last good copy is kept in ``state/`` for offline use)."""
     of = _fetch_module()
     cfg = load_config() or {}
     # the manifest the runtime was last installed from (the latest one after "try latest" or a fallback), else the pinned one
-    src = source or str(_channel_state().get("installed_from") or cfg.get("manifest_url", ""))
+    src = _resolve_manifest_source(source or str(_channel_state().get("installed_from") or cfg.get("manifest_url", "")))
     if not src:
         raise ModulesError("no manifest address (modules.json)")
     cache = paths.state_dir() / MANIFEST_CACHE
@@ -428,7 +454,7 @@ def install(module_ids: Optional[List[str]] = None, progress: Optional[Progress]
     components fetched.  Resumable: run it again after a failure.  Activates the runtime folder when done."""
     of = _fetch_module()
     cfg = load_config() or {}
-    src = manifest_source or str(cfg.get("manifest_url", ""))
+    src = _resolve_manifest_source(manifest_source or str(cfg.get("manifest_url", "")))
     latest = "" if manifest_source else latest_url()
     try:
         man = load_manifest(src)

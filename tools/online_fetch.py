@@ -21,6 +21,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -79,16 +80,35 @@ class Status:
         with self._lock:
             self._beat += 1
             state, permille, text = self._cur
-            tmp = self.path.with_name(self.path.name + ".tmp")
+            # UTF-8, with a BOM on Windows: Inno Setup reads UTF-8 only when the BOM is present,
+            # and Notepad on Windows does the same. ASCII-with-replace dropped every non-ASCII message.
+            encoding = "utf-8-sig" if sys.platform == "win32" else "utf-8"
+            body = f"{state}\n{permille}\n{text.replace(chr(10), ' ')[:300]}\n{self._beat}\n"
             try:
-                # UTF-8, with a BOM on Windows: Inno Setup reads UTF-8 only when the BOM is present,
-                # and Notepad on Windows does the same. ASCII-with-replace dropped every non-ASCII message.
-                encoding = "utf-8-sig" if sys.platform == "win32" else "utf-8"
-                tmp.write_text(f"{state}\n{permille}\n{text.replace(chr(10), ' ')[:300]}\n{self._beat}\n",
-                               encoding=encoding)
-                os.replace(tmp, self.path)
+                self.path.parent.mkdir(parents=True, exist_ok=True)
             except OSError:
-                pass
+                return
+            # Each write gets its own temp name. A shared ``status.txt.tmp`` lost the race with the
+            # installer (WinError 5 / 32). A sharing violation is retried; a status write never fails the download.
+            for attempt in range(8):
+                tmp_name = ""
+                try:
+                    fd, tmp_name = tempfile.mkstemp(prefix=self.path.name + ".", suffix=".tmp", dir=self.path.parent)
+                    with os.fdopen(fd, "w", encoding=encoding, newline="\n") as handle:
+                        handle.write(body)
+                    os.replace(tmp_name, self.path)
+                    tmp_name = ""
+                    return
+                except PermissionError:
+                    time.sleep(0.02 * (attempt + 1))
+                except OSError:
+                    return
+                finally:
+                    if tmp_name:
+                        try:
+                            os.unlink(tmp_name)
+                        except OSError:
+                            pass
 
     def write(self, state: str, fraction: float, text: str, force: bool = False) -> None:
         now = time.time()
@@ -118,8 +138,17 @@ def _is_loopback(host: str) -> bool:
     return host in ("127.0.0.1", "localhost", "::1")
 
 
+def is_local_name(url: str) -> bool:
+    """True for one file name beside the installer (no scheme, no directory)."""
+    if not url or "/" in url or "\\" in url or ":" in url or url in (".", "..") or ".." in url:
+        return False
+    return re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,199}", url) is not None
+
+
 def check_url(url: str) -> None:
-    """Only https (http for loopback) is accepted."""
+    """Only https (http for loopback) or a single local file name is accepted."""
+    if is_local_name(url):
+        return
     p = urllib.parse.urlparse(url)
     if p.scheme == "https" or (p.scheme == "http" and _is_loopback(p.hostname or "")):
         return
@@ -268,22 +297,75 @@ def ranked(urls: List[str]) -> List[str]:
     return sorted(urls, key=lambda u: -_host_speed(u))
 
 
+def _local_roots(payload_dir: Optional[Path], manifest_source: str) -> List[Path]:
+    """Folders that may hold a file-name component: ``--payload-dir``, then the manifest's own folder."""
+    roots: List[Path] = []
+    if payload_dir is not None:
+        roots.append(Path(payload_dir))
+    if manifest_source and not re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", manifest_source):
+        parent = Path(manifest_source).expanduser().resolve().parent
+        if all(parent != root.resolve() for root in roots):
+            roots.append(parent)
+    return roots
+
+
+def _find_local(name: str, roots: List[Path]) -> Path:
+    """Return ``name`` inside one of ``roots``. A name that leaves the folder is refused."""
+    if not is_local_name(name):
+        raise FetchError(f"Refusing a non-HTTPS address: {name}")
+    for root in roots:
+        base = root.resolve()
+        cand = (base / name).resolve()
+        if cand != base and base not in cand.parents:
+            continue
+        if cand.is_file():
+            return cand
+    raise FetchError(f"Local file {name} was not found next to the installer")
+
+
+def _copy_local(comp: dict, url: str, cache: Path, progress: Callable[[int, int], None],
+                verifying: Optional[Callable[[], None]], payload_dir: Optional[Path], manifest_source: str) -> Path:
+    """Copy a file that sits next to the installer into the cache and check its size and SHA-256."""
+    size, sha = int(comp["size"]), comp["sha256"]
+    src = _find_local(url, _local_roots(payload_dir, manifest_source))
+    cache.mkdir(parents=True, exist_ok=True)
+    final = cache / f"{sha}.zip"
+    if not (final.is_file() and final.stat().st_size == size):
+        shutil.copyfile(src, final)
+    if verifying:
+        verifying()
+    if final.stat().st_size != size or sha256_file(final) != sha:
+        final.unlink(missing_ok=True)
+        raise FetchError(f"Download of {comp.get('file') or comp['id']} failed: the local file does not match the manifest")
+    progress(size, size)
+    return final
+
+
 def download(comp: dict, cache: Path, progress: Callable[[int, int], None], sleep: Callable[[float], None] = time.sleep,
-             verifying: Optional[Callable[[], None]] = None) -> Path:
+             verifying: Optional[Callable[[], None]] = None, payload_dir: Optional[Path] = None,
+             manifest_source: str = "") -> Path:
     """Download one component into ``cache`` (resumable) and return the verified file path.  Every source is tried in turn (the
     partial file is kept: all sources serve the same bytes, the SHA-256 decides).  ``verifying()`` is called right before the
-    SHA-256 of a finished file is computed (it takes a few seconds for a big wheel), so the caller can say so."""
-    srcs = ranked(sources(comp))
+    SHA-256 of a finished file is computed (it takes a few seconds for a big wheel), so the caller can say so.
+    A file-name URL is copied from ``payload_dir`` or from the folder of a local manifest. It is not fetched over HTTP."""
+    srcs = sources(comp)
+    local = [u for u in srcs if is_local_name(u)]
+    remote = ranked([u for u in srcs if u not in local])
+    ordered = local + remote
     last: Optional[FetchError] = None
-    for i, url in enumerate(srcs):
+    for i, url in enumerate(ordered):
         try:
-            return _download_from(comp, url, cache, progress, sleep, RETRIES if i == len(srcs) - 1 else 3, verifying)
+            if is_local_name(url):
+                return _copy_local(comp, url, cache, progress, verifying, payload_dir, manifest_source)
+            return _download_from(comp, url, cache, progress, sleep, RETRIES if i == len(ordered) - 1 else 3, verifying)
         except FetchError as exc:
             if str(exc) == "cancelled":
                 raise
             last = exc
-            if i + 1 < len(srcs):
-                print(f"{exc} - trying {srcs[i + 1].split('/')[2]}", file=sys.stderr, flush=True)
+            if i + 1 < len(ordered):
+                nxt = ordered[i + 1]
+                label = nxt if is_local_name(nxt) else nxt.split("/")[2]
+                print(f"{exc} - trying {label}", file=sys.stderr, flush=True)
     assert last is not None
     raise last
 
@@ -521,7 +603,7 @@ def _have_size(path: Path, comp: dict) -> bool:
 def run(manifest_source: str, dest: Path, cache: Path, status: _Progress, only: Optional[List[str]] = None,
         sleep: Callable[[float], None] = time.sleep, roles: Optional[List[str]] = None,
         portable: Optional[Path] = None, keep_all: bool = False, offline: bool = False, flavor: str = "auto",
-        modules: Optional[List[str]] = None, prune: bool = False) -> int:
+        modules: Optional[List[str]] = None, prune: bool = False, payload_dir: Optional[Path] = None) -> int:
     """Install the components of the manifest into ``dest``; returns the number of components fetched.
 
     ``portable``: a *portable setup folder* (docs/THIN-INSTALLER.md).  Every selected component is also kept there
@@ -616,10 +698,12 @@ def run(manifest_source: str, dest: Path, cache: Path, status: _Progress, only: 
         raise FetchError(f"Not enough free disk space: about {need >> 20} MB needed, {free >> 20} MB free.")
     need_net = [c for c in fetch if not (portable is not None and _have_size(portable_file(portable, c), c))]
     if need_net and not offline and _nr is not None and hasattr(_nr, "pick_fastest"):
-        try:                                                     # the fastest network interface for the downloads below
-            _nr.pick_fastest(sources(need_net[0])[0])
-        except Exception as exc:  # noqa: BLE001 - the probe is an optimisation only
-            print(f"network probe failed: {exc}", file=sys.stderr, flush=True)
+        first = sources(need_net[0])[0]
+        if not is_local_name(first):
+            try:                                                 # the fastest network interface for the downloads below
+                _nr.pick_fastest(first)
+            except Exception as exc:  # noqa: BLE001 - the probe is an optimisation only
+                print(f"network probe failed: {exc}", file=sys.stderr, flush=True)
     weights = [int(c["size"]) * 2 for c in fetch] or [1]      # download + verify/extract
     total_w, base, fetched = float(sum(weights)), 0.0, 0
     if reused:
@@ -642,7 +726,7 @@ def run(manifest_source: str, dest: Path, cache: Path, status: _Progress, only: 
             zpath = keepfile                                      # the folder already has it (no network)
             _say(status, base / total_w, f"Using {name} from the setup folder", "folder", c, name, force=True)
         else:
-            zpath = download(c, cache, dl, sleep, verifying)
+            zpath = download(c, cache, dl, sleep, verifying, payload_dir=payload_dir, manifest_source=manifest_source)
             if keepfile is not None:
                 keepfile.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(zpath, keepfile)
@@ -731,7 +815,7 @@ class _Sub:
 
 def run_portable(manifest_source: str, dest: Path, cache: Path, status: Status, portable: Path, roles: Optional[List[str]] = None,
                  models: str = "auto", flavor: str = "auto", keep_all: bool = True, offline: bool = False,
-                 sleep: Callable[[float], None] = time.sleep) -> int:
+                 sleep: Callable[[float], None] = time.sleep, payload_dir: Optional[Path] = None) -> int:
     """Components (+ models) into the setup folder and the install of ``roles``; see :func:`run`.  Models are a bonus: if they cannot
     be had the install still succeeds and the final message says so."""
     pm = _portable_mod()
@@ -753,7 +837,7 @@ def run_portable(manifest_source: str, dest: Path, cache: Path, status: Status, 
         pass
     share = man_bytes / float(man_bytes + mbytes) if mbytes else 1.0
     n = run(manifest_source, dest, cache, _Sub(status, 0.0, share), roles=roles, portable=portable, keep_all=keep_all,
-            offline=offline, flavor=flavor, sleep=sleep)
+            offline=offline, flavor=flavor, sleep=sleep, payload_dir=payload_dir)
     note = ""
     if repos:
         try:
@@ -788,6 +872,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--prefer", choices=("pinned", "latest"), default="pinned", help="which manifest to try first (default pinned)")
     ap.add_argument("--iface", help="network interface / local IP to use, 'auto' (default) or 'default' (never hop); "
                                     "same as the VOXPRINT_NET_IFACE variable")
+    ap.add_argument("--payload-dir", help="folder that holds file-name components (the shell zip next to the setup exe)")
     try:
         a = ap.parse_args(argv)
     except SystemExit:
@@ -799,17 +884,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     st = Status(Path(a.status) if a.status else None)
     st.start_heartbeat()
     try:
+        payload = Path(a.payload_dir) if a.payload_dir else None
         if a.from_folder:
             n = run_portable("", Path(a.dest), Path(a.cache), st, Path(a.from_folder), roles=a.role, models="none", flavor=a.flavor,
-                             keep_all=False, offline=True)
+                             keep_all=False, offline=True, payload_dir=payload)
         elif not a.manifest:
             raise FetchError("--manifest or --from-folder is required")
         elif a.portable and a.portable_all:
             n = run_portable(a.manifest, Path(a.dest), Path(a.cache), st, Path(a.portable), roles=a.role,
-                             models=a.models or "auto", flavor=a.flavor)
+                             models=a.models or "auto", flavor=a.flavor, payload_dir=payload)
         else:
             n, used = run_channel(a.manifest, a.latest_manifest or "", Path(a.dest), Path(a.cache), st, a.prefer, only=a.only,
-                                  roles=a.role, portable=Path(a.portable) if a.portable else None, flavor=a.flavor)
+                                  roles=a.role, portable=Path(a.portable) if a.portable else None, flavor=a.flavor,
+                                  payload_dir=payload)
             if used != a.manifest:
                 print(f"installed from {used}")
     except FetchError as exc:

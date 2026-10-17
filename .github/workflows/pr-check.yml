@@ -177,7 +177,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          ./installer/build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag v0.0.0-beta -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json -BaseUrl http://127.0.0.1:8097 -ManifestUrl http://127.0.0.1:8097/manifest-thin-beta.json
+          ./installer/build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag v0.0.0-ci -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json -LocalAssets
           python tools\check_manifest_tags.py build\online-release
           if ($LASTEXITCODE -ne 0) { throw "a manifest URL names a GitHub tag that does not exist" }
           if (Select-String -Path build\online-release\*.json -Pattern "v0.0.0-dev" -Quiet) { throw "manifest still points at v0.0.0-dev" }
@@ -187,9 +187,8 @@ jobs:
           if ($versioned.Count -lt 1) { throw "versioned setup file was not written" }
           "installer bytes: $($setup.Length)"
           "installer MiB: $([math]::Round($setup.Length / 1MB, 1))"
-          Start-Process python -ArgumentList "-m","http.server","8097","--bind","127.0.0.1","--directory","build\online-release" -WindowStyle Hidden
-          Start-Sleep 3
-          (Invoke-WebRequest http://127.0.0.1:8097/manifest-thin-beta.json -UseBasicParsing).StatusCode
+          if (-not (Test-Path build\online-release\embedded-manifest.json)) { throw "embedded manifest was not written" }
+          if (-not (Test-Path build\online-release\Voxprint-shell-*.zip)) { throw "shell zip was not written next to the setup exe" }
           $p = Start-Process $setup.FullName -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxmdl","/LOG=C:\vxmdl.log" -Wait -PassThru
           if ($p.ExitCode -ne 0) { Get-Content C:\vxmdl.log -Tail 80; throw "install exit code $($p.ExitCode)" }
           if (-not (Test-Path C:\vxmdl\voxprint-audiobook-builder.exe)) { throw "the shell was not installed" }
@@ -230,4 +229,7 @@ jobs:
             build/online-release/voxprint-audiobook-builder-setup*.exe
             build/online-release/voxprint-audiobook-builder-setup*.exe.sha256
             build/online-release/manifest-thin-*.json
+            build/online-release/embedded-manifest.json
+            build/online-release/Voxprint-shell-*.zip
+            build/online-release/*.whl
           retention-days: 14

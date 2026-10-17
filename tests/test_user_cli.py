@@ -383,7 +383,8 @@ def test_narrate_json_progress_and_result(tmp_path, capsys):
     for line in captured.out.splitlines():
         if line.strip():
             json.loads(line)
-    assert "flash-attn" in captured.err and "library banner" in captured.err
+    assert "flash-attn" not in captured.err and "flash-attn" not in captured.out
+    assert "library banner" in captured.err
     lines = _json_lines(captured.out)
     assert lines[0]["type"] == "progress" and lines[0]["stage"] == "synth"
     assert 0 <= lines[0]["percent"] <= 100

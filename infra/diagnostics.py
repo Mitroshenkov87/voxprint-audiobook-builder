@@ -20,6 +20,7 @@ import platform
 import re
 import sys
 import threading
+import warnings
 import time
 import zipfile
 from pathlib import Path
@@ -180,13 +181,57 @@ def skip_missing_sox_probe(which: Optional[Callable[[str], Optional[str]]] = Non
     return True
 
 
+_FLASH_ATTN_NOTE = re.compile(r"flash-attn is not installed", re.IGNORECASE)
+
+
+class _QuietNotes:
+    """Drops the flash-attn install note. It is a ``print``, so a warnings filter does not see it."""
+
+    def __init__(self, inner) -> None:
+        self._inner = inner
+        self._pending = ""
+
+    def write(self, text: str) -> int:
+        """Write ``text``, omitting any line that is the flash-attn note."""
+        self._pending += "" if text is None else str(text)
+        written = 0 if text is None else len(str(text))
+        while "\n" in self._pending:
+            line, self._pending = self._pending.split("\n", 1)
+            if _FLASH_ATTN_NOTE.search(line):
+                continue
+            self._inner.write(line + "\n")
+        return written
+
+    def flush(self) -> None:
+        """Forward a trailing fragment that is not the flash-attn note."""
+        if self._pending and not _FLASH_ATTN_NOTE.search(self._pending):
+            self._inner.write(self._pending)
+        self._pending = ""
+        flush = getattr(self._inner, "flush", None)
+        if flush is not None:
+            flush()
+
+    def __getattr__(self, name: str):
+        """Forward everything else to the wrapped stream."""
+        return getattr(self._inner, name)
+
+
+def silence_library_notes() -> None:
+    """Ignore pydub's invalid-escape SyntaxWarning and drop the flash-attn note from both streams."""
+    warnings.filterwarnings("ignore", category=SyntaxWarning, module=r"pydub(\.|$)")
+    warnings.filterwarnings("ignore", message=r".*flash-attn.*")
+    if not isinstance(sys.stderr, _QuietNotes):
+        sys.stderr = _QuietNotes(sys.stderr)
+    if not isinstance(sys.stdout, _QuietNotes):
+        sys.stdout = _QuietNotes(sys.stdout)
+
+
 def quiet_known_warnings() -> None:
     """Drop the warnings of :data:`WARNING_NOISE` and the log records of :data:`LOG_NOISE`, and skip the SoX shell probe
     when SoX is missing (called once at start-up, before the heavy imports)."""
-    import warnings
-
     for pattern in WARNING_NOISE:
         warnings.filterwarnings("ignore", message=pattern)
+    silence_library_notes()
     quiet_known_log_noise()
     try:
         skip_missing_sox_probe()

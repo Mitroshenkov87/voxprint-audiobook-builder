@@ -20,7 +20,8 @@ param(
     [string]$MirrorBase = "",       # optional fallback address prefix for the locked files (our mirror)
     [string]$Build = $env:VOXPRINT_BUILD,      # CI build number (tools/build_number.py); written into the installer's version resource
     [string]$Codename = $env:VOXPRINT_CODENAME,
-    [switch]$LegacyPayload          # allow the OLD multi-GB payload parts for a real release (deleted on purpose; never needed now)
+    [switch]$LegacyPayload,         # allow the OLD multi-GB payload parts for a real release (deleted on purpose; never needed now)
+    [switch]$LocalAssets            # shell zip and sdist wheels are file names next to the setup exe; the manifest is embedded
 )
 $ErrorActionPreference = "Stop"
 function Check([string]$what) { if ($LASTEXITCODE -ne 0) { throw "$what failed (exit code $LASTEXITCODE)" } }
@@ -64,6 +65,7 @@ if ($fetchMb -gt 60) { throw "voxprint-fetch.exe is $([int]$fetchMb) MB - an imp
 $pargs = @("tools\make_online_payload.py", "--dist", $Dist, "--out", "build\online-release", "--tag", $Tag, "--repo", $Repo,
            "--limit-mib", "$LimitMib")
 if ($BaseUrl) { $pargs += @("--base-url", $BaseUrl) }
+if ($LocalAssets) { $pargs += "--local-assets" }
 if ($RuntimeLock) {
     $Thin = $true
     $pargs += @("--runtime-lock", $RuntimeLock)
@@ -78,17 +80,27 @@ Check "make_online_payload"
 $channel = if ($Tag -match '^[vV]?[0-9][0-9.]*-') { "beta" } else { "stable" }
 $manifest = if ($RuntimeLock) { "manifest-thin-$channel.json" } else { "manifest-$channel.json" }
 if (-not (Test-Path "build\online-release\$manifest")) { throw "$manifest was not written" }
-if (-not $ManifestUrl) { $ManifestUrl = "https://github.com/$Repo/releases/download/$Tag/$manifest" }
-# the newest release's manifest: fallback of the pinned one and the "try the latest versions" option (local test builds: none)
-$LatestManifestUrl = if ($ManifestUrl -like "https://github.com/*") { "https://github.com/$Repo/releases/latest/download/$manifest" } else { "" }
+if ($LocalAssets) {
+    Copy-Item "build\online-release\$manifest" "build\online-release\embedded-manifest.json" -Force
+    $ManifestUrl = ""
+    $LatestManifestUrl = ""
+} else {
+    if (-not $ManifestUrl) { $ManifestUrl = "https://github.com/$Repo/releases/download/$Tag/$manifest" }
+    # the newest release's manifest: fallback of the pinned one and the "try the latest versions" option (local test builds: none)
+    $LatestManifestUrl = if ($ManifestUrl -like "https://github.com/*") { "https://github.com/$Repo/releases/latest/download/$manifest" } else { "" }
+}
 
 $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
 if (-not (Test-Path $iscc)) { $iscc = "$env:ProgramFiles\Inno Setup 6\ISCC.exe" }
 $ver = (Get-Content credits.json -Raw | ConvertFrom-Json).app.version
 $setupName = "voxprint-audiobook-builder-setup-$ver-win-x64.exe"
 $aliasName = "voxprint-audiobook-builder-setup-win-x64.exe"
-$isArgs = @("/DONLINE", "/DONEDIR", "/DManifestUrl=$ManifestUrl")
-if ($LatestManifestUrl) { $isArgs += "/DLatestManifestUrl=$LatestManifestUrl" }
+if ($LocalAssets) {
+    $isArgs = @("/DONLINE", "/DONEDIR", "/DEMBEDMANIFEST")
+} else {
+    $isArgs = @("/DONLINE", "/DONEDIR", "/DManifestUrl=$ManifestUrl")
+    if ($LatestManifestUrl) { $isArgs += "/DLatestManifestUrl=$LatestManifestUrl" }
+}
 if ($Thin) { $isArgs += "/DTHIN" }
 if ($Portable) { $isArgs += "/DPORTABLE" }
 if ($Build -match '^\d+$') { $isArgs += "/DAppBuild=$Build" }
