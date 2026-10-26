@@ -52,3 +52,5 @@ sox
 qwen-omni-utils
 # build/packaging tool pulled in by PyTorch: at least the release with the PackageIndex path-traversal fix (PYSEC-2025-49)
 setuptools>=78.1.1
+# Torch's CPU wheel installs filelock 3.32.3. CVE-2026-112940 is fixed in 4.2.1.
+filelock>=4.2.1
