@@ -3,8 +3,9 @@
 The audio sample (book, voice, pace, player) is this window. Settings, check
 and repair, and backup open the existing settings dialog, because the shell
 already sends ``view.settings``. Voices, Roles, Re-voice, and Train voice are Sections and Steps in
-``docs/ui/FEATURE-MAP.md``. This pin has neither a section row nor a step
-wizard, so those windows stay as they are. This file does not invent them.
+``docs/ui/FEATURE-MAP.md``. This window does not open that row or wizard yet,
+so those windows stay as they are. ``set_voices`` takes one flat id and label
+list. This file does not invent sections.
 
     from ui.shell_window import AudiobookShell
     window = AudiobookShell()
@@ -20,6 +21,7 @@ from PySide6.QtGui import QFont, QFontMetrics
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
+    QFormLayout,
     QHBoxLayout,
     QLabel,
     QLayout,
@@ -35,11 +37,13 @@ from voxprint_common.i18n import tr as shell_tr
 from voxprint_common.paths import state_dir
 from voxprint_common.suite_settings import set_window_geometry, window_geometry
 from voxprint_common.ui.expert import ExpertMode
+from voxprint_common.ui.safety import ReviewedOutput
 from voxprint_common.ui.simple_image import Phase, SimpleLayout, SimpleWidget
 from voxprint_common.ui.theme import build_shell_style
 from voxprint_common.ui.tokens import load as load_tokens
 from voxprint_common.ui.variants import WINDOW_HEIGHT, WINDOW_WIDTH, state_names, surface_for
 
+from core.voice_library import VoiceLibrary
 from infra.mdl_gate import manage_argv, models_ready
 from ui.main_window import MainWindow
 from ui.narrate_state import (
@@ -50,8 +54,8 @@ from ui.narrate_state import (
     narrate_settings,
 )
 
-# Methods the shell does not offer. Callers look them up and do not invent them.
-MISSING_SHELL_API = ("set_voices", "input_path", "open_page", "pause")
+# Methods this pin's screen still does not offer. set_voices, input_path, and pause do.
+MISSING_SHELL_API = ("open_page",)
 
 # Chip stylesheet padding is 14 px on each side. See QPushButton[chip="true"].
 _CHIP_PAD_X = 14
@@ -63,6 +67,74 @@ _EXPORT_SOURCES = ("narr.container", "narr.split_chapters", "narr.file")
 _EXPORT_ROWS = ("format", "chapters")
 
 _CATALOGS = Path(__file__).resolve().parent.parent / "locales" / "shell"
+
+
+def flat_voice_rows(voices: object) -> list[tuple[str, str]]:
+    """Return one ``(id, label)`` list for ``set_voices``.
+
+    A pair is one voice. A pair whose second item is a list of pairs is a male
+    or female group from the old shape; those voices join the same list.
+    """
+    rows: list[tuple[str, str]] = []
+    seen: set[str] = set()
+
+    def add(voice_id: object, label: object) -> None:
+        ident = str(voice_id).strip()
+        text = str(label).strip()
+        if not ident or not text or ident in seen:
+            return
+        seen.add(ident)
+        rows.append((ident, text))
+
+    if not isinstance(voices, (list, tuple)):
+        return rows
+    for item in voices:
+        if not isinstance(item, tuple) or len(item) != 2:
+            continue
+        key, value = item
+        if isinstance(value, str):
+            add(key, value)
+            continue
+        if isinstance(value, (list, tuple)):
+            for nested_id, nested_label in flat_voice_rows(value):
+                add(nested_id, nested_label)
+    return rows
+
+
+def library_voice_rows() -> list[tuple[str, str]]:
+    """Installed voices as a flat ``set_voices`` list. An empty library stays empty."""
+    return flat_voice_rows([(record.id, record.name) for record in VoiceLibrary().list_voices()])
+
+
+def _needs_restack(form: QWidget) -> bool:
+    """True when the expert form still has a side-by-side row."""
+    layout = form.layout()
+    if layout is None:
+        return False
+    if not form.property("stackedRows"):
+        return True
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        sub = None if item is None else item.layout()
+        if isinstance(sub, (QHBoxLayout, QFormLayout)):
+            return True
+    return False
+
+
+def _take_widgets(layout: QLayout) -> list[QWidget]:
+    """Remove every widget from ``layout``, including rows inside a nested box."""
+    held: list[QWidget] = []
+    while layout.count():
+        taken = layout.takeAt(0)
+        if taken is None:
+            break
+        widget = taken.widget()
+        if widget is not None:
+            held.append(widget)
+        nested = taken.layout()
+        if nested is not None:
+            held.extend(_take_widgets(nested))
+    return held
 
 
 def _layout_holding(layout: QLayout | None, widget: QWidget) -> QLayout | None:
@@ -105,12 +177,13 @@ class _Allow:
         """
         return None
 
-    def review_result(self, prompt: str, item_id: str) -> str | None:
+    def review_result(self, prompt: str, item_id: str, output: ReviewedOutput) -> str | None:
         """Allow a finished item.
 
         Args:
             prompt: The book name.
             item_id: The id the caller chose.
+            output: The finished file. This app does not review the audio.
         """
         return None
 
@@ -147,6 +220,7 @@ class AudiobookShell:
         self._export_key: tuple[object, bool] | None = None
         self._bind_export()
         self._bind_screen()
+        self._publish_voices()
         self.screen.refresh()
         self.expert = ExpertMode()
         self._stop_expert = self.expert.subscribe(self.screen.set_expert)
@@ -248,6 +322,12 @@ class AudiobookShell:
                 self._fill_expert_width(form)
         finally:
             self._painting = False
+
+    def _publish_voices(self) -> None:
+        """Fill the voice combo from the library. Warm, Clear, and Low stay when it is empty."""
+        rows = library_voice_rows()
+        if rows:
+            self.screen.set_voices(rows)
 
     def _bind_export(self) -> None:
         """Keep the format chips and the audiobook file on one value."""
@@ -452,7 +532,7 @@ class AudiobookShell:
     def _restack_expert(self) -> None:
         """One label, then one control, in each expert row, inside the scroll panel."""
         form = self.screen.root.findChild(QWidget, "expertForm")
-        if form is None or form.property("stackedRows"):
+        if form is None or not _needs_restack(form):
             return
         layout = form.layout()
         if layout is None:
@@ -461,15 +541,10 @@ class AudiobookShell:
         while index < layout.count():
             item = layout.itemAt(index)
             sub = None if item is None else item.layout()
-            if not isinstance(sub, QHBoxLayout):
+            if not isinstance(sub, (QHBoxLayout, QFormLayout)):
                 index += 1
                 continue
-            held: list[QWidget] = []
-            while sub.count():
-                taken = sub.takeAt(0)
-                widget = taken.widget()
-                if widget is not None:
-                    held.append(widget)
+            held = _take_widgets(sub)
             layout.takeAt(index)
             sub.deleteLater()
             for widget in held:
@@ -533,11 +608,12 @@ class AudiobookShell:
         for index in range(layout.count()):
             item = layout.itemAt(index)
             widget = None if item is None else item.widget()
+            if widget is None:
+                continue
+            widget.setMaximumWidth(width)
             if not isinstance(widget, QComboBox):
                 continue
-            widget.setMaximumWidth(16777215)
             widget.setMinimumWidth(width)
-            widget.setMaximumWidth(width)
             widget.setSizePolicy(QSizePolicy.Policy.Expanding, widget.sizePolicy().verticalPolicy())
         layout.activate()
 

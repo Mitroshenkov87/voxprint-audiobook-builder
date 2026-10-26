@@ -13,6 +13,7 @@ from voxprint_common.i18n import add_catalogs, set_language
 from voxprint_common.i18n import tr as shell_tr
 from voxprint_common.mdl import load_manifest
 from voxprint_common.ui.presets import PresetMatch
+from voxprint_common.ui.safety import ReviewedOutput
 from voxprint_common.ui.simple_image import Phase
 from voxprint_common.ui.tokens import load as load_tokens
 
@@ -32,7 +33,7 @@ from core.pauses import DEFAULT_LENGTHS_MS
 from infra.mdl_gate import manifest_path
 from ui.model_slots import choices
 from ui.narrate_state import SURFACE_ID, export_format, narrate_presets, narrate_settings
-from ui.shell_window import MISSING_SHELL_API, AudiobookShell
+from ui.shell_window import MISSING_SHELL_API, AudiobookShell, flat_voice_rows
 
 ROOT = Path(__file__).resolve().parents[1]
 SHELL_LOCALES = ROOT / "locales" / "shell"
@@ -223,10 +224,29 @@ def test_create_without_a_book_asks_for_one_and_settings_opens_the_existing_dial
 
 def test_this_pin_has_no_section_row_or_step_wizard(app):
     window = _open("en")
+    for name in ("set_voices", "input_path", "pause"):
+        assert callable(getattr(window.screen, name, None)), name
     for name in MISSING_SHELL_API:
         assert not callable(getattr(window.screen, name, None)), name
     for name in ("set_section", "add_section", "set_steps", "open_wizard"):
         assert not callable(getattr(window.screen, name, None)), name
+    assert window.widget.findChildren(QTabBar) == []
+
+
+def test_set_voices_flattens_groups_into_one_list(app):
+    grouped = (
+        ("Male", (("levi", "Levi"), ("boaz", "Boaz"))),
+        ("Female", (("miriam", "Miriam"), ("", "Skip"))),
+        ("levi", "Again"),
+    )
+    assert flat_voice_rows(grouped) == [("levi", "Levi"), ("boaz", "Boaz"), ("miriam", "Miriam")]
+    window = _open("en")
+    window.screen.set_voices(flat_voice_rows(grouped))
+    voice = window.widget.findChild(QComboBox, "voicePicker")
+    assert voice is not None
+    assert [voice.itemData(index) for index in range(voice.count())] == ["levi", "boaz", "miriam"]
+    assert [voice.itemText(index) for index in range(voice.count())] == ["Levi", "Boaz", "Miriam"]
+    window.widget.close()
 
 
 def test_moved_choices_stay_as_live_expert_values(app):
@@ -258,14 +278,16 @@ def test_russian_reading_style_says_avto():
     assert "Само" not in catalog.values()
 
 
-def test_empty_history_strip_stays_hidden_until_a_job_finishes(app):
+def test_empty_history_strip_stays_hidden_until_a_job_finishes(app, tmp_path):
     window = _open("en")
     strip = window.widget.findChild(QScrollArea, "historyStrip")
     assert strip is not None and not strip.isVisible()
     window.show_progress(1, 2, "Reading", eta_seconds=10)
     QApplication.processEvents()
     assert not strip.isVisible()
-    window.layout.finish("chapter-1")
+    audio = tmp_path / "chapter-1.wav"
+    audio.write_bytes(b"RIFF")
+    assert window.layout.finish("chapter-1", ReviewedOutput(path=audio)) is not None
     window.screen.refresh()
     QApplication.processEvents()
     assert strip.isVisible() and strip.height() == 104
