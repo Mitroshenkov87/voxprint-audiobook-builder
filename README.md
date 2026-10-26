@@ -1,5 +1,10 @@
 # VOXPrint AI Audiobook Builder
 
+> [!WARNING]
+> **⚠️ Deep alpha.** This software is experimental; nothing is guaranteed to work. Use at your own risk.
+>
+> **⚠️ Глубокая альфа.** Программа экспериментальная, работа не гарантируется.
+
 **Train a voice from a short recording, then narrate whole books in it - offline, on your own computer.**
 
 Part of the VOXPrint AI Media Suite (with [VOXPrint AI Movie Dubber](https://github.com/Mitroshenkov87/voxprint-movie-dubber), coming soon).
