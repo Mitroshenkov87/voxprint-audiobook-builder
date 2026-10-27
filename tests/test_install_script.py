@@ -14,7 +14,7 @@ OFFICIAL = "Mitroshenkov87/voxprint-audiobook-builder"
 
 def test_script_and_readme_stay_on_the_official_release():
     script = (ROOT / "install.ps1").read_text(encoding="utf-8")
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    readme = (ROOT / "docs" / "README-full.md").read_text(encoding="utf-8")
     workflow = (ROOT / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")
     assert OFFICIAL in script
     assert "releases/download/" in script
@@ -23,7 +23,7 @@ def test_script_and_readme_stay_on_the_official_release():
     assert "RunAs" in script
     assert "Option 2: one command in PowerShell (as Administrator)" in readme
     assert "irm https://raw.githubusercontent.com/Mitroshenkov87/voxprint-audiobook-builder/main/install.ps1 | iex" in readme
-    assert "](install.ps1)" in readme
+    assert "/blob/main/install.ps1)" in readme
     assert "\n  install-script:\n" in workflow
     assert "http://127.0.0.1:8765/" in workflow
     step = workflow.split("install-script:", 1)[1].split("online-smoke:", 1)[0]

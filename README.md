@@ -1,134 +1,16 @@
 # VOXPrint AI Audiobook Builder
 
+Offline audiobook narration with voice cloning for TXT, FB2 and EPUB books.
+
 > [!WARNING]
-> **⚠️ Deep alpha.** This software is experimental; nothing is guaranteed to work. Use at your own risk.
->
-> **⚠️ Глубокая альфа.** Программа экспериментальная, работа не гарантируется.
+> **Deep alpha.** This software is experimental, and nothing is guaranteed to work. Use at your own risk.
 
-**Train a voice from a short recording, then narrate whole books in it - offline, on your own computer.**
+- **Latest pre-release:** [v1.0.0-rc.6](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v1.0.0-rc.6)
+- **Full documentation:** [docs/README-full.md](docs/README-full.md) and the [docs/](docs/) folder
 
-Part of the VOXPrint AI Media Suite (with [VOXPrint AI Movie Dubber](https://github.com/Mitroshenkov87/voxprint-movie-dubber), coming soon).
-
-![status: beta](https://img.shields.io/badge/status-beta%20%2F%20experimental-orange) ![licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue) ![platform: Windows 11 + RTX 40+](https://img.shields.io/badge/platform-Windows%2011%20%2B%20RTX%2040%2B-lightgrey)
-
-> **1.0.0 RC6 (build 1004 "Shomer", tag v1.0.0-rc.6).** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs an **NVIDIA GeForce RTX 40-series or newer** GPU, and **Windows 11 24H2+** or a **Linux release from 2025+**. There is no CPU-only mode. 16 GB of VRAM is recommended. Details: [tests and caveats](docs/TESTING.md).
-
-<p align="center"><img src="docs/screenshots/rc2/abb-03-narrate.png" alt="Narrate window: a Russian book ready to read with the Levi voice, MP3 per chapter and one M4B file selected" width="720"></p>
-
-System requirements: an NVIDIA RTX 40-series or newer GPU (compute capability 8.9 or higher). Windows 11 24H2 or newer, or a Linux distribution released from 2025. Older systems are not supported. There is no CPU-only mode.
-
-<p align="center"><img src="docs/screenshots/en-667/01-main-window.png" alt="VOXPrint Studio" width="420"> <img src="docs/screenshots/en-667/04-voice-library-boaz-tirzah.png" alt="My voices: build 667 screenshot. Tirzah and Gideon are the bundled voices; the picture also shows Boaz, which is retired" width="420"></p>
-<p align="center"><img src="docs/screenshots/en-667/02-narrate-book-top.png" alt="Narrate a book" width="420"> <img src="docs/screenshots/en-667/07-settings-pauses-speed-repair.png" alt="Settings: pauses and reading speed" width="300"></p>
-
-## 🎙 Train your own voice: read one of these scripts
-> **Recording scripts (EN / RU / DE)** - ready-made texts to read aloud when you record your voice for Voxprint. Read for **about 15 minutes** (plus 2-3 optional minutes), save the recording, give the app the TXT as the text - done. The **consent sentence** is built in at the end, no swear words.
->
-> | English | Русский | Deutsch |
-> |---|---|---|
-> | [TXT](docs/recording-scripts/Voxprint-RecordingScript-v6-en.txt) · [PDF](docs/recording-scripts/Voxprint-RecordingScript-v6-en.pdf) · [print](docs/recording-scripts/Voxprint-RecordingScript-v6-en-print.pdf) | [TXT](docs/recording-scripts/Voxprint-RecordingScript-v6-ru.txt) · [PDF](docs/recording-scripts/Voxprint-RecordingScript-v6-ru.pdf) · [print](docs/recording-scripts/Voxprint-RecordingScript-v6-ru-print.pdf) | [TXT](docs/recording-scripts/Voxprint-RecordingScript-v6-de.txt) · [PDF](docs/recording-scripts/Voxprint-RecordingScript-v6-de.pdf) · [print](docs/recording-scripts/Voxprint-RecordingScript-v6-de-print.pdf) |
->
-> Only record your own voice, or one whose owner agreed. More: [about the scripts](docs/recording-scripts/README.md).
-
-## What it does
-* **Narrate books** - TXT, FB2 (also `.fb2.zip`), EPUB and `.vxbook` with chapters; output as one Opus file, MP3 per chapter or M4B; pause, cancel and resume at any time. A `.vxbook` can carry its own voices. An optional soundscape (off until you turn it on) plays only when that file asks for one ([details](docs/SOUNDSCAPE.md)).
-* **Pauses that follow the text** (new in 0.1.3) - the text is cut per sentence and at strong breaks, each spoken piece is trimmed of its own silence and measured pauses are inserted: comma 0.25 s, strong break 0.4 s, sentence 0.6 s, paragraph or verse line 1.0 s, chapter or scene break 2.0 s. Adjustable in *Settings -> Narration: pauses and speed* or with `voxprint narrate --pause-...`.
-* **Reading speed that adapts to the text** (new in 0.1.3) - long, descriptive and scripture-like sentences are read a little slower, dialogue at the voice's own pace; a reading style per book (*Automatic*, *Solemn / scripture*, *Fiction*, *Dialogue-heavy*) and a global speed of 70-130 %. Applied after synthesis with the pitch kept, so changing pauses or speed never re-synthesizes finished parts.
-* **Train your voice** - give it a 5-15 minute recording (yours, or of someone who agreed) and the text you read; everything else is automatic ([Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS) LoRA).
-* **Offline translation** before narrating: Russian, English, German ([details](docs/TRANSLATION.md)).
-* **Re-voice** a recording: turn it into editable text, or convert it directly into one of your voices ([details](docs/REVOICE.md)).
-* **Open voices included** - two bundled voices come with the standard download: *Levi* (male, the default narrator) and *Miriam* (female). More voices are one click away in the online catalog (Voices -> Download voices, or `voxprint voices download <id>`): *Natan* and *Shimon* (male), *Rivka* and *Noa* (female). All are Russian, **CC0-1.0** (free for any use, also commercial) and trained only from public-domain LibriVox recordings; bundled voices are read-only in the library ([bundled voices](voices/BUNDLED.md), [catalog](voices/README.md)). Multi-voice narration starts with Levi as narrator, Natan and Shimon for the men and Miriam for the women. Up to build 702 the bundled pair was *Tirzah* and *Gideon*; they are retired, and an install that has them keeps them. Older sample: [Genesis 1:1-2:3 with Tirzah](samples/genesis-tirzah.mp3) ([samples](samples/README.md)).
-* **Per-voice licences and consent** - every voice carries a licence and a usage scope; the UI shows whether commercial use is allowed ([voices](docs/VOICES.md)).
-* **Resumable and safe** - downloads, narration and backups continue where they stopped; SHA-256 checks everywhere; *Check & repair* verifies every component and model file and re-downloads only the damaged ones.
-* **Local and private** - no account, no telemetry; your recordings never leave the computer ([privacy](docs/PRIVACY.md)).
-* UI in English, Deutsch, Русский, Українська and Latviešu; automatic text clean-up (numbers in words, abbreviations, footnotes) for Russian and English.
-
-More: [all features and screenshots](docs/FEATURES.md) · [how it works](docs/HOW-IT-WORKS.md).
-
-## Download
-| Build | File | Size |
-|---|---|---|
-| **Online installer (Windows 11 x64, NVIDIA GPU)** | [`voxprint-audiobook-builder-setup-<version>-win-x64.exe`](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases) | about 34 MB; downloads the libraries from PyTorch/PyPI during setup |
-
-The same bytes are also attached as `voxprint-audiobook-builder-setup-win-x64.exe` (the name [install.ps1](install.ps1) downloads), each with a `.sha256` file. The published [v0.2.4-beta](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v0.2.4-beta) installer is `Voxprint-Setup-online.exe` (35,409,166 bytes, build 704 "Achim"), SHA-256 `c7dd024b4917ba128b064c12d8373182b76f9c10e77fb49f6c06fc8fac0e636d`. Setup installs the Python runtime, PyTorch, ffmpeg and the required models into `%LOCALAPPDATA%\Voxprint\shared\` while it runs, including a silent install. Optional models are offered in the Components window and are not all started at once. Scripts should call `voxprint-audiobook-cli.exe` (installed under `VOXPrint AI Suite\Audiobook Builder`).
-
-<p align="center"><img src="docs/screenshots/rc2/abb-01-main-components-first-run.png" alt="Components window on first start: program components and models, with sizes shown and free space checked before a download" width="720"></p>
-A full offline installer may return later; the Linux version is temporarily unavailable.
-
-### Windows security warnings
-The installer is not code-signed yet, so a new download has no reputation. Download it only from the [GitHub releases page](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases). Check the SHA-256 against the `.sha256` file next to the installer, and only then keep or run the file ([details](docs/DOWNLOADS.md)):
-
-```powershell
-Get-FileHash .\voxprint-audiobook-builder-setup-win-x64.exe -Algorithm SHA256
-```
-
-Edge is the strictest. Its download bar offers **Delete** for a file that is rarely downloaded, and the file can be removed before you run it. Do not click Delete. Hover the download, then **... -> Keep -> Show more -> Keep anyway**.
-
-Chrome and other browsers may show a similar download warning. When you start the installer, from any browser, Microsoft Defender SmartScreen may say **Windows protected your PC**. Choose **More info -> Run anyway**. That step is usually milder than Edge. An antivirus program may also flag the unsigned file.
-
-Code signing is being applied for (SignPath Foundation). The warning will go away later.
-
-**Option 1.** Download `voxprint-audiobook-builder-setup-win-x64.exe` from the [releases page](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases) and run it. Releases through v0.2.4-beta used `Voxprint-Setup-online.exe`.
-
-**Option 2: one command in PowerShell (as Administrator).** Read [install.ps1](install.ps1) first. It downloads the installer and its `.sha256` file only from the official GitHub releases, checks the hash, then starts setup. `-Silent` passes `/VERYSILENT`. `-Version v0.2.4-beta` picks that tag; otherwise the latest pre-release is used.
-
-```powershell
-irm https://raw.githubusercontent.com/Mitroshenkov87/voxprint-audiobook-builder/main/install.ps1 | iex
-```
-
-## Quick start
-1. Install and start Voxprint - the **Studio** opens. Under *Train your voice* choose your recording and the text you read, press **Create voice (LoRA)**.
-2. Open *Narrate a book*, choose a TXT / FB2 / EPUB / `.vxbook` file and your voice (optionally tick *Translate the book*).
-3. Press **Start narration** and listen while the rest is being made. The audiobook lands in the projects folder (`%LOCALAPPDATA%\Voxprint\Projects\Audiobooks`, shortcut *VOXPrint Projects* in Documents).
-
-## Soundscape (optional)
-A `.vxbook` book with sound markup (`sound/1`, written by VOXPrint AI Plotweaver) can get quiet background music and transition accents, generated locally and ducked under the narration.
-* **Off by default.** Turn it on in *Settings -> Narration: pauses and speed -> Play a soundscape under narration when the book asks for one*.
-* **Downloaded only when you turn it on:** the **ACE-Step 1.5** model (about 10 GB; code and weights MIT, generated music usable commercially). The full download never includes it.
-* **Only `.vxbook` books with sound markup.** TXT, Markdown, FB2, EPUB and a `.vxbook` without `sound/1` are never given music.
-* **Skip it for one run:** `voxprint narrate book.vxbook --voice ID --no-soundscape` (the saved setting stays).
-
-Details and licences: [docs/SOUNDSCAPE.md](docs/SOUNDSCAPE.md).
-
-## Roadmap
-
-The next version finishes the command line other programs can call (dry-run and JSON), the remaining icons, more accurate Russian yo, stress and speaker marks, and an updater that downloads only what changed. Later: an offline install bundle, Hebrew in the interface with right-to-left layout, a check that can improve a trained voice, Linux polish, code signing, and more open voices. A plan for placing each model across video memory, system memory and disk is in the same file.
-
-[Full roadmap](ROADMAP.md).
-
-## Documentation
-* **Documentation site:** [mitroshenkov87.github.io/voxprint-audiobook-builder](https://mitroshenkov87.github.io/voxprint-audiobook-builder/)
-* **User manual (PDF, 0.1.3 build 667):** [English](docs/manual/Voxprint-Manual-en.pdf) · [Русский](docs/manual/Voxprint-Manual-ru.pdf) · [Deutsch](docs/manual/Voxprint-Manual-de.pdf) (print versions and sources: [`docs/manual/`](docs/manual/); screenshots: [`docs/screenshots/en-667/`](docs/screenshots/en-667/))
-* **Recording scripts** to read when you record a voice (ru / en / de, TXT + PDF): [`docs/recording-scripts/`](docs/recording-scripts/)
-* [User guide](docs/USER-GUIDE.md) · [Command-line interface](docs/CLI.md) · [Driving the app (for agents)](docs/AGENTS.md) · [FAQ](docs/FAQ.md) · [Translation](docs/TRANSLATION.md) · [Re-voice](docs/REVOICE.md) · [Soundscape](docs/SOUNDSCAPE.md) · [Voices and licences](docs/VOICES.md) · [AAC / M4B notice](docs/AAC-M4B.md)
-* [Models, mirrors and backups](docs/MODELS.md) · [Downloads and hashes](docs/DOWNLOADS.md) · [Runtime](docs/RUNTIME.md) · [Linux](docs/LINUX.md) · [Building and contributing](docs/BUILDING.md)
-* [How it works](docs/HOW-IT-WORKS.md) · [Voice quality](docs/VOICE-QUALITY.md) · [Architecture](docs/ARCHITECTURE.md) · [Tests and verification](docs/TESTING.md) · [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md)
-
-## Philosophy
-
-Voxprint apps are complete: the choices about models, settings and pipelines are already made, so you install the app and start working. Like software used to be, there is no account, no subscription and no online sign-in, and your files stay on your computer. Voxprint looks forward. It is built for current operating systems and recent NVIDIA GPUs, and it drops old platforms after two to three years instead of carrying them. Free and open source (Apache-2.0), with modern open formats by default. [Read more](PHILOSOPHY.md)
-
-## Licence and credits
-Source code: **Apache License 2.0** ([`LICENSE`](LICENSE), [`NOTICE`](NOTICE)). Models and voices keep their own licences - see [docs/LICENSES.md](docs/LICENSES.md). Terms of use (End User Agreement, not legal advice): [docs/legal/](docs/legal/EULA-audiobook-builder.md). Open-source components and credits: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
-
-*Independent, non-commercial project by Aleksandr Mitroshenkov; not affiliated with any product or company with a similar name ("VoxPrint"/"Voxprint").*
-Use voices only with the owner's permission.
-
-Contributing: [CONTRIBUTING.md](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) (for AI coding agents).
-
-## Reusable parts
-A few large pieces can be copied on their own. Each file's docstring says what it does, how to call it, and how to credit Voxprint. Small helpers are not listed.
-
-* [`core/yo.py`](core/yo.py) - Russian letter yo, only where the dictionary is sure, plus "все" / "всё" by context and "чём" / "нём" / "всём" after о, об, в, во, на, при. Data: [`core/data/`](core/data/YO_DATASET.md) (the context rules are `core/data/yo_context.json`).
-* [`core/speakers.py`](core/speakers.py) - paragraph speaker marks (narrator, male, female), the reply parser, a check that rejects a one-line shift, and the voice cast (a second voice per role, characters pinned by name).
-* [`infra/model_downloader.py`](infra/model_downloader.py) - resumable, hash-checked model downloads.
+License: [Apache-2.0](LICENSE)
 
 ## ☕ Support the Project
 
-If you find this project useful and would like to support its development, you can buy me a coffee!
-
-- **Network:** TRON (TRC-20)
-- **Accepted:** USDT or TRX
-- **Address:** `TYveZBXaSpM4FEHa6iGrc7A6zuLfS4z3x6`
-
-> ⚠️ **Important:** Please ensure you are sending funds **only** via the TRON (TRC-20) network. 
-> Sending assets from other networks (such as Ethereum ERC-20, BSC BEP-20, etc.) to this address will result in **permanent loss of funds**.
+Donations (TRON TRC-20, USDT or TRX): `TYveZBXaSpM4FEHa6iGrc7A6zuLfS4z3x6`
+Send only via the TRON (TRC-20) network; other networks lose funds permanently.
