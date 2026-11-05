@@ -201,6 +201,15 @@ def test_body_headings():
     assert out == "Текст.\n\nГлава третья\n\nчетырнадцать\n\nСовсем другая часть\n\nПродолжение."
 
 
+def test_bare_roman_single_letter_stays_in_english():
+    # "I" alone is the English pronoun far more often than the numeral 1; only Russian reads a single
+    # bare letter as a chapter number. Multi-letter numerals still convert in both languages.
+    assert prep("I wandered lonely as a cloud.\n\nI\n\nMore text.", "en", [tp.STEP_HEADINGS]) == \
+        "I wandered lonely as a cloud.\n\nI\n\nMore text."
+    assert prep("XIV\n\nMore text.", "en", [tp.STEP_HEADINGS]) == "fourteen\n\nMore text."
+    assert prep("I\n\nMore text.", "ru", [tp.STEP_HEADINGS]) == "один\n\nMore text."
+
+
 # ----------------------------------------------------------------------------- whole book
 
 def test_prepare_book_is_pure_deterministic_and_reports(tmp_path):
