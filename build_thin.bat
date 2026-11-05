@@ -55,10 +55,10 @@ pyinstaller --onedir --windowed --noconfirm --clean --name "voxprint-audiobook-b
 set PYI_ERR=%ERRORLEVEL%
 python tools\embed_build_stamp.py --restore-module
 if not "%PYI_ERR%"=="0" (echo [ERROR] PyInstaller failed. & exit /b 1)
-rem  abi3 cryptography loads python3.dll from the extension's own folder. PyInstaller
-rem  looks for python3t.dll instead and leaves python3.dll out of the DLL search path.
+rem  python3.dll is a forwarder to python315.dll. It has to sit beside python315.dll
+rem  in _internal. A copy next to _rust.pyd makes the forwarder look for python315.dll
+rem  in that folder and the import fails. PyInstaller looks for python3t.dll and skips this one.
 copy /Y "%PY3DLL%" "dist\thin\voxprint-audiobook-builder\_internal\python3.dll" || exit /b 1
-copy /Y "%PY3DLL%" "dist\thin\voxprint-audiobook-builder\_internal\cryptography\hazmat\bindings\python3.dll" || exit /b 1
 rem  The bootloader ignores a trailer. Swapping only this exe updates the build status reports.
 python tools\embed_build_stamp.py --exe "%CD%\dist\thin\voxprint-audiobook-builder\voxprint-audiobook-builder.exe" || (echo [ERROR] exe stamp. & exit /b 1)
 
