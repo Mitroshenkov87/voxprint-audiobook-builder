@@ -22,6 +22,9 @@ for %%m in (%HEAVY%) do call set EXCL=%%EXCL%% --exclude-module %%m
 rem  The runtime (PyTorch & co.) is downloaded later and imports the WHOLE standard library (timeit, unittest ...): bundle all of it.
 python tools\gen_stdlib_bundle.py build\stdlib_bundle || (echo [ERROR] stdlib list. & exit /b 1)
 
+rem  The cp315 cryptography wheel is tagged abi3.abi3t and imports python3t.dll, which
+rem  a normal CPython 3.15 does not ship. Install the cp311 abi3 wheel (python3.dll) instead.
+uv pip install --reinstall "cryptography @ https://files.pythonhosted.org/packages/9a/4f/adfc442765721292fff86d314ce385d3249d22db42295c0dd057727b60f3/cryptography-50.0.2-cp311-abi3-win_amd64.whl" || exit /b 1
 rem  cryptography's abi3 extension imports python3.dll. PyInstaller ships python315.dll and misses this one.
 python -c "from pathlib import Path; import sys; Path('build/py3dll.txt').write_text(str(Path(sys.base_prefix)/'python3.dll'), encoding='ascii')" || exit /b 1
 set /p PY3DLL=<build\py3dll.txt
