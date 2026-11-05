@@ -53,7 +53,13 @@ def test_earlier_capitalised_linux_folder_is_still_found(monkeypatch, tmp_path):
     cur = paths.app_home()
     assert cur.name == "voxprint-ai-suite"
     old = h / ".local" / "share" / "Voxprint"
-    if not cur.exists() or not old.samefile(cur):             # (a case-insensitive file system would make them one folder)
+    # A case-insensitive volume treats Voxprint and voxprint as one directory, and home()
+    # moves that directory to voxprint-ai-suite. samefile then raises because the old path is gone.
+    try:
+        adopted = old.exists() and cur.exists() and old.samefile(cur)
+    except OSError:
+        adopted = not old.exists()
+    if not adopted:
         assert old.name in [p.name for p in paths.previous_homes()]
 
 
