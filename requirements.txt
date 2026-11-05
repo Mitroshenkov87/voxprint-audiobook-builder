@@ -1,6 +1,8 @@
-# Suite library, release v0.2.4. uv checks --hash against the wheel.
+# Suite library Yitro (voxprint-common v0.2.5).
+# The matching wheel and its SHA-256 stay in infra/runtime_lock.json (suite)
+# for an installer with no git pin.
 # pip turns on hash-checking mode for the whole file, so install this file with uv.
-voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/voxprint_common-0.2.4-py3-none-any.whl --hash=sha256:3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239
+voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@v0.2.5
 
 # Voxprint - dependencies (no hard pins here; only lower bounds and the upper bounds that are needed).
 # Installation order on Windows (done by build.bat):
@@ -50,3 +52,5 @@ sox
 qwen-omni-utils
 # build/packaging tool pulled in by PyTorch: at least the release with the PackageIndex path-traversal fix (PYSEC-2025-49)
 setuptools>=78.1.1
+# Torch's CPU wheel installs filelock 3.32.3. CVE-2026-112940 is fixed in 4.2.1.
+filelock>=4.2.1

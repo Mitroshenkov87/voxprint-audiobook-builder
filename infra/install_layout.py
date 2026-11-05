@@ -5,8 +5,8 @@ The windowed file is ``voxprint-audiobook-builder.exe``. Scripts call
 ``voxprint-audiobook-cli.exe``. The Start menu folder is ``VOXPrint AI Suite`` and the
 shortcut is ``VOXPrint AI Audiobook Builder``. Linux installs the package at
 ``/opt/voxprint-ai-suite/audiobook-builder`` and puts ``voxprint-audiobook-cli`` on
-``PATH``. Voices and settings stay in ``%LOCALAPPDATA%\\Voxprint`` and
-``~/.local/share/voxprint``.
+``PATH``. Voices and settings stay in ``%LOCALAPPDATA%\\VOXPrint AI Suite`` and
+``~/.local/share/voxprint-ai-suite``. A legacy ``Voxprint`` / ``voxprint`` folder is moved there.
 
 Peers read the shared manifest key ``installs`` (not ``apps``, which counted
 resources), then the Windows registry ``Software\\voxprint\\Apps\\audiobook-builder``,

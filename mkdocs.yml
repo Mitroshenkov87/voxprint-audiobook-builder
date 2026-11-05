@@ -98,6 +98,7 @@ nav:
       - Command-line guide: CLI.md
       - Driving the app: AGENTS.md
       - Architecture: ARCHITECTURE.md
+      - UI feature map: ui/FEATURE-MAP.md
       - Models: MODELS.md
       - Downloads: DOWNLOADS.md
       - Runtime: RUNTIME.md

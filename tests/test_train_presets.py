@@ -67,14 +67,16 @@ def test_train_window_shows_presets_estimate_and_collapsed_advanced_panel(app, t
     w = _window()
     assert [w.cmb_preset.itemData(i) for i in range(4)] == ["fast", "balanced", "maximum", "manual"]
     assert w.preset == "balanced" and w.adv_box.isHidden()
-    assert "RTX 4090" in w.lbl_estimate.text() and "10" in w.lbl_estimate.text()       # example for a 10-minute recording
+    assert "10" in w.lbl_estimate.text()                                                # example for a 10-minute recording
+    assert "RTX 4090" in w.lbl_estimate_detail.text()                                   # the card name stays under Advanced
+    example = w.lbl_estimate.text()
     wav = tmp_path / "r.wav"
     au.write_wav(wav, np.zeros(16000 * 300, dtype=np.float32), 16000)                  # 5 minutes
     w.set_audio(wav)
-    assert "5" in w.lbl_estimate.text() or "clips" in w.lbl_estimate.text()
+    assert w.lbl_estimate.text() != example
     n5 = w.lbl_estimate.text()
     w.cmb_preset.setCurrentIndex(2)
-    assert w.lbl_estimate.text() != n5 and "RTX 4090" in w.lbl_estimate.text()
+    assert w.lbl_estimate.text() != n5 and "RTX 4090" in w.lbl_estimate_detail.text()
     assert not w.sp_epochs.isEnabled()                                                  # only Manual edits the numbers
     w.cmb_preset.setCurrentIndex(3)
     assert w.sp_epochs.isEnabled() and not w.adv_box.isHidden()
@@ -105,10 +107,12 @@ def test_preset_texts_in_every_language():
     from core.i18n import tr
     for lang in i18n.LANGS:
         i18n.set_language(lang, persist=False)
-        for k in ("preset.label", "preset.fast", "preset.desc_maximum", "preset.estimate", "preset.adv_lr", "preset.adv_hint"):
+        for k in ("preset.label", "preset.fast", "preset.desc_maximum", "preset.estimate", "preset.estimate_detail", "preset.expert_note", "preset.adv_lr", "preset.adv_hint"):
             assert tr(k) != k
     i18n.set_language("en", persist=False)
-    assert "about 2 min" in tr("preset.estimate", time="2 min", epochs=5, rank=32, n=70, gpu="X")
+    assert tr("preset.estimate", time="2 min", epochs=5, rank=32, n=70, gpu="X") == "About 2 min."
+    detail = tr("preset.estimate_detail", time="2 min", epochs=5, rank=32, n=70, gpu="X")
+    assert "X" in detail and "32" in detail and "70" in detail
 
 
 def test_run_task_passes_a_preset_plan_to_the_trainer_only_when_not_balanced(tmp_path, monkeypatch):

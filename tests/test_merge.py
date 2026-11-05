@@ -190,10 +190,13 @@ def test_merge_button_state_hints_and_flow(app, adapter, monkeypatch, tmp_path):
 
     w = mw.MainWindow(runner=runner, autocheck=False, auto_open_folder=False)
     w.show()
-    assert w.btn_merge.text() == "Собрать универсальную модель (~4 ГБ)"
+    assert w.btn_merge.text() == "Собрать голос для других программ"
     assert not w.btn_merge.isEnabled() and w.btn_merge.toolTip()
-    assert "десятки МБ" in w.lbl_hint_lora.text() and "Alexandria" in w.lbl_hint_lora.text()
-    assert "4 ГБ" in w.lbl_hint_merge.text() and "Qwen3-TTS" in w.lbl_hint_merge.text()
+    assert "LoRA" not in w.lbl_hint_lora.text() and "адаптер" not in w.lbl_hint_lora.text().lower()
+    assert "Qwen3-TTS" not in w.lbl_hint_merge.text()
+    assert "десятки МБ" in w.lbl_expert_note.text() and "Alexandria" in w.lbl_expert_note.text()
+    assert "4 ГБ" in w.lbl_expert_note.text() and "Qwen3-TTS" in w.lbl_expert_note.text()
+    assert not w.adv_box.isVisible()
     pr.remember_adapter(adapter, "Мой голос")
     w._refresh_buttons()
     assert w.btn_merge.isEnabled()
