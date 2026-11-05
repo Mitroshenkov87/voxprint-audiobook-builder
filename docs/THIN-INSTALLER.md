@@ -10,9 +10,9 @@ is repacked or uploaded by us, so a CI build takes minutes instead of an hour an
 | Part | Source | Pinned by | Fallback |
 |---|---|---|---|
 | Voxprint shell (Qt, numpy, soundfile, our code) | our GitHub release (`Voxprint-shell-01.zip`) | SHA-256 in the manifest | — |
-| PyTorch 2.11.0 `cu130` + torchaudio 2.11.0 (CPU wheels are pinned for CI only) | `download.pytorch.org/whl/<flavor>/` | `infra/runtime_lock.json` | optional mirror (`urls`) |
+| PyTorch 2.14.1 `cu130` (CPU wheels are pinned for CI only; TorchAudio has no cp315 wheel) | `download.pytorch.org/whl/<flavor>/` | `infra/runtime_lock.json` | optional mirror (`urls`) |
 | ~70 other libraries (transformers, scipy, librosa, onnxruntime, peft ...) | PyPI (`files.pythonhosted.org`) | `infra/runtime_lock.json` | optional mirror |
-| 3 sdist-only pure-Python packages (`eng-to-ipa`, `sox`, `docopt`) | built from the hash-checked PyPI sdist in CI, shipped as small wheels in our release | SHA-256 in the manifest | — |
+| 4 sdist-only packages (`eng-to-ipa`, `sox`, `docopt`, `pyyaml`) | built from the hash-checked PyPI sdist in CI, shipped as small wheels in our release. PyYAML 6.0.3 has no cp315 wheel | SHA-256 in the manifest | — |
 | Visual C++ runtime | Microsoft (`aka.ms/vs/17/release/vc_redist.x64.exe`, fetched by CI and embedded in the setup) — installed only if the PC lacks 14.29 or newer | — | — |
 | ffmpeg | the PC's own, else the pinned LGPL build of BtbN/FFmpeg-Builds (`infra/assets_manifest.json`, SHA-256) — on first use, as before | SHA-256 | bundled `imageio-ffmpeg` |
 | Models (Qwen3 TTS / ASR / aligner, translation) | Hugging Face → ModelScope → our HF backup mirror (`infra/model_downloader.py`) | pinned revisions + sizes/SHA-256 | see `docs/MODELS.md` |
@@ -38,11 +38,11 @@ every file is still at its address with the pinned size). CI only reads the comm
 
 | # | Rule |
 |---|---|
-| 1 | Same CPython minor version as Voxprint (the `Tag:` of the installed wheel, now `cp314`) and `win_amd64` |
-| 2 | `torch` inside `compat.torch` of the lock (now `>=2.11,<2.12`; we ship 2.11.0) |
-| 3 | `torchaudio` in the same `site-packages`: the same release number as `torch`, or TorchAudio 2.11 (the last release) with torch 2.11 or newer |
+| 1 | Same CPython minor version as Voxprint (the `Tag:` of the installed wheel, now `cp315`) and `win_amd64` |
+| 2 | `torch` inside `compat.torch` of the lock (now `>=2.14,<2.15`; we ship 2.14.1) |
+| 3 | `torchaudio` in the same `site-packages` and the same release as `torch`. Python 3.15 has no such wheel, so a foreign copy is not reused |
 | 4 | Flavor: a CUDA build must not need a newer driver than the one installed (an older CUDA build is fine). There is no CPU wheel for users |
-| 5 | `torch/lib`, `torch/__init__.py`, `torchaudio/__init__.py` exist |
+| 5 | `torch/lib`, `torch/__init__.py` and `torchaudio/__init__.py` exist. Without a cp315 TorchAudio wheel this check does not pass |
 | 6 | The child-process check passes (150 s limit) |
 
 The flavor we download is `cu130` when the driver supports CUDA 13 (driver 600 or newer, or a header that says CUDA 13.0+). Otherwise there is no supported wheel and Voxprint does not install a CPU build. CI jobs that need a CPU wheel set the internal `VOXPRINT_TORCH_FLAVOR=cpu` (see [DEVELOPMENT.md](DEVELOPMENT.md) and [RUNTIME.md](RUNTIME.md)).
@@ -112,7 +112,7 @@ a launcher that installs from the folder without any manifest URL.
 
 ## Decisions to know about
 
-* PyTorch 2.11.0 `cu130` is the build we ship, with TorchAudio 2.11.0 of the same flavor. Reuse is limited to `compat.torch` in the lock; only the child-process check proves a foreign copy works.
+* PyTorch 2.14.1 `cu130` is the build we ship. TorchAudio is not installed: 2.11.1 has no regular cp315 wheel. Reuse is limited to `compat.torch` in the lock; only the child-process check proves a foreign copy works.
 * The mirror fallback (`urls`) is implemented but no mirror is populated yet: the CUDA wheel of PyTorch (2.6 GB) is above GitHub's 2 GiB asset limit, so a mirror
   would have to live on Hugging Face (or be split). If upstream removes an old wheel, the lock must be regenerated (`tools/check_lock_urls.py` warns in CI).
-* Python 3.14 / Windows x64 for this lock (`cp314-win_amd64`, plus abi3 wheels that still install on 3.14). Linux uses the same Python. See [RUNTIME.md](RUNTIME.md).
+* Python 3.15.2 / Windows x64 for this lock (`cp315-win_amd64`, plus abi3 wheels that still install on 3.15). Linux uses the same Python. See [RUNTIME.md](RUNTIME.md).

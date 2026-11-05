@@ -3,9 +3,9 @@
 One tree, one ``manifest.json`` (schema 1, :mod:`voxprint_common.runtime_manifest`)::
 
     %LOCALAPPDATA%\\Voxprint\\shared\\          Windows
-    ~/.local/share/voxprint/shared/         Linux
+    ~/.local/share/voxprint-ai-suite/shared/         Linux
 
-    runtime/py314-torch2.11-cu130   torch 2.11.0+cu130 (reused, not downloaded again)
+    runtime/py315-torch2.14-cu130   torch 2.14.1+cu130 (reused, not downloaded again)
     wheels/audiobook-builder        this app's other wheels (CPU onnxruntime never sits beside torch)
     tools/                          ffmpeg and other pinned tools
     manifest.json
@@ -46,9 +46,9 @@ APP_ID = "audiobook-builder"
 MANIFEST_NAME = "manifest.json"
 SCHEMA = 1
 RESOURCES = ("runtime", "tools")
-TORCH_ID = "torch-2.11.0-cu130"
-TORCH_VERSION = "2.11.0+cu130"
-TORCH_REL = "runtime/py314-torch2.11-cu130"
+TORCH_ID = "torch-2.14.1-cu130"
+TORCH_VERSION = "2.14.1+cu130"
+TORCH_REL = "runtime/py315-torch2.14-cu130"
 WHEELS_ID = "audiobook-wheels"
 WHEELS_REL = "wheels/audiobook-builder"
 _BOOKKEEPING = {".users.json", "reuse.json"}
@@ -81,7 +81,7 @@ def manifest_path() -> Path:
 
 
 def torch_dir() -> Path:
-    """Directory of the shared torch 2.11.0+cu130 component."""
+    """Directory of the shared torch 2.14.1+cu130 component."""
     return root() / TORCH_REL
 
 
@@ -248,7 +248,7 @@ def populated(folder: Path) -> bool:
 
 
 def foreign_torch_path() -> Path | None:
-    """A torch 2.11.0+cu130 tree another app already refs, or None when we may write our own."""
+    """A torch 2.14.1+cu130 tree another app already refs, or None when we may write our own."""
     _migrate_apps_manifest()
     if not manifest_path().is_file():
         return None

@@ -1,23 +1,23 @@
 # Runtime
 
-Voxprint runs on **Python 3.14** (Windows x64 and Linux x86-64).
+Voxprint runs on **Python 3.15** (Windows x64 and Linux x86-64). The installer bundles CPython **3.15.2** (uv's standalone build). `requires-python` is `>=3.15`.
 
 | Piece | Version |
 |---|---|
-| Python | 3.14 |
-| PyTorch | 2.11.0, flavor `cu130` |
-| TorchAudio | 2.11.0, flavor `cu130` (same release as torch; its native ops are built against that torch) |
+| Python | 3.15.2 (bundled); wheel tags are cp315 |
+| PyTorch | 2.14.1, flavor `cu130` |
+| TorchAudio | not installed (see below) |
 | nvidia-cublas-cu12 | 12.9.2.10 |
 | nvidia-cudnn-cu12 | 9.27.0.42 |
 | PySide6 | 6.11 or newer |
 
-TorchAudio has no wheel for torch 2.12–2.14 on `cu130` and Python 3.14, so both packages stay on 2.11.0. `torchcodec` is not installed. CI installs the CPU build of the same torch and torchaudio.
+2.14.1 is the newest torch with a regular cp315 wheel for both `cu130` and CPU. TorchAudio 2.11.1, the newest release, has no regular cp315 wheel (stable wheels stop at cp314; nightlies are free-threaded `cp315t` only). onnxruntime 1.31.1, the newest release, has no cp315 wheel and no sdist. Both are listed in the lock's `blocked` array and are not installed. `torchcodec` is not installed. CI installs the CPU build of torch 2.14.1.
 
-The pinned Windows wheels are in `infra/runtime_lock.json` (`python tools/make_runtime_lock.py`). A few libraries publish an abi3 wheel tagged for an older 3.x (`audioop-lts` cp313, `av` and `soxr` cp312). Those wheels install on Python 3.14. Every package that publishes a cp314 wheel is pinned to that wheel.
+The pinned Windows wheels are in `infra/runtime_lock.json` (`python tools/make_runtime_lock.py`). A few libraries publish an abi3 wheel tagged for an older 3.x (`audioop-lts` cp313, `av` and `soxr` cp312). Those wheels install on Python 3.15. Every package that publishes a cp315 wheel is pinned to that wheel.
 
-`voxprint-common` 0.2.4 is pinned by the released wheel in `requirements.txt` and in the lock's `suite` object (`voxprint_common-0.2.4-py3-none-any.whl`, SHA-256 `3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239`). pip checks that hash when it installs the wheel. The thin shell bundles it. It is not one of the PyPI runtime downloads. VOXPrint MDL (`voxprint-mdl`) from that wheel downloads the models in `voxprint-app-models.json`.
+`voxprint-common` 0.6.4 is pinned by the released wheel in `requirements.txt` and in the lock's `suite` object (`voxprint_common-0.6.4-py3-none-any.whl`, SHA-256 `1b7abcc99530d6f155b4be41fba26f3f27b8b54789d49282b936430c53a4314b`). That release requires Python >=3.14 and declares 3.14 and 3.15. pip checks the hash when it installs the wheel. The thin shell bundles it. It is not one of the PyPI runtime downloads. VOXPrint MDL (`voxprint-mdl`) from that wheel downloads the models in `voxprint-app-models.json`.
 
-The shared runtime is one `shared/manifest.json` (schema 1, `components`). Torch 2.11.0+cu130 lives at `shared/runtime/py314-torch2.11-cu130` and is reused when another Voxprint app already refs that component, instead of being downloaded again. This app's other wheels, including a CPU `onnxruntime`, stay in `shared/wheels/audiobook-builder`. An upgrade moves an existing `<app home>/runtime` (or a flat `shared/runtime` that still has torch at the top) into those two folders. Uninstall drops this app's ref and deletes a directory only when this app was the last ref and the path is not a shared root (the models root, `shared/runtime`, the voices root, a cache root, or the suite home). Model files stay with VOXPrint MDL. There is no separate setup page for that.
+The shared runtime is one `shared/manifest.json` (schema 1, `components`). Torch 2.14.1+cu130 lives at `shared/runtime/py315-torch2.14-cu130` and is reused when another Voxprint app already refs that component, instead of being downloaded again. This app's other wheels stay in `shared/wheels/audiobook-builder`. An upgrade moves an existing `<app home>/runtime` (or a flat `shared/runtime` that still has torch at the top) into those two folders. Uninstall drops this app's ref and deletes a directory only when this app was the last ref and the path is not a shared root (the models root, `shared/runtime`, the voices root, a cache root, or the suite home). Model files stay with VOXPrint MDL. There is no separate setup page for that.
 
 ## Why cu130 only
 

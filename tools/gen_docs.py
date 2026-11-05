@@ -210,8 +210,8 @@ def _command_summaries(parser: argparse.ArgumentParser) -> Dict[str, str]:
 def _help_block(title: str, parser: argparse.ArgumentParser, aliases: Sequence[str]) -> str:
     """One command, from the parser's description and arguments.
 
-    This is not ``format_help()``. That text wraps differently on Python 3.12
-    and 3.14, and the page is committed, so the two interpreters have to agree.
+    This is not ``format_help()``. That text wraps differently on Python 3.12,
+    3.14 and 3.15, and the page is committed, so the interpreters have to agree.
     """
     lines = [f"## `{title}`", ""]
     if aliases:

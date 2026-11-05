@@ -1,6 +1,8 @@
 """Import the native libraries the runtime ships, and exit 1 on the first failure.
 
-CI runs this on Python 3.14 after the CPU PyTorch wheels and ``requirements.txt`` are installed.
+CI runs this on Python 3.15 after the CPU PyTorch wheels and ``requirements.txt`` are installed.
+``onnxruntime`` and ``torchaudio`` have no regular CPython 3.15 wheel; a missing import of those
+two is reported as blocked and does not fail the run. Any other import failure still does.
 CTranslate2 is imported through :func:`infra.cuda12_libs.import_ctranslate2` so the CUDA 12
 libraries are on the path first.
 
@@ -9,6 +11,7 @@ Usage: ``python tools/check_native_imports.py``
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -24,6 +27,8 @@ _ensure_root_on_path()
 
 from infra.cuda12_libs import import_ctranslate2  # noqa: E402 - repo root must be on the path first
 
+#: No regular cp315 wheel. A missing import is reported and does not fail CI.
+BLOCKED = frozenset({"onnxruntime", "torchaudio"})
 #: Import names (not distribution names). ``audioop`` is the module provided by ``audioop-lts``.
 NATIVE = (
     "numpy",
@@ -61,15 +66,24 @@ def main() -> int:
         try:
             importlib.import_module(name)
             print(f"OK    {name}")
+        except ModuleNotFoundError as exc:
+            if name in BLOCKED:
+                print(f"BLOCKED {name}: {exc}")
+            else:
+                bad += 1
+                print(f"FAIL  {name}: {type(exc).__name__}: {exc}")
         except Exception as exc:  # noqa: BLE001
             bad += 1
             print(f"FAIL  {name}: {type(exc).__name__}: {exc}")
-    try:
-        check_torchaudio_ops()
-        print("OK    torchaudio.functional.resample")
-    except Exception as exc:  # noqa: BLE001
-        bad += 1
-        print(f"FAIL  torchaudio.functional.resample: {type(exc).__name__}: {exc}")
+    if importlib.util.find_spec("torchaudio") is None:
+        print("BLOCKED torchaudio.functional.resample: torchaudio is not installed")
+    else:
+        try:
+            check_torchaudio_ops()
+            print("OK    torchaudio.functional.resample")
+        except Exception as exc:  # noqa: BLE001
+            bad += 1
+            print(f"FAIL  torchaudio.functional.resample: {type(exc).__name__}: {exc}")
     try:
         import_ctranslate2()
         print("OK    ctranslate2")

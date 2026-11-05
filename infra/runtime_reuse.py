@@ -213,7 +213,7 @@ def _suite_runtime_prefixes(env: Dict[str, str], home: Path) -> List[Path]:
             continue
         seen.add(key)
         found.append(root / "shared" / "runtime")
-        found.append(root / "shared" / "runtime" / "py314-torch2.11-cu130")
+        found.append(root / "shared" / "runtime" / "py315-torch2.14-cu130")
         try:
             children = sorted(p for p in root.glob("runtime-*") if p.is_dir())
         except OSError:
@@ -559,8 +559,8 @@ def extra_paths() -> List[str]:
 def _torchaudio_pairs(torch_ver: str, audio_ver: str) -> bool:
     """True when both wheels are the same release. A flavor tag, when both sides have one, must match too.
 
-    TorchAudio's native ops are compiled against that torch. A later torch is not a pair: there is no TorchAudio
-    wheel for 2.12-2.14 on CUDA 13 and Python 3.14.
+    TorchAudio's native ops are compiled against that torch. A later torch is not a pair. TorchAudio 2.11.1,
+    the newest release, has no regular CPython 3.15 wheel.
     """
     torch_base, torch_sep, torch_flavor = torch_ver.partition("+")
     audio_base, audio_sep, audio_flavor = audio_ver.partition("+")

@@ -384,7 +384,7 @@ def test_all_portable_texts_exist_in_three_languages():
     iss = _iss()
     for key in ("PortablePageCaption", "PortablePageDescription", "PortableCheck", "PortableInfo", "PortableFoundInfo", "PortablePrompt",
                 "PortableBadFolder", "PortableMissing"):
-        for lang in ("english", "russian", "german"):
+        for lang in ("english", "german"):
             m = re.search(rf"^{lang}\.{key}=(.+)$", iss, re.M)
             assert m and m.group(1).strip(), (lang, key)
     assert "portable" in re.search(r"^english\.PortableCheck=(.+)$", iss, re.M).group(1).lower()

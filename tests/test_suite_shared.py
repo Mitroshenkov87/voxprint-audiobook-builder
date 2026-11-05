@@ -19,7 +19,7 @@ def test_register_and_unregister_keep_a_resource_another_app_still_uses(tmp_path
     assert not (suite_shared.root() / "tools").exists()
     assert (suite_shared.resource_dir("runtime") / "torch").is_dir()
     assert suite_shared.apps_using("runtime") == ["movie-dubber"]
-    assert suite_shared.unregister("movie-dubber") == ["torch-2.11.0-cu130"]
+    assert suite_shared.unregister("movie-dubber") == ["torch-2.14.1-cu130"]
 
 
 def test_install_suite_runs_the_runtime_and_ffmpeg_and_records_the_app(tmp_path, monkeypatch):

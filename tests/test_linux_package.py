@@ -26,13 +26,13 @@ def test_linux_data_dir_is_xdg_and_lower_case(monkeypatch, tmp_path):
     monkeypatch.delenv("VOXPRINT_HOME", raising=False)
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
-    assert paths.app_home() == tmp_path / "xdg" / "voxprint"
+    assert paths.app_home() == tmp_path / "xdg" / "voxprint-ai-suite"
     monkeypatch.delenv("XDG_DATA_HOME")
     monkeypatch.setenv("HOME", str(tmp_path / "h"))
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "h"))
-    assert paths.app_home() == tmp_path / "h" / ".local" / "share" / "voxprint"
+    assert paths.app_home() == tmp_path / "h" / ".local" / "share" / "voxprint-ai-suite"
     monkeypatch.setenv("XDG_DATA_HOME", "relative/path")       # XDG says: relative values are invalid
-    assert paths.app_home() == tmp_path / "h" / ".local" / "share" / "voxprint"
+    assert paths.app_home() == tmp_path / "h" / ".local" / "share" / "voxprint-ai-suite"
 
 
 def test_voxprint_home_overrides_everywhere(monkeypatch, tmp_path):
@@ -51,7 +51,7 @@ def test_earlier_capitalised_linux_folder_is_still_found(monkeypatch, tmp_path):
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: h))
     monkeypatch.setenv("XDG_DATA_HOME", str(h / ".local" / "share"))
     cur = paths.app_home()
-    assert cur.name == "voxprint"
+    assert cur.name == "voxprint-ai-suite"
     old = h / ".local" / "share" / "Voxprint"
     if not cur.exists() or not old.samefile(cur):             # (a case-insensitive file system would make them one folder)
         assert old.name in [p.name for p in paths.previous_homes()]

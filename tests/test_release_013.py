@@ -274,7 +274,8 @@ def test_uninstall_never_deletes_models_voices_or_settings():
 def test_the_wizard_language_becomes_the_app_language_once():
     iss = _iss()
     assert "function AppLanguageCode(): String;" in iss
-    for wizard, code in (("russian", "ru"), ("german", "de")):
+    for wizard, code in (("german", "de"),):
+        assert "ActiveLanguage = 'russian'" not in iss
         assert f"ActiveLanguage = '{wizard}' then\n    Result := '{code}'" in iss
     assert "if not FileExists(StateDir + '\\language') then" in iss
     assert "SaveStringsToUTF8FileWithoutBOM(StateDir + '\\language', Lines, False);" in iss

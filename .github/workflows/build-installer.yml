@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.15"
       - name: install.ps1 dry run against a local release
         shell: pwsh
         run: |
@@ -105,7 +105,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.15"
       - name: Inno Setup 6
         shell: pwsh
         run: choco install innosetup --no-progress -y
@@ -334,7 +334,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.15"
       - name: Inno Setup 6
         shell: pwsh
         run: choco install innosetup --no-progress -y
@@ -388,7 +388,7 @@ jobs:
           python main.py --modules-status
           python main.py --install-modules
           if ($LASTEXITCODE -ne 0) { throw "--install-modules failed" }
-          $shared = "C:\vxhome\shared\runtime\py314-torch2.11-cu130\torch\lib\big.dll"
+          $shared = "C:\vxhome\shared\runtime\py315-torch2.14-cu130\torch\lib\big.dll"
           if (-not (Test-Path $shared)) { throw "the torch module was not unpacked into the shared runtime ($shared)" }
           if (Test-Path C:\vxhome\runtime\torch) { throw "torch landed in the legacy runtime folder" }
           python main.py --modules-status
@@ -416,7 +416,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.15"
       - name: Inno Setup 6
         shell: pwsh
         run: choco install innosetup --no-progress -y
@@ -451,7 +451,7 @@ jobs:
             if ($line -match 'VOXPRINT_PYTEST_RC=(\d+)') { $script:recorded = [int]$Matches[1] }
           }
           # Same rule as pr-check: prefer the status pytest recorded before shutdown (tests/conftest.py). A Qt DLL
-          # detach on Python 3.14 can make the process exit non-zero after a green session (run 54). No recorded
+          # detach on Python 3.15 can make the process exit non-zero after a green session (run 54). No recorded
           # status means the process died during the tests, and that still fails the step.
           $rc = $LASTEXITCODE
           if ($null -ne $script:recorded) { $rc = $script:recorded }
@@ -551,16 +551,16 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           # The first install unpacked the wheels into the shared torch component
-          # <VOXPRINT_HOME>\shared\runtime\py314-torch2.11-cu130. Another Voxprint program keeps that tree at
-          # %LOCALAPPDATA%\Voxprint\shared\runtime\py314-torch2.11-cu130. This home is C:\vxhome2, so that
+          # <VOXPRINT_HOME>\shared\runtime\py315-torch2.14-cu130. Another Voxprint program keeps that tree at
+          # %LOCALAPPDATA%\Voxprint\shared\runtime\py315-torch2.14-cu130. This home is C:\vxhome2, so that
           # default folder is a foreign copy and must be reused, not downloaded again.
-          $src = "C:\vxhome1\shared\runtime\py314-torch2.11-cu130"
+          $src = "C:\vxhome1\shared\runtime\py315-torch2.14-cu130"
           if (-not (Test-Path $src)) {
             Get-ChildItem C:\vxhome1 -Recurse -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
             throw "the first install did not unpack into the shared torch component ($src)"
           }
           Get-ChildItem $src | Select-Object -ExpandProperty Name
-          $other = Join-Path $env:LOCALAPPDATA "Voxprint\shared\runtime\py314-torch2.11-cu130"
+          $other = Join-Path $env:LOCALAPPDATA "Voxprint\shared\runtime\py315-torch2.14-cu130"
           New-Item -ItemType Directory -Force (Split-Path $other) | Out-Null
           Copy-Item $src $other -Recurse -Force
           Get-ChildItem $other | Select-Object -ExpandProperty Name
@@ -572,7 +572,7 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "--install-modules failed" }
           $line = Get-Content C:\vxhome2\logs\modules.txt | Select-String "^torch" | Select-Object -First 1
           if ($line -notmatch "reused") { throw "PyTorch was not reused: $line" }
-          if (Test-Path C:\vxhome2\shared\runtime\py314-torch2.11-cu130\torch) { throw "PyTorch was downloaded into this home although the shared copy is on the PC" }
+          if (Test-Path C:\vxhome2\shared\runtime\py315-torch2.14-cu130\torch) { throw "PyTorch was downloaded into this home although the shared copy is on the PC" }
           $p = Start-Process $exe -ArgumentList "--probe-torch" -Wait -PassThru
           Get-Content C:\vxhome2\logs\probe_torch.txt
           if ($p.ExitCode -ne 0) { throw "the reused PyTorch does not work" }

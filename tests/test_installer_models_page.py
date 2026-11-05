@@ -8,7 +8,7 @@ from pathlib import Path
 from infra import existing_models, paths
 
 ISS = Path(__file__).resolve().parents[1] / "installer" / "Voxprint.iss"
-LANGS = ("english", "russian", "german")
+LANGS = ("english", "german")
 
 
 def text() -> str:
@@ -30,7 +30,7 @@ def test_bom_and_crlf_are_kept():
 def test_three_wizard_languages():
     langs = re.findall(r'^Name: "(\w+)"; MessagesFile: "([^"]+)"', section("Languages"), re.M)
     assert [n for n, _ in langs] == list(LANGS)
-    assert dict(langs)["german"].endswith("German.isl") and dict(langs)["russian"].endswith("Russian.isl")
+    assert dict(langs)["german"].endswith("German.isl") and "russian" not in dict(langs)
 
 
 def test_every_custom_message_exists_in_all_languages_and_every_use_is_defined():
@@ -40,7 +40,7 @@ def test_every_custom_message_exists_in_all_languages_and_every_use_is_defined()
         if m:
             assert m.group(3).strip(), line
             defined[m.group(1)].add(m.group(2))
-    assert defined["english"] == defined["russian"] == defined["german"] and len(defined["english"]) >= 9
+    assert defined["english"] == defined["german"] and len(defined["english"]) >= 9
     # {cm:Name} in script sections, CustomMessage('Name') in [Code]
     builtin = set()
     used = set(re.findall(r"\{cm:(\w+)", text())) | set(re.findall(r"CustomMessage\('(\w+)'\)", text()))
@@ -50,7 +50,7 @@ def test_every_custom_message_exists_in_all_languages_and_every_use_is_defined()
     for name in defined["english"]:
         ph = {l: sorted(set(re.findall(r"%\d", next(x for x in section("CustomMessages").splitlines() if x.startswith(f"{l}.{name}=")))))
               for l in LANGS}
-        assert ph["english"] == ph["russian"] == ph["german"], name
+        assert ph["english"] == ph["german"], name
 
 
 def test_no_russian_text_is_left_outside_the_message_table():

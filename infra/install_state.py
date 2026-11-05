@@ -36,7 +36,8 @@ OWNER_MARKER = ".voxprint-owned"
 #: Modules whose presence proves a usable install (checked without importing them - fast; see ``deep``).
 HEALTH_MODULES = ("torch", "transformers", "peft", "accelerate", "safetensors", "qwen_tts", "qwen_asr")
 REQUIREMENT_FILES = ("requirements.txt", "requirements-verified.txt", "requirements-nodeps.txt")
-PYTHON_VERSION_DEFAULT = "3.14"   # = the Python of the build/dev machine (build.bat: py -3.14); verify_install compares only major.minor with the running interpreter
+PYTHON_VERSION_DEFAULT = "3.15.2"   # bundled embeddable runtime (uv python-build-standalone); verify_install compares only major.minor
+TORCH_SPEC = "torch==2.14.1"          # newest release with a regular cp315 wheel for cu130 and cpu. torchaudio has none.
 
 # Stable reason codes (each has a locale key ``health.<code>``); they never contain tracebacks.
 R_NO_MANIFEST = "no_manifest"
@@ -260,7 +261,7 @@ def plan_commands(uv: str, torch_flavor: str, python_version: str = PYTHON_VERSI
     cmds: List[List[str]] = [[uv, "venv", "--python", python_version, "--seed", str(venv)]]
     if not skip_torch:
         index = f"https://download.pytorch.org/whl/{torch_flavor}"
-        cmds.append([uv, "pip", "install", "--python", py, "torch", "torchaudio", "--index-url", index])
+        cmds.append([uv, "pip", "install", "--python", py, TORCH_SPEC, "--index-url", index])
     cmds.append([uv, "pip", "install", "--python", py, "-r", str(root / "requirements.txt"),
                  "-r", str(root / "requirements-verified.txt")])
     cmds.append([uv, "pip", "install", "--python", py, "--no-deps", "-r", str(root / "requirements-nodeps.txt")])

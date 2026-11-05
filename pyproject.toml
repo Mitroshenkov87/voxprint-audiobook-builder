@@ -1,0 +1,7 @@
+[project]
+name = "voxprint-audiobook-builder"
+version = "1.0.0rc6"
+description = "Offline audiobook narration with voice cloning."
+requires-python = ">=3.15"
+readme = "README.md"
+license = "Apache-2.0"

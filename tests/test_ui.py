@@ -70,7 +70,12 @@ def test_selftest_imports_reports_and_writes_log(capsys):
     # a clean interpreter: other tests leave stub "torch" modules / fake dist-info behind in this process
     has_torch = subprocess.run([sys.executable, "-c", "import torch"], capture_output=True).returncode == 0
     if has_torch:                         # a light dev box without PyTorch: only the report itself is checked above
-        assert "OK    torch" in log and "OK    qwen_tts" in log    # core libraries are present in the full dev/test env
+        assert "OK    torch" in log
+        # qwen_tts imports onnxruntime, which has no cp315 wheel.
+        if "No module named 'onnxruntime'" in log:
+            assert "BLOCKED" in log and "onnxruntime" in log
+        else:
+            assert "OK    qwen_tts" in log
 
 
 def test_successful_run_shows_ready_and_progress(app, tmp_path):

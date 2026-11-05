@@ -5,6 +5,12 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+### Changed
+- **Python 3.15.2.** `requires-python` is `>=3.15`. CI uses `setup-python` `3.15`. The Windows and Linux installers bundle CPython 3.15.2. PyTorch is 2.14.1 `cu130` (the newest release with a regular cp315 wheel for `cu130` and CPU). The shared runtime directory is `shared/runtime/py315-torch2.14-cu130`.
+- **voxprint-common 0.6.4.** The pin is the released wheel `voxprint_common-0.6.4-py3-none-any.whl` (SHA-256 `1b7abcc99530d6f155b4be41fba26f3f27b8b54789d49282b936430c53a4314b`). That release requires Python >=3.14 and declares 3.14 and 3.15. The suite data folder is `%LOCALAPPDATA%\VOXPrint AI Suite` on Windows and `~/.local/share/voxprint-ai-suite` on Linux. An existing `%LOCALAPPDATA%\Voxprint` or `~/.local/share/voxprint` directory is moved on the first start.
+- **Installer languages.** The setup wizard offers English and German. Russian remains a narration language and an in-app interface language.
+- **Not installed on 3.15.** TorchAudio 2.11.1 (newest release) has no regular cp315 wheel. onnxruntime 1.31.1 (newest release) has no cp315 wheel and no sdist. Both are recorded in `infra/runtime_lock.json` under `blocked`.
+
 ### Fixed
 - A CI installer built without a release tag embeds its manifest and installs the shell zip from the folder next to the setup file. It does not name a `v0.0.0-dev` release.
 - The fetch status file uses a private temporary name and retries a sharing violation. A status write cannot fail a download. When the model step fails, setup ends with exit code 1.
