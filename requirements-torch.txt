@@ -1,6 +1,6 @@
 # FALLBACK way to install PyTorch with CUDA (the main one is `uv pip install torch --torch-backend=cu130`, see build.bat).
 # cu130 needs an NVIDIA driver that supports CUDA 13 (driver 600 or newer). CPU wheels are for CI only.
-# TorchAudio is the same release as torch. Its native ops are built against that torch.
+# 2.14.1 is the newest torch with a regular CPython 3.15 wheel for both cu130 and cpu.
+# torchaudio is not listed: 2.11.1 is the newest release and has no regular cp315 wheel.
 --index-url https://download.pytorch.org/whl/cu130
-torch==2.11.0
-torchaudio==2.11.0
+torch==2.14.1

@@ -127,9 +127,9 @@ def _runtime_populated(folder: Path) -> bool:
 def runtime_dir() -> Path:
     """Where this app's modules are unpacked.
 
-    That is the shared torch component (``runtime/py314-torch2.11-cu130``) when we may write it.
+    That is the shared torch component (``runtime/py315-torch2.14-cu130``) when we may write it.
     An older ``<app home>/runtime`` is moved there on first use. When another app already holds
-    torch 2.11.0+cu130, our other wheels go to ``wheels/audiobook-builder`` and torch is not downloaded again.
+    torch 2.14.1+cu130, our other wheels go to ``wheels/audiobook-builder`` and torch is not downloaded again.
     """
     suite_shared.migrate_installed_runtime()
     if suite_shared.foreign_torch_path() is not None:

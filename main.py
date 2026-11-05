@@ -67,6 +67,8 @@ def _selftest_imports(argv=()) -> int:
         bad += 1
         lines.append(f"FAIL  ctranslate2: {type(exc).__name__}: {exc}")
     install_qwen_tf()
+    # No regular CPython 3.15 wheel. A missing import does not fail the self-test.
+    blocked = {"torchaudio", "onnxruntime"}
     for name in ("requests", "urllib3", "tqdm", "yaml", "tokenizers", "torch", "torchaudio", "transformers", "peft", "accelerate", "safetensors", "qwen_tts", "qwen_asr",
                  "bitsandbytes", "soundfile", "librosa", "scipy.signal", "imageio_ffmpeg", "onnxruntime", "huggingface_hub",
                  "certifi", "PySide6.QtWidgets", "http.cookies", "email.mime.text", "xml.dom.minidom", "logging.config"):
@@ -74,9 +76,18 @@ def _selftest_imports(argv=()) -> int:
         try:
             mod = importlib.import_module(name)
             lines.append(f"OK    {name} {getattr(mod, '__version__', '')} ({time.time() - t:.1f}s)")
+        except ModuleNotFoundError as exc:
+            if name in blocked or (exc.name or "") in blocked:
+                lines.append(f"BLOCKED {name}: {exc}")
+                continue
+            bad += 1
+            lines.append(f"FAIL  {name}: {type(exc).__name__}: {exc}")
         except Exception as exc:  # noqa: BLE001
             if name == "bitsandbytes":          # optional: without it training uses plain AdamW
                 lines.append(f"WARN  {name} (optional): {type(exc).__name__}: {exc}")
+                continue
+            if name in blocked or any(part in str(exc) for part in ("onnxruntime", "torchaudio")):
+                lines.append(f"BLOCKED {name}: {exc}")
                 continue
             bad += 1
             lines.append(f"FAIL  {name}: {type(exc).__name__}: {exc}")
@@ -86,6 +97,12 @@ def _selftest_imports(argv=()) -> int:
         try:
             exec(stmt, {})  # nosec B102 - constant import statements of the self-test above
             lines.append(f"OK    {stmt} ({time.time() - t:.1f}s)")
+        except ModuleNotFoundError as exc:
+            if (exc.name or "") in ("onnxruntime", "torchaudio"):
+                lines.append(f"BLOCKED {stmt}: {exc}")
+                continue
+            bad += 1
+            lines.append(f"FAIL  {stmt}: {type(exc).__name__}: {exc}")
         except Exception as exc:  # noqa: BLE001
             bad += 1
             lines.append(f"FAIL  {stmt}: {type(exc).__name__}: {exc}")

@@ -48,7 +48,12 @@ def _fetch(url: str, dest: Path) -> None:
 
 def build_sdist_wheel(w: dict, work: Path, out: Path, fetch: Callable[[str, Path], None] = _fetch,
                       run: Callable[..., "subprocess.CompletedProcess"] = subprocess.run) -> Path:
-    """Download the pinned sdist, check its SHA-256, build a wheel from it; it must be pure Python (``-none-any``)."""
+    """Download the pinned sdist, check its SHA-256, and build a wheel from it.
+
+    A pure ``-none-any`` wheel is accepted. A ``cp315`` Windows x64 wheel is also accepted:
+    PyYAML 6.0.3 publishes no cp315 wheel, and its sdist tags the result for the builder's
+    platform even when the libyaml extension is left out.
+    """
     work.mkdir(parents=True, exist_ok=True)
     src = work / w["file"]
     fetch(w["url"], src)
@@ -63,8 +68,8 @@ def build_sdist_wheel(w: dict, work: Path, out: Path, fetch: Callable[[str, Path
     if not cand:
         raise SystemExit(f"no wheel was built from {w['file']}")
     whl = cand[-1]
-    if not whl.name.endswith("-none-any.whl"):
-        raise SystemExit(f"{whl.name} is not pure Python: it cannot be shipped for every PC; use a wheel from PyPI")
+    if not (whl.name.endswith("-none-any.whl") or whl.name.endswith("-cp315-cp315-win_amd64.whl")):
+        raise SystemExit(f"{whl.name} is not pure Python and is not a cp315 Windows wheel: it cannot be shipped; use a wheel from PyPI")
     return whl
 
 

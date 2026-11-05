@@ -1,5 +1,5 @@
-"""Application directories (Windows: ``%LOCALAPPDATA%\\Voxprint``; Linux: ``~/.local/share/voxprint``;
-overridable with ``VOXPRINT_HOME``).
+"""Application directories (Windows: ``%LOCALAPPDATA%\\VOXPrint AI Suite``; Linux: ``~/.local/share/voxprint-ai-suite``;
+overridable with ``VOXPRINT_HOME``). A legacy ``Voxprint`` / ``voxprint`` folder is moved on the first call.
 
 Layout under :func:`app_home`::
 
@@ -34,9 +34,9 @@ APP_NAME = "Voxprint"
 
 
 def app_home() -> Path:
-    """Root data directory: ``$VOXPRINT_HOME``, else ``%LOCALAPPDATA%\\Voxprint`` (Windows) / ``$XDG_DATA_HOME/voxprint``
-    (Linux and others, default ``~/.local/share/voxprint`` - lower case by XDG habit; the Linux installer keeps ``app/`` and
-    ``venv/`` there too)."""
+    """Root data directory: ``$VOXPRINT_HOME``, else ``%LOCALAPPDATA%\\VOXPrint AI Suite`` (Windows) /
+    ``$XDG_DATA_HOME/voxprint-ai-suite`` (Linux, default ``~/.local/share/voxprint-ai-suite``).
+    A legacy ``Voxprint`` / ``voxprint`` directory is moved here on the first call."""
     p = suite_paths.home()
     p.mkdir(parents=True, exist_ok=True)
     return p

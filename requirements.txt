@@ -1,10 +1,12 @@
-# Suite library, release v0.2.4. uv checks --hash against the wheel.
+# Suite library, release v0.6.4. uv checks --hash against the wheel.
 # pip turns on hash-checking mode for the whole file, so install this file with uv.
-voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/voxprint_common-0.2.4-py3-none-any.whl --hash=sha256:3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239
+# v0.6.4 requires Python >=3.14 and declares 3.14 and 3.15.
+voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.6.4/voxprint_common-0.6.4-py3-none-any.whl --hash=sha256:1b7abcc99530d6f155b4be41fba26f3f27b8b54789d49282b936430c53a4314b
 
 # Voxprint - dependencies (no hard pins here; only lower bounds and the upper bounds that are needed).
 # Installation order on Windows (done by build.bat):
-#   1) uv pip install torch==2.11.0 torchaudio==2.11.0 --torch-backend=cu130    (fallback: requirements-torch.txt)
+#   1) uv pip install torch==2.14.1 --torch-backend=cu130    (fallback: requirements-torch.txt)
+#      torchaudio is not installed: 2.11.1 is the newest release and has no CPython 3.15 wheel.
 #   2) uv pip install -r requirements.txt -r requirements-verified.txt   (this file + the verified versions)
 #   3) uv pip install --no-deps -r requirements-nodeps.txt     (qwen-asr, qwen-tts-hf - see the comment below)
 # Do not use "uv run" without --no-sync (it replaces CUDA torch with the CPU build). flash-attn is not needed on Windows.
@@ -30,7 +32,7 @@ hf_xet                                  # fast model downloads from HF (on Windo
 transformers>=5.16.1,<5.17
 huggingface_hub>=1.32.0,<2              # AIKIDO-2026-285573 fixed in 1.32.0; 2.x is httpx2
 sentencepiece                           # tokenizer of the Opus-MT translation models (MarianTokenizer)
-ctranslate2                             # CTranslate2 wheels are CUDA 12 builds; see infra/cuda12_libs.py
+ctranslate2>=4.8.5                      # 4.8.2 has no cp315 wheel; 4.8.5 does. CUDA 12 builds; see infra/cuda12_libs.py
 nvidia-cublas-cu12==12.9.2.10           # CUDA 12 runtime for CTranslate2 (not shipped by torch cu130)
 nvidia-cudnn-cu12==9.27.0.42
 accelerate>=1.12
@@ -43,9 +45,10 @@ rutextnorm
 
 # dependencies of qwen-asr / qwen-tts-hf (the packages themselves are in requirements-nodeps.txt)
 einops
-onnxruntime
+# Newest onnxruntime (1.31.1) has no cp315 wheel and no sdist, so it is not installed on this runtime.
+onnxruntime; python_version < "3.15"
 six               # needed by nagisa/qwen-asr (without it the PyInstaller build fails: No module named six)
-nagisa            # soynlp (GPLv3) is deliberately NOT installed: qwen-asr imports it lazily, for Korean only
+nagisa>=0.3.1     # 0.3.0 has no cp315 wheel. DyNet38 is not required on 3.15. soynlp (GPLv3) is not installed: qwen-asr imports it lazily, for Korean only
 sox
 qwen-omni-utils
 # build/packaging tool pulled in by PyTorch: at least the release with the PackageIndex path-traversal fix (PYSEC-2025-49)

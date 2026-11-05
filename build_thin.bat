@@ -22,6 +22,14 @@ for %%m in (%HEAVY%) do call set EXCL=%%EXCL%% --exclude-module %%m
 rem  The runtime (PyTorch & co.) is downloaded later and imports the WHOLE standard library (timeit, unittest ...): bundle all of it.
 python tools\gen_stdlib_bundle.py build\stdlib_bundle || (echo [ERROR] stdlib list. & exit /b 1)
 
+rem  The cp315 cryptography wheel is tagged abi3.abi3t and imports python3t.dll, which
+rem  a normal CPython 3.15 does not ship. Install the cp311 abi3 wheel (python3.dll) instead.
+uv pip install --reinstall "cryptography @ https://files.pythonhosted.org/packages/9a/4f/adfc442765721292fff86d314ce385d3249d22db42295c0dd057727b60f3/cryptography-50.0.2-cp311-abi3-win_amd64.whl" || exit /b 1
+rem  cryptography's abi3 extension imports python3.dll. PyInstaller ships python315.dll and misses this one.
+python -c "from pathlib import Path; import sys; Path('build/py3dll.txt').write_text(str(Path(sys.base_prefix)/'python3.dll'), encoding='ascii')" || exit /b 1
+set /p PY3DLL=<build\py3dll.txt
+if not exist "%PY3DLL%" (echo [ERROR] python3.dll not found: %PY3DLL% & exit /b 1)
+
 rem  PyInstaller drops the *.dist-info of bundled packages; the downloaded libraries look them up (transformers: "No package metadata was
 rem  found for packaging").  Copy the metadata of every shell package listed in infra\runtime_lock.json "shell".
 set META=
@@ -44,12 +52,16 @@ pyinstaller --onedir --windowed --noconfirm --clean --name "voxprint-audiobook-b
   --add-data "%CD%\core\data;core\data" ^
   --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^
   --collect-submodules core --collect-submodules infra --collect-submodules ui --collect-submodules workers --collect-submodules tools ^
-  --hidden-import netroute --hidden-import soundfile --collect-all certifi --collect-all voxprint_common ^
+  --add-binary "%PY3DLL%;." --hidden-import netroute --hidden-import soundfile --collect-all certifi --collect-all voxprint_common --collect-all cryptography ^
   --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
   %META% %EXCL% main.py
 set PYI_ERR=%ERRORLEVEL%
 python tools\embed_build_stamp.py --restore-module
 if not "%PYI_ERR%"=="0" (echo [ERROR] PyInstaller failed. & exit /b 1)
+rem  python3.dll is a forwarder to python315.dll. It has to sit beside python315.dll
+rem  in _internal. A copy next to _rust.pyd makes the forwarder look for python315.dll
+rem  in that folder and the import fails. PyInstaller looks for python3t.dll and skips this one.
+copy /Y "%PY3DLL%" "dist\thin\voxprint-audiobook-builder\_internal\python3.dll" || exit /b 1
 rem  The bootloader ignores a trailer. Swapping only this exe updates the build status reports.
 python tools\embed_build_stamp.py --exe "%CD%\dist\thin\voxprint-audiobook-builder\voxprint-audiobook-builder.exe" || (echo [ERROR] exe stamp. & exit /b 1)
 
@@ -69,7 +81,7 @@ pyinstaller --onedir --console --noconfirm --name voxprint-audiobook-cli --distp
   --add-data "%CD%\core\data;core\data" ^
   --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^
   --collect-submodules core --collect-submodules infra --collect-submodules ui --collect-submodules workers --collect-submodules tools ^
-  --hidden-import netroute --hidden-import soundfile --collect-all certifi --collect-all voxprint_common ^
+  --add-binary "%PY3DLL%;." --hidden-import netroute --hidden-import soundfile --collect-all certifi --collect-all voxprint_common --collect-all cryptography ^
   --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
   %META% %EXCL% main.py
 if errorlevel 1 (echo [ERROR] Console PyInstaller failed. & exit /b 1)

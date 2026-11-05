@@ -7,11 +7,12 @@
 # Installs the package for the machine (writes /opt and /usr with sudo when this user is not root):
 #   /opt/voxprint-ai-suite/audiobook-builder          the program (Python source)
 #   /opt/voxprint-ai-suite/audiobook-builder/venv     its Python environment
-#   ~/.local/share/voxprint/                          models, voices, settings, logs (per user; kept on upgrade)
+#   ~/.local/share/voxprint-ai-suite/                 models, voices, settings, logs (per user; kept on upgrade)
 #   /usr/local/bin/voxprint-audiobook-cli             the launcher (voxprint is a compatibility name)
 #   /usr/share/applications/voxprint-audiobook-builder.desktop
 # An older install under ~/.local/share/voxprint/app is removed. That data folder is not.
-# PyTorch: torch 2.11.0 cu130 (NVIDIA driver 600+) with TorchAudio 2.11.0.
+# PyTorch: torch 2.14.1 cu130 (NVIDIA driver 600+). The venv is CPython 3.15.2 from uv.
+# TorchAudio is not installed: 2.11.1 has no regular CPython 3.15 wheel.
 # An NVIDIA GeForce RTX 40-series or newer GPU (compute capability 8.9+) is required. There is no CPU-only install.
 # Internal CI switches, not shown in --help: --skip-gpu-check, --gpu-check-only, and --torch-backend cpu (only with --skip-gpu-check).
 # Re-running the script updates the program (the environment is reused).  `--uninstall` removes it again.
@@ -22,7 +23,7 @@ REPO="${VOXPRINT_REPO:-@REPO@}"
 TAG="${VOXPRINT_TAG:-@TAG@}"
 BASE_URL="${VOXPRINT_BASE_URL:-https://github.com/$REPO/releases/download/$TAG}"
 
-DATA="${VOXPRINT_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/voxprint}"
+DATA="${VOXPRINT_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/voxprint-ai-suite}"
 PREFIX="/opt/voxprint-ai-suite/audiobook-builder"
 BIN_DIR="/usr/local/bin"
 APPS_DIR="/usr/share/applications"
@@ -218,11 +219,10 @@ require_gpu
 # ----------------------------------------------------------------------------------------------- system checks
 say "VOXPrint for Linux (EXPERIMENTAL) - checking the system"
 PY="${VOXPRINT_PYTHON:-python3}"
-command -v "$PY" >/dev/null 2>&1 || die "python3 not found. Debian/Ubuntu: sudo apt install python3 python3-venv"
-if ! "$PY" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 14) else 1)'; then
-  die "Python 3.14 is required (found: $("$PY" -c 'import sys; print(sys.version.split()[0])')). Set VOXPRINT_PYTHON=/path/to/python3.14 to use another one."
-fi
-echo "Python: $("$PY" -c 'import sys; print(sys.version.split()[0])') ($(command -v "$PY"))"
+command -v "$PY" >/dev/null 2>&1 || die "python3 not found. Debian/Ubuntu: sudo apt install python3"
+"$PY" -c 'import sys; raise SystemExit(0 if sys.version_info[0] == 3 else 1)' || die "Python 3 is required to start the installer."
+echo "Bootstrap Python: $("$PY" -c 'import sys; print(sys.version.split()[0])') ($(command -v "$PY"))"
+echo "Bundled runtime: Python 3.15.2"
 
 MISSING=""
 if [ "$NO_SYSCHECK" = 1 ]; then
@@ -258,7 +258,7 @@ fi
 if [ "$MODE" = check ]; then
   echo "Check finished."; exit 0
 fi
-"$PY" -c 'import venv, ensurepip' 2>/dev/null || die "python3-venv is missing: sudo apt-get install python3-venv"
+# The venv is uv's CPython 3.15.2, not a copy of the bootstrap interpreter.
 
 # ----------------------------------------------------------------------------------------------- the program
 remove_old_user_package
@@ -304,22 +304,50 @@ as_root chown -R "$OWNER" "$APP"
 
 # ----------------------------------------------------------------------------------------------- the Python environment
 if [ "$RECREATE" = 1 ]; then rm -rf "$VENV"; fi
-if [ -x "$VENV/bin/python" ] && ! "$VENV/bin/python" -c 'import sys' 2>/dev/null; then rm -rf "$VENV"; fi
+if [ -x "$VENV/bin/python" ] && ! "$VENV/bin/python" -c 'import sys; raise SystemExit(0 if sys.version_info[:3]==(3,15,2) else 1)' 2>/dev/null; then rm -rf "$VENV"; fi
+UV_BOOT="$CACHE/uv-bin/uv"
+if [ ! -x "$UV_BOOT" ]; then
+  say "Downloading uv"
+  mkdir -p "$CACHE/uv-bin"
+  case "$(uname -m)" in
+    aarch64|arm64) UV_ARCH="aarch64" ;;
+    *) UV_ARCH="x86_64" ;;
+  esac
+  "$PY" - "$CACHE/uv-bin" "$UV_ARCH" <<'PYUV' || die "could not download uv"
+import io, stat, sys, tarfile, urllib.request
+from pathlib import Path
+dest_dir, arch = Path(sys.argv[1]), sys.argv[2]
+url = f"https://github.com/astral-sh/uv/releases/latest/download/uv-{arch}-unknown-linux-gnu.tar.gz"
+req = urllib.request.Request(url, headers={"User-Agent": "voxprint-install/1"})
+with urllib.request.urlopen(req, timeout=120) as r:
+    blob = r.read()
+with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
+    member = next(m for m in tar.getmembers() if m.name == "uv" or m.name.endswith("/uv"))
+    src = tar.extractfile(member)
+    if src is None:
+        raise SystemExit("uv binary missing from the archive")
+    dest = dest_dir / "uv"
+    dest.write_bytes(src.read())
+    dest.chmod(dest.stat().st_mode | stat.S_IEXEC)
+PYUV
+fi
 if [ ! -x "$VENV/bin/python" ]; then
-  say "Creating the Python environment in $VENV"
-  "$PY" -m venv "$VENV" || die "could not create the virtual environment"
+  say "Creating the Python 3.15.2 environment in $VENV"
+  "$UV_BOOT" venv "$VENV" --python 3.15.2 || die "could not install the Python 3.15.2 runtime"
 fi
 VPY="$VENV/bin/python"
-say "Installing the installer tools (pip, uv)"
-"$VPY" -m pip install --quiet --upgrade pip uv || die "pip could not install uv (is the network reachable?)"
+"$VPY" -c 'import sys; raise SystemExit(0 if sys.version_info[:3]==(3,15,2) else 1)' \
+  || die "the bundled runtime is not Python 3.15.2 (found: $("$VPY" -c 'import sys; print(sys.version.split()[0])'))"
+say "Installing the installer tools (uv)"
+"$UV_BOOT" pip install --python "$VPY" uv || die "could not install uv into the runtime"
 UV="$VENV/bin/uv"
 export UV_LINK_MODE=copy UV_CACHE_DIR="${UV_CACHE_DIR:-$CACHE/uv}"
 
 if [ "$TORCH" = cpu ] && [ "$SKIP_GPU" != 1 ]; then
   die "VOXPrint has no CPU-only install. An NVIDIA GeForce RTX 40-series or newer GPU is required."
 fi
-say "Installing PyTorch $TORCH (torch 2.11.0, torchaudio 2.11.0)"
-"$UV" pip install --python "$VPY" "torch==2.11.0" "torchaudio==2.11.0" --index-url "https://download.pytorch.org/whl/$TORCH" || die "PyTorch ($TORCH) could not be installed"
+say "Installing PyTorch $TORCH (torch 2.14.1)"
+"$UV" pip install --python "$VPY" "torch==2.14.1" --index-url "https://download.pytorch.org/whl/$TORCH" || die "PyTorch ($TORCH) could not be installed"
 say "Installing the other Python packages (this takes a few minutes)"
 "$UV" pip install --python "$VPY" -r "$APP/requirements.txt" -r "$APP/requirements-verified.txt" || die "installing requirements.txt failed"
 "$UV" pip install --python "$VPY" --no-deps -r "$APP/requirements-nodeps.txt" || die "installing requirements-nodeps.txt failed"

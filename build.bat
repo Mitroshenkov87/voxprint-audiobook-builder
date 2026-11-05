@@ -4,11 +4,11 @@ rem  Voxprint - build "voxprint-audiobook-builder.exe" (PyInstaller) and the ins
 rem  Usage:    build.bat            -> dist\voxprint-audiobook-builder.exe and dist\voxprint-audiobook-cli.exe
 rem            build.bat onedir     -> folder dist\voxprint-audiobook-builder\   (--onedir, starts faster; recommended
 rem                                    if --onefile with PyTorch gets too big/slow)
-rem  Requires Windows 11 x64 and Python 3.14 (py launcher). The models are NOT part of the exe: they are downloaded on first start.
+rem  Requires Windows 11 x64 and Python 3.15 (py launcher; the installer runtime is 3.15.2). The models are NOT part of the exe: they are downloaded on first start.
 rem
 rem  Install rules (from our research, see README):
-rem   * PyTorch through "uv pip install torch==2.11.0 torchaudio==2.11.0 --torch-backend=cu130" (driver 600+);
-rem     fallback: the cu130 index from requirements-torch.txt. Torch and TorchAudio are the same release.
+rem   * PyTorch through "uv pip install torch==2.14.1 --torch-backend=cu130" (driver 600+);
+rem     fallback: the cu130 index from requirements-torch.txt. TorchAudio has no CPython 3.15 wheel.
 rem   * NEVER run "uv run" without --no-sync: it re-syncs the environment and replaces CUDA torch with the CPU build.
 rem   * flash-attn is not installed on Windows (training uses eager/SDPA attention).
 rem   * qwen-asr and qwen-tts pin different transformers versions -> they are installed with --no-deps.
@@ -21,14 +21,14 @@ chcp 65001 >nul
 cd /d "%~dp0"
 
 if not exist ".venv\Scripts\python.exe" (
-    py -3.14 -m venv .venv || (echo [ERROR] Python 3.14 not found ^(py -3.14^). & exit /b 1)
+    py -3.15 -m venv .venv || (echo [ERROR] Python 3.15 not found ^(py -3.15^). & exit /b 1)
 )
 call ".venv\Scripts\activate.bat"
 python -m pip install -U pip wheel uv || exit /b 1
 
 echo === PyTorch (cu130) ===
 if not defined VOX_TORCH_BACKEND set VOX_TORCH_BACKEND=cu130
-uv pip install torch==2.11.0 torchaudio==2.11.0 --torch-backend=%VOX_TORCH_BACKEND%
+uv pip install torch==2.14.1 --torch-backend=%VOX_TORCH_BACKEND%
 if errorlevel 1 (
     echo [i] uv could not select wheels - trying the cu130 index
     python -m pip install -r requirements-torch.txt || exit /b 1

@@ -24,7 +24,7 @@ where.exe voxprint-audiobook-cli
 |---|---|
 | Launcher on `PATH` | `/usr/local/bin/voxprint-audiobook-cli` (`voxprint` starts the same program) |
 | Program tree | `/opt/voxprint-ai-suite/audiobook-builder` |
-| Data, models, voices, logs | `~/.local/share/voxprint` (`$XDG_DATA_HOME/voxprint`, or `$VOXPRINT_HOME`) |
+| Data, models, voices, logs | `~/.local/share/voxprint-ai-suite` (`$XDG_DATA_HOME/voxprint-ai-suite`, or `$VOXPRINT_HOME`) |
 
 **Source checkout.** From the repository root, with the project environment active:
 
@@ -38,11 +38,11 @@ Same subcommands as the executable. Help text says `voxprint`.
 
 | | Windows | Linux |
 |---|---|---|
-| Data root | `%LOCALAPPDATA%\Voxprint` | `~/.local/share/voxprint` |
-| Voices | `%LOCALAPPDATA%\Voxprint\voices` | `~/.local/share/voxprint/voices` |
-| Models | `%LOCALAPPDATA%\Voxprint\models` | `~/.local/share/voxprint/models` |
-| Projects | `%LOCALAPPDATA%\Voxprint\Projects` | `~/.local/share/voxprint/Projects` |
-| Logs | `%LOCALAPPDATA%\Voxprint\logs\voxprint.log` | `~/.local/share/voxprint/logs/voxprint.log` |
+| Data root | `%LOCALAPPDATA%\VOXPrint AI Suite` | `~/.local/share/voxprint-ai-suite` |
+| Voices | `%LOCALAPPDATA%\VOXPrint AI Suite\voices` | `~/.local/share/voxprint-ai-suite/voices` |
+| Models | `%LOCALAPPDATA%\VOXPrint AI Suite\models` | `~/.local/share/voxprint-ai-suite/models` |
+| Projects | `%LOCALAPPDATA%\VOXPrint AI Suite\Projects` | `~/.local/share/voxprint-ai-suite/Projects` |
+| Logs | `%LOCALAPPDATA%\VOXPrint AI Suite\logs\voxprint.log` | `~/.local/share/voxprint-ai-suite/logs/voxprint.log` |
 
 The models folder may be a different path if it was chosen during setup. `status` does not print that path (reports cut paths to names). A missing model still shows `"installed": false`.
 

@@ -18,19 +18,19 @@ def test_voxprint_common_is_pinned_by_the_released_wheel_and_its_sha256():
     lock = json.loads((ROOT / "infra" / "runtime_lock.json").read_text(encoding="utf-8"))
     suite = lock["suite"]
     assert suite == mrl.suite_record()
-    assert suite["version"] == "0.2.4"
-    assert suite["sha256"] == "3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
-    assert suite["size"] == 182510
+    assert suite["version"] == "0.6.4"
+    assert suite["sha256"] == "1b7abcc99530d6f155b4be41fba26f3f27b8b54789d49282b936430c53a4314b"
+    assert suite["size"] == 432931
     pin = mrl.suite_requirement(suite)
     assert pin in req
     assert pin == (
-        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.4/"
-        "voxprint_common-0.2.4-py3-none-any.whl --hash=sha256:3051bc64700964705bf5cee5182829d1311560a38a9f7436195f26481e4fa239"
+        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.6.4/"
+        "voxprint_common-0.6.4-py3-none-any.whl --hash=sha256:1b7abcc99530d6f155b4be41fba26f3f27b8b54789d49282b936430c53a4314b"
     )
     assert "git+" not in req
     assert "git" not in lock
     assert all(row["dist"] != "voxprint-common" for row in lock["wheels"])
-    assert lock["python"] == "3.14"
+    assert lock["python"] == "3.15" and lock["python_full"] == "3.15.2"
     parsed = Requirement(pin.split(" --hash=", 1)[0])
     assert parsed.name == "voxprint-common"
     assert parsed.url == suite["url"]
@@ -59,7 +59,7 @@ def test_an_apps_manifest_migrates_into_schema_1_components(tmp_path, monkeypatc
         },
     }), encoding="utf-8")
     data = suite_shared.load_manifest()
-    torch = data["components"]["torch-2.11.0-cu130"]
+    torch = data["components"]["torch-2.14.1-cu130"]
     assert set(torch["refs"]) == {"audiobook-builder", "movie-dubber"}
     assert "shared-models" not in data["components"]
     assert data["components"]["ffmpeg-8"]["refs"] == ["audiobook-builder"]

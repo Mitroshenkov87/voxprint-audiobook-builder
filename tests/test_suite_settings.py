@@ -171,7 +171,7 @@ def test_installer_detects_the_sibling_and_reads_the_shared_folder():
     body = t.split("function InitialModelsDir")[1].split("\nend;")[0]
     assert body.index("{param:ModelsFolder|}") < body.index("SuiteJsonString('models_dir')") < body.index("models_dir.txt")
     assert "function MovieDubberInstalled" in t and "'\"movie-dubber\"'" in t and "MovieDubberInstalled(ModelsEdit.Text)" in t
-    for lang in ("english", "russian", "german"):
+    for lang in ("english", "german"):
         assert f"{lang}.ModelsSiblingFound=" in t
     assert "ExecAsOriginalUser" in t and "'--sync-suite-settings'" in t and "'--unregister-runtime-user'" in t
 

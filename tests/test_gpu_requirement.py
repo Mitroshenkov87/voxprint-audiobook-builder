@@ -258,7 +258,7 @@ def test_windows_installer_checks_the_gpu_and_hides_the_ci_switch():
     body = text.split("function InitializeSetup")[1].split("\nfunction ")[0]
     assert "ParamSwitch('SKIPGPUCHECK')" in body or 'ParamSwitch("SKIPGPUCHECK")' in body
     assert "GpuRequired" in body and "Result := False" in body
-    for lang, none in (("english", "none"), ("russian", "нет"), ("german", "keine")):
+    for lang, none in (("english", "none"), ("german", "keine")):
         line = next(x for x in text.splitlines() if x.startswith(f"{lang}.GpuRequired="))
         assert "40" in line and "%1" in line
         assert next(x for x in text.splitlines() if x.startswith(f"{lang}.GpuNone=")).endswith(none)

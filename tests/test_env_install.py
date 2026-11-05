@@ -356,7 +356,7 @@ def test_plan_uses_uv_with_explicit_python_and_torch_index(tmp_path):
     py = str(ist.venv_python(venv))
     assert cmds[0][:3] == ["uv", "venv", "--python"]
     assert all(c[:3] == ["uv", "pip", "install"] and c[3:5] == ["--python", py] for c in cmds[1:])
-    assert "https://download.pytorch.org/whl/cu128" in cmds[1] and "torch" in cmds[1]
+    assert "https://download.pytorch.org/whl/cu128" in cmds[1] and "torch==2.14.1" in cmds[1]
     assert cmds[3][5] == "--no-deps"
 
 
@@ -629,5 +629,5 @@ def test_ensure_ffmpeg_in_audio_utils_requires_smoke_test(monkeypatch, tmp_path)
 
 
 def test_default_venv_python_matches_supported_runtime():
-    # --verify-install compares the manifest's Python version with the running interpreter (3.14): the default venv is 3.14 too
-    assert ist.PYTHON_VERSION_DEFAULT == "3.14"
+    # --verify-install compares the manifest's Python version with the running interpreter: the bundled runtime is 3.15.2
+    assert ist.PYTHON_VERSION_DEFAULT == "3.15.2"

@@ -79,10 +79,11 @@ def test_dataset_records_plain_text_and_rebuilds_the_same_bytes():
         rebuilt = runtime_path.read_bytes()
         rebuilt_dataset = dataset_path.read_bytes()
         # Python 3.12 gzip.compress(mtime=0) writes OS byte 3; GzipFile writes 255.
-        # The shipped header is the GzipFile one. The deflate stream can differ by zlib
-        # build (Windows CPython 3.14 wrote 1,324,198 bytes for this same payload), so the
-        # check is the decompressed table, not the compressed size.
-        assert before[:10] == rebuilt[:10] == bytes.fromhex("1f8b08000000000002ff")
+        # The shipped header is the GzipFile one. Byte 8 (extra flags) is 2 on 3.14 and
+        # 0 on 3.15. The deflate stream can differ by zlib build, so the check is the
+        # decompressed table, not the compressed size.
+        assert before[:8] == rebuilt[:8] == bytes.fromhex("1f8b080000000000")
+        assert before[9] == rebuilt[9] == 0xFF
         assert gzip.decompress(rebuilt) == gzip.decompress(before)
         assert gzip.decompress(rebuilt_dataset) == gzip.decompress(dataset)
         assert stats["dataset_rows"] == 139996
