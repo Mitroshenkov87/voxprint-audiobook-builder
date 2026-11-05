@@ -698,7 +698,9 @@ def prepare_heading(line: str, ctx: _Ctx) -> str:
     if m and ctx.lang in ("ru", "en") and roman_to_int(m.group(1)) and len(m.group(1)) > 1:
         ctx.counts[STEP_HEADINGS] += 1
         return nw.cardinal(roman_to_int(m.group(1)), ctx.lang)
-    if m and ctx.lang in ("ru", "en") and roman_to_int(m.group(1)):
+    if m and ctx.lang == "ru" and roman_to_int(m.group(1)):
+        # a single letter: in Russian a bare "I" / "V" is a chapter number, in English "I" is the pronoun
+        # (the first-person line of many a poem) and must stay as written
         ctx.counts[STEP_HEADINGS] += 1
         return nw.cardinal(roman_to_int(m.group(1)), ctx.lang)
     fixed = _sentence_case(s)
