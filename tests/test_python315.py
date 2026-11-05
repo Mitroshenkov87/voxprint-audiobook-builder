@@ -29,6 +29,8 @@ def test_installer_bundles_python_3_15_2_and_drops_russian():
     iss = (ROOT / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
     assert 'Name: "russian"' not in iss and "Russian.isl" not in iss
     assert 'Name: "english"' in iss and 'Name: "german"' in iss
+    thin = (ROOT / "build_thin.bat").read_text(encoding="utf-8")
+    assert thin.count("--collect-all cryptography") == 2
 
 
 def test_lock_records_the_packages_with_no_3_15_wheel():
