@@ -22,6 +22,11 @@ for %%m in (%HEAVY%) do call set EXCL=%%EXCL%% --exclude-module %%m
 rem  The runtime (PyTorch & co.) is downloaded later and imports the WHOLE standard library (timeit, unittest ...): bundle all of it.
 python tools\gen_stdlib_bundle.py build\stdlib_bundle || (echo [ERROR] stdlib list. & exit /b 1)
 
+rem  cryptography's abi3 extension imports python3.dll. PyInstaller ships python315.dll and misses this one.
+python -c "from pathlib import Path; import sys; Path('build/py3dll.txt').write_text(str(Path(sys.base_prefix)/'python3.dll'), encoding='ascii')" || exit /b 1
+set /p PY3DLL=<build\py3dll.txt
+if not exist "%PY3DLL%" (echo [ERROR] python3.dll not found: %PY3DLL% & exit /b 1)
+
 rem  PyInstaller drops the *.dist-info of bundled packages; the downloaded libraries look them up (transformers: "No package metadata was
 rem  found for packaging").  Copy the metadata of every shell package listed in infra\runtime_lock.json "shell".
 set META=
@@ -44,7 +49,7 @@ pyinstaller --onedir --windowed --noconfirm --clean --name "voxprint-audiobook-b
   --add-data "%CD%\core\data;core\data" ^
   --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^
   --collect-submodules core --collect-submodules infra --collect-submodules ui --collect-submodules workers --collect-submodules tools ^
-  --hidden-import netroute --hidden-import soundfile --collect-all certifi --collect-all voxprint_common --collect-all cryptography ^
+  --add-binary "%PY3DLL%;." --hidden-import netroute --hidden-import soundfile --collect-all certifi --collect-all voxprint_common --collect-all cryptography ^
   --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
   %META% %EXCL% main.py
 set PYI_ERR=%ERRORLEVEL%
@@ -69,7 +74,7 @@ pyinstaller --onedir --console --noconfirm --name voxprint-audiobook-cli --distp
   --add-data "%CD%\core\data;core\data" ^
   --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^
   --collect-submodules core --collect-submodules infra --collect-submodules ui --collect-submodules workers --collect-submodules tools ^
-  --hidden-import netroute --hidden-import soundfile --collect-all certifi --collect-all voxprint_common --collect-all cryptography ^
+  --add-binary "%PY3DLL%;." --hidden-import netroute --hidden-import soundfile --collect-all certifi --collect-all voxprint_common --collect-all cryptography ^
   --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
   %META% %EXCL% main.py
 if errorlevel 1 (echo [ERROR] Console PyInstaller failed. & exit /b 1)
