@@ -31,6 +31,7 @@ def test_installer_bundles_python_3_15_2_and_drops_russian():
     assert 'Name: "english"' in iss and 'Name: "german"' in iss
     thin = (ROOT / "build_thin.bat").read_text(encoding="utf-8")
     assert thin.count("--collect-all cryptography") == 2 and thin.count('--add-binary "%PY3DLL%;."') == 2
+    assert 'cryptography\\hazmat\\bindings\\python3.dll' in thin
 
 
 def test_lock_records_the_packages_with_no_3_15_wheel():
