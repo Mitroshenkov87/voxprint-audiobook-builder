@@ -1,18 +1,22 @@
 name: build-installer
 
-# workflow_dispatch builds the installer. Pull requests run only the cheap jobs (install-script, online-smoke,
+# workflow_dispatch builds the installer. A "v*" tag push also builds it, so the Windows installer attaches to
+# the GitHub release for that tag. Pull requests run only the cheap jobs (install-script, online-smoke,
 # thin-smoke) so a smoke assertion cannot stay red until a release dispatch. Job "build-thin" builds the ONLINE
 # installer voxprint-audiobook-builder-setup-<version>-win-x64.exe: our small shell (Qt + program) and a manifest that points to the libraries at
 # their upstream sites (docs/THIN-INSTALLER.md). The quick jobs "online-smoke" and "thin-smoke" test the installer
 # chain with a fake program folder in a few minutes (smoke_only=true). The former heavy job "build" (full installer
 # + multi-GB payload parts, also run on every "v*" tag push) was REMOVED on purpose: those assets were deleted from
-# the release and must never be recreated. Releases are built only by a manual run of "build-thin".
-# On a manual run the audit job runs first. The installer jobs do not start when ruff, mypy, bandit (high), gitleaks, or an
+# the release and must never be recreated. Releases are built by "build-thin" - on a tag push automatically, otherwise
+# by a manual run of "build-thin".
+# On a manual run or a tag push the audit job runs first. The installer jobs do not start when ruff, mypy, bandit (high), gitleaks, or an
 # un-allowlisted pip-audit high/critical finding fails that job. Vulture and radon do not fail it. Pull requests already
 # run audit.yml, so this workflow does not repeat it.
 on:
   pull_request:
     branches: [main]
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       release_tag:
@@ -403,7 +407,7 @@ jobs:
   # then repeats it with "another program's" PyTorch to prove the reuse path.
   build-thin:
     needs: audit
-    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.smoke_only }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.smoke_only) || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) }}
     runs-on: windows-latest
     timeout-minutes: 60
     env:
@@ -411,7 +415,7 @@ jobs:
       PYTHONUTF8: "1"
       # Internal: unit tests and the CPU PyTorch install on this runner. Not a user setting.
       VOXPRINT_ALLOW_NO_GPU: "1"
-      REL_TAG: ${{ inputs.release_tag }}
+      REL_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

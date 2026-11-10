@@ -52,8 +52,11 @@ def test_workflows_stamp_the_explicit_build_and_ignore_the_run_number():
 
 def test_the_heavy_full_build_cannot_run_any_more():
     wf = (ROOT / ".github" / "workflows" / "build-installer.yml").read_text(encoding="utf-8")
-    assert "\n  build:\n" not in wf and "build_full" not in wf and "tags:" not in wf
+    assert "\n  build:\n" not in wf and "build_full" not in wf
     assert "build.bat onedir" not in wf
+    # a v* tag push may only run the thin build (which attaches to the release); the heavy full-payload job stays gone
+    assert 'push:\n    tags: ["v*"]' in wf
+    assert "REL_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}" in wf
 
 
 def test_thin_job_publishes_an_exe_patch():
