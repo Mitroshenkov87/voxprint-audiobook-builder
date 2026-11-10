@@ -5,17 +5,25 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+## [1.0.0-rc.7] - 2026-11-10 - build 1005 "Yachad"
+
+Codename *Yachad* (together, Tehillim 133:1): the shared UI shell and one interface language. The version is **1.0.0-rc.7**. The release tag for this build is `v1.0.0-rc.7` (a pre-release). People see `1.0.0 RC7 · build 1005 "Yachad"`; the Windows file version is `1.0.0.1005`. The build number is the `build` field in `BUILD.json` (**1005**). `offset` is history only and is not added to the CI run number. Release notes: [docs/RELEASE-NOTES-1005-YACHAD.md](docs/RELEASE-NOTES-1005-YACHAD.md).
+
 ### Changed
-- **Shared UI shell (draft).** The simple screen keeps Choose a book, a full-width voice, and chips for pace, voices, format (MP3, M4B with chapter markers, Opus), split into chapters, background music, and reading manner, then Create audiobook. The chips write the same settings the expert panel shows. Language, text preparation, sound quality, the AI label, and the fine technical parameters stay expert fields. Expert rows are one label and one control, in titled sections, inside the scroll panel. The train window is three numbered groups: recording and text, quality, then consent, the voice name, and Train. Quick preview, compare, checks, voice details, and Build a voice for other apps stay under More options. Consent sentences are unchanged. Chips grow to fit Russian, English, and German. An empty history row stays hidden. The train window title stays light on the dark background. The window is the voxprint-common screen for `audiobook-builder`. The pin is `voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@v0.2.5` (Yitro, commit `8a94b53`). The voice combo is a flat `set_voices` list of id and label; an empty library still shows Warm, Clear, and Low. Male and female groups are not in this pin. The matching 0.2.5 wheel and its SHA-256 stay in the lock's `suite` object for an installer that has no git pin. The rc.6 refusal to delete a shared root is unchanged. `docs/ui/FEATURE-MAP.md` lists every old-UI feature and every CLI feature. Nothing is dropped. Sections (Narrate, Voices, Roles, Re-voice) and the 3-step Train voice wizard are designed there; this pin does not have those pieces yet. Suite data follows that library: `~/.local/share/voxprint-ai-suite` on Linux and `%LOCALAPPDATA%\VOXPrint AI Suite` on Windows. A legacy `voxprint` / `Voxprint` folder is moved there on first use.
+- **voxprint-common 0.7.1.** The pin is `voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@v0.7.1` (`requirements.txt` and the lock's `git` list). The lock's `suite` object records the matching wheel (`voxprint_common-0.7.1-py3-none-any.whl`, SHA-256 `7e5b1dd62ca1a4d298bc7fb610f03398929b231823151a312012d1d327b6f029`). The suite screen refits its chips on style changes; this app's chip fitting uses the same density tokens, and the chips grow to fit their English labels. Suite data follows that library: `~/.local/share/voxprint-ai-suite` on Linux and `%LOCALAPPDATA%\VOXPrint AI Suite` on Windows.
+- **English-only interface.** The UI and the installer wizard ship English only. Russian, German, Ukrainian and Latvian stay fully supported *content* languages (narration, TTS, yo/stress, training): only the interface and installer dropped them. The catalogs `locales/{de,ru,uk,lv}.json` and `locales/shell/{de,ru,uk,lv}.json`, the translated manuals and screenshots are gone; `core/i18n.py` offers `("en",)` only, and a saved or system language that is not English falls back to English.
+- **MDL display fields.** Every row of `voxprint-app-models.json` carries `label`, `purpose` and `group` for the MDL manage page. No model, file, id, `on_demand` flag or `vram_tier` changed: Qwen3-TTS 12Hz Base (the 1.7B / 16 GB row) stays the default narrator, the compact 0.6B row stays 8 GB.
+- **Windows installer on a release tag.** Pushing a `v*` tag now runs `build-thin`, so the Windows installer attaches to the GitHub release for that tag (`REL_TAG` comes from the ref). The removed heavy full-payload job stays gone. On a tag push the audit job still runs first.
+- Python stays 3.14; `filelock>=4.2.1` stays (CVE-2026-112940).
 
 ### Fixed
-- **filelock 4.2.1.** The audit environment was keeping Torch's filelock 3.32.3 (CVE-2026-112940). `requirements.txt` now requires 4.2.1 or newer.
 - The simple screen keeps the voice list and the book drop zone wide enough for one line of text. The expert toggle fits its bold label. The expert panel keeps a single reset beside the pace chips and leaves room for its scrollbar. The voice name sits inside the consent group.
 - A CI installer built without a release tag embeds its manifest and installs the shell zip from the folder next to the setup file. It does not name a `v0.0.0-dev` release.
 - The fetch status file uses a private temporary name and retries a sharing violation. A status write cannot fail a download. When the model step fails, setup ends with exit code 1.
 - `--json` and the self-test result are UTF-8 even when Windows cannot change the console code page.
 - The command line imports the stock voices into the same `<home>/voices` folder the window reads, so they are present after a full install.
 - pydub's `SyntaxWarning` and the flash-attn note are not printed.
+- `ui/std_buttons.py`: the unused Qt `translate` parameter is marked so vulture stays quiet.
 
 ## [1.0.0-rc.6] - 2026-10-11 - build 1004 "Shomer"
 
