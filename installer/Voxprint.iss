@@ -48,7 +48,7 @@
 #define AppFolder "Audiobook Builder"
 #define StartMenu "VOXPrint AI Suite"
 #define AppDisplayName "VOXPrint AI Audiobook Builder"
-#define AppVersion "1.0.0-rc.7"
+#define AppVersion "1.0.0-rc.8"
 ; Windows version resources are four numbers. The pre-release suffix stays in AppVersion.
 #define AppVersionInfo "1.0.0"
 #define AppExe "voxprint-audiobook-builder.exe"

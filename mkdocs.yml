@@ -122,6 +122,7 @@ nav:
       - Template: legal/EULA-TEMPLATE.md
   - Release notes:
       - Template: RELEASE-NOTES-TEMPLATE.md
+      - 1.0.0 Chesed: RELEASE-NOTES-1006-CHESED.md
       - 1.0.0 Yachad: RELEASE-NOTES-1005-YACHAD.md
       - 1.0.0 Shomer: RELEASE-NOTES-1004-SHOMER.md
       - 1.0.0 Amud: RELEASE-NOTES-1003-AMUD.md

@@ -133,18 +133,18 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
 
     from tools import build_number as bn
 
-    # offset is history. The number is BUILD.json "build" (1005) or a tag that ends in +N / -buildN.
+    # offset is history. The number is BUILD.json "build" (1006) or a tag that ends in +N / -buildN.
     # GITHUB_RUN_NUMBER is ignored, including the runs that used to move the offset.
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "57"}) == 1005
-    assert bn.build_number({"GITHUB_RUN_NUMBER": "56"}) == 1005
-    assert bn.build_number({}) == 1005
-    assert bn.build_number({"GITHUB_REF": "refs/tags/v1.0.0-rc.4", "GITHUB_REF_NAME": "v1.0.0-rc.4"}) == 1005
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "57"}) == 1006
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "56"}) == 1006
+    assert bn.build_number({}) == 1006
+    assert bn.build_number({"GITHUB_REF": "refs/tags/v1.0.0-rc.4", "GITHUB_REF_NAME": "v1.0.0-rc.4"}) == 1006
     assert bn.build_number({"REL_TAG": "v1.0.0-rc.5+1005", "GITHUB_RUN_NUMBER": "99"}) == 1005
     assert bn.build_number({"GITHUB_REF": "refs/tags/v1.0.0-rc.5-build1003",
                             "GITHUB_REF_NAME": "v1.0.0-rc.5-build1003"}) == 1003
     assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34", "REL_TAG": "v1.0.0-rc.5+1005"}) == 700
     assert bn.build_number({"VOXPRINT_BUILD": "0"}) == 0
-    assert bn.info()["build"] == 1005
+    assert bn.info()["build"] == 1006
     assert bn.info()["offset"] == 944
     note = bn.info()["offset_note"]
     assert "946" in note and "run 53" in note and "Nachon" in note and "run 55 + 945 = 1000" in note and "Chazak" in note
@@ -153,15 +153,16 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     assert "1003" in note and "Amud" in note and "v1.0.0-rc.5" in note
     assert "1004" in note and "Shomer" in note and "v1.0.0-rc.6" in note
     assert "1005" in note and "Yachad" in note and "v1.0.0-rc.7" in note
+    assert "1006" in note and "Chesed" in note and "v1.0.0-rc.8" in note
     name = bn.info()["codename"]
-    assert name == "Yachad" and name.isascii() and name.isalpha()
+    assert name == "Chesed" and name.isascii() and name.isalpha()
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     credits = json.loads((root / "credits.json").read_text(encoding="utf-8"))
-    assert credits["app"]["version"] == "1.0.0-rc.7" and credits["app"]["channel"] == "rc"
-    assert credits["app"]["codename"] == "Yachad"
+    assert credits["app"]["version"] == "1.0.0-rc.8" and credits["app"]["channel"] == "rc"
+    assert credits["app"]["codename"] == "Chesed"
     iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8")
-    assert '#define AppVersion "1.0.0-rc.7"' in iss
+    assert '#define AppVersion "1.0.0-rc.8"' in iss
     assert '#define AppVersionInfo "1.0.0"' in iss
     assert "VersionInfoVersion={#AppVersionInfo}.{#AppBuild}" in iss
     log = (root / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -179,6 +180,12 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     assert heading6 in log and log.index("## [Unreleased]") < log.index(heading6) < log.index(heading5)
     heading7 = '## [1.0.0-rc.7] - 2026-11-10 - build 1005 "Yachad"'
     assert heading7 in log and log.index("## [Unreleased]") < log.index(heading7) < log.index(heading6)
+    heading8 = '## [1.0.0-rc.8] - 2026-11-10 - build 1006 "Chesed"'
+    assert heading8 in log and log.index("## [Unreleased]") < log.index(heading8) < log.index(heading7)
+    notes = (root / "docs" / "RELEASE-NOTES-1006-CHESED.md").read_text(encoding="utf-8")
+    assert notes.startswith("**VOXPrint 1.0.0 RC8")
+    assert "Chesed" in notes and "v1.0.0-rc.8" in notes and "1006" in notes
+    assert "Tehillim" not in notes
     notes = (root / "docs" / "RELEASE-NOTES-1005-YACHAD.md").read_text(encoding="utf-8")
     assert notes.startswith("**VOXPrint 1.0.0 RC7")
     assert "Yachad" in notes and "v1.0.0-rc.7" in notes and "1005" in notes
@@ -250,6 +257,11 @@ def test_build_number_and_codename(tmp_path, monkeypatch):
     monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.7")
     assert appinfo.release_version() == "1.0.0-rc.7"
     assert appinfo.version_label() == '1.0.0 RC7 \u00b7 build 1005 "Yachad"'
+    monkeypatch.setattr(appinfo, "APP_BUILD", 1006)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Chesed")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.8")
+    assert appinfo.release_version() == "1.0.0-rc.8"
+    assert appinfo.version_label() == '1.0.0 RC8 \u00b7 build 1006 "Chesed"'
     monkeypatch.setattr(appinfo, "APP_BUILD", 665)
     monkeypatch.setattr(appinfo, "APP_CODENAME", "Tikkun")
     monkeypatch.setattr(appinfo, "APP_CHANNEL", "beta")
