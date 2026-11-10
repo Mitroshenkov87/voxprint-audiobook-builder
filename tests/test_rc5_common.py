@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 UI_PIN = (
     "voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common"
-    "@v0.7.1"
+    "@v0.7.2"
 )
 
 
@@ -24,14 +24,14 @@ def test_voxprint_common_keeps_the_released_wheel_and_pins_the_ui_shell():
     lock = json.loads((ROOT / "infra" / "runtime_lock.json").read_text(encoding="utf-8"))
     suite = lock["suite"]
     assert suite == mrl.suite_record()
-    assert suite["version"] == "0.7.1"
-    assert suite["sha256"] == "7e5b1dd62ca1a4d298bc7fb610f03398929b231823151a312012d1d327b6f029"
-    assert suite["size"] == 444417
+    assert suite["version"] == "0.7.2"
+    assert suite["sha256"] == "91783f7409bfc357baf4f54ccad35c2897b8fbb323f886672d92b626b16e8d2a"
+    assert suite["size"] == 448287
     pin = mrl.suite_requirement(suite)
     assert pin not in req
     assert pin == (
-        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.7.1/"
-        "voxprint_common-0.7.1-py3-none-any.whl --hash=sha256:7e5b1dd62ca1a4d298bc7fb610f03398929b231823151a312012d1d327b6f029"
+        "voxprint-common @ https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.7.2/"
+        "voxprint_common-0.7.2-py3-none-any.whl --hash=sha256:91783f7409bfc357baf4f54ccad35c2897b8fbb323f886672d92b626b16e8d2a"
     )
     assert UI_PIN in req
     assert lock["git"] == [UI_PIN]

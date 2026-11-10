@@ -6,7 +6,7 @@ The main screen is section Narrate: Choose a book, a full-width voice, and chips
 
 ## Missing shell pieces
 
-Pinned tag `v0.7.1` (commit `16804bf3`) includes Sections (a tab row), Steps (a wizard), `set_voices`, full `input_path`, Pause and resume, a player with a chapter list, a light theme, and `ui.geometry`. UI freeze (Aleksandr, 15:15): do not wire new polish yet. Still not in this pin:
+Pinned tag `v0.7.2` (commit `d2817c8f`) includes Sections (a tab row), Steps (a wizard), `set_voices`, full `input_path`, Pause and resume, a player with a chapter list, a light theme, and `ui.geometry`. This pin also adds the This app / Shared model tabs and the `16 GB` badge to the Manage models window and removes the shared RU strings (the interface stays English-only); no new `mdl.json` fields are needed. UI freeze (Aleksandr, 15:15): do not wire new polish yet. Still not in this pin:
 
 | Piece | Designed use |
 | --- | --- |
