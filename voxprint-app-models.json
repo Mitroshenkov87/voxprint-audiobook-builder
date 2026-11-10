@@ -237,7 +237,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "Qwen3-TTS 0.6B",
+   "purpose": "Compact narrator for 8 GB cards.",
+   "group": "voice"
   },
   {
    "id": "qwen3-tts",
@@ -474,7 +477,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "Qwen3-TTS 1.7B Base",
+   "purpose": "Default narrator for 16 GB cards.",
+   "group": "voice"
   },
   {
    "id": "qwen3-tts-tokenizer",
@@ -559,7 +565,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "Qwen3-TTS speech tokenizer",
+   "purpose": "Tokenizes speech for the Qwen3-TTS narrators.",
+   "group": "internal"
   },
   {
    "id": "opus-mt-en-ru",
@@ -701,7 +710,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "English to Russian",
+   "purpose": "Translates book text from English to Russian.",
+   "group": "translate"
   },
   {
    "id": "opus-mt-ru-en",
@@ -843,7 +855,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "Russian to English",
+   "purpose": "Translates book text from Russian to English.",
+   "group": "translate"
   },
   {
    "id": "opus-mt-tc-bible-big-deu-eng-fra-por-spa-gmw",
@@ -956,7 +971,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "European to West Germanic",
+   "purpose": "Translates West European book text into English or German.",
+   "group": "translate"
   },
   {
    "id": "opus-mt-tc-bible-big-gmw-deu-eng-fra-por-spa",
@@ -1069,7 +1087,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "West Germanic to European",
+   "purpose": "Translates English or German book text into West European languages.",
+   "group": "translate"
   },
   {
    "id": "opus-mt-tc-big-de-zle",
@@ -1182,7 +1203,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "German to East Slavic",
+   "purpose": "Translates book text from German to Russian or Ukrainian.",
+   "group": "translate"
   },
   {
    "id": "opus-mt-tc-big-en-zle",
@@ -1295,7 +1319,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "English to East Slavic",
+   "purpose": "Translates book text from English to Russian or Ukrainian.",
+   "group": "translate"
   },
   {
    "id": "opus-mt-tc-big-zle-de",
@@ -1408,7 +1435,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "East Slavic to German",
+   "purpose": "Translates book text from Russian or Ukrainian to German.",
+   "group": "translate"
   },
   {
    "id": "opus-mt-tc-big-zle-en",
@@ -1521,7 +1551,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "East Slavic to English",
+   "purpose": "Translates book text from Russian or Ukrainian to English.",
+   "group": "translate"
   },
   {
    "id": "gemma-4-12b",
@@ -1543,7 +1576,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "Gemma 4 12B",
+   "purpose": "Drafts speaker marks and book structure.",
+   "group": "writer"
   },
   {
    "id": "ace-step",
@@ -1890,7 +1926,10 @@
       }
      ]
     }
-   ]
+   ],
+   "label": "ACE-Step",
+   "purpose": "Creates background music and ambience for the audiobook.",
+   "group": "generate"
   },
   {
    "id": "voice-open-universal",
@@ -1907,7 +1946,10 @@
       "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/open-universal.zip"
      ]
     }
-   ]
+   ],
+   "label": "Open universal voice",
+   "purpose": "Open English voice trained on public-domain LJ Speech.",
+   "group": "voice"
   },
   {
    "id": "voice-noa",
@@ -1924,7 +1966,10 @@
       "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/noa.zip"
      ]
     }
-   ]
+   ],
+   "label": "Noa",
+   "purpose": "Optional female Russian voice for narration.",
+   "group": "voice"
   },
   {
    "id": "voice-levi",
@@ -1941,7 +1986,10 @@
       "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v2/levi.zip"
      ]
     }
-   ]
+   ],
+   "label": "Levi",
+   "purpose": "Male Russian voice for narration.",
+   "group": "voice"
   },
   {
    "id": "voice-natan",
@@ -1958,7 +2006,10 @@
       "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v2/natan.zip"
      ]
     }
-   ]
+   ],
+   "label": "Natan",
+   "purpose": "Male Russian voice for narration.",
+   "group": "voice"
   },
   {
    "id": "voice-shimon",
@@ -1975,7 +2026,10 @@
       "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v2/shimon.zip"
      ]
     }
-   ]
+   ],
+   "label": "Shimon",
+   "purpose": "Male Russian voice for narration.",
+   "group": "voice"
   },
   {
    "id": "voice-miriam",
@@ -1992,7 +2046,10 @@
       "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v2/miriam.zip"
      ]
     }
-   ]
+   ],
+   "label": "Miriam",
+   "purpose": "Female Russian voice for narration.",
+   "group": "voice"
   },
   {
    "id": "voice-rivka",
@@ -2009,7 +2066,10 @@
       "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v2/rivka.zip"
      ]
     }
-   ]
+   ],
+   "label": "Rivka",
+   "purpose": "Female Russian voice for narration.",
+   "group": "voice"
   }
  ]
 }
