@@ -5,6 +5,14 @@ The first pre-release is v0.1.0-beta; the sections below list the changes per re
 
 ## [Unreleased]
 
+## [1.0.0-rc.8] - 2026-11-10 - build 1006 "Chesed"
+
+Codename *Chesed* (lovingkindness): the suite library pin moves to voxprint-common 0.7.2. The version is **1.0.0-rc.8**. The release tag for this build is `v1.0.0-rc.8` (a pre-release). People see `1.0.0 RC8 · build 1006 "Chesed"`; the Windows file version is `1.0.0.1006`. The build number is the `build` field in `BUILD.json` (**1006**). `offset` is history only and is not added to the CI run number. Release notes: [docs/RELEASE-NOTES-1006-CHESED.md](docs/RELEASE-NOTES-1006-CHESED.md).
+
+### Changed
+- **voxprint-common 0.7.2.** The pin is `voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@v0.7.2` (`requirements.txt` and the lock's `git` list). The lock's `suite` object records the matching wheel (`voxprint_common-0.7.2-py3-none-any.whl`, SHA-256 `91783f7409bfc357baf4f54ccad35c2897b8fbb323f886672d92b626b16e8d2a`). The Manage models window gains This app / Shared model tabs and a `16 GB` badge; the shared RU strings are removed (the interface stays English-only). No new `mdl.json` fields are needed.
+- Python stays 3.14.
+
 ## [1.0.0-rc.7] - 2026-11-10 - build 1005 "Yachad"
 
 Codename *Yachad* (together, Tehillim 133:1): the shared UI shell and one interface language. The version is **1.0.0-rc.7**. The release tag for this build is `v1.0.0-rc.7` (a pre-release). People see `1.0.0 RC7 · build 1005 "Yachad"`; the Windows file version is `1.0.0.1005`. The build number is the `build` field in `BUILD.json` (**1005**). `offset` is history only and is not added to the CI run number. Release notes: [docs/RELEASE-NOTES-1005-YACHAD.md](docs/RELEASE-NOTES-1005-YACHAD.md).
