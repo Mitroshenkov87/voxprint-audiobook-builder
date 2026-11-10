@@ -57,8 +57,7 @@ from ui.narrate_state import (
 # Methods this pin's screen still does not offer. set_voices, input_path, and pause do.
 MISSING_SHELL_API = ("open_page",)
 
-# Chip stylesheet padding is 14 px on each side. See QPushButton[chip="true"].
-_CHIP_PAD_X = 14
+# Chip stylesheet padding comes from the tokens (chip_pad_px each side). See _fit_pills.
 _HISTORY_HEIGHT = 104
 _EXPERT_SCROLL_PAD = 18
 _DROP_TEXT_PX = 15
@@ -619,7 +618,9 @@ class AudiobookShell:
 
     def _fit_pills(self) -> None:
         density = load_tokens().density
-        pad = _CHIP_PAD_X * 2 + density.border_px * 2
+        # the suite refits a chip on style changes with its own _chip_width (chip_pad_px + border_px per side,
+        # DemiBold only while checked): keep the same formula so the two do not fight
+        pad = (density.chip_pad_px + density.border_px) * 2
         for button in self.screen.root.findChildren(QPushButton):
             name = str(button.objectName())
             if button.property("chip") != "true" and not name.startswith("reset-") and name != "expertToggle":
@@ -629,7 +630,9 @@ class AudiobookShell:
                 continue
             font = QFont(button.font())
             font.setPixelSize(density.body_px)
-            font.setWeight(QFont.Weight.DemiBold)
+            checked = bool(button.isChecked()) and (button.property("chip") == "true" or name == "expertToggle")
+            if checked:
+                font.setWeight(QFont.Weight.DemiBold)
             advance = QFontMetrics(font).horizontalAdvance(text)
             extra = 8 if name == "expertToggle" else 0
             button.setMinimumWidth(max(advance + pad + extra, 36))

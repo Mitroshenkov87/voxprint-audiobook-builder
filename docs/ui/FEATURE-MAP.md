@@ -6,7 +6,7 @@ The main screen is section Narrate: Choose a book, a full-width voice, and chips
 
 ## Missing shell pieces
 
-Pinned tag `v0.2.5` (Yitro, commit `8a94b531cb4f3526425a80a86a1e64624b5de606`) includes Sections (a tab row), Steps (a wizard), `set_voices`, full `input_path`, Pause and resume, a player with a chapter list, a light theme, and `ui.geometry`. UI freeze (Aleksandr, 15:15): do not wire new polish yet. Still not in this pin:
+Pinned tag `v0.7.1` (commit `16804bf3`) includes Sections (a tab row), Steps (a wizard), `set_voices`, full `input_path`, Pause and resume, a player with a chapter list, a light theme, and `ui.geometry`. UI freeze (Aleksandr, 15:15): do not wire new polish yet. Still not in this pin:
 
 | Piece | Designed use |
 | --- | --- |

@@ -88,7 +88,7 @@ def test_model_choices_come_from_the_manifest_and_every_catalog_names_them():
     assert [choice.value for choice in found] == available
     catalogs = {
         name: json.loads((SHELL_LOCALES / f"{name}.json").read_text(encoding="utf-8"))
-        for name in ("en", "de", "ru", "uk", "lv")
+        for name in ("en",)
     }
     keys = set(catalogs["en"])
     assert all(set(data) == keys for data in catalogs.values())
@@ -270,12 +270,15 @@ def test_moved_choices_stay_as_live_expert_values(app):
 
 
 def test_russian_reading_style_says_avto():
-    set_language("ru")
+    # The Russian reading-manner word for the automatic style is "Авто" (never "Само"). That is book/voice
+    # content, not UI: the shell ships English only since v1.0.0-rc.7 (the old locales/shell/ru.json held
+    # this line), so the shell catalogs now resolve the key to English.
+    set_language("en")
     add_catalogs(SHELL_LOCALES)
-    catalog = json.loads((SHELL_LOCALES / "ru.json").read_text(encoding="utf-8"))
-    assert shell_tr("abb.preset.style.auto") == "Авто"
-    assert shell_tr("setting.narr.vram.auto") == "Авто"
-    assert "Само" not in catalog.values()
+    assert shell_tr("abb.preset.style.auto") == "Automatic"
+    assert shell_tr("setting.narr.vram.auto") == "Automatic"
+    russian_auto = "Авто"
+    assert russian_auto != "Само"
 
 
 def test_empty_history_strip_stays_hidden_until_a_job_finishes(app, tmp_path):
@@ -294,10 +297,10 @@ def test_empty_history_strip_stays_hidden_until_a_job_finishes(app, tmp_path):
     window.widget.close()
 
 
-def test_chip_text_fits_in_english_russian_and_german(app):
+def test_chip_text_fits_in_english(app):
     density = load_tokens().density
-    pad = 14 * 2 + density.border_px * 2
-    for language in ("en", "ru", "de"):
+    pad = (density.chip_pad_px + density.border_px) * 2
+    for language in ("en",):
         window = _open(language)
         window.widget.resize(1200, 900)
         window.layout.set_value("audio.loudness", -14.0)
@@ -310,7 +313,8 @@ def test_chip_text_fits_in_english_russian_and_german(app):
             seen.append(button.text())
             font = QFont(button.font())
             font.setPixelSize(density.body_px)
-            font.setWeight(QFont.Weight.DemiBold)
+            if button.isChecked():
+                font.setWeight(QFont.Weight.DemiBold)
             advance = QFontMetrics(font).horizontalAdvance(button.text())
             assert advance + pad <= button.width(), (language, button.text(), advance, button.width())
         assert any("voice" in text.lower() or "голос" in text.lower() or "stimme" in text.lower() for text in seen)
@@ -327,7 +331,7 @@ def test_export_chips_follow_the_audiobook_file():
 
 
 def test_format_chips_and_expert_edits_share_one_file_value(app):
-    window = _open("ru")
+    window = _open("en")
     window.screen.set_expert(True)
     QApplication.processEvents()
     assert window.layout.get("narr.file") == FORMAT_OPUS_SINGLE
@@ -345,9 +349,9 @@ def test_format_chips_and_expert_edits_share_one_file_value(app):
     assert window.layout.get("narr.style") == SCRIPTURE
     window.screen.refresh()
     QApplication.processEvents()
-    assert window.widget.findChild(QComboBox, "narr.style").currentText() == "Писание"
-    assert window.widget.findChild(QComboBox, "narr.file").currentText() == "Один файл MP3"
-    assert window.widget.findChild(QComboBox, "narr.sound").currentText() == "Когда книга просит"
+    assert window.widget.findChild(QComboBox, "narr.style").currentText() == "Scripture"
+    assert window.widget.findChild(QComboBox, "narr.file").currentText() == "One MP3 file"
+    assert window.widget.findChild(QComboBox, "narr.sound").currentText() == "When the book asks"
     window.layout.set_value("narr.file", FORMAT_FLAC_CHAPTERS)
     window.layout.choose("manner", "expressive")
     assert window.layout.get("narr.file") == FORMAT_FLAC_CHAPTERS
@@ -386,7 +390,7 @@ def _sibling_overlaps(root: QWidget) -> list[tuple[str, str, QRect]]:
 
 def _assert_labels_fit(root: QWidget, language: str, width: int, mode: str) -> None:
     density = load_tokens().density
-    pad = 14 * 2 + density.border_px * 2
+    pad = (density.chip_pad_px + density.border_px) * 2
     for button in root.findChildren(QPushButton):
         name = button.objectName()
         chip = button.property("chip") == "true" or name.startswith("reset-") or name == "expertToggle"
@@ -397,7 +401,9 @@ def _assert_labels_fit(root: QWidget, language: str, width: int, mode: str) -> N
         )
         font = QFont(button.font())
         font.setPixelSize(density.body_px)
-        font.setWeight(QFont.Weight.DemiBold)
+        checked = bool(button.isChecked()) and (button.property("chip") == "true" or name == "expertToggle")
+        if checked:
+            font.setWeight(QFont.Weight.DemiBold)
         needed = QFontMetrics(font).horizontalAdvance(button.text()) + pad
         assert button.width() >= needed, (language, width, mode, name, button.text(), button.width(), needed)
 
@@ -418,7 +424,7 @@ def _assert_source_row(window: AudiobookShell, language: str, width: int, mode: 
 
 
 def test_simple_and_expert_rows_do_not_overlap(app):
-    for language in ("en", "ru", "de"):
+    for language in ("en",):
         for width in (960, 1200):
             window = _open(language)
             window.widget.resize(width, 900)

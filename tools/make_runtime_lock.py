@@ -61,13 +61,13 @@ TEST_EXTRAS = {"huggingface-hub", "requests", "scipy", "pyyaml", "tqdm", "urllib
 COMPAT = {"torch": ">=2.11,<2.12", "python_minor_must_match": True}
 #: Released suite wheel. The thin shell bundles it. It is not a PyPI runtime download.
 SUITE_DIST = "voxprint-common"
-SUITE_VERSION = "0.2.5"
-SUITE_FILE = "voxprint_common-0.2.5-py3-none-any.whl"
+SUITE_VERSION = "0.7.1"
+SUITE_FILE = "voxprint_common-0.7.1-py3-none-any.whl"
 SUITE_URL = (
-    "https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.2.5/" + SUITE_FILE
+    "https://github.com/Mitroshenkov87/voxprint-common/releases/download/v0.7.1/" + SUITE_FILE
 )
-SUITE_SHA256 = "4980c1ab5a75b22dec1a16b16474ccb350110c8d3d056f25b5ed74a623fe6a9b"
-SUITE_SIZE = 326999
+SUITE_SHA256 = "7e5b1dd62ca1a4d298bc7fb610f03398929b231823151a312012d1d327b6f029"
+SUITE_SIZE = 444417
 
 
 def norm(n: str) -> str:
@@ -228,7 +228,7 @@ def git_dist_names(lock: dict) -> List[str]:
 def requirement_lines(lock: dict, *, tests: bool) -> List[str]:
     """Pinned shell packages, plus the suite install when ``tests`` is true.
 
-    A non-empty ``git`` list replaces the hashed 0.2.5 wheel. An empty list
+    A non-empty ``git`` list replaces the hashed suite wheel. An empty list
     keeps that wheel, so the installer hash check still works.
     """
     pins = dict(lock["shell"])
