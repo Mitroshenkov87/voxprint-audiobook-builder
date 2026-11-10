@@ -175,21 +175,22 @@ def test_gear_opens_settings_and_language_switches_every_window(app, lib):
     s.btn_gear.click()
     dlg = s.settings_dialog()
     assert dlg.isVisible() and dlg.btn_update.isEnabled()
-    dlg.cmb_lang.setCurrentIndex(dlg.cmb_lang.findData("de"))
-    assert i18n.get_language() == "de"
-    assert s.card_narrate.lbl_title.text() == "Ein Buch vertonen" and s.lbl_tagline.text() == "Stimme trainieren, Bücher vertonen"
-    assert s.voices_window.lbl_title.text() == "Meine Stimmen" and s.narrate_window.btn_start.text() == "Vertonung starten"
-    assert s.trainer.lbl_title.text() == "Eigene Stimme trainieren" and s.btn_back.text() == "\u2190 Studio"
-    dlg.cmb_lang.setCurrentIndex(dlg.cmb_lang.findData("ru"))
-    assert s.card_voices.lbl_title.text() == "Мои голоса" and s.trainer.btn_back.text() == "\u2190 Студия"
+    assert dlg.cmb_lang.count() == 1 and dlg.cmb_lang.findData("de") == -1     # English-only UI
+    dlg.cmb_lang.setCurrentIndex(dlg.cmb_lang.findData("en"))
+    assert i18n.get_language() == "en"
+    assert s.card_narrate.lbl_title.text() == "Narrate a book" and s.lbl_tagline.text() == "Train a voice, narrate books"
+    assert s.voices_window.lbl_title.text() == "My voices" and s.narrate_window.btn_start.text() == "Start narration"
+    assert s.trainer.lbl_title.text() == "Train your voice" and s.btn_back.text() == "\u2190 Studio"
+    dlg.cmb_lang.setCurrentIndex(0)
+    assert s.card_voices.lbl_title.text() == "My voices" and s.trainer.btn_back.text() == "\u2190 Studio"
     s.shutdown()
 
 
 def test_language_switch_inside_the_training_window_updates_the_studio(app, lib):
     i18n.set_language("en")
     s = make_studio(lib)
-    s.trainer.set_language("ru")
-    assert s.card_narrate.lbl_title.text() == "Озвучить книгу" and s.narrate_window.btn_book.text() == "Выбрать книгу…"
+    s.trainer.set_language("ru")                              # a dropped UI language: English stays
+    assert s.card_narrate.lbl_title.text() == "Narrate a book" and s.narrate_window.btn_book.text() == "Choose book…"
     s.shutdown()
 
 
@@ -206,8 +207,8 @@ def test_language_is_locked_while_a_job_runs(app, lib, tmp_path):
     s.set_language("de")
     assert i18n.get_language() == "en"
     assert wait_for(lambda: not nw.busy)
-    s.set_language("de")
-    assert i18n.get_language() == "de"
+    s.set_language("de")                                      # a dropped UI language: English stays
+    assert i18n.get_language() == "en"
     s.shutdown()
 
 
@@ -441,7 +442,7 @@ def test_format_defaults_groups_and_descriptions(app, lib):
 
 
 def test_aac_option_has_a_note_and_the_disclaimer_appears_when_selected(app, lib):
-    for lang, word in (("en", "patent"), ("ru", "патент"), ("de", "Patent")):
+    for lang, word in (("en", "patent"), ("ru", "patent")):   # a dropped UI language falls back to English
         i18n.set_language(lang)
         s = make_studio(lib)
         n = s.narrate_window

@@ -17,8 +17,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 def _isolated_home(tmp_path, monkeypatch):
     """Tests never write to the real application data folder."""
     monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "voxprint_home"))
-    # Many tests compare Russian messages, so the default test language is Russian.
-    # (The localization tests set VOXPRINT_LANG themselves.)
+    # The interface is English-only since v1.0.0-rc.7: a dropped code such as "ru" is ignored
+    # and every test runs in English. (Tests that need another setup set VOXPRINT_LANG themselves.)
     monkeypatch.setenv("VOXPRINT_LANG", "ru")
     # The real machine's %APPDATA%/%LOCALAPPDATA% must not leak into the search for earlier installs (Windows)
     monkeypatch.setenv("APPDATA", str(tmp_path / "appdata_roaming"))

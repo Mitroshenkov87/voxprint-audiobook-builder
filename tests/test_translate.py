@@ -330,21 +330,23 @@ def test_translate_card_warns_when_the_voice_speaks_another_language(app, lib, t
     assert "already in this language" in n.lbl_tr_state.text()
 
 
-def test_translate_card_is_localized_in_en_ru_de(app, lib, tmp_path):
+def test_translate_card_is_localized_in_english(app, lib, tmp_path):
     s = make_studio(lib)
     n = s.narrate_window
     n.show()
     seen = set()
-    for lang, word, right in (("en", "Translate the book", "right to translate"), ("ru", "Перевод книги", "отвечаете за наличие прав"),
-                              ("de", "Buch übersetzen", "verantwortlich"), ("uk", "Переклад книги", "прав на переклад"),
-                              ("lv", "Tulkot grāmatu", "tiesībām")):
+    for lang, word, right in (("en", "Translate the book", "right to translate"),):
         i18n.set_language(lang)
         n.retranslate()
         assert word in n.lbl_tr_title.text() and right in n.lbl_tr_note.text()
         names = [n.cmb_translate.itemText(i) for i in range(n.cmb_translate.count())]
         assert len(set(names)) == 3
         seen.add(tuple(names))
-    assert len(seen) == 5
+    i18n.set_language("ru")                                     # a dropped UI language falls back to English
+    n.retranslate()
+    assert "Translate the book" in n.lbl_tr_title.text()
+    seen.add(tuple(n.cmb_translate.itemText(i) for i in range(n.cmb_translate.count())))
+    assert len(seen) == 1
     i18n.set_language("en")
 
 

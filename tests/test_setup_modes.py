@@ -37,7 +37,7 @@ def test_installer_offers_exactly_full_and_quick_with_the_pinned_total():
     # the wizard's "about N GB" is the honest sum of the pins (update the defines when a pinned model changes)
     assert abs(models_mb - sizes["models"] // 2 ** 20) <= 50 and abs(runtime_mb - sizes["runtime"] // 2 ** 20) <= 50
     assert 20 * 2 ** 30 < sizes["total"] < 40 * 2 ** 30
-    for lang in ("english", "russian", "german"):
+    for lang in ("english",):
         assert f"{lang}.ModeFull=" in iss and f"{lang}.ModeQuick=" in iss and f"{lang}.ModeNoSpace=" in iss
     assert "ModePage.Add(" in iss and iss.count("ModePage.Add(") == 2                    # exactly two choices
     assert "{param:Mode|full}" in iss and "install_mode.txt" in iss and "SpaceProblem(" in iss

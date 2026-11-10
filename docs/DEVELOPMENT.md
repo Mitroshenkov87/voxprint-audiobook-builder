@@ -52,7 +52,7 @@ On Windows, never run `uv run` without `--no-sync` (it replaces CUDA torch with 
 * Never touch other programs' folders: model reuse is **read-only**, and only folders carrying Voxprint's ownership marker may be replaced or deleted.
 
 ## Localization
-All user-visible text goes through `tr("some.key")` and lives in `locales/en.json`, `de.json`, `ru.json`, `uk.json`, `lv.json` (identical keys and `{placeholders}`, and every key used in code must exist - all enforced by `tests/test_i18n.py`, which also rejects Cyrillic string literals in code). New UI text therefore means one catalog entry per language. See "Adding a language" in [docs/BUILDING.md](BUILDING.md).
+All user-visible text goes through `tr("some.key")` and lives in `locales/en.json` (the UI is English-only; a test checks that every key used in code exists and rejects Cyrillic string literals in code). See "Localization" in [docs/BUILDING.md](BUILDING.md).
 Russian *data* (abbreviation tables of the text normalizer, the number words of `core/num_words.py`, the preparation rules of `core/text_prep.py` and the validator of `core/text_cleanup.py`, the Russian heading words of `core/book_parsers.py`, test fixtures) legitimately contains Cyrillic; such modules are listed in the exception list of `tests/test_i18n.py`.
 
 ## Third-party components

@@ -32,7 +32,7 @@ from voxprint_common.i18n import set_language
 
 
 def main() -> None:
-    """Grab English and Russian screens into the directory named on the command line."""
+    """Grab the English screens into the directory named on the command line."""
     out = Path(sys.argv[1] if len(sys.argv) > 1 else ROOT / "docs" / "screenshots" / "ui-shell")
     out.mkdir(parents=True, exist_ok=True)
     app = QApplication.instance() or QApplication([])
@@ -51,25 +51,9 @@ def main() -> None:
     _save(english_expert.widget, out / "expert-en.png")
     english_expert.widget.close()
 
-    _use_home(out, "simple-ru")
-    russian = _shell(app, "ru")
-    _save(russian.widget, out / "simple-ru.png")
-    russian.widget.close()
-    app.processEvents()
-
-    _use_home(out, "expert-ru")
-    russian_expert = _shell(app, "ru")
-    _show_expert(russian_expert, app)
-    _save(russian_expert.widget, out / "expert-ru.png")
-    russian_expert.widget.close()
-
     _use_home(out, "train-en")
     training = _train(app, "en")
     _save(training, out / "train-en.png")
-    training.close()
-    _use_home(out, "train-ru")
-    training = _train(app, "ru")
-    _save(training, out / "train-ru.png")
     training.close()
 
     homes = out / ".homes"

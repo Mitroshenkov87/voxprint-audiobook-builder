@@ -86,7 +86,7 @@ def test_rate_is_smoothed_and_restarts_on_a_new_file():
 
 
 # ------------------------------------------------------------------------------------------------ the translated live line
-def test_live_line_in_three_languages():
+def test_live_line_in_english():
     try:
         i18n.set_language("en")
         assert mods.live_line("download", "PyTorch (torch.whl)", 42, 100, 35 * 1024 ** 2) == \
@@ -94,10 +94,8 @@ def test_live_line_in_three_languages():
         assert mods.live_line("verify", "x.whl").startswith("Verifying: x.whl")
         assert mods.live_line("unpack", "x.whl", 1, 2) == "Unpacking: x.whl — 50%"
         assert "\u2026" in mods.live_line("download", "x", 0, 0, 0)          # speed not known yet
-        i18n.set_language("ru")
-        assert mods.live_line("download", "x", 1, 2, 2 ** 20).startswith("Скачивается: x — 50%")
-        i18n.set_language("de")
-        assert mods.live_line("verify", "x").startswith("Wird geprüft: x")
+        i18n.set_language("ru")                                              # a dropped UI language: English stays
+        assert mods.live_line("download", "x", 1, 2, 2 ** 20).startswith("Downloading: x — 50%")
     finally:
         i18n.set_language("en")
 

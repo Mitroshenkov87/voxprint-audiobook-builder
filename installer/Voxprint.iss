@@ -22,7 +22,7 @@
 ;    (infra/existing_models.py: restore_backup).  The backup (often on an external drive) is only read.
 ; Voices and settings stay in %LOCALAPPDATA%\Voxprint.
 ; Silent: /ModelsFolder="D:\Voxprint models".  The older /ModelsDir="D:\old\models" (a folder to IMPORT models from, written to
-; state\existing_models_dir.txt) still works.  Wizard languages: English, Russian, German.
+; state\existing_models_dir.txt) still works.  Wizard language: English only (since v1.0.0-rc.7).
 ;
 ; ONLINE variant:  ISCC /DONLINE /DONEDIR /DManifestUrl=<https://.../manifest-beta.json> installer\Voxprint.iss
 ;   ->  Output\voxprint-audiobook-builder-setup-<version>-win-x64.exe
@@ -48,7 +48,7 @@
 #define AppFolder "Audiobook Builder"
 #define StartMenu "VOXPrint AI Suite"
 #define AppDisplayName "VOXPrint AI Audiobook Builder"
-#define AppVersion "1.0.0-rc.6"
+#define AppVersion "1.0.0-rc.7"
 ; Windows version resources are four numbers. The pre-release suffix stays in AppVersion.
 #define AppVersionInfo "1.0.0"
 #define AppExe "voxprint-audiobook-builder.exe"
@@ -126,7 +126,7 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; Windows 11 24H2+ (build 26100). Older versions are refused: [Messages] before the wizard, and
-; InitializeSetup again with the detected build number (English, Russian, German).
+; InitializeSetup again with the detected build number (English only).
 MinVersion=10.0.26100
 CloseApplications=yes
 ; {app} is added to the user PATH so voxprint-audiobook-cli.exe is found after a scripted install.
@@ -134,120 +134,48 @@ ChangesEnvironment=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
-Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 
 [Messages]
 english.WinVersionTooLowError=VOXPrint AI Audiobook Builder requires Windows 11 24H2 or newer (build 26100). This version of Windows is older and is not supported. Setup will exit.
-russian.WinVersionTooLowError=VOXPrint AI Audiobook Builder требует Windows 11 24H2 или новее (сборка 26100). Эта версия Windows старше и не поддерживается. Установка будет завершена.
-german.WinVersionTooLowError=VOXPrint AI Audiobook Builder benötigt Windows 11 24H2 oder neuer (Build 26100). Diese Windows-Version ist älter und wird nicht unterstützt. Die Installation wird beendet.
 
 [CustomMessages]
 english.RunPrefetch=Start %1 now
-russian.RunPrefetch=Запустить %1 сейчас
-german.RunPrefetch=%1 jetzt starten
 english.ModePageCaption=Setup type
-russian.ModePageCaption=Тип установки
-german.ModePageCaption=Installationsart
 english.ModePageDescription=Required pieces are installed during setup. Optional models can wait.
-russian.ModePageDescription=Нужное устанавливается во время установки. Дополнительные модели могут подождать.
-german.ModePageDescription=Das Nötige wird während der Installation eingerichtet. Optionale Modelle können warten.
 english.ModePageSubCaption=Both choices install the runtime, ffmpeg and the required models during setup. Optional models wait until you ask for them.
-russian.ModePageSubCaption=Оба варианта ставят среду, ffmpeg и нужные модели во время установки. Дополнительные модели ждут, пока вы их не запросите.
-german.ModePageSubCaption=Beide Varianten installieren die Laufzeit, ffmpeg und die nötigen Modelle während der Installation. Optionale Modelle warten, bis Sie sie anfordern.
 english.ModeFull=Full (recommended): setup installs the Python runtime, PyTorch, ffmpeg and the required models now (about %1 GB). Optional models are offered afterwards and are not all started at once
-russian.ModeFull=Полная (рекомендуется): установка сейчас ставит среду Python, PyTorch, ffmpeg и нужные модели (около %1 ГБ). Дополнительные модели предлагаются потом и не запускаются все сразу
-german.ModeFull=Vollständig (empfohlen): Das Setup installiert jetzt die Python-Laufzeit, PyTorch, ffmpeg und die nötigen Modelle (ca. %1 GB). Optionale Modelle werden danach angeboten und nicht alle auf einmal gestartet
 english.ModeQuick=Quick: setup installs the Python runtime, PyTorch, ffmpeg and the required models now. The Components window offers optional models (about %1 GB) and does not start them until you press Download
-russian.ModeQuick=Быстрая: установка сейчас ставит среду Python, PyTorch, ffmpeg и нужные модели. Окно «Компоненты» предлагает дополнительные модели (около %1 ГБ) и не запускает их, пока вы не нажмёте «Скачать»
-german.ModeQuick=Schnell: Das Setup installiert jetzt die Python-Laufzeit, PyTorch, ffmpeg und die nötigen Modelle. Das Fenster „Komponenten" bietet optionale Modelle an (ca. %1 GB) und startet sie erst, wenn Sie auf Download klicken
 english.ModeNoSpace=Not enough free space for the full download on %1: about %2 GB are needed, %3 GB are free.%n%nChoose a models folder on another drive (Back), free some space, or choose Quick setup.
-russian.ModeNoSpace=Недостаточно места для полной загрузки на %1: нужно около %2 ГБ, свободно %3 ГБ.%n%nВыберите папку моделей на другом диске (Назад), освободите место или выберите быструю установку.
-german.ModeNoSpace=Nicht genug freier Speicher für den vollständigen Download auf %1: etwa %2 GB werden benötigt, %3 GB sind frei.%n%nWählen Sie einen Modellordner auf einem anderen Laufwerk (Zurück), schaffen Sie Platz oder wählen Sie die schnelle Installation.
 english.VcRedistStatus=Installing Microsoft Visual C++ components...
-russian.VcRedistStatus=Устанавливаю компоненты Microsoft Visual C++…
-german.VcRedistStatus=Microsoft Visual C++-Komponenten werden installiert...
 english.WinBuildTooOld=%1 requires Windows 11 24H2 or newer (build 26100). This PC is Windows build %2, which is older. Setup will exit.
-russian.WinBuildTooOld=%1 требует Windows 11 24H2 или новее (сборка 26100). На этом ПК сборка Windows %2 — она старше. Установка будет завершена.
-german.WinBuildTooOld=%1 benötigt Windows 11 24H2 oder neuer (Build 26100). Dieser PC hat Windows-Build %2 und ist damit älter. Die Installation wird beendet.
 english.GpuRequired=VOXPrint needs an NVIDIA GeForce RTX 40-series or newer GPU. Detected: %1.
-russian.GpuRequired=VOXPrint нужна видеокарта NVIDIA GeForce RTX 40-й серии или новее. Обнаружено: %1.
-german.GpuRequired=VOXPrint benötigt eine NVIDIA GeForce RTX der 40er-Serie oder neuer. Erkannt: %1.
 english.GpuNone=none
-russian.GpuNone=нет
-german.GpuNone=keine
 english.ModelsPageCaption=Models folder
-russian.ModelsPageCaption=Папка моделей
-german.ModelsPageCaption=Modellordner
 english.ModelsPageDescription=Where should the models (all of them: about %1 GB) be stored?
-russian.ModelsPageDescription=Где хранить модели (все вместе: около %1 ГБ)?
-german.ModelsPageDescription=Wo sollen die Modelle (alle zusammen: ca. %1 GB) gespeichert werden?
 english.ModelsPageSubCaption=Keep the default or choose another folder or drive. An empty folder becomes the models folder (models are downloaded into it); models it already holds are used. A folder with a VOXPrint backup (voxprint-backup.json) is only read: on the first start its models and voices are restored into the default folder. Your voices and settings stay in the user profile.
-russian.ModelsPageSubCaption=Оставьте папку по умолчанию или выберите другую папку или диск. Пустая папка становится папкой моделей (модели скачиваются в неё); уже имеющиеся в ней модели используются. Папка с резервной копией VOXPrint (voxprint-backup.json) только читается: при первом запуске модели и голоса восстанавливаются из неё в папку по умолчанию. Ваши голоса и настройки остаются в профиле пользователя.
-german.ModelsPageSubCaption=Behalten Sie den Standard oder wählen Sie einen anderen Ordner oder ein anderes Laufwerk. Ein leerer Ordner wird zum Modellordner (die Modelle werden dorthin geladen); vorhandene Modelle werden verwendet. Ein Ordner mit einer VOXPrint-Sicherung (voxprint-backup.json) wird nur gelesen: Beim ersten Start werden Modelle und Stimmen daraus in den Standardordner wiederhergestellt. Ihre Stimmen und Einstellungen bleiben im Benutzerprofil.
 english.ModelsPagePrompt=Models folder:
-russian.ModelsPagePrompt=Папка моделей:
-german.ModelsPagePrompt=Modellordner:
 english.ModelsPageBadFolder=The folder %1 cannot be created or is not writable. Choose another folder.
-russian.ModelsPageBadFolder=Папку %1 не удаётся создать или в неё нельзя записывать. Выберите другую папку.
-german.ModelsPageBadFolder=Der Ordner %1 kann nicht angelegt werden oder ist nicht beschreibbar. Wählen Sie einen anderen Ordner.
 english.ModelsPageProtected=The folder %1 is inside Program Files: the program runs without administrator rights and could not download models there. Choose another folder.
-russian.ModelsPageProtected=Папка %1 находится в Program Files: программа работает без прав администратора и не сможет скачивать туда модели. Выберите другую папку.
-german.ModelsPageProtected=Der Ordner %1 liegt in Program Files: Das Programm läuft ohne Administratorrechte und könnte dort keine Modelle speichern. Wählen Sie einen anderen Ordner.
 english.ModelsPageBackupFound=The folder %1 contains a VOXPrint backup. It will not be used as the models folder: on the first start its models and voices are copied into %2 (the backup itself is only read).
-russian.ModelsPageBackupFound=В папке %1 найдена резервная копия VOXPrint. Она не станет папкой моделей: при первом запуске модели и голоса будут скопированы из неё в %2 (сама копия только читается).
-german.ModelsPageBackupFound=Der Ordner %1 enthält eine VOXPrint-Sicherung. Er wird nicht als Modellordner verwendet: Beim ersten Start werden Modelle und Stimmen nach %2 kopiert (die Sicherung selbst wird nur gelesen).
 
 english.LatestCheck=Try the latest component versions (falls back to the verified ones)
-russian.LatestCheck=Попробовать последние версии компонентов (с откатом на проверенные)
-german.LatestCheck=Neueste Komponentenversionen versuchen (sonst die geprüften)
 english.OnlineStatus=Downloading and unpacking the VOXPrint components (the download can be resumed if it is interrupted)...
-russian.OnlineStatus=Загрузка и распаковка компонентов VOXPrint (при обрыве загрузку можно продолжить)...
-german.OnlineStatus=VOXPrint-Komponenten werden geladen und entpackt (bei einem Abbruch kann der Download fortgesetzt werden)...
 english.OnlineFailed=The download of the VOXPrint components failed:%n%n%1%n%nCheck the internet connection and run the setup again: finished parts are kept and the download continues where it stopped.
-russian.OnlineFailed=Не удалось загрузить компоненты VOXPrint:%n%n%1%n%nПроверьте подключение к интернету и запустите установку снова: готовые части сохранены, загрузка продолжится с места остановки.
-german.OnlineFailed=Der Download der VOXPrint-Komponenten ist fehlgeschlagen:%n%n%1%n%nPrüfen Sie die Internetverbindung und starten Sie das Setup erneut: Fertige Teile bleiben erhalten, der Download wird fortgesetzt.
 english.OnlineStalled=The downloader stopped responding.
-russian.OnlineStalled=Загрузчик перестал отвечать.
-german.OnlineStalled=Der Downloader antwortet nicht mehr.
 
 english.PortablePageCaption=Portable setup folder (optional)
-russian.PortablePageCaption=Переносимая папка установки (необязательно)
-german.PortablePageCaption=Portabler Setup-Ordner (optional)
 english.PortablePageDescription=Keep everything the setup downloads, for an offline reinstall.
-russian.PortablePageDescription=Сохранить всё, что скачивает установка, для переустановки без интернета.
-german.PortablePageDescription=Alles behalten, was das Setup lädt, für eine Neuinstallation ohne Internet.
 english.PortableCheck=Keep a portable setup folder (all components and models, for offline reinstall)
-russian.PortableCheck=Хранить переносимую папку установки (все компоненты и модели, для переустановки без интернета)
-german.PortableCheck=Portablen Setup-Ordner behalten (alle Komponenten und Modelle, für Neuinstallation ohne Internet)
 english.PortableInfo=The setup downloads ALL components and the models this PC needs into this folder (even those already on the PC) with a checksum list, and installs from it. Later you can run the installer again, or copy the folder to another PC, and install without internet; when the internet is available, only newer parts are downloaded. This needs about 3 GB for the program and up to 10 GB more for the models. No desktop shortcuts are created.
-russian.PortableInfo=Установка скачает ВСЕ компоненты и нужные этому ПК модели в эту папку (даже те, что уже есть на ПК) со списком контрольных сумм и установит из неё. Позже можно запустить установщик снова или скопировать папку на другой ПК и установить без интернета; при наличии интернета докачиваются только более новые части. Нужно около 3 ГБ для программы и до 10 ГБ для моделей. Ярлыки на рабочем столе не создаются.
-german.PortableInfo=Das Setup lädt ALLE Komponenten und die für diesen PC nötigen Modelle in diesen Ordner (auch bereits vorhandene) mit einer Prüfsummenliste und installiert daraus. Später können Sie das Setup erneut starten oder den Ordner auf einen anderen PC kopieren und ohne Internet installieren; ist Internet vorhanden, werden nur neuere Teile geladen. Erforderlich sind etwa 3 GB für das Programm und bis zu 10 GB für die Modelle. Es werden keine Desktop-Verknüpfungen erstellt.
 english.PortableFoundInfo=A setup folder was found: %1%n%nThe setup installs from it. Without internet nothing is downloaded; with internet only newer parts are fetched.
-russian.PortableFoundInfo=Найдена папка установки: %1%n%nУстановка пойдёт из неё. Без интернета ничего не скачивается; при наличии интернета докачиваются только более новые части.
-german.PortableFoundInfo=Ein Setup-Ordner wurde gefunden: %1%n%nDas Setup installiert daraus. Ohne Internet wird nichts geladen; mit Internet werden nur neuere Teile geholt.
 english.PortablePrompt=Setup folder:
-russian.PortablePrompt=Папка установки:
-german.PortablePrompt=Setup-Ordner:
 english.PortableBadFolder=The folder %1 cannot be used (it cannot be created or written to). Choose another folder.
-russian.PortableBadFolder=Папку %1 нельзя использовать (её нельзя создать или записать в неё). Выберите другую папку.
-german.PortableBadFolder=Der Ordner %1 kann nicht verwendet werden (er kann nicht angelegt oder beschrieben werden). Wählen Sie einen anderen Ordner.
 
 english.ModelsSiblingFound=VOXPrint AI Movie Dubber is installed on this PC. Both programs use one models folder, so every model is downloaded only once.
-russian.ModelsSiblingFound=На этом ПК установлен VOXPrint AI Movie Dubber. Обе программы используют одну папку моделей, поэтому каждая модель скачивается только один раз.
-german.ModelsSiblingFound=VOXPrint AI Movie Dubber ist auf diesem PC installiert. Beide Programme nutzen einen Modellordner, daher wird jedes Modell nur einmal geladen.
 english.PortableMissing=The setup folder %1 (from /FromFolder) was not found or has no manifest.json.
-russian.PortableMissing=Папка установки %1 (из /FromFolder) не найдена или в ней нет manifest.json.
-german.PortableMissing=Der Setup-Ordner %1 (aus /FromFolder) wurde nicht gefunden oder enthält keine manifest.json.
 english.SuiteStatus=Installing the Python runtime, PyTorch, ffmpeg and the required models...
-russian.SuiteStatus=Устанавливаются среда Python, PyTorch, ffmpeg и нужные модели...
-german.SuiteStatus=Python-Laufzeit, PyTorch, ffmpeg und die nötigen Modelle werden installiert...
 english.SuiteStalled=The component installer stopped responding.
-russian.SuiteStalled=Установщик компонентов перестал отвечать.
-german.SuiteStalled=Der Komponenten-Installer antwortet nicht mehr.
 english.SuiteFailed=The shared components could not be installed:%n%n%1
-russian.SuiteFailed=Не удалось установить общие компоненты:%n%n%1
-german.SuiteFailed=Die gemeinsamen Komponenten konnten nicht installiert werden:%n%n%1
 
 ; No desktop shortcut on purpose (no [Tasks] section at all, so no task can be selected, silent or not): only the Start menu entry below + the Apps list entry.
 [InstallDelete]

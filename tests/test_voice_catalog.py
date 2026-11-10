@@ -115,11 +115,12 @@ def test_names_and_descriptions_follow_the_ui_language_with_fallback(tmp_path):
     lib = VoiceLibrary(tmp_path / "lib")
     rec = repo.download_voice(repo.parse_index(index_for(entry))[0], lib, opener=opener_for({URL: data}))
     ent = repo.parse_index(index_for(entry))[0]
-    for lang, name in (("ru", "Открытый голос"), ("en", "Open Voice"), ("de", "Offene Stimme")):
+    # the UI is English-only: every other code (incl. the former UI languages) falls back to the stored English default
+    for lang in ("ru", "en", "de", "uk", "lv"):
         i18n.set_language(lang)
-        assert rec.name == name and ent.display_name == name
+        assert rec.name == "Open Voice" and ent.display_name == "Open Voice"
     i18n.set_language("ru")
-    assert rec.description.startswith("Полностью открытый") and ent.display_description.startswith("Полностью открытый")
+    assert rec.description.startswith("A fully open") and ent.display_description.startswith("A fully open")
     i18n.set_language("en")
     assert rec.description.startswith("A fully open")
     assert rec.info["name"] == "Open Voice"                      # the stored default stays untouched
@@ -148,7 +149,7 @@ def test_catalog_lists_local_voices_then_remote_ones_and_hides_installed_downloa
     lib = VoiceLibrary(tmp_path / "lib")
     lib.add_from_adapter(make_adapter(tmp_path / "own", name="Anna"))
     items = cat.build(lib, entries)
-    assert [(i.name, i.installed) for i in items] == [("Anna", True), ("Открытый голос", False), ("Bob", False)]
+    assert [(i.name, i.installed) for i in items] == [("Anna", True), ("Open Voice", False), ("Bob", False)]
     assert items[1].key == "repo:open-voice" and items[1].scope == c.PRIVATE and items[2].scope == c.COMMERCIAL
     assert items[1].remote and items[1].size_bytes == entry["size_bytes"]
     rec = repo.download_voice(entries[0], lib, opener=opener_for({URL: data}))

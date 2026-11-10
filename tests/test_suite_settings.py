@@ -36,9 +36,9 @@ def test_unknown_keys_are_kept_and_missing_keys_are_defaults():
     ss.path().parent.mkdir(parents=True, exist_ok=True)
     ss.path().write_text(json.dumps({"schema": 1, "dubber_only": {"x": 1}, "theme": "neon-pink"}), encoding="utf-8")
     assert ss.theme() == "glass-dark"                         # another program's theme: our default
-    ss.set_value("ui_language", "ru")
+    ss.set_value("ui_language", "en")
     data = json.loads(ss.path().read_text(encoding="utf-8"))
-    assert data["dubber_only"] == {"x": 1} and data["theme"] == "neon-pink" and data["ui_language"] == "ru"
+    assert data["dubber_only"] == {"x": 1} and data["theme"] == "neon-pink" and data["ui_language"] == "en"
     assert ss.gpu() == "auto" and ss.models_dir() is None
 
 
@@ -55,7 +55,8 @@ def test_gpu_values(value, expected):
     assert ss.set_value("gpu", value) == expected and ss.gpu() == expected
 
 
-@pytest.mark.parametrize("key,value", [("gpu", "cpu"), ("gpu", "CPU"), ("gpu", "vulkan"), ("gpu", "cuda:x"), ("ui_language", "zz"), ("models_dir", "rel/dir"),
+@pytest.mark.parametrize("key,value", [("gpu", "cpu"), ("gpu", "CPU"), ("gpu", "vulkan"), ("gpu", "cuda:x"),
+                                       ("ui_language", "ru"), ("ui_language", "zz"), ("models_dir", "rel/dir"),
                                        ("theme", ""), ("volume", 3)])
 def test_invalid_values_are_refused(key, value):
     with pytest.raises(ValueError):
@@ -66,11 +67,11 @@ def test_language_choice_is_shared(monkeypatch):
     from core import i18n
 
     monkeypatch.delenv("VOXPRINT_LANG")
-    i18n.set_language("uk", persist=True)
-    assert json.loads(ss.path().read_text(encoding="utf-8"))["ui_language"] == "uk"
+    i18n.set_language("en", persist=True)
+    assert json.loads(ss.path().read_text(encoding="utf-8"))["ui_language"] == "en"
     i18n.reset()
-    ss.set_value("ui_language", "lv")                         # changed by the Movie Dubber
-    assert i18n.get_language() == "lv"
+    ss.set_value("ui_language", "en")                         # English-only: the only shared UI language
+    assert i18n.get_language() == "en"
 
 
 def test_models_dir_order_env_suite_own_file(tmp_path, monkeypatch):
@@ -107,16 +108,16 @@ def test_migrate_and_installer_sync(tmp_path, monkeypatch):
     monkeypatch.delenv(paths.MODELS_DIR_ENV, raising=False)
     old = tmp_path / "old"
     (paths.state_dir() / paths.MODELS_DIR_FILE).write_text(str(old), encoding="utf-8")
-    (paths.state_dir() / "language").write_text("de", encoding="utf-8")
+    (paths.state_dir() / "language").write_text("en", encoding="utf-8")
     ss.migrate_quietly()
-    assert ss.models_dir() == old and ss.read_raw()["ui_language"] == "de"
-    ss.set_value("ui_language", "ru")
+    assert ss.models_dir() == old and ss.read_raw()["ui_language"] == "en"
+    ss.set_value("ui_language", "en")
     new = tmp_path / "new"
     (paths.state_dir() / paths.MODELS_DIR_FILE).write_text(str(new), encoding="utf-8")
     ss.migrate_quietly()                                      # a value already shared is not overwritten at start ...
     assert ss.models_dir() == old
     assert ss.sync_cli() == 0                                 # ... but the installer's explicit choice is
-    assert ss.models_dir() == new and ss.read_raw()["ui_language"] == "ru"
+    assert ss.models_dir() == new and ss.read_raw()["ui_language"] == "en"
 
 
 def test_main_flags(tmp_path, monkeypatch):
@@ -171,7 +172,7 @@ def test_installer_detects_the_sibling_and_reads_the_shared_folder():
     body = t.split("function InitialModelsDir")[1].split("\nend;")[0]
     assert body.index("{param:ModelsFolder|}") < body.index("SuiteJsonString('models_dir')") < body.index("models_dir.txt")
     assert "function MovieDubberInstalled" in t and "'\"movie-dubber\"'" in t and "MovieDubberInstalled(ModelsEdit.Text)" in t
-    for lang in ("english", "russian", "german"):
+    for lang in ("english",):
         assert f"{lang}.ModelsSiblingFound=" in t
     assert "ExecAsOriginalUser" in t and "'--sync-suite-settings'" in t and "'--unregister-runtime-user'" in t
 

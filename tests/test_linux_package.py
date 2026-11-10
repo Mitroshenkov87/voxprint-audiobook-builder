@@ -78,7 +78,7 @@ def test_package_contents_and_manifest(built):
     assert c["file"] == "Voxprint-linux-app.zip" and c["sha256"] == mk.sha256_of(out / c["file"]) and c["size"] == (out / c["file"]).stat().st_size
     with zipfile.ZipFile(out / c["file"]) as z:
         names = set(z.namelist())
-    assert {"main.py", "credits.json", "requirements.txt", "core/translate.py", "ui/studio.py", "locales/de.json",
+    assert {"main.py", "credits.json", "requirements.txt", "core/translate.py", "ui/studio.py", "locales/en.json",
             "installer/linux/voxprint-audiobook-builder.desktop", "installer/linux/install-voxprint-linux.sh", "assets/voxprint.png"} <= names
     assert not any(n.startswith(("tests/", ".github/", "docs/manual")) or "__pycache__" in n or n.endswith(".pyc") for n in names)
     assert "installer/Voxprint.iss" not in names and "build.bat" not in names

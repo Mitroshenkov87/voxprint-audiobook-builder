@@ -1,4 +1,4 @@
-"""Localization: key/placeholder parity of en/de/ru/uk/lv, language detection and switching, no hard-coded user strings in code."""
+"""Localization: the single English catalog, language detection and switching, no hard-coded user strings in code."""
 import json
 import re
 from pathlib import Path
@@ -18,37 +18,23 @@ def _cat(lang):
     return json.loads((LOC / f"{lang}.json").read_text(encoding="utf-8"))
 
 
-def test_languages_and_identical_keys_and_placeholders():
-    assert LANGS == ("en", "de", "ru", "uk", "lv")
-    assert i18n.LANG_NAMES["uk"] == "Українська" and i18n.LANG_NAMES["lv"] == "Latviešu"
+def test_english_is_the_only_ui_language_and_catalog():
+    assert LANGS == ("en",)
+    assert i18n.LANG_NAMES == {"en": "English"}
     assert set(i18n.LANG_NAMES) == set(LANGS)
     # no stray catalogs of dropped/unsupported languages
     assert sorted(p.stem for p in (ROOT / "locales").glob("*.json")) == sorted(LANGS)
-    cats = {l: _cat(l) for l in LANGS}
-    base = cats["en"]
+    base = _cat("en")
     assert len(base) > 150
-    for l in LANGS:
-        assert set(cats[l]) == set(base), (l, set(cats[l]) ^ set(base))
-        for k, v in cats[l].items():
-            assert v.strip(), (l, k)
-            assert set(PH.findall(v)) == set(PH.findall(base[k])), (l, k)
+    for k, v in base.items():
+        assert v.strip(), k
 
 
-def test_scripts_match_languages():
-    en, de = _cat("en"), _cat("de")
-    # The egg caption is the same Russian line in every catalog, including English and German.
+def test_english_catalog_has_no_cyrillic():
+    en = _cat("en")
+    # The egg caption is the same Russian line in every catalog, including English.
     kept = {"easter_egg.caption"}
-    assert not [k for k, v in {**{("en", k): v for k, v in en.items()}, **{("de", k): v for k, v in de.items()}}.items()
-                if k[1] not in kept and CYR.search(v)]
-    c = _cat("ru")
-    assert CYR.search(c["ui.btn_lora"]) and CYR.search(c["about.what"])
-    assert c["ui.language"] == "Язык"
-    uk, lv = _cat("uk"), _cat("lv")
-    assert CYR.search(uk["ui.btn_lora"]) and uk["ui.language"] == "Мова"
-    assert lv["ui.language"] == "Valoda" and "ā" in lv["narr.start"] and "ī" in lv["ui.settings_title"]
-    # a handful of labels are the same in every language (format names, placeholder-only lines)
-    same = [k for k, v in en.items() if v == uk[k] or v == lv[k]]
-    assert len(same) < 20, same
+    assert not [k for k, v in en.items() if k not in kept and CYR.search(v)]
 
 
 def test_every_key_used_in_code_exists():
@@ -102,24 +88,27 @@ def test_no_cyrillic_user_literals_left_in_code():
 
 
 def test_tr_fallbacks(monkeypatch):
-    i18n.set_language("de")
-    assert tr("ui.btn_dataset") == "Aufnahmen vorbereiten"
+    i18n.set_language("en")
+    assert tr("ui.btn_dataset") == _cat("en")["ui.btn_dataset"]
     assert tr("no.such.key") == "no.such.key"
-    assert tr("progress.pieces") == _cat("de")["progress.pieces"]            # missing parameter - no exception
-    assert tr("progress.pieces", n=3) == "Erhaltene Fragmente: 3"
-    # no translation in that language -> English
-    monkeypatch.setitem(i18n.load_catalog("de"), "ui.cancel", "")
-    del i18n.load_catalog("de")["ui.cancel"]
-    i18n.set_language("de")
-    assert tr("ui.cancel") == _cat("en")["ui.cancel"]
-    assert i18n.tr_lang("ui.ready", "ru") == _cat("ru")["ui.ready"]
+    assert tr("progress.pieces") == _cat("en")["progress.pieces"]            # missing parameter - no exception
+    assert tr("progress.pieces", n=3) == _cat("en")["progress.pieces"].format(n=3)
+    # a dropped UI language falls back to English
+    monkeypatch.setenv("VOXPRINT_LANG", "de")
+    i18n.reset()
+    assert tr("ui.btn_dataset") == _cat("en")["ui.btn_dataset"]
+    assert i18n.tr_lang("ui.ready", "ru") == _cat("en")["ui.ready"]
+    monkeypatch.delenv("VOXPRINT_LANG", raising=False)
+    i18n.reset()
 
 
 def test_normalize_code():
     n = i18n.normalize_code
-    assert n("ru-RU") == "ru" and n("de_AT.UTF-8") == "de" and n("EN") == "en" and n("de-AT") == "de"
-    assert n("uk_UA.UTF-8") == "uk" and n("lv_LV.UTF-8") == "lv"
-    assert n("be-BY") is None                                          # Belarusian is not offered
+    assert n("EN") == "en" and n("en-US") == "en"
+    # the UI is English-only: every other code (incl. the former UI languages) is not offered
+    assert n("ru-RU") is None and n("de_AT.UTF-8") is None and n("de-AT") is None
+    assert n("uk_UA.UTF-8") is None and n("lv_LV.UTF-8") is None
+    assert n("be-BY") is None                                          # Belarusian was never offered
     assert n("fr-FR") is None and n("") is None and n(None) is None and n("C") is None
 
 
@@ -134,17 +123,19 @@ def test_detection_order(monkeypatch, tmp_path):
     monkeypatch.setenv("LANG", "fr_FR.UTF-8")
     assert i18n.detect_language() == "en"                       # unsupported system language -> English
     monkeypatch.setenv("LANG", "uk_UA.UTF-8")
-    assert i18n.detect_language() == "uk"
+    assert i18n.detect_language() == "en"                       # a dropped UI language -> English
     monkeypatch.setenv("LANG", "lv_LV.UTF-8")
-    assert i18n.detect_language() == "lv"
+    assert i18n.detect_language() == "en"
     monkeypatch.setenv("LANG", "ru_RU.UTF-8")
-    assert i18n.detect_language() == "ru"                       # the system language
-    i18n.set_language("de", persist=True)
-    assert i18n.saved_language() == "de" and i18n.detect_language() == "de"   # a saved choice beats the system language
-    monkeypatch.setenv("VOXPRINT_LANG", "de")
-    assert i18n.detect_language() == "de"                       # the environment variable beats everything
+    assert i18n.detect_language() == "en"                       # Russian stays a content language, not a UI language
+    i18n.set_language("en", persist=True)
+    assert i18n.saved_language() == "en" and i18n.detect_language() == "en"
+    monkeypatch.setenv("VOXPRINT_LANG", "en")
+    assert i18n.detect_language() == "en"                       # the environment variable beats everything
+    monkeypatch.setenv("VOXPRINT_LANG", "ru")
+    assert i18n.detect_language() == "en"                       # a dropped code is ignored
     monkeypatch.setenv("VOXPRINT_LANG", "xx")
-    assert i18n.detect_language() == "de"                       # an unknown code is ignored
+    assert i18n.detect_language() == "en"                       # an unknown code is ignored
 
 
 def test_windows_locale_name(monkeypatch):
@@ -162,17 +153,14 @@ def test_windows_locale_name(monkeypatch):
 
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr(ctypes, "windll", Win(), raising=False)
-    assert i18n.system_language() == "de"
+    assert i18n.system_language() is None               # German is a dropped UI language -> not offered
 
 
 def test_stage_labels_follow_language():
     from core.events import Stage
-    i18n.set_language("ru")
-    assert Stage.ALIGN.label == "Выравнивание"
     i18n.set_language("en")
     assert Stage.ALIGN.label == "Alignment"
-    i18n.set_language("de")
-    assert Stage.TRAIN.label == "Stimme trainieren"
+    assert Stage.TRAIN.label == "Training the voice"
 
 
 def test_errors_use_current_language():
@@ -180,8 +168,6 @@ def test_errors_use_current_language():
     i18n.set_language("en")
     assert CancelledByUser().user_message == "The operation was cancelled."
     assert OutOfMemoryError_().user_message == "Not enough video memory (VRAM)."
-    i18n.set_language("de")
-    assert "Grafikspeicher" in OutOfMemoryError_().user_message
 
 
 # ------------------------------------------------------------------ UI
@@ -196,25 +182,20 @@ def test_ui_language_switcher_retranslates_and_persists(app):
     w = MainWindow(runner=lambda *a: None, autocheck=False, auto_open_folder=False)
     w.show()
     cmb = w.settings_dialog().cmb_lang
-    assert cmb.count() == len(i18n.LANGS) and cmb.currentData() == "ru"
-    assert [cmb.itemText(i) for i in range(cmb.count())] == ["English", "Deutsch", "Русский", "Українська", "Latviešu"]
+    assert cmb.count() == len(i18n.LANGS) == 1 and cmb.currentData() == "en"
+    assert [cmb.itemText(i) for i in range(cmb.count())] == ["English"]
     w.set_language("en")
     assert w.btn_lora.text() == "Train the voice" and w.btn_merge.text() == "Build a voice for other apps"
     assert w.lbl_status.text() == "Choose the audio and the text - I will do the rest."
     assert w.lbl_audio.text().startswith("No file chosen")
     assert w._chips[next(iter(w._chips))].text() == "Updates"
+    # one language: the switcher cannot change anything, but the persistence machinery still stores the choice
+    assert i18n.set_language("en", persist=True) == "en"
     assert i18n.saved_language() == "en"
-    w.set_language("de")
-    assert w.btn_dataset.text() == "Aufnahmen vorbereiten"
-    w.set_language("ru")
-    assert w.settings_dialog().btn_update.text() == _cat("ru")["ui.btn_update"]
-    w.set_language("uk")
-    assert i18n.get_language() == "uk" and w.btn_lora.text() == _cat("uk")["ui.btn_lora"]
-    assert w.settings_dialog().cmb_lang.currentData() == "uk"
-    w.set_language("lv")
-    assert i18n.get_language() == "lv" and w.btn_dataset.text() == _cat("lv")["ui.btn_dataset"]
+    w.set_language("ru")                                         # dropped language: ignored, English stays
+    assert i18n.get_language() == "en" and w.settings_dialog().cmb_lang.currentData() == "en"
     w.set_language("be")                                         # not offered: ignored
-    assert i18n.get_language() == "lv" and w.settings_dialog().cmb_lang.currentData() == "lv"
+    assert i18n.get_language() == "en" and w.settings_dialog().cmb_lang.currentData() == "en"
     # the chosen file is kept when the language changes
     w.set_audio(Path("/tmp/voice.wav"))
     w.set_language("en")
@@ -230,7 +211,7 @@ def test_ui_language_switch_disabled_while_busy(app, monkeypatch):
     dlg = w.settings_dialog()
     assert not dlg.cmb_lang.isEnabled() and not dlg.btn_update.isEnabled()
     before = i18n.get_language()
-    dlg.cmb_lang.setCurrentIndex(dlg.cmb_lang.findData("en") if before != "en" else 1)
+    dlg.cmb_lang.setCurrentIndex(0)
     assert i18n.get_language() == before                       # the language does not change while a task is running
     w.close()
 

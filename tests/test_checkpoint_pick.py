@@ -174,7 +174,7 @@ def test_run_task_auto_pick_end_to_end(tmp_path, monkeypatch):
                     updater=_NoUpd(), aligner_factory=TrueRateAligner, voice_library=lib, asr_factory=asr,
                     synth_deps=dict(engine_factory=broken, mos=None))
     assert res3.pick is None and res3.voice_id and lib.get(res3.voice_id).adapter_scale == ast.DEFAULT_SCALE
-    assert any("контрольн" in w.lower() for w in res3.warnings)
+    assert any("checkpoint" in w.lower() for w in res3.warnings)
 
 
 # --------------------------------------------------------------------------- tiny real model: holdout + validation loss

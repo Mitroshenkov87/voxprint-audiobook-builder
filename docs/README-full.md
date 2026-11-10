@@ -9,7 +9,7 @@ Part of the VOXPrint AI Media Suite (with [VOXPrint AI Movie Dubber](https://git
 
 ![status: beta](https://img.shields.io/badge/status-beta%20%2F%20experimental-orange) ![licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue) ![platform: Windows 11 + RTX 40+](https://img.shields.io/badge/platform-Windows%2011%20%2B%20RTX%2040%2B-lightgrey)
 
-> **1.0.0 RC6 (build 1004 "Shomer", tag v1.0.0-rc.6).** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs an **NVIDIA GeForce RTX 40-series or newer** GPU, and **Windows 11 24H2+** or a **Linux release from 2025+**. There is no CPU-only mode. 16 GB of VRAM is recommended. Details: [tests and caveats](TESTING.md).
+> **1.0.0 RC7 (build 1005 "Yachad", tag v1.0.0-rc.7).** The whole pipeline has run end to end on one machine (RTX 4090, Windows), but only one speaker was tested and settings may still change. Back up your recordings and voices, and report problems as issues. Needs an **NVIDIA GeForce RTX 40-series or newer** GPU, and **Windows 11 24H2+** or a **Linux release from 2025+**. There is no CPU-only mode. 16 GB of VRAM is recommended. Details: [tests and caveats](TESTING.md).
 
 <p align="center"><img src="screenshots/rc2/abb-03-narrate.png" alt="Narrate window: a Russian book ready to read with the Levi voice, MP3 per chapter and one M4B file selected" width="720"></p>
 
@@ -95,7 +95,7 @@ The next version finishes the command line other programs can call (dry-run and 
 
 ## Documentation
 * **Documentation site:** [mitroshenkov87.github.io/voxprint-audiobook-builder](https://mitroshenkov87.github.io/voxprint-audiobook-builder/)
-* **User manual (PDF, 0.1.3 build 667):** [English](manual/Voxprint-Manual-en.pdf) · [Russian](manual/Voxprint-Manual-ru.pdf) · [Deutsch](manual/Voxprint-Manual-de.pdf) (print versions and sources: [`docs/manual/`](manual/); screenshots: [`docs/screenshots/en-667/`](screenshots/en-667/))
+* **User manual (PDF, 0.1.3 build 667):** [English](manual/Voxprint-Manual-en.pdf) (print version and sources: [`docs/manual/`](manual/); screenshots: [`docs/screenshots/en-667/`](screenshots/en-667/))
 * **Recording scripts** to read when you record a voice (ru / en / de, TXT + PDF): [`docs/recording-scripts/`](recording-scripts/)
 * [User guide](USER-GUIDE.md) · [Command-line interface](CLI.md) · [Driving the app (for agents)](AGENTS.md) · [FAQ](FAQ.md) · [Translation](TRANSLATION.md) · [Re-voice](REVOICE.md) · [Soundscape](SOUNDSCAPE.md) · [Voices and licences](VOICES.md) · [AAC / M4B notice](AAC-M4B.md)
 * [Models, mirrors and backups](MODELS.md) · [Downloads and hashes](DOWNLOADS.md) · [Runtime](RUNTIME.md) · [Linux](LINUX.md) · [Building and contributing](BUILDING.md)

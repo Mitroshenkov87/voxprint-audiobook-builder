@@ -64,12 +64,12 @@ def test_my_voices_shows_remote_cards_with_badges_size_and_a_download_button(app
     assert "MB" in r.lbl_meta.text() or "kB" in r.lbl_meta.text() or r.lbl_meta.text()
     assert "Test use only" in r.lbl_note.text() and r.btn_download.isEnabled() and r.lbl_state.text() == "Not downloaded yet"
     assert not w.empty.isVisibleTo(w)
-    i18n.set_language("ru")
+    i18n.set_language("ru")                                     # a dropped UI language falls back to English
     w.retranslate()
-    assert cards(w, RemoteCard)[0].lbl_name.text() == "Открытый голос" and "Только для тестов" in cards(w, RemoteCard)[0].lbl_note.text()
+    assert cards(w, RemoteCard)[0].lbl_name.text() == "Open Voice" and "Test use only" in cards(w, RemoteCard)[0].lbl_note.text()
     i18n.set_language("de")
     w.retranslate()
-    assert cards(w, RemoteCard)[0].btn_download.text() == "Herunterladen"
+    assert cards(w, RemoteCard)[0].btn_download.text() == "Download"
 
 
 def test_download_button_fetches_and_the_card_becomes_a_local_voice(app, lib, tmp_path, entries):
@@ -117,10 +117,10 @@ def test_edit_dialog_keeps_the_stored_name_and_explains_the_test_only_licence(ap
 
 def test_edit_dialog_edits_the_schema3_details(app, lib, tmp_path, entries):
     from ui.voices_window import VoiceEditDialog
-    i18n.set_language("ru")
+    i18n.set_language("ru")                                   # a dropped UI language falls back to English
     rec = fake_download(tmp_path)(entries[0], lib)
     dlg = VoiceEditDialog(rec)
-    assert dlg.cmb_gender.count() == 3 and dlg.cmb_age.count() == 5 and "Пол" in dlg.cmb_gender.itemText(0)
+    assert dlg.cmb_gender.count() == 3 and dlg.cmb_age.count() == 5 and "Gender" in dlg.cmb_gender.itemText(0)
     dlg.cmb_gender.setCurrentIndex(dlg.cmb_gender.findData("male"))
     dlg.cmb_age.setCurrentIndex(dlg.cmb_age.findData("young"))
     dlg.edt_speaker.setText("Борис")

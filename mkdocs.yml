@@ -116,14 +116,13 @@ nav:
       - Fish Drama 3 plan: plans/FISH-DRAMA-3.md
   - Manuals:
       - English: manual/src/manual_en.md
-      - Deutsch: manual/src/manual_de.md
-      - Russian: manual/src/manual_ru.md
   - Legal:
       - Audiobook Builder: legal/EULA-audiobook-builder.md
       - Movie Dubber draft: legal/EULA-movie-dubber-DRAFT.md
       - Template: legal/EULA-TEMPLATE.md
   - Release notes:
       - Template: RELEASE-NOTES-TEMPLATE.md
+      - 1.0.0 Yachad: RELEASE-NOTES-1005-YACHAD.md
       - 1.0.0 Shomer: RELEASE-NOTES-1004-SHOMER.md
       - 1.0.0 Amud: RELEASE-NOTES-1003-AMUD.md
       - 1.0.0 Ometz: RELEASE-NOTES-1002-OMETZ.md

@@ -4,7 +4,7 @@ Agreed with the Movie Dubber (it reads and writes the same file).  Only four val
 program's own settings::
 
     {"schema": 1,
-     "ui_language": "ru",            # ISO code; default: the OS language if supported, else "en"
+     "ui_language": "en",            # ISO code; the interface is English-only, so "en" (default: "en")
      "theme": "glass-dark",          # unknown -> the program's default theme ("glass-dark" here, our only theme)
      "models_dir": null,             # absolute path, or null = the default folder; VOXPRINT_MODELS_DIR always wins
      "gpu": "auto"}                  # "auto" | "cuda:N"  (no CPU choice)
@@ -115,8 +115,8 @@ def values() -> Dict[str, Any]:
 def set_value(key: str, value: Any) -> Any:
     """Validate and store one shared value (other keys, known or not, stay).  Returns the stored value.
 
-    ``ValueError`` for an unknown key or an invalid value. The UI language stays this program's list
-    (``en`` / ``de`` / ``ru`` / ``uk`` / ``lv``); the file itself is the suite ``suite.json``.
+    ``ValueError`` for an unknown key or an invalid value. The UI language is English-only
+    (``en``); the file itself is the suite ``suite.json``.
     """
     if key == "ui_language":
         stored: Any = normalize_language(value)
