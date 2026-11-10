@@ -37,6 +37,46 @@ def test_app_manifest_lists_required_models_and_leaves_the_rest_on_demand():
     assert "core/data" not in blob
 
 
+def test_app_manifest_fills_the_mdl_display_fields_and_keeps_vram_tiers():
+    document = json.loads((ROOT / "voxprint-app-models.json").read_text(encoding="utf-8"))
+    expected = {
+        ("qwen3-tts", "8gb"): ("Qwen3-TTS 0.6B", "Compact narrator for 8 GB cards.", "voice"),
+        ("qwen3-tts", "16gb"): ("Qwen3-TTS 1.7B Base", "Default narrator for 16 GB cards.", "voice"),
+        ("qwen3-tts-tokenizer", "any"): ("Qwen3-TTS speech tokenizer", "Tokenizes speech for the Qwen3-TTS narrators.", "internal"),
+        ("opus-mt-en-ru", "any"): ("English to Russian", "Translates book text from English to Russian.", "translate"),
+        ("opus-mt-ru-en", "any"): ("Russian to English", "Translates book text from Russian to English.", "translate"),
+        ("opus-mt-tc-bible-big-deu-eng-fra-por-spa-gmw", "any"): ("European to West Germanic", "Translates West European book text into English or German.", "translate"),
+        ("opus-mt-tc-bible-big-gmw-deu-eng-fra-por-spa", "any"): ("West Germanic to European", "Translates English or German book text into West European languages.", "translate"),
+        ("opus-mt-tc-big-de-zle", "any"): ("German to East Slavic", "Translates book text from German to Russian or Ukrainian.", "translate"),
+        ("opus-mt-tc-big-en-zle", "any"): ("English to East Slavic", "Translates book text from English to Russian or Ukrainian.", "translate"),
+        ("opus-mt-tc-big-zle-de", "any"): ("East Slavic to German", "Translates book text from Russian or Ukrainian to German.", "translate"),
+        ("opus-mt-tc-big-zle-en", "any"): ("East Slavic to English", "Translates book text from Russian or Ukrainian to English.", "translate"),
+        ("gemma-4-12b", "any"): ("Gemma 4 12B", "Drafts speaker marks and book structure.", "writer"),
+        ("ace-step", "any"): ("ACE-Step", "Creates background music and ambience for the audiobook.", "generate"),
+        ("voice-open-universal", "any"): ("Open universal voice", "Open English voice trained on public-domain LJ Speech.", "voice"),
+        ("voice-noa", "any"): ("Noa", "Optional female Russian voice for narration.", "voice"),
+        ("voice-levi", "any"): ("Levi", "Male Russian voice for narration.", "voice"),
+        ("voice-natan", "any"): ("Natan", "Male Russian voice for narration.", "voice"),
+        ("voice-shimon", "any"): ("Shimon", "Male Russian voice for narration.", "voice"),
+        ("voice-miriam", "any"): ("Miriam", "Female Russian voice for narration.", "voice"),
+        ("voice-rivka", "any"): ("Rivka", "Female Russian voice for narration.", "voice"),
+    }
+    groups = {"generate", "edit", "upscale", "restore", "voice", "transcribe", "translate", "writer", "safety", "internal"}
+    seen = set()
+    for row in document["models"]:
+        key = (row["id"], row["vram_tier"])
+        seen.add(key)
+        assert key in expected, key
+        label, purpose, group = expected[key]
+        assert row["label"] == label
+        assert row["purpose"] == purpose
+        assert row["group"] == group and group in groups
+        assert len(row["label"]) <= 40 and len(row["purpose"]) <= 80 and "\n" not in row["purpose"]
+    assert seen == set(expected)
+    tiers = {row["vram_tier"] for row in document["models"] if row["id"] == "qwen3-tts"}
+    assert tiers == {"8gb", "16gb"}
+
+
 def test_models_ready_asks_mdl_for_this_app(monkeypatch):
     monkeypatch.delenv("VOXPRINT_SKIP_SUITE", raising=False)
     seen = []
@@ -170,7 +210,9 @@ def test_a_missing_model_is_not_downloaded_here(tmp_path, monkeypatch):
     assert "voxprint-mdl" in ei.value.user_message
     assert called == []
     assert importlib.util.find_spec("infra.parallel_download") is None
-    assert [p.name for p in tmp_path.iterdir() if not p.name.startswith(".")] == []
+    # no model files or folders appear; the app home may be created as a side effect of translating the error
+    home = paths.app_home().resolve()
+    assert [p.name for p in tmp_path.iterdir() if not p.name.startswith(".") and p.resolve() != home] == []
 
 
 def test_manage_models_opens_the_mdl_window():

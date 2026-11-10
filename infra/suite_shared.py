@@ -2,8 +2,8 @@
 
 One tree, one ``manifest.json`` (schema 1, :mod:`voxprint_common.runtime_manifest`)::
 
-    %LOCALAPPDATA%\\Voxprint\\shared\\          Windows
-    ~/.local/share/voxprint/shared/         Linux
+    %LOCALAPPDATA%\\VOXPrint AI Suite\\shared\\   Windows
+    ~/.local/share/voxprint-ai-suite/shared/  Linux
 
     runtime/py314-torch2.11-cu130   torch 2.11.0+cu130 (reused, not downloaded again)
     wheels/audiobook-builder        this app's other wheels (CPU onnxruntime never sits beside torch)

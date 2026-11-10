@@ -1,4 +1,4 @@
-"""installer/Voxprint.iss: the optional "existing models" wizard page, trilingual wizard texts, encoding.
+"""installer/Voxprint.iss: the optional "existing models" wizard page, English-only wizard texts, encoding.
 
 Inno Setup cannot be compiled on Linux, so these tests lint the script: encoding, message tables, the Pascal block structure and
 the contract with the app (the file the page writes is the file ``infra.existing_models`` reads)."""
@@ -8,7 +8,7 @@ from pathlib import Path
 from infra import existing_models, paths
 
 ISS = Path(__file__).resolve().parents[1] / "installer" / "Voxprint.iss"
-LANGS = ("english", "russian", "german")
+LANGS = ("english",)
 
 
 def text() -> str:
@@ -27,30 +27,25 @@ def test_bom_and_crlf_are_kept():
     assert raw.startswith(b"\xef\xbb\xbf") and raw.count(b"\r\n") == raw.count(b"\n")
 
 
-def test_three_wizard_languages():
+def test_one_wizard_language_english():
     langs = re.findall(r'^Name: "(\w+)"; MessagesFile: "([^"]+)"', section("Languages"), re.M)
     assert [n for n, _ in langs] == list(LANGS)
-    assert dict(langs)["german"].endswith("German.isl") and dict(langs)["russian"].endswith("Russian.isl")
+    assert dict(langs)["english"].endswith("Default.isl")
 
 
-def test_every_custom_message_exists_in_all_languages_and_every_use_is_defined():
+def test_every_custom_message_exists_in_every_language_and_every_use_is_defined():
     defined = {l: set() for l in LANGS}
     for line in section("CustomMessages").splitlines():
         m = re.match(r"(\w+)\.(\w+)=(.+)", line)
         if m:
             assert m.group(3).strip(), line
             defined[m.group(1)].add(m.group(2))
-    assert defined["english"] == defined["russian"] == defined["german"] and len(defined["english"]) >= 9
+    assert defined["english"] and len(defined["english"]) >= 9
     # {cm:Name} in script sections, CustomMessage('Name') in [Code]
     builtin = set()
     used = set(re.findall(r"\{cm:(\w+)", text())) | set(re.findall(r"CustomMessage\('(\w+)'\)", text()))
     assert used - builtin <= defined["english"], used - builtin - defined["english"]
     assert {"ModelsPageCaption", "ModelsPageDescription", "ModelsPageSubCaption", "ModelsPagePrompt", "ModelsPageBadFolder", "ModelsPageProtected"} <= used
-    # the %1/%2 placeholders agree between the languages
-    for name in defined["english"]:
-        ph = {l: sorted(set(re.findall(r"%\d", next(x for x in section("CustomMessages").splitlines() if x.startswith(f"{l}.{name}=")))))
-              for l in LANGS}
-        assert ph["english"] == ph["russian"] == ph["german"], name
 
 
 def test_no_russian_text_is_left_outside_the_message_table():
@@ -111,7 +106,7 @@ def test_no_desktop_shortcut_only_start_menu_and_upgrades_remove_the_old_one():
 
 
 def test_setup_refuses_windows_older_than_24h2():
-    """Build < 26100 is a hard stop, in every wizard language, with no offer to continue."""
+    """Build < 26100 is a hard stop, in the wizard language, with no offer to continue."""
     t = text()
     assert "MinVersion=10.0.26100" in section("Setup")
     assert "WinBuildWarning" not in t and "Continue the installation" not in t
@@ -123,7 +118,7 @@ def test_setup_refuses_windows_older_than_24h2():
         low = next(x for x in section("Messages").splitlines() if x.startswith(f"{lang}.WinVersionTooLowError="))
         for line in (custom, low):
             assert "26100" in line and "Windows 11 24H2" in line
-            assert "Windows 10" not in line and "Continue" not in line and "Продолжить" not in line
+            assert "Windows 10" not in line and "Continue" not in line
 
 
 def test_a_backup_folder_is_a_restore_source_not_the_models_folder():

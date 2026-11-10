@@ -41,7 +41,7 @@ CONTEXTS = ("QPlatformTheme", "QDialogButtonBox", "QMessageBox", "QGnomeTheme")
 class ButtonTranslator(QTranslator):
     """Translates only the standard button texts, always into the CURRENT UI language (a language switch needs no reload)."""
 
-    def translate(self, context: str, source: str, disambiguation: Optional[str] = None,
+    def translate(self, context: str, source: str, _disambiguation: Optional[str] = None,
                   n: int = -1) -> Optional[str]:  # noqa: D401
         key = SOURCES.get(source) if context in CONTEXTS else None
         # None = "not mine": Qt keeps its own text (an empty string would REPLACE every other text of Qt with nothing)

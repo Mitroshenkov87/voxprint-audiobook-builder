@@ -165,8 +165,8 @@ def test_lora_applied_to_talker_only_and_trains(tmp_path):
 
 def test_loss_warnings():
     from core.lora_trainer import loss_warnings
-    assert any("низкая" in w for w in loss_warnings(2.9, 6.0))
-    assert any("не уменьшилась" in w for w in loss_warnings(5.0, 5.0))
+    assert any("low" in w for w in loss_warnings(2.9, 6.0))
+    assert any("barely decreased" in w for w in loss_warnings(5.0, 5.0))
     assert loss_warnings(4.5, 7.0) == []
 
 

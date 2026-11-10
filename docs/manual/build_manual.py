@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Build the Voxprint user manual PDFs (en, ru, de) from docs/manual/src/manual_<lang>.md.
+"""Build the Voxprint user manual PDFs (en only) from docs/manual/src/manual_en.md.
+
+The interface is English-only since v1.0.0-rc.7, so only the English manual is built.
 
 Toolchain: Markdown -> HTML (python-markdown) -> PDF (WeasyPrint).  Needs: pip install markdown weasyprint pillow
   * ``{{key}}``  in the sources is replaced by the UI string ``key`` of locales/<lang>.json (exactly as in the app);
-  * ``{{en:key}}`` is the English UI string ``key`` (used by the ru/de manuals to name what the English screenshots show);
-  * ``![caption](@name)`` is a screenshot: img/<lang>/name.png, then img/en/name.png, then the English screenshot of the
-    current build in docs/screenshots/en-667/ (see :data:`SHOTS`); a non-localized picture is noted in the caption.
-Two themes per language (same content): ``Voxprint-Manual-<lang>.pdf`` = DARK (default, full-bleed near-black pages) and
+  * ``![caption](@name)`` is a screenshot: img/<lang>/name.png, then the English screenshot of the
+    current build in docs/screenshots/en-667/ (see :data:`SHOTS`).
+Two themes (same content): ``Voxprint-Manual-<lang>.pdf`` = DARK (default, full-bleed near-black pages) and
 ``Voxprint-Manual-<lang>-print.pdf`` = LIGHT for printing.  The logo (mark + wordmark) is generated here as SVG - no external assets.
 Contrast of every text/background pair of both palettes is checked (WCAG, see :func:`check_contrast`) before building.
 Usage: python docs/manual/build_manual.py [--out DIR] [--theme dark|print|both] [lang ...]
@@ -20,17 +21,11 @@ from weasyprint import HTML
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
-LANGS = ("en", "ru", "de")
+LANGS = ("en",)
 META = {
     "en": dict(title="VOXPrint AI Audiobook Builder", sub="User manual", contents="Contents", page="Page",
                ver="Version 0.1.3 (beta) · build 667 “Menuchah” · manual of 9 October 2026", fallback=" (screenshot of the English interface)",
                fig="Figure", html="en"),
-    "ru": dict(title="VOXPrint AI Audiobook Builder", sub="Руководство пользователя", contents="Содержание", page="Стр.",
-               ver="Версия 0.1.3 (бета) · сборка 667 «Menuchah» · руководство от 9 октября 2026 г.", fallback=" (снимок английского интерфейса)",
-               fig="Рис.", html="ru"),
-    "de": dict(title="VOXPrint AI Audiobook Builder", sub="Benutzerhandbuch", contents="Inhalt", page="Seite",
-               ver="Version 0.1.3 (Beta) · Build 667 „Menuchah“ · Handbuch vom 9. Oktober 2026", fallback=" (Screenshot der englischen Oberfläche)",
-               fig="Abb.", html="de"),
 }
 
 # ----------------------------------------------------------------------------------------------- themes

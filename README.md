@@ -5,7 +5,7 @@ Offline audiobook narration with voice cloning for TXT, FB2 and EPUB books.
 > [!WARNING]
 > **Deep alpha.** This software is experimental, and nothing is guaranteed to work. Use at your own risk.
 
-- **Latest pre-release:** [v1.0.0-rc.6](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v1.0.0-rc.6)
+- **Latest pre-release:** [v1.0.0-rc.7](https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/tag/v1.0.0-rc.7)
 - **Full documentation:** [docs/README-full.md](docs/README-full.md) and the [docs/](docs/) folder
 
 License: [Apache-2.0](LICENSE)

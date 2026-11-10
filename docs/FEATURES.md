@@ -39,7 +39,7 @@ The principles shared by every app of the VOXPrint AI Media Suite (complete, loc
   (1.7B or 0.6B base, 8-bit Adam, automatic retry plan after out-of-memory). An RTX 40-series or newer GPU is required.
 * Optional **universal model** (~4 GB, `custom_voice` format) merged from the adapter - works in any Qwen3-TTS app.
 * **`voice.json`** next to the adapter (schema 3): id, name, language (BCP-47 code), creation date (UTC), speech duration, epochs, base model, author, speaker, prepared by, organization, project link, licence (+ URL), gender, age group, the derived voice type, description and the derived `commercial_use`.
-* **Settings** dialog (gear): language (English, Deutsch, Русский, Українська, Latviešu), update check, model/data folders, repair, About.
+* **Settings** dialog (gear): language (English; the interface is English-only), update check, model/data folders, repair, About.
 * Scrollable window that stays usable on small screens (e.g. 1366x768 at 150% scaling).
 * Safe self-maintenance: verified-version updates with staging + smoke test + rollback, a repair command, a completion manifest.
 * Acrylic (glass) look on Windows 11 with a dark, high-contrast (WCAG AA) theme and a plain fallback.
@@ -50,7 +50,7 @@ Narrate and the first-run Components window from the 1.0.0-rc.2 run on an RTX 40
 <p align="center"><img src="screenshots/rc2/abb-03-narrate.png" alt="Narrate window: a Russian book ready to read with the Levi voice, MP3 per chapter and one M4B file selected" width="640"></p>
 <p align="center"><img src="screenshots/rc2/abb-01-main-components-first-run.png" alt="Components window on first start: program components and models, with sizes shown and free space checked before a download" width="640"></p>
 
-Real screenshots of build 667 "Menuchah" (0.1.3-beta) on **Windows 11 (RTX 4090, dark theme, English UI)**, in [`docs/screenshots/en-667/`](screenshots/en-667). Personal paths and network addresses are blurred. Older Russian and German screenshots (0.1.0) are in [`docs/screenshots/ru/`](screenshots/ru) and [`docs/screenshots/de/`](screenshots/de).
+Real screenshots of build 667 "Menuchah" (0.1.3-beta) on **Windows 11 (RTX 4090, dark theme, English UI)**, in [`docs/screenshots/en-667/`](screenshots/en-667). Personal paths and network addresses are blurred. The interface is English-only since 1.0.0-rc.7; older localized screenshots were removed.
 
 | Studio | My voices (build 667 screenshot; Tirzah and Gideon are bundled, the picture also shows Boaz, which is retired) |
 |---|---|

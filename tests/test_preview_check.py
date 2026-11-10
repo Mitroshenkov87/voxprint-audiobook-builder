@@ -162,7 +162,7 @@ def test_post_training_check_reports_quality_and_suggests(tmp_path, monkeypatch)
                        voice_library=VoiceLibrary(tmp_path / ("lib" + expect)), asr_factory=lambda: FakeASR([pr.SAMPLE_TEXT["russian"]]),
                        synth_deps=dict(engine_factory=lambda a, l, e=engine: e))
         assert res.quality["verdict"] == expect
-        assert (expect == "good") == (not any("проверк" in w.lower() for w in res.warnings))
+        assert (expect == "good") == (not any("check" in w.lower() for w in res.warnings))
 
 
 pytest.importorskip("PySide6")
@@ -182,7 +182,7 @@ def test_train_window_preview_flow(app, tmp_path):
     w = MainWindow(runner=lambda req, p, c: seen.append(req), autocheck=False, auto_open_folder=False, gpu_fn=lambda: G)
     played = []
     w.previewer = SimpleNamespace(play=lambda p: played.append(p))
-    assert not w.btn_preview.isEnabled() and "около" in w.lbl_preview_estimate.text()
+    assert not w.btn_preview.isEnabled() and "about" in w.lbl_preview_estimate.text()
     (tmp_path / "a.wav").write_bytes(b"x"); (tmp_path / "t.txt").write_text("x", encoding="utf-8")
     w.set_audio(tmp_path / "a.wav"); w.set_text(tmp_path / "t.txt")
     assert w.chk_compare.isChecked()                     # the best option is pre-selected

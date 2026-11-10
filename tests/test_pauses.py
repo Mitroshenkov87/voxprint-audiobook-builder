@@ -142,10 +142,10 @@ def test_narrate_window_has_the_slider_with_the_default_and_passes_it_to_the_job
     assert pz.load_level() == 4                                    # remembered for the next start
     i18n.set_language("ru")
     n.retranslate()
-    assert n.lbl_pauses.text() == "Паузы" and "мс" in n.lbl_pauses_value.text()
+    assert n.lbl_pauses.text() == "Pauses" and "ms" in n.lbl_pauses_value.text()
     i18n.set_language("de")
     n.retranslate()
-    assert n.lbl_pauses.text() == "Pausen"
+    assert n.lbl_pauses.text() == "Pauses"
     n.shutdown()
     n2 = narrate(lib, tmp_path, [], runner=lambda *a: None)
     assert n2.sld_pauses.value() == 4

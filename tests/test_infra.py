@@ -115,7 +115,7 @@ def test_plan_variants_and_cpu_fallback():
     for plan in (plan_training(GpuInfo(False), 100), plan_training(GpuInfo(True, "x", 16.0), 100, force_cpu=True),
                  plan_training(GpuInfo(True, "x", 3.0), 100)):
         assert plan.device == "cpu" and plan.dtype == "float32" and not plan.use_8bit_adam and plan.warnings
-    assert any("мало" in w for w in plan_training(GpuInfo(True, "x", 16.0), 10).warnings)
+    assert any("few" in w for w in plan_training(GpuInfo(True, "x", 16.0), 10).warnings)
 
 
 def test_reduce_after_oom_chain():
@@ -193,7 +193,7 @@ def test_ensure_model_downloads_then_reuses(tmp_path):
                         get_remote_sha=lambda r: "abc123")
     assert md.verify_local_model(p) and md.local_revision("Org/Model", tmp_path) == "abc123"
     assert not (tmp_path / "Org--Model.partial").exists()
-    assert any(f == 1.0 for f, _ in calls) and any("Первый запуск" in m for _, m in calls)
+    assert any(f == 1.0 for f, _ in calls) and any("First start" in m for _, m in calls)
     # a second time - without touching the network
     p2 = md.ensure_model("Org/Model", prog, root=tmp_path, snapshot_download=_fake_snapshot(fail=True))
     assert p2 == p
@@ -315,7 +315,7 @@ def test_update_rolls_back_on_failed_compat(tmp_path):
     assert res.rolled_back and not res.needs_restart and res.after == {}
     assert (paths.packages_dir() / "old_pkg").exists() and not (paths.packages_dir() / "qwen_asr").exists()
     assert not list(paths.staging_dir().glob("pkgs-*"))
-    assert "прежняя" in res.summary() or "прежн" in res.summary()
+    assert "previous version was kept" in res.summary() or "previous" in res.summary()
 
 
 def test_update_pip_failure(tmp_path):
@@ -367,7 +367,7 @@ def test_offline_check_and_apply(tmp_path):
         raise OSError("offline")
     u = Updater(fetch_json=fetch, python_exe="python", installed_fn=lambda n: "1", packages={"a": ""}, models=())
     rep, res = u.check_and_apply()
-    assert not rep.network_ok and "интернет" in res.summary()
+    assert not rep.network_ok and "internet" in res.summary()
     assert u.should_autocheck()  # a failed check does not reset the timer
 
 

@@ -40,15 +40,59 @@ def test_main_window_keeps_only_core_buttons_plus_gear(app):
     w = make_window(lambda *a: None)
     w.show()
     texts = {b.text() for b in (w.btn_audio, w.btn_text, w.btn_dataset, w.btn_lora)}
-    assert texts == {"Выбрать аудио", "Выбрать текст", "Создать датасет", "Создать голос (LoRA)"}
+    assert texts == {"Choose audio", "Choose text", "Prepare the recordings", "Train the voice"}
     # service items moved to the Settings dialog
     for gone in ("btn_update", "btn_about", "cmb_lang"):
         assert not hasattr(w, gone)
-    assert w.btn_settings.isEnabled() and w.btn_settings.toolTip() == "Настройки"
+    assert w.btn_settings.isEnabled() and w.btn_settings.toolTip() == "Settings"
     assert w.windowTitle() == "VOXPrint AI Audiobook Builder"
     assert not w.btn_lora.isEnabled() and not w.btn_dataset.isEnabled()  # no files
     assert [s.label for s in plan_for(KIND_LORA)] == [
-        "Проверка обновлений", "Загрузка модели", "Выравнивание", "Нарезка", "Обучение LoRA", "Сохранение"]
+        "Updates", "Loading model", "Alignment", "Slicing", "Training the voice", "Saving"]
+    w.close()
+
+
+def test_train_title_is_light_on_a_painted_background(app):
+    from PySide6.QtGui import QColor
+
+    i18n.set_language("en", persist=False)
+    w = make_window(lambda *a: None)
+    w.resize(1200, 900)
+    w.show()
+    QApplication.processEvents()
+    image = w.grab().toImage()
+    origin = w.lbl_title.mapTo(w, w.lbl_title.rect().topLeft())
+    light = False
+    for y in range(origin.y(), origin.y() + w.lbl_title.height(), 2):
+        for x in range(origin.x(), origin.x() + min(w.lbl_title.width(), 280), 2):
+            color = image.pixelColor(x, y)
+            if color.red() > 200 and color.green() > 200 and color.blue() > 200:
+                light = True
+                break
+        if light:
+            break
+    assert light
+    background = image.pixelColor(6, 6)
+    assert background != QColor(0, 0, 0)
+    visible = " ".join((
+        w.lbl_title.text(), w.lbl_sub.text(), w.btn_lora.text(), w.lbl_hint_lora.text(),
+        w.btn_merge.text(), w.lbl_hint_merge.text(), w.btn_dataset.text(),
+        w.lbl_preset_desc.text(), w.lbl_estimate.text(), w.lbl_preview_estimate.text(),
+        w.edt_voice_desc.placeholderText(), w.lbl_voice_type_hint.text(),
+        " ".join(chip.text() for chip in w._chips.values()),
+    ))
+    for word in ("LoRA", "adapter", "GPU", "clips", "voice.json"):
+        assert word not in visible, word
+    assert "adapter" in w.lbl_estimate_detail.text()
+    assert not w.adv_box.isVisible()
+    assert w.lbl_step1.text() == "1. Recording and text"
+    assert w.lbl_step2.text() == "2. Quality"
+    assert w.lbl_step3.text() == "3. Consent and name"
+    assert w.more_box.isHidden()
+    assert w.btn_preview.parentWidget() is w.more_box
+    assert w.btn_merge.parentWidget() is w.more_box
+    assert w.edt_voice_name.parentWidget() is w.lbl_step3.parentWidget()
+    assert w.lbl_consent.text() == "Voice owner's consent"
     w.close()
 
 
@@ -137,7 +181,7 @@ def test_cancel(app, tmp_path):
     w.btn_dataset.click()
     assert wait_for(lambda: w.busy)
     w.btn_cancel.click()
-    assert wait_for(lambda: not w.busy and w.lbl_status.text() == "Отменено.")
+    assert wait_for(lambda: not w.busy and w.lbl_status.text() == "Cancelled.")
     w.close()
 
 
@@ -228,7 +272,7 @@ def test_first_run_prefetch_message_and_buttons(app, tmp_path):
     w.start_prefetch()
     assert not w.btn_lora.isEnabled()  # the buttons are locked during the first-run download
     gate.set()
-    assert wait_for(lambda: "готово" in w.lbl_status.text().lower() and not w.busy)
+    assert wait_for(lambda: "ready" in w.lbl_status.text().lower() and not w.busy)
     assert calls and w.btn_lora.isEnabled()
     w.close()
 
@@ -250,7 +294,7 @@ def test_first_run_prefetch_failure_is_friendly(app):
 def test_privacy_footer_and_one_time_notice(app, tmp_path):
     from ui import main_window as mw
     w = mw.MainWindow(runner=lambda *a, **k: None, autocheck=False, auto_open_folder=False)
-    assert "с разрешения владельца голоса" in w.lbl_privacy.text() and "только на этом компьютере" in w.lbl_privacy.text()
+    assert "with the voice owner's permission" in w.lbl_privacy.text() and "stay on this computer" in w.lbl_privacy.text()
     assert not mw.privacy_acknowledged()
     assert w.maybe_show_privacy_notice() is False          # offscreen: the window is not shown
     assert not mw.privacy_acknowledged()
@@ -280,10 +324,10 @@ def test_settings_dialog_holds_service_items(app, monkeypatch):
     w.open_settings()
     dlg = w.settings_dialog()
     assert dlg.isVisible() and w.settings_dialog() is dlg          # one reused instance
-    assert dlg.cmb_lang.count() == len(i18n.LANGS) and dlg.cmb_lang.currentData() == "ru"
-    assert dlg.btn_update.text() == "Проверить обновления"
+    assert dlg.cmb_lang.count() == len(i18n.LANGS) and dlg.cmb_lang.currentData() == "en"
+    assert dlg.btn_update.text() == "Check for updates"
     dlg.cmb_lang.setCurrentIndex(dlg.cmb_lang.findData("en"))
-    assert i18n.get_language() == "en" and w.btn_lora.text() == "Create voice (LoRA)"
+    assert i18n.get_language() == "en" and w.btn_lora.text() == "Train the voice"
     assert dlg.btn_update.text() == "Check for updates" and dlg.windowTitle() == "Settings"
     opened = []
     import ui.main_window as mw

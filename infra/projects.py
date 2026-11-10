@@ -2,7 +2,7 @@
 
 Best practice for big, re-creatable data on Windows: a local folder that is NOT synced by OneDrive.
 
-* default: ``<app home>/Projects`` (``%LOCALAPPDATA%\\Voxprint\\Projects`` on Windows, ``~/.local/share/voxprint/Projects``
+* default: ``<app home>/Projects`` (``%LOCALAPPDATA%\\VOXPrint AI Suite\\Projects`` on Windows, ``~/.local/share/voxprint-ai-suite/Projects``
   on Linux); one sub-folder per kind and one consolidated folder per project inside it: ``Audiobooks/<book>/``,
   ``Voices/<voice>_Voxprint/``, ``Re-voice/``;
 * the user can choose another folder in Settings (remembered in ``state/projects_folder.txt``); a folder inside OneDrive

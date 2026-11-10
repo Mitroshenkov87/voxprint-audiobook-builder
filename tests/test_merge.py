@@ -124,7 +124,7 @@ def test_export_disk_space_error(adapter, base_dir, monkeypatch):
     monkeypatch.setattr(shutil, "disk_usage", lambda p: shutil._ntuple_diskusage(10**12, 10**12 - 10**9, 10**9))
     with pytest.raises(ExportError) as ei:
         mx.export_merged_model(adapter, adapter / "merged_model", base_dir=base_dir, load_model=_load)
-    assert ei.value.kind == "export" and "ГБ" in ei.value.user_message
+    assert ei.value.kind == "export" and "GB" in ei.value.user_message
     assert not (adapter / "merged_model").exists()
 
 
@@ -190,10 +190,13 @@ def test_merge_button_state_hints_and_flow(app, adapter, monkeypatch, tmp_path):
 
     w = mw.MainWindow(runner=runner, autocheck=False, auto_open_folder=False)
     w.show()
-    assert w.btn_merge.text() == "Собрать универсальную модель (~4 ГБ)"
+    assert w.btn_merge.text() == "Build a voice for other apps"
     assert not w.btn_merge.isEnabled() and w.btn_merge.toolTip()
-    assert "десятки МБ" in w.lbl_hint_lora.text() and "Alexandria" in w.lbl_hint_lora.text()
-    assert "4 ГБ" in w.lbl_hint_merge.text() and "Qwen3-TTS" in w.lbl_hint_merge.text()
+    assert "LoRA" not in w.lbl_hint_lora.text() and "адаптер" not in w.lbl_hint_lora.text().lower()
+    assert "Qwen3-TTS" not in w.lbl_hint_merge.text()
+    assert "tens of MB" in w.lbl_expert_note.text() and "Alexandria" in w.lbl_expert_note.text()
+    assert "4 GB" in w.lbl_expert_note.text() and "Qwen3-TTS" in w.lbl_expert_note.text()
+    assert not w.adv_box.isVisible()
     pr.remember_adapter(adapter, "Мой голос")
     w._refresh_buttons()
     assert w.btn_merge.isEnabled()
@@ -217,5 +220,5 @@ def test_merge_button_blocks_on_low_disk(app, adapter, monkeypatch):
     w = mw.MainWindow(runner=lambda *a: called.append(a), autocheck=False, auto_open_folder=False)
     monkeypatch.setattr(mw.model_export, "required_free_gb", lambda a: (10**6, REPO))
     assert w.start_merge() is False and not called
-    assert "ГБ" in w.last_error_text
+    assert "GB" in w.last_error_text
     w.close()

@@ -24,10 +24,14 @@ def test_check_and_repair_does_not_overlap_the_right_column(app, lib):
     d.bar_autorepair.setVisible(True)
     flow = d.findChild(ColumnFlow, "content")
     d.resize(2400, 900)
+    # Windows (and some offscreen plugins) cap a top-level dialog to the
+    # screen width, which can sit just below two_column_width(). Give the
+    # content widget the intended width so the scroll area can grow it.
+    flow.setMinimumWidth(2400)
     QApplication.processEvents()
     d.layout().activate()
     QApplication.processEvents()
-    assert flow.two
+    assert flow.two, (d.width(), flow.width(), flow.two_column_width())
     assert d.lbl_autorepair_status.minimumSizeHint().width() <= 160
     assert d.lbl_autorepair_status.height() > 30          # the long line wraps instead of widening the column
     widgets = [d.btn_projects_open, d.btn_projects_change, d.btn_projects_default, d.btn_backup, d.btn_restore,

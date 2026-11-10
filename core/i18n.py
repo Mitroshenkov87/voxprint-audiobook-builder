@@ -1,9 +1,8 @@
 """Localization: plain JSON catalogs ``locales/<code>.json`` with flat keys such as ``"ui.btn_lora"`` and
 ``{name}``-style parameters.
 
-Languages: ``en`` (default), ``de``, ``ru``, ``uk``, ``lv``.  To add a language, copy ``locales/en.json`` to
-``locales/<code>.json``, translate the values, add the code to ``LANGS`` and its native name to ``LANG_NAMES``
-(the tests check that every catalog has exactly the same keys and placeholders as English).
+Languages: ``en`` only (the interface is English-only since v1.0.0-rc.7).  Russian stays a fully supported
+*content* language (narration, TTS, yo/stress, training); it is just no longer a UI language.
 
 The UI language is chosen in this order:
 
@@ -27,10 +26,10 @@ from typing import Dict, Optional
 
 log = logging.getLogger("voxprint.i18n")
 
-LANGS = ("en", "de", "ru", "uk", "lv")
+LANGS = ("en",)
 DEFAULT_LANG = "en"
 #: Language names are shown in their own language (in the language selector).
-LANG_NAMES = {"en": "English", "de": "Deutsch", "ru": "Русский", "uk": "Українська", "lv": "Latviešu"}
+LANG_NAMES = {"en": "English"}
 
 _catalogs: Dict[str, Dict[str, str]] = {}
 _current: Optional[str] = None

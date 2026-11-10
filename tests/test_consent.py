@@ -112,7 +112,7 @@ def test_unclear_or_missing_statement_is_private_with_a_warning(tmp_path, monkey
     res, lib = _run(tmp_path, monkeypatch, consent_mode="auto")
     rec = lib.get(res.voice_id)
     assert rec.scope == c.PRIVATE and rec.info["license"] == "custom/personal-only"
-    assert any("заявлени" in w.lower() for w in res.warnings) and not rec.info["consent"]["confirmed"]
+    assert any("statement" in w.lower() for w in res.warnings) and not rec.info["consent"]["confirmed"]
 
 
 def test_asr_failure_never_fails_the_training_and_manual_none_modes(tmp_path, monkeypatch):
@@ -198,15 +198,16 @@ def test_voice_card_and_narrate_show_the_scope(app, tmp_path):
     for i in range(n.cmb_voice.count()):
         if n.cmb_voice.itemData(i) == recs["Pub"].id:
             n.cmb_voice.setCurrentIndex(i)
-    assert n.badge_box.count() == 2 and "бесплатно" in n.lbl_voice_info.text()
+    assert n.badge_box.count() == 2 and "free of charge" in n.lbl_voice_info.text()
 
 
-def test_consent_texts_in_every_language_and_templates_cover_all_scopes():
+def test_consent_texts_and_templates_cover_all_scopes():
     from core import i18n
     from core.i18n import tr
-    for lang in ("en", "ru", "de"):
-        i18n.set_language(lang, persist=False)
-        for k in ("consent.title", "consent.hint_auto", "consent.scope_private_only", "consent.detected", "warn.consent_unclear",
-                  "narr.done_private_reminder"):
-            assert tr(k) != k
+    i18n.set_language("en", persist=False)
+    for k in ("consent.title", "consent.hint_auto", "consent.scope_private_only", "consent.detected", "warn.consent_unclear",
+              "narr.done_private_reminder"):
+        assert tr(k) != k
+    # the spoken consent statement stays available in every content language (not a UI language)
+    for lang in c.TEMPLATES:
         assert set(c.TEMPLATES[lang]) == set(c.SCOPES)

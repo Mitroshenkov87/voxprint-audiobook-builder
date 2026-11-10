@@ -88,7 +88,7 @@ def test_many_files_become_one_dataset_with_totals_and_gates(tmp_path):
     report = json.loads((tmp_path / "ds" / "report.json").read_text(encoding="utf-8"))
     assert report["mode"] == "no_transcript" and report["asr"]["kept"] == rep.kept
     assert all(s["source"] and 0 <= s["confidence"] <= 1 for s in report["segment_times"])
-    assert any("распознан" in w for w in res.warnings)                    # the "not checked by a human" note is always there
+    assert any("recognised" in w for w in res.warnings)                    # the "not checked by a human" note is always there
     x, sr = au.load_audio(tmp_path / "ds" / "segment_001.flac", 24000)
     assert sr == 24000 and np.max(np.abs(x)) <= 0.96
 
@@ -158,7 +158,7 @@ def test_train_window_no_transcript_flow(app, tmp_path):
     w.chk_no_text.setChecked(True)
     assert w.no_transcript and not w.asr_box.isHidden() and w.btn_text.isVisibleTo(w)      # the text row stays: optional script
     assert w.btn_text.text() == tr("asr.choose_script") and w.lbl_text.text() == tr("asr.script_none")
-    assert "ошибаться" in w.lbl_asr_warning.text()
+    assert "make mistakes" in w.lbl_asr_warning.text()
     for f in ("a.wav", "b.mp3"):
         (tmp_path / f).write_bytes(b"x")
     (tmp_path / "t.txt").write_bytes(b"x")

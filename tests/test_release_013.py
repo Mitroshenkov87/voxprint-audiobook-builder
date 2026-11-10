@@ -289,8 +289,8 @@ def test_state_files_are_written_without_bom_and_read_with_or_without(monkeypatc
     paths.state_dir().mkdir(parents=True, exist_ok=True)
     (paths.state_dir() / "install_mode.txt").write_bytes(b"\xef\xbb\xbfquick\r\n")
     assert setup_mode.mode() == "quick"
-    (paths.state_dir() / "language").write_bytes(b"\xef\xbb\xbfde\r\n")       # an older installer's BOM
-    assert i18n.saved_language() == "de"
+    (paths.state_dir() / "language").write_bytes(b"\xef\xbb\xbfde\r\n")       # an older installer's BOM: a dropped language is not offered
+    assert i18n.saved_language() is None
     (paths.state_dir() / "language").write_bytes(b"en\r\n")
     assert i18n.saved_language() == "en"
 
@@ -305,7 +305,7 @@ def test_standard_buttons_follow_the_ui_language():
     app = QApplication.instance() or QApplication([])
     std_buttons.install(app)
     try:
-        for lang in ("en", "de", "ru", "uk", "lv"):
+        for lang in ("en", "ru"):                              # a dropped UI language falls back to English
             i18n.set_language(lang)
             box = QMessageBox(QMessageBox.Icon.Information, "t", "x", QMessageBox.StandardButton.Ok)
             std_buttons.localize(box)
@@ -319,7 +319,7 @@ def test_standard_buttons_follow_the_ui_language():
         assert QCoreApplication.translate("QPlatformTheme", "OK") == "OK"
         assert QCoreApplication.translate("SomethingElse", "OK") == "OK"         # only the button texts are touched
     finally:
-        i18n.set_language("ru")
+        i18n.set_language("en")
 
 
 def test_the_privacy_notice_and_other_info_boxes_use_the_localized_buttons():

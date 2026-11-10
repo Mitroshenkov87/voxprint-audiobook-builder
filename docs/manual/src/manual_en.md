@@ -37,7 +37,7 @@ Supported systems: current and previous year OS releases (Windows 11 24H2 and ne
 
 ## The installer
 
-Run **voxprint-audiobook-builder-setup-win-x64.exe** (the same bytes are also attached as `voxprint-audiobook-builder-setup-<version>-win-x64.exe`; check the `.sha256` file on the release). Inno Setup, per-machine installation, about 34 MB. Build 667 was published as `Voxprint-Setup-online.exe` (35,235,971 bytes, SHA-256 `c145a9fc84c736d655fbbe9bfd5c1cc94794b1be7fb8e9a5eec293e6f1578e42`). It is an *online* installer: the libraries (PyTorch and the rest) are downloaded from PyTorch/PyPI during setup. The installer is not code-signed, so Windows SmartScreen warns – choose *More info → Run anyway* only after the SHA-256 matches the one on the release page. The wizard is available in English, Russian and German; the language you pick there becomes the program's interface language.
+Run **voxprint-audiobook-builder-setup-win-x64.exe** (the same bytes are also attached as `voxprint-audiobook-builder-setup-<version>-win-x64.exe`; check the `.sha256` file on the release). Inno Setup, per-machine installation, about 34 MB. Build 667 was published as `Voxprint-Setup-online.exe` (35,235,971 bytes, SHA-256 `c145a9fc84c736d655fbbe9bfd5c1cc94794b1be7fb8e9a5eec293e6f1578e42`). It is an *online* installer: the libraries (PyTorch and the rest) are downloaded from PyTorch/PyPI during setup. The installer is not code-signed, so Windows SmartScreen warns – choose *More info → Run anyway* only after the SHA-256 matches the one on the release page. The wizard is in English; the program's interface is English-only (Russian stays a content language for books and voices).
 
 The page **Setup type** offers two choices. **Full** (default) downloads everything on the first start without another click – the components and all models, about 28 GB; the wizard shows the total and checks the free space first. **Quick** installs only the program; the first start opens the **{{modules.title}}** window, which offers the same complete download and starts it when you press Download. Nothing is left out in either mode.
 
@@ -394,7 +394,7 @@ Open **{{ui.settings_title}}** with the gear button (top right of the Studio and
 
 | Control | What it does |
 |---|---|
-| **{{ui.language}}** | The interface language: English, Deutsch, Русский, Українська, Latviešu. It changes at once in all windows. |
+| **{{ui.language}}** | The interface language: English only (since v1.0.0-rc.7). |
 | **{{ui.transparency}}** | How translucent the windows are: *{{ui.transparency_default}}*, *{{ui.transparency_more}}* or *{{ui.transparency_off}}*. |
 | **{{ui.net_iface}}** | Which network adapter the downloads use. *{{ui.net_iface_auto}}*: if a download cannot connect (VPN, unusual adapter), the other interfaces are tried and the working one is remembered. |
 | **{{asrmodel.label}}** | Which speech-recognition model is used. *{{asrmodel.auto}}* takes the 1.7B model on cards with about 8 GB of video memory or more, otherwise 0.6B. The line below the check box shows the model in use. |
@@ -543,7 +543,7 @@ The same check runs without the window as `voxprint-audiobook-builder.exe --auto
 
 **Does Voxprint send my recordings anywhere?** No. It sends nothing to the internet except downloading models, checking for updates and, when you open the repository, fetching the voice index and the voices you choose. No telemetry, no account.
 
-**Which languages are supported?** The interface: English, Deutsch, Русский, Українська, Latviešu. Text preparation covers Russian and English fully. The speech model supports further languages, but they are not tested.
+**Which languages are supported?** The interface: English only. Text preparation covers Russian and English fully. The speech model supports further languages, but they are not tested.
 
 **Where is the log?** {{ui.settings_data_folder}} in Settings. Send the file from there if an error repeats.
 

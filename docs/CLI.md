@@ -455,7 +455,7 @@ A missing book, an unreadable `.vxbook`, or an output folder that does not exist
 
 Plotweaver and the other VOXPrint programs find this install in the shared suite manifest, then in the Windows registry, then at the default path.
 
-The manifest is `%LOCALAPPDATA%\Voxprint\shared\manifest.json` (Linux: `~/.local/share/voxprint/shared/manifest.json`). The record is the `installs` object, key `audiobook-builder`:
+The manifest is `%LOCALAPPDATA%\VOXPrint AI Suite\shared\manifest.json` (Linux: `~/.local/share/voxprint-ai-suite/shared/manifest.json`). The record is the `installs` object, key `audiobook-builder`:
 
 ```json
 "installs": {
@@ -470,6 +470,6 @@ The manifest is `%LOCALAPPDATA%\Voxprint\shared\manifest.json` (Linux: `~/.local
 
 On Windows the same two paths are also under `HKCU\Software\voxprint\Apps\audiobook-builder` and `HKLM\Software\voxprint\Apps\audiobook-builder` (`InstallPath`, `CliPath`). The installer writes both. A frozen copy writes the current-user key when it starts.
 
-If neither record exists, use the default path above. On Linux the launcher is `/usr/local/bin/voxprint-audiobook-cli` (`voxprint` starts the same program). The program files stay in `/opt/voxprint-ai-suite/audiobook-builder`. An older copy under `~/.local/share/voxprint/app` is removed on install; voices and settings in `~/.local/share/voxprint` stay. On Windows an older `C:\Program Files\Voxprint` folder and an intermediate `C:\Program Files\voxprint-ai-suite\audiobook-builder` folder are removed. A folder spelled `Voxprint AI Suite` is renamed to `VOXPrint AI Suite`.
+If neither record exists, use the default path above. On Linux the launcher is `/usr/local/bin/voxprint-audiobook-cli` (`voxprint` starts the same program). The program files stay in `/opt/voxprint-ai-suite/audiobook-builder`. An older copy under `~/.local/share/voxprint/app` is removed on install. Voices and settings live in `~/.local/share/voxprint-ai-suite`; a legacy `~/.local/share/voxprint` folder is moved there on first use. On Windows an older `C:\Program Files\Voxprint` folder and an intermediate `C:\Program Files\voxprint-ai-suite\audiobook-builder` folder are removed. A folder spelled `Voxprint AI Suite` is renamed to `VOXPrint AI Suite`.
 
 voxprint-common 0.1.1 has no install registry. This record is an extra key on the shared manifest, kept beside `components`. Call `voxprint-audiobook-cli.exe` (or `voxprint-audiobook-cli` on Linux), not the windowed exe and not the old `voxprint-cli.exe`.

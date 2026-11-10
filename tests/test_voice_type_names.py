@@ -62,10 +62,8 @@ def test_older_voices_without_a_type_still_load_and_show_as_unspecified(tmp_path
     from ui.voices_window import meta_line
     i18n.set_language("en")
     assert "Voice type: not specified" in meta_line(rec)
-    i18n.set_language("ru")
-    assert "Тип голоса: не указан" in meta_line(rec)
-    i18n.set_language("de")
-    assert "Stimmtyp: nicht angegeben" in meta_line(rec)
+    i18n.set_language("ru")                                     # a dropped UI language falls back to English
+    assert "Voice type: not specified" in meta_line(rec)
     i18n.set_language("en")
 
 
@@ -126,7 +124,7 @@ def test_train_window_suggests_but_never_overrides_the_users_choice(app, tmp_pat
 def test_selector_is_localized(app):
     from tests.test_ui import make_window
     seen = {}
-    for lang, word in (("en", "Male"), ("ru", "Мужской"), ("de", "Männlich")):
+    for lang, word in (("en", "Male"), ("ru", "Male")):        # a dropped UI language falls back to English
         i18n.set_language(lang)
         w = make_window(lambda *a: None)
         texts = [w.cmb_voice_type.itemText(i) for i in range(w.cmb_voice_type.count())]
