@@ -237,8 +237,12 @@ class SettingsDialog(GlassDialog):
         ngrid.addWidget(self.cmb_style, r, 1)
         self.chk_ordinals = QCheckBox()               # core/ordinals.py: "глава 2" -> "глава вторая"
         self.chk_ordinals.setChecked(ordinals.load_enabled())
+        # The English label is a long sentence; a QCheckBox never wraps, so the
+        # left card was ~1000 px wide and two-column layout failed on a typical
+        # 1280 px (or offscreen-capped) window.
+        self.row_ordinals, self.lbl_ordinals = screen_fit.wrapped_check(self.chk_ordinals)
         r = ngrid.rowCount()
-        ngrid.addWidget(self.chk_ordinals, r, 0, 1, 2)
+        ngrid.addWidget(self.row_ordinals, r, 0, 1, 2)
         self.chk_ordinals.toggled.connect(self._on_ordinals_toggled)
         self.chk_soundscape = QCheckBox()
         self.chk_soundscape.setChecked(soundscape_model.enabled())
@@ -528,7 +532,8 @@ class SettingsDialog(GlassDialog):
         for i, text in enumerate((tr("narrset.style_auto"), tr("narrset.style_scripture"), tr("narrset.style_fiction"),
                                   tr("narrset.style_dialogue"))):
             self.cmb_style.setItemText(i, text)              # same order as pace.STYLES
-        self.chk_ordinals.setText(tr("narrset.ordinals"))
+        self.lbl_ordinals.setText(tr("narrset.ordinals"))
+        self.lbl_ordinals.setToolTip(tr("narrset.ordinals_tip"))
         self.chk_ordinals.setToolTip(tr("narrset.ordinals_tip"))
         self.chk_soundscape.setText(tr("narrset.soundscape"))
         self.chk_soundscape.setToolTip(tr("narrset.soundscape_tip"))

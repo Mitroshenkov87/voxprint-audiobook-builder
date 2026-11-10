@@ -196,7 +196,7 @@ def test_settings_dialog_checkbox(tmp_path):
     _ = QApplication.instance() or QApplication([])
     i18n.set_language("ru")
     d = SettingsDialog(make_studio(VoiceLibrary(tmp_path / "voices")))
-    assert d.chk_ordinals.isChecked() and d.chk_ordinals.text() == i18n.tr("narrset.ordinals")
+    assert d.chk_ordinals.isChecked() and d.lbl_ordinals.text() == i18n.tr("narrset.ordinals")
     assert d.chk_soundscape.isChecked() is False
     assert d.chk_soundscape.text() == i18n.tr("narrset.soundscape")
     d.chk_ordinals.setChecked(False)
