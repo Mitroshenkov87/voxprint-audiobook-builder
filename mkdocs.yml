@@ -78,6 +78,7 @@ validation:
 
 nav:
   - Home: index.md
+  - Full README: README-full.md
   - Roadmap: generated/roadmap.md
   - Using the app:
       - User guide: USER-GUIDE.md
