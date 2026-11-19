@@ -1,0 +1,129 @@
+"""Shared pytest setup: every test gets an isolated app-data folder, a fixed language and no network/model-cache access."""
+import ctypes
+import faulthandler
+import os
+import sys
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+@pytest.fixture(autouse=True)
+def _isolated_home(tmp_path, monkeypatch):
+    """Tests never write to the real application data folder."""
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "voxprint_home"))
+    # The interface is English-only since v1.0.0-rc.7: a dropped code such as "ru" is ignored
+    # and every test runs in English. (Tests that need another setup set VOXPRINT_LANG themselves.)
+    monkeypatch.setenv("VOXPRINT_LANG", "ru")
+    # The real machine's %APPDATA%/%LOCALAPPDATA% must not leak into the search for earlier installs (Windows)
+    monkeypatch.setenv("APPDATA", str(tmp_path / "appdata_roaming"))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "appdata_local"))
+    # Ordinary tests never reach the network or other programs' model caches.
+    monkeypatch.setenv("VOXPRINT_NO_ENV_PROBE", "1")
+    # The voice index is public now: windows that refresh it when they open (Narrate, My voices) must not reach the real one
+    # (a late answer adds online voices to the list in the middle of a test). Tests that need an index pass their own fetch/URL.
+    monkeypatch.setenv("VOXPRINT_VOICES_INDEX", "offline://tests")
+    monkeypatch.setenv("VOXPRINT_OWN_ENV", "1")   # the test interpreter counts as Voxprint-owned (auto-upgrade); external-env tests pass external_env=True
+    # Internal: this suite has no RTX 40-series GPU. Not a user option (see infra/gpu_requirement.py).
+    monkeypatch.setenv("VOXPRINT_ALLOW_NO_GPU", "1")
+    # Suite downloads belong to the installer and VOXPrint MDL, never to this process: mdl_models.ensure()
+    # raises instead of spawning ``voxprint-mdl`` (tests that exercise it inject a fake runner).
+    monkeypatch.setenv("VOXPRINT_SKIP_SUITE", "1")
+    monkeypatch.delenv("VOXPRINT_NET_IFACE", raising=False)
+    from infra import netroute
+
+    netroute.reset_memory()
+    from core import i18n
+
+    i18n.reset()
+    yield
+    i18n.reset()
+
+
+_ci_exit: int | None = None
+
+
+def remember_exit_status(exitstatus: int) -> None:
+    """Remember the session result so :func:`leave_before_native_shutdown` can use it."""
+    global _ci_exit
+    _ci_exit = int(exitstatus)
+
+
+def _terminate_windows(code: int) -> bool:
+    """End this process without ``DLL_PROCESS_DETACH``. ``ExitProcess`` (what ``os._exit`` calls) still runs it,
+    and on Python 3.14 that detach access-violates once Qt is loaded.
+
+    ``faulthandler`` (enabled by the CI pytest command) reports that kill as an access violation and the
+    process exit code becomes the exception code. Silence it first so a green session stays exit 0.
+    """
+    faulthandler.disable()
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    return bool(kernel.TerminateProcess(kernel.GetCurrentProcess(), code & 0xFFFFFFFF))
+
+
+def _qt_loaded() -> bool:
+    """True once this process has imported PySide6 (the Windows hard-exit then crashes the session)."""
+    return any(name == "PySide6" or name.startswith("PySide6.") for name in sys.modules)
+
+
+def leave_before_native_shutdown() -> bool:
+    """On GitHub Actions, exit with the session result and skip interpreter shutdown.
+
+    Python 3.14 and PySide6 print ``QObject: shared QObject was deleted directly`` and then
+    the process dies with a bus error after a green session. The result is already decided.
+    A crash during a test never reaches this function. Off CI the process exits normally.
+    Streams are flushed first: ``os._exit`` does not, and the failure text would never reach the log.
+
+    Windows with Qt loaded exits normally. ``TerminateProcess`` and ``ExitProcess`` both come back as a
+    non-zero status for those sessions (``test_auto_quality`` and ``test_screen_fit``). A Windows session
+    that never imported Qt still uses ``TerminateProcess``, which skips the DLL detach crash.
+    """
+    if os.environ.get("GITHUB_ACTIONS") != "true" or _ci_exit is None:
+        return False
+    code = int(_ci_exit)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    if sys.platform == "win32" and _qt_loaded():
+        return False
+    if sys.platform == "win32" and _terminate_windows(code):
+        return True
+    os._exit(code)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call(item):
+    """Dump this test's stacks if it runs longer than ``VOXPRINT_TEST_TRACEBACK_S`` seconds.
+
+    The Windows installer job sets that (about 150) together with pytest-timeout. A process-wide
+    timer is not started here: a healthy session is longer than one test.
+    """
+    raw = os.environ.get("VOXPRINT_TEST_TRACEBACK_S", "").strip()
+    try:
+        seconds = float(raw) if raw else 0.0
+    except ValueError:
+        seconds = 0.0
+    if seconds > 0:
+        faulthandler.dump_traceback_later(seconds, repeat=False, file=sys.stderr, exit=False)
+    try:
+        yield
+    finally:
+        if seconds > 0:
+            faulthandler.cancel_dump_traceback_later()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    remember_exit_status(exitstatus)
+    # The Windows parent trusts this line. Qt shutdown can still change the process exit code after a green
+    # session, and that code is not the test result.
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print(f"VOXPRINT_PYTEST_RC={int(exitstatus)}", flush=True)
+
+
+def pytest_unconfigure(config):
+    # After the terminal summary. Earlier than this, os._exit would hide the failure list.
+    leave_before_native_shutdown()

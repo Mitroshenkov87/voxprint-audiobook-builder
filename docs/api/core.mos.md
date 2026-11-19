@@ -1,0 +1,3 @@
+# `core.mos`
+
+::: core.mos

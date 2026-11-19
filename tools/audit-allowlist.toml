@@ -1,0 +1,11 @@
+# Accepted pip-audit advisories. The release audit blocks on high and critical
+# advisories that are not listed here. Each entry needs an id and a reason.
+# "package" is optional; when set, the id matches only that distribution.
+# Match is against the advisory id and any alias (PYSEC, GHSA, CVE).
+#
+# The transformers 4.57.6 highs (GHSA-29pf-2h5f-8g72, GHSA-fgcw-684q-jj6r,
+# GHSA-xrqw-3rrv-vx5w, GHSA-x9r9-c232-4q39, PYSEC-2025-217) were listed here
+# because qwen-tts 0.1.1 could not import on transformers 5. transformers 5.16.1
+# contains those fixes, and the TTS package is now qwen-tts-hf. They are not
+# accepted anymore. Add a row only when a pin cannot take the fixed release,
+# and put an expiry in the reason.

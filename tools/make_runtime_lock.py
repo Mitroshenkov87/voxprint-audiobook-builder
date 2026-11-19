@@ -1,0 +1,318 @@
+"""Write ``infra/runtime_lock.json``: the pinned list of third-party wheels the thin installer downloads from THEIR upstream sites.
+
+Why: building and uploading ~3 GB of PyTorch & co. on every release took an hour although all of it already lives on PyPI and
+download.pytorch.org.  The release now holds only our own small shell and a manifest that points to the original files; every
+file is pinned (version, size, SHA-256).  Run this tool when the dependencies change (needs network and ``uv``), review the diff,
+commit the lock.  CI never resolves anything: it only reads the committed file.
+
+* pure libraries: ``uv pip compile requirements.txt requirements-verified.txt`` for Windows / the build Python -> the wheel of every
+  pin from the PyPI JSON API (``cp314-win_amd64``, ``abi3`` or ``py3-none-any``; an sdist-only package is marked ``sdist`` - CI builds a pure-Python wheel from it);
+* ``requirements-nodeps.txt`` (qwen-asr / qwen-tts conflict on transformers): pinned as they are, without their own dependencies;
+* PyTorch: ``torch`` and TorchAudio of one version for the user flavor (cu130) and the CI-only CPU flavor, from
+  download.pytorch.org. TorchAudio's native ops are built against that torch. There is no TorchAudio wheel for
+  2.12-2.14 on cu130 / cp314, so the pair is 2.11.0;
+* the packages that the PyInstaller shell bundles (Qt, numpy, soundfile ...) are NOT listed as downloads - they are listed under
+  ``shell`` so that CI installs exactly those versions into the shell's build environment.
+
+Usage: ``python tools/make_runtime_lock.py [--torch 2.11.0] [--torchaudio 2.11.0] [--python 3.14]``
+"""
+from __future__ import annotations
+
+import argparse
+import concurrent.futures as cf
+import datetime
+import json
+import re
+import subprocess
+import sys
+import urllib.parse
+import urllib.request
+from pathlib import Path
+from typing import Dict, List, Optional
+
+ROOT = Path(__file__).resolve().parent.parent
+LOCK = ROOT / "infra" / "runtime_lock.json"
+SCHEMA = 1
+UA = "voxprint-lock/1"
+#: User-facing CUDA flavor. CPU wheels are still pinned (``CI_FLAVORS``) so CI can install them; they are not offered to users.
+FLAVORS = ("cu130",)
+CI_FLAVORS = ("cpu",)
+#: Same release as ``torch``. TorchAudio's native ops are built against that torch; 2.11.0 is the newest such pair on cu130 / cp314.
+TORCHAUDIO_VERSION = "2.11.0"
+#: Provided by the PyInstaller shell (installed from this lock into the build environment, bundled into the exe).
+SHELL_PROVIDED = {"pyside6", "pyside6-essentials", "pyside6-addons", "shiboken6", "numpy", "soundfile", "cffi", "pycparser",
+                  "certifi", "psutil", "packaging"}
+#: Dropped from the downloads: build tools / things the program never needs at run time.
+SKIP = {"pyinstaller", "pytest", "pip", "setuptools", "wheel"}
+#: PyTorch comes from download.pytorch.org per flavor.
+TORCH = ("torch", "torchaudio")
+#: Which libraries are downloaded together (one progress bar in the Components window).
+GROUPS = [
+    ("audio", "Audio and science libraries", ("scipy", "librosa", "numba", "llvmlite", "scikit-learn", "soxr", "audioread", "pooch",
+                                              "joblib", "threadpoolctl", "lazy-loader", "decorator", "msgpack", "onnxruntime",
+                                              "av", "pillow", "pydub", "imageio-ffmpeg", "sox", "resampy", "audioop-lts")),
+    ("cuda12", "CUDA 12 libraries for CTranslate2", ("nvidia-cublas-cu12", "nvidia-cudnn-cu12", "ctranslate2")),
+    ("text", "Text and language", ("nagisa", "pymorphy3", "pymorphy3-dicts-ru", "ru-normalizr", "rutextnorm", "num2words", "eng-to-ipa",
+                                   "sentencepiece", "regex", "dawg2-python", "docopt-ng", "six", "dynet", "cython")),
+]
+#: Libraries (besides the shell's) that the unit tests import; the thin build's CI installs them to run the suite without PyTorch.
+TEST_EXTRAS = {"huggingface-hub", "requests", "scipy", "pyyaml", "tqdm", "urllib3", "filelock", "fsspec", "typing-extensions",
+               "hf-xet", "idna", "charset-normalizer"}
+COMPAT = {"torch": ">=2.11,<2.12", "python_minor_must_match": True}
+#: Suite wheel. The thin shell bundles it. It is not a PyPI runtime download.
+#: 0.8.0 is untagged and the release pages are gone, so the pin is a commit; the recorded
+#: wheel is built from it (``pip wheel --no-deps git+https://...@<commit>`` is reproducible).
+SUITE_DIST = "voxprint-common"
+SUITE_VERSION = "0.8.0"
+SUITE_COMMIT = "2ec81bb17c33c00d748aa9e21301d2bad80df7db"
+SUITE_FILE = "voxprint_common-0.8.0-py3-none-any.whl"
+SUITE_URL = f"git+https://github.com/Mitroshenkov87/voxprint-common@{SUITE_COMMIT}"
+SUITE_SHA256 = "9020ddb9639831b5e12a38ecdf47eb2c01a882e0138c5439563e41bf8b1a6952"
+SUITE_SIZE = 689311
+
+
+def norm(n: str) -> str:
+    return re.sub(r"[-_.]+", "-", n).lower()
+
+
+def get(url: str, binary: bool = False, method: str = "GET"):
+    req = urllib.request.Request(url, headers={"User-Agent": UA}, method=method)
+    with urllib.request.urlopen(req, timeout=60) as r:  # nosec B310 - dev tool, https URLs from our own lists
+        return r if method == "HEAD" else (r.read() if binary else r.read().decode("utf-8"))
+
+
+def compile_pins(py: str) -> Dict[str, str]:
+    """name -> version from ``uv pip compile`` (torch excluded)."""
+    cmd = ["uv", "pip", "compile", str(ROOT / "requirements.txt"), str(ROOT / "requirements-verified.txt"), "--python-version", py,
+           "--python-platform", "windows", "--no-emit-package", "torch", "--no-emit-package", "torchaudio", "--quiet"]
+    out = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
+    pins = {}
+    for line in out.splitlines():
+        m = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;#]+)", line)
+        if m:
+            pins[norm(m.group(1))] = m.group(2)
+    for line in (ROOT / "requirements-nodeps.txt").read_text(encoding="utf-8").splitlines():
+        m = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)==([^\s;#]+)", line.strip())
+        if m:
+            pins[norm(m.group(1))] = m.group(2)
+    return pins
+
+
+def wheel_score(fn: str, tag: str) -> Optional[int]:
+    """Higher = more specific; None = not installable on win_amd64 / CPython ``tag`` (e.g. cp314)."""
+    from packaging.utils import parse_wheel_filename
+
+    try:
+        _n, _v, _b, tags = parse_wheel_filename(fn)
+    except Exception:  # noqa: BLE001
+        return None
+    best = None
+    minor = int(tag[2:])
+    for t in tags:
+        py, abi, plat = t.interpreter, t.abi, t.platform
+        if plat not in ("win_amd64", "any"):
+            continue
+        if py == tag and abi == tag:
+            s = 4
+        elif py.startswith("cp3") and abi == "abi3" and int(re.sub(r"\D", "", py[2:]) or 99) <= minor:
+            s = 3
+        elif py == tag and abi == "none":
+            s = 2
+        elif py.startswith("py3") or py == "py2.py3":
+            s = 1
+        else:
+            continue
+        s += 10 if plat == "win_amd64" else 0
+        best = s if best is None or s > best else best
+    return best
+
+
+def pypi_wheel(name: str, version: str, tag: str) -> dict:
+    data = json.loads(get(f"https://pypi.org/pypi/{name}/{version}/json"))
+    best, best_s = None, -1
+    for f in data["urls"]:
+        if f["packagetype"] != "bdist_wheel":
+            continue
+        s = wheel_score(f["filename"], tag)
+        if s is not None and s > best_s:
+            best, best_s = f, s
+    if best is None:           # sdist only: CI builds a (pure Python) wheel from it and ships that small file itself
+        for f in data["urls"]:
+            if f["packagetype"] == "sdist":
+                return {"dist": name, "version": version, "file": f["filename"], "url": f["url"], "size": f["size"],
+                        "sha256": f["digests"]["sha256"], "sdist": True}
+        raise SystemExit(f"{name}=={version}: neither a wheel for Windows x64 / {tag} nor an sdist on PyPI - pin another version")
+    return {"dist": name, "version": version, "file": best["filename"], "url": best["url"], "size": best["size"],
+            "sha256": best["digests"]["sha256"]}
+
+
+def torch_wheel(pkg: str, version: str, flavor: str, tag: str) -> dict:
+    base = f"https://download.pytorch.org/whl/{flavor}/{pkg}/"
+    html = get(base)
+    want = f"{pkg}-{version}+{flavor}-{tag}-{tag}-win_amd64.whl"
+    for m in re.finditer(r'href="([^"]+)"', html):
+        href = m.group(1)
+        url, _, frag = href.partition("#sha256=")
+        fn = urllib.parse.unquote(url.rsplit("/", 1)[-1])
+        if fn == want:
+            full = base.replace(f"/{pkg}/", "/") + urllib.parse.quote(fn)      # canonical address (the index points to a CDN host)
+            size = int(get(full, method="HEAD").headers["Content-Length"])
+            return {"dist": pkg, "version": f"{version}+{flavor}", "file": fn, "url": full, "size": size, "sha256": frag,
+                    "flavor": flavor}
+    raise SystemExit(f"{want} not found at {base}")
+
+
+def group_of(name: str) -> str:
+    for gid, _t, members in GROUPS:
+        if name in members:
+            return gid
+    return "libs"
+
+
+def build(py: str, torch_version: str, torchaudio_version: str = TORCHAUDIO_VERSION) -> dict:
+    tag = "cp" + py.replace(".", "")
+    pins = compile_pins(py)
+    shell = {n: v for n, v in sorted(pins.items()) if n in SHELL_PROVIDED}
+    todo = {n: v for n, v in sorted(pins.items()) if n not in SHELL_PROVIDED and n not in SKIP and n not in TORCH}
+    with cf.ThreadPoolExecutor(8) as ex:
+        libs = list(ex.map(lambda kv: pypi_wheel(kv[0], kv[1], tag), todo.items()))
+    for w in libs:
+        w["group"] = group_of(w["dist"])
+    versions = {"torch": torch_version, "torchaudio": torchaudio_version}
+    torch = []
+    for fl in (*FLAVORS, *CI_FLAVORS):
+        for pkg in TORCH:
+            w = torch_wheel(pkg, versions[pkg], fl, tag)
+            w["group"] = "torch"
+            torch.append(w)
+    titles = {"torch": "PyTorch (neural networks)", "libs": "Libraries (transformers, PEFT, tokenizers ...)"}
+    titles.update({g[0]: g[1] for g in GROUPS})
+    return {"schema": SCHEMA, "generated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d"), "python": py,
+            "platform": "win_amd64", "compat": COMPAT, "torch_version": torch_version,
+            "torchaudio_version": torchaudio_version, "flavors": list(FLAVORS), "ci_flavors": list(CI_FLAVORS),
+            "group_titles": titles, "shell": shell, "suite": suite_record(), "wheels": libs + torch}
+
+
+def suite_record() -> dict:
+    """The voxprint-common wheel built from the pinned commit (url, size, sha256). Not a PyPI download."""
+    return {
+        "dist": SUITE_DIST, "version": SUITE_VERSION, "commit": SUITE_COMMIT, "file": SUITE_FILE, "url": SUITE_URL,
+        "size": SUITE_SIZE, "sha256": SUITE_SHA256,
+    }
+
+
+def suite_requirement(row: Optional[dict] = None) -> str:
+    """pip requirement. A plain file ``url`` carries ``--hash`` (checked when the wheel is downloaded);
+    a ``git+`` url cannot (pip rejects hashes on VCS pins) - CI builds the wheel from ``suite.commit``
+    and compares ``suite.sha256`` instead."""
+    item = suite_record() if row is None else row
+    pin = f"{item['dist']} @ {item['url']}"
+    return pin if str(item["url"]).startswith("git+") else f"{pin} --hash=sha256:{item['sha256']}"
+
+
+def _dist_name(line: str) -> str:
+    """PEP 503 name in front of ``@``, without an extra such as ``[ui]``."""
+    name = str(line).split("@", 1)[0].strip()
+    return name.split("[", 1)[0].strip()
+
+
+def git_dist_names(lock: dict) -> List[str]:
+    """Distribution names bundled with the shell: the suite wheel, and any leftover ``git`` pins."""
+    names = []
+    suite = lock.get("suite")
+    if isinstance(suite, dict) and str(suite.get("dist") or "").strip():
+        names.append(str(suite["dist"]).strip())
+    for line in lock.get("git") or []:
+        name = _dist_name(str(line))
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def requirement_lines(lock: dict, *, tests: bool) -> List[str]:
+    """Pinned shell packages, plus the suite install when ``tests`` is true.
+
+    A non-empty ``git`` list replaces the suite wheel pin. An empty list
+    keeps that pin, so the installer install still works.
+    """
+    pins = dict(lock["shell"])
+    if tests:
+        for wheel in lock["wheels"]:
+            if wheel["dist"] in TEST_EXTRAS:
+                pins[wheel["dist"]] = wheel["version"]
+    lines = [f"{name}=={version}" for name, version in pins.items()]
+    if not tests:
+        return lines
+    git = [str(item).strip() for item in (lock.get("git") or []) if str(item).strip()]
+    if git:
+        lines.extend(git)
+        return lines
+    suite = lock.get("suite")
+    if isinstance(suite, dict) and suite.get("url") and suite.get("sha256"):
+        lines.append(suite_requirement(suite))
+    return lines
+
+
+def keep_git(lock: dict, previous: dict) -> dict:
+    """Copy a hand-written ``git`` pin onto a freshly built lock, after ``suite``."""
+    git = previous.get("git")
+    if not isinstance(git, list) or not git:
+        return lock
+    ordered: dict = {}
+    for key, value in lock.items():
+        ordered[key] = value
+        if key == "suite":
+            ordered["git"] = list(git)
+    if "git" not in ordered:
+        ordered["git"] = list(git)
+    return ordered
+
+
+def pyinstaller_metadata_args(lock: dict) -> List[str]:
+    """PyInstaller copies a package's code but NOT its ``*.dist-info``; ``importlib.metadata`` then cannot see it and the downloaded
+    libraries' version checks fail (real PC: transformers -> "No package metadata was found for packaging").  One
+    ``--copy-metadata`` per package the shell bundles fixes that. The suite wheel (voxprint-common) is bundled too."""
+    out: List[str] = []
+    dists = set(lock["shell"]) | set(git_dist_names(lock))
+    for dist in sorted(dists):
+        out += ["--copy-metadata", dist]
+    return out
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--torch", default="2.11.0")
+    ap.add_argument("--torchaudio", default=TORCHAUDIO_VERSION)
+    ap.add_argument("--python", default="3.14")
+    ap.add_argument("--out", default=str(LOCK))
+    ap.add_argument("--shell-requirements", action="store_true", help="print the pinned shell packages (for CI) and exit")
+    ap.add_argument("--test-requirements", action="store_true",
+                    help="like --shell-requirements plus the few pure libraries the unit tests import (CI of the thin build)")
+    ap.add_argument("--pyinstaller-metadata-args", action="store_true",
+                    help="print '--copy-metadata <dist>' for every shell package (build_thin.bat) and exit")
+    a = ap.parse_args(argv)
+    if a.pyinstaller_metadata_args:
+        print(" ".join(pyinstaller_metadata_args(json.loads(Path(a.out).read_text(encoding="utf-8")))))
+        return 0
+    if a.shell_requirements or a.test_requirements:
+        lock = json.loads(Path(a.out).read_text(encoding="utf-8"))
+        print("\n".join(requirement_lines(lock, tests=a.test_requirements)))
+        return 0
+    out = Path(a.out)
+    previous: dict = {}
+    if out.is_file():
+        try:
+            loaded = json.loads(out.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            loaded = {}
+        if isinstance(loaded, dict):
+            previous = loaded
+    lock = keep_git(build(a.python, a.torch, a.torchaudio), previous)
+    out.write_text(json.dumps(lock, indent=1) + "\n", encoding="utf-8")
+    tot = sum(w["size"] for w in lock["wheels"] if w.get("flavor") in (None, "cu130"))
+    print(f"{len(lock['wheels'])} wheels, {tot / 2**20:.0f} MiB for cu130 -> {a.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,598 @@
+name: build-installer
+
+# workflow_dispatch builds the installer. A "v*" tag push also builds it. Builds are kept as CI artifacts only:
+# this workflow never creates a GitHub release or uploads to one. Pull requests run only the cheap jobs (install-script, online-smoke,
+# thin-smoke) so a smoke assertion cannot stay red until a release dispatch. Job "build-thin" builds the ONLINE
+# installer voxprint-audiobook-builder-setup-<version>-win-x64.exe: our small shell (Qt + program) and a manifest that points to the libraries at
+# their upstream sites (docs/THIN-INSTALLER.md). The quick jobs "online-smoke" and "thin-smoke" test the installer
+# chain with a fake program folder in a few minutes (smoke_only=true). The former heavy job "build" (full installer
+# + multi-GB payload parts, also run on every "v*" tag push) was REMOVED on purpose: those assets were deleted from
+# the release and must never be recreated. Release builds come from "build-thin" - on a tag push automatically, otherwise
+# by a manual run of "build-thin" - and are kept as CI artifacts only.
+# On a manual run or a tag push the audit job runs first. The installer jobs do not start when ruff, mypy, bandit (high), gitleaks, or an
+# un-allowlisted pip-audit high/critical finding fails that job. Vulture and radon do not fail it. Pull requests already
+# run audit.yml, so this workflow does not repeat it.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: "build-thin only: skip the unit-test step (to repeat a build quickly)"
+        type: boolean
+        required: false
+        default: false
+      smoke_only:
+        description: "Only run the quick smoke jobs (online-smoke, thin-smoke); no full build"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    if: github.event_name != 'pull_request'
+    uses: ./.github/workflows/audit.yml
+  install-script:
+    needs: audit
+    if: always() && !cancelled() && (github.event_name == 'pull_request' || needs.audit.result == 'success')
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: install.ps1 dry run against a local release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          # The refusals below are child processes that exit 1 on purpose. A native
+          # non-zero exit must not abort this step, and it must not become the
+          # step's own exit code after the checks have passed.
+          $PSNativeCommandUseErrorActionPreference = $false
+          $dir = Join-Path $env:TEMP "voxprint-fake-release"
+          if (Test-Path $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $bytes = [byte[]](1, 2, 3, 4, 5)
+          [IO.File]::WriteAllBytes((Join-Path $dir "voxprint-audiobook-builder-setup-win-x64.exe"), $bytes)
+          $hash = (Get-FileHash (Join-Path $dir "voxprint-audiobook-builder-setup-win-x64.exe") -Algorithm SHA256).Hash.ToLower()
+          "$hash  voxprint-audiobook-builder-setup-win-x64.exe" | Set-Content -Encoding ascii (Join-Path $dir "voxprint-audiobook-builder-setup-win-x64.exe.sha256")
+          $server = Start-Process python -ArgumentList "-m","http.server","8765","--bind","127.0.0.1","--directory",$dir -PassThru -WindowStyle Hidden
+          $script = (Resolve-Path .\install.ps1).Path
+          function Invoke-Install([string[]]$ArgList) {
+            # The child's transcript must not join the exit code in the return value.
+            & pwsh -NoProfile -File $script @ArgList | Out-Host
+            return $LASTEXITCODE
+          }
+          try {
+            # .sha256 is application/octet-stream, so pwsh 7 returns Content as bytes.
+            $ready = $false
+            foreach ($i in 1..50) {
+              try {
+                $probe = Invoke-WebRequest "http://127.0.0.1:8765/voxprint-audiobook-builder-setup-win-x64.exe.sha256" -UseBasicParsing
+                $text = $probe.Content
+                if ($text -is [byte[]]) { $text = [Text.Encoding]::ASCII.GetString($text) }
+                if ($probe.StatusCode -eq 200 -and $text.StartsWith($hash)) { $ready = $true; break }
+              } catch { Start-Sleep -Milliseconds 200 }
+            }
+            if (-not $ready) { throw "local release server did not serve the matching hash" }
+            $code = Invoke-Install @("-DryRun", "-SourceUrl", "http://127.0.0.1:8765/")
+            if ($code -ne 0) { throw "matching dry run failed: $code" }
+            "0000000000000000000000000000000000000000000000000000000000000000  voxprint-audiobook-builder-setup-win-x64.exe" | Set-Content -Encoding ascii (Join-Path $dir "voxprint-audiobook-builder-setup-win-x64.exe.sha256")
+            $code = Invoke-Install @("-DryRun", "-SourceUrl", "http://127.0.0.1:8765/")
+            if ($code -eq 0) { throw "a bad SHA-256 was accepted" }
+            $code = Invoke-Install @("-DryRun", "-SourceUrl", "https://example.com/voxprint-audiobook-builder-setup-win-x64.exe")
+            if ($code -eq 0) { throw "a non-local source was accepted" }
+            $code = Invoke-Install @("-SourceUrl", "http://127.0.0.1:8765/")
+            if ($code -eq 0) { throw "-SourceUrl was accepted without -DryRun" }
+          } finally {
+            if ($server -and -not $server.HasExited) { Stop-Process -Id $server.Id -Force }
+          }
+          exit 0
+  online-smoke:
+    needs: audit
+    if: always() && !cancelled() && (github.event_name == 'pull_request' || needs.audit.result == 'success')
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Inno Setup 6
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: PyInstaller
+        shell: pwsh
+        run: python -m pip install --quiet pyinstaller
+      - name: A fake program folder and the licence files the script expects
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist\Voxprint\_internal\lib, build\notices | Out-Null
+          $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          if (-not (Test-Path -LiteralPath $csc)) { $csc = Join-Path $env:WINDIR "Microsoft.NET\Framework\v4.0.30319\csc.exe" }
+          @'
+          using System;
+          class V {
+            static int Main(string[] args) {
+              foreach (string a in args) {
+                if (a == "--version" || a == "-V") {
+                  Console.WriteLine("VOXPrint AI Audiobook Builder test");
+                  return 0;
+                }
+              }
+              return 0;
+            }
+          }
+          '@ | Set-Content -Encoding ascii C:\vxver.cs
+          & $csc /nologo /out:C:\vxver.exe C:\vxver.cs
+          if ($LASTEXITCODE -ne 0) { throw "could not compile the version stub" }
+          Copy-Item C:\vxver.exe "dist\Voxprint\voxprint-audiobook-builder.exe"
+          Copy-Item C:\vxver.exe dist\Voxprint\voxprint-audiobook-cli.exe
+          python -c "import os; [open(f'dist/Voxprint/_internal/lib/blob{i}.bin','wb').write(os.urandom(6*1024*1024)) for i in range(5)]"
+          Copy-Item THIRD_PARTY_NOTICES.md build\notices\
+      - name: Build the online installer (small parts, served from localhost)
+        shell: pwsh
+        run: |
+          ./installer/build_online.ps1 -Tag v0.0.0-beta -BaseUrl http://127.0.0.1:8099 -ManifestUrl http://127.0.0.1:8099/manifest-beta.json -LimitMib 8 -Python python
+      - name: Serve the parts
+        shell: pwsh
+        run: |
+          Start-Process python -ArgumentList "-m","http.server","8099","--bind","127.0.0.1","--directory","build\online-release" -WindowStyle Hidden
+          Start-Sleep 3
+          (Invoke-WebRequest http://127.0.0.1:8099/manifest-beta.json -UseBasicParsing).StatusCode
+      - name: Silent install, reuse, failure and uninstall
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $setup = "build\online-release\voxprint-audiobook-builder-setup-win-x64.exe"
+          Write-Host ("setup size: {0:N0} bytes" -f (Get-Item $setup).Length)
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke1.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content C:\vxsmoke1.log -Tail 60; throw "install exit code $($p.ExitCode)" }
+          foreach ($f in Get-ChildItem dist\Voxprint -Recurse -File) {
+            $rel = $f.FullName.Substring((Resolve-Path dist\Voxprint).Path.Length + 1)
+            $t = Join-Path C:\vxsmoke $rel
+            if (-not (Test-Path $t)) { throw "missing after install: $rel" }
+            if ((Get-FileHash $t).Hash -ne (Get-FileHash $f.FullName).Hash) { throw "different content: $rel" }
+          }
+          Get-Content C:\vxsmoke\voxprint-components.json
+          if (Test-Path C:\vxsmoke\unins000.exe) { "uninstaller present" } else { throw "no uninstaller" }
+          # Suite models root (infra/paths.py default_models_dir, installer DefaultModelsDir): setup
+          # registers this program in %LOCALAPPDATA%\Voxprint\models\.users.json. A fresh install does
+          # not create the previous shared\models\.users.json.
+          $users = Join-Path $env:LOCALAPPDATA "Voxprint\models\.users.json"
+          if (-not (Test-Path $users)) { throw "models users file was not created: $users" }
+          if (Test-Path (Join-Path $env:LOCALAPPDATA "Voxprint\shared\models\.users.json")) { throw "setup wrote the previous shared\models users file" }
+          if (-not (Select-String -Path $users -Pattern '"audiobook-builder": true' -SimpleMatch -Quiet)) { throw "models users file has no audiobook-builder key" }
+          '{"movie-dubber": true}' | Set-Content -Encoding ascii $users
+          $blob = "C:\vxsmoke\_internal\lib\blob0.bin"
+          $written = (Get-Item $blob).LastWriteTimeUtc
+          # second run: the payload is already on disk (reuse) and the other program's key stays
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxsmoke","/LOG=C:\vxsmoke2.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content C:\vxsmoke2.log -Tail 60; throw "second install exit code $($p.ExitCode)" }
+          if ((Get-Item $blob).LastWriteTimeUtc -ne $written) { throw "the second install rewrote a component that was already installed" }
+          $text = Get-Content -Raw $users
+          Write-Host "users file after the second install: $text"
+          if (-not ($text.Contains('"audiobook-builder": true') -and $text.Contains('"movie-dubber": true'))) { throw "the other program's key was not kept" }
+          # an unreachable manifest must fail the setup (and leave a message, not a crash)
+          $p = Start-Process $setup -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxsmoke-bad","/Manifest=http://127.0.0.1:9/manifest.json","/LOG=C:\vxsmoke3.log" -Wait -PassThru
+          Write-Host "unreachable manifest -> exit code $($p.ExitCode)"
+          if ($p.ExitCode -eq 0) { throw "the setup reported success for an unreachable manifest" }
+          # uninstall removes the downloaded files
+          # no -Wait: the uninstaller starts a temporary copy of itself and Start-Process would wait for the whole tree
+          $p = Start-Process C:\vxsmoke\unins000.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/LOG=C:\vxsmoke-un.log" -PassThru
+          $gui = "C:\vxsmoke\voxprint-audiobook-builder.exe"
+          for ($i = 0; $i -lt 60 -and (Test-Path -LiteralPath $gui); $i++) { Start-Sleep 2 }
+          Get-Process | Where-Object { $_.ProcessName -like "unins*" -or $_.ProcessName -like "*vxsmoke*" } | Format-Table Id, ProcessName
+          if (Test-Path -LiteralPath $gui) { if (Test-Path C:\vxsmoke-un.log) { Get-Content C:\vxsmoke-un.log -Tail 30 }; throw "files left after the uninstall" }
+          if (-not (Test-Path $users)) { throw "the uninstall deleted the shared models folder another program still uses" }
+          $left = Get-Content -Raw $users
+          if (-not $left.Contains('"movie-dubber"')) { throw "uninstall dropped the other program from the shared models refcount" }
+          "uninstalled"
+      - name: Old Program Files layout is migrated; data and the new programs stay
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $old = "C:\Program Files\Voxprint"
+          $oldSuite = "C:\Program Files\Voxprint AI Suite\Audiobook Builder"
+          $kebab = "C:\Program Files\voxprint-ai-suite\audiobook-builder"
+          $dest = "C:\Program Files\VOXPrint AI Suite\Audiobook Builder"
+          New-Item -ItemType Directory -Force $old, $oldSuite, $kebab | Out-Null
+          Copy-Item C:\vxver.exe "$old\Voxprint.exe"
+          Copy-Item C:\vxver.exe "$old\voxprint-cli.exe"
+          Copy-Item C:\vxver.exe "$oldSuite\Voxprint AI Audiobook Builder.exe"
+          "suite-marker" | Set-Content -Encoding utf8 "$oldSuite\suite-marker.txt"
+          Copy-Item C:\vxver.exe "$kebab\voxprint-audiobook-builder.exe"
+          "kebab-marker" | Set-Content -Encoding utf8 "$kebab\kebab-marker.txt"
+          $shell = New-Object -ComObject WScript.Shell
+          foreach ($menu in @(
+            "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Voxprint",
+            "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Voxprint"
+          )) {
+            New-Item -ItemType Directory -Force $menu | Out-Null
+            $lnk = $shell.CreateShortcut((Join-Path $menu "VOXPrint AI Audiobook Builder.lnk"))
+            $lnk.TargetPath = "$old\Voxprint.exe"
+            $lnk.Save()
+          }
+          $oldMenu = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Voxprint AI Suite"
+          New-Item -ItemType Directory -Force $oldMenu | Out-Null
+          $lnk = $shell.CreateShortcut((Join-Path $oldMenu "Audiobook Builder.lnk"))
+          $lnk.TargetPath = "$oldSuite\Voxprint AI Audiobook Builder.exe"
+          $lnk.Save()
+          $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+          $segments = @()
+          if ($userPath) { $segments = @($userPath -split ";" | Where-Object { $_.Trim() -ne "" }) }
+          foreach ($extra in @($old, $oldSuite, $kebab)) {
+            $have = @($segments | Where-Object { $_.Trim().TrimEnd("\") -eq $extra })
+            if ($have.Count -eq 0) { $segments += $extra }
+          }
+          [Environment]::SetEnvironmentVariable("Path", ($segments -join ";"), "User")
+          $uk = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F1D2B7A-3C54-4E0B-9A41-7B5E0C9D2F18}_is1"
+          New-Item -Force $uk | Out-Null
+          New-ItemProperty -Path $uk -Name InstallLocation -Value $old -PropertyType String -Force | Out-Null
+          $data = Join-Path $env:LOCALAPPDATA "Voxprint"
+          New-Item -ItemType Directory -Force (Join-Path $data "voices"), (Join-Path $data "state") | Out-Null
+          "keep-me" | Set-Content -Encoding utf8 (Join-Path $data "migration-marker.txt")
+          "narrator" | Set-Content -Encoding utf8 (Join-Path $data "voices\narrator.txt")
+          $setup = "build\online-release\voxprint-audiobook-builder-setup-win-x64.exe"
+          # Start-Process splits an unquoted /DIR on spaces, so the suite path would become C:\Program.
+          $psi = New-Object System.Diagnostics.ProcessStartInfo
+          $psi.FileName = (Resolve-Path -LiteralPath $setup).Path
+          $psi.Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SKIPGPUCHECK /SkipSuite=1 /DIR=`"$dest`" /LOG=C:\vxmigrate.log"
+          $psi.UseShellExecute = $false
+          $proc = [System.Diagnostics.Process]::Start($psi)
+          $null = $proc.WaitForExit()
+          if ($proc.ExitCode -ne 0) { Get-Content C:\vxmigrate.log -Tail 80; throw "migration install exit code $($proc.ExitCode)" }
+          $pf = "C:\Program Files"
+          $flat = @(Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name.Equals("Voxprint", [StringComparison]::Ordinal) })
+          if ($flat.Count -ne 0) { throw "the old program folder is still there" }
+          $kebabName = @(Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name.Equals("voxprint-ai-suite", [StringComparison]::Ordinal) })
+          if ($kebabName.Count -ne 0) { throw "the lower-case suite folder is still there" }
+          if (Test-Path -LiteralPath (Join-Path $kebab "kebab-marker.txt")) { throw "the kebab install was kept" }
+          if (-not (Test-Path -LiteralPath (Join-Path $dest "suite-marker.txt"))) { throw "the existing install folder was wiped" }
+          $oldExe = Join-Path $dest "Voxprint AI Audiobook Builder.exe"
+          if (Test-Path -LiteralPath $oldExe) { throw "the old program file is still in the install folder" }
+          $suiteName = @(Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name.Equals("VOXPrint AI Suite", [StringComparison]::Ordinal) })
+          if ($suiteName.Count -ne 1) {
+            $seen = (Get-ChildItem -LiteralPath $pf -Force | Where-Object { $_.Name -like "*oxprint*" } | ForEach-Object { $_.Name }) -join ", "
+            throw "install folder name is wrong: $seen"
+          }
+          $appName = @(Get-ChildItem -LiteralPath (Join-Path $pf "VOXPrint AI Suite") -Force | Where-Object { $_.Name.Equals("Audiobook Builder", [StringComparison]::Ordinal) })
+          if ($appName.Count -ne 1) { throw "app folder name is wrong" }
+          $exeName = @(Get-ChildItem -LiteralPath $dest -Force -File | Where-Object { $_.Name.Equals("voxprint-audiobook-builder.exe", [StringComparison]::Ordinal) })
+          if ($exeName.Count -ne 1) {
+            $seen = (Get-ChildItem -LiteralPath $dest -Force -File | ForEach-Object { $_.Name }) -join ", "
+            throw "program file name is wrong: $seen"
+          }
+          $menuParent = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs"
+          $menuName = @(Get-ChildItem -LiteralPath $menuParent -Force | Where-Object { $_.Name.Equals("VOXPrint AI Suite", [StringComparison]::Ordinal) })
+          if ($menuName.Count -ne 1) {
+            $seen = (Get-ChildItem -LiteralPath $menuParent -Force | Where-Object { $_.Name -like "*Suite*" -or $_.Name -eq "Voxprint" } | ForEach-Object { $_.Name }) -join ", "
+            throw "Start menu folder casing is wrong: $seen"
+          }
+          foreach ($menu in @(
+            "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Voxprint",
+            "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Voxprint"
+          )) {
+            if (Test-Path -LiteralPath (Join-Path $menu "VOXPrint AI Audiobook Builder.lnk")) { throw "old shortcut remains in $menu" }
+          }
+          $pathNow = [Environment]::GetEnvironmentVariable("Path", "User")
+          $parts = @($pathNow -split ";" | ForEach-Object { $_.Trim().TrimEnd("\") } | Where-Object { $_ -ne "" })
+          $still = @($parts | Where-Object { $_.Equals($old, [StringComparison]::OrdinalIgnoreCase) })
+          if ($still.Count -gt 0) { throw "the old folder is still on PATH: $pathNow" }
+          $cased = @($parts | Where-Object { $_.Equals($dest, [StringComparison]::Ordinal) })
+          if ($cased.Count -lt 1) { throw "PATH does not have the new folder casing: $pathNow" }
+          $wrongCase = @($parts | Where-Object { $_.Equals($oldSuite, [StringComparison]::Ordinal) })
+          if ($wrongCase.Count -gt 0) { throw "PATH still has the old suite casing: $pathNow" }
+          $kebabLeft = @($parts | Where-Object { $_.Equals($kebab, [StringComparison]::OrdinalIgnoreCase) })
+          if ($kebabLeft.Count -gt 0) { throw "PATH still has the kebab folder: $pathNow" }
+          if ((Get-Content -Raw (Join-Path $data "migration-marker.txt")) -notmatch "keep-me") { throw "user data was not kept" }
+          if (-not (Test-Path -LiteralPath (Join-Path $data "voices\narrator.txt"))) { throw "voices were not kept" }
+          $gui = Join-Path $dest "voxprint-audiobook-builder.exe"
+          $cli = Join-Path $dest "voxprint-audiobook-cli.exe"
+          foreach ($exe in @($gui, $cli)) {
+            if (-not (Test-Path -LiteralPath $exe)) { throw "missing after migration: $exe" }
+            $ran = Start-Process -FilePath $exe -ArgumentList "--version" -Wait -PassThru -NoNewWindow
+            if ($ran.ExitCode -ne 0) { throw "$exe --version exited $($ran.ExitCode)" }
+          }
+          $shortcut = Join-Path $menuParent "VOXPrint AI Suite\VOXPrint AI Audiobook Builder.lnk"
+          if (-not (Test-Path -LiteralPath $shortcut)) { throw "Start menu shortcut is missing: $shortcut" }
+          $reg = Get-ItemProperty "HKLM:\Software\voxprint\Apps\audiobook-builder"
+          if (-not [string]$reg.InstallPath.TrimEnd("\").Equals($dest, [StringComparison]::Ordinal)) { throw "discovery InstallPath is $($reg.InstallPath)" }
+          if (-not [string]$reg.CliPath.Equals($cli, [StringComparison]::Ordinal)) { throw "discovery CliPath is $($reg.CliPath)" }
+          $un = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F1D2B7A-3C54-4E0B-9A41-7B5E0C9D2F18}_is1"
+          $loc = (Get-ItemProperty $un).InstallLocation
+          if ($loc.TrimEnd("\") -eq $old) { throw "the uninstall key still points at the old folder" }
+          $shown = (Get-ItemProperty $un).DisplayName
+          if ($shown -ne "VOXPrint AI Audiobook Builder") { throw "uninstall display name is $shown" }
+          "migrated"
+      - name: Logs
+        if: always()
+        shell: pwsh
+        run: |
+          foreach ($l in "C:\vxsmoke1.log","C:\vxsmoke2.log","C:\vxsmoke3.log","C:\vxsmoke-un.log","C:\vxmigrate.log") { if (Test-Path $l) { "== $l"; Get-Content $l -Tail 25 } }
+
+  # THIN installer (docs/THIN-INSTALLER.md): fake shell + fake site-packages -> build_online.ps1 -Thin -> silent install installs only the
+  # shell -> the app's module manager downloads the runtime modules.  Also checks the Windows adapter enumeration of netroute.
+  thin-smoke:
+    needs: audit
+    if: always() && !cancelled() && (github.event_name == 'pull_request' || needs.audit.result == 'success')
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+      # Internal: the runner has no RTX 40-series GPU. Not a user setting.
+      VOXPRINT_ALLOW_NO_GPU: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Inno Setup 6
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: PyInstaller
+        shell: pwsh
+        run: python -m pip install --quiet pyinstaller
+      - name: Windows network adapters (infra/netroute.py)
+        shell: pwsh
+        run: |
+          python -c "from infra import netroute as n; w = n._from_windows(); print('ctypes:', w); a = n.local_addresses(); print('all:', a); import sys; sys.exit(0 if w and a else 1)"
+      - name: A fake thin shell and a fake site-packages
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist\Voxprint\_internal, build\notices | Out-Null
+          Copy-Item "$env:WINDIR\System32\whoami.exe" "dist\Voxprint\voxprint-audiobook-builder.exe"
+          python -c "import os; open('dist/Voxprint/_internal/shell.bin','wb').write(os.urandom(2*1024*1024))"
+          Copy-Item THIRD_PARTY_NOTICES.md build\notices\
+          @'
+          import os, pathlib
+          site = pathlib.Path("build/fake-site"); site.mkdir(parents=True, exist_ok=True)
+          def dist(name, files):
+              di = site / f"{name}-1.0.dist-info"; di.mkdir(exist_ok=True)
+              (di / "METADATA").write_text(f"Metadata-Version: 2.1\nName: {name}\nVersion: 1.0\n")
+              rec = []
+              for rel, n in files.items():
+                  p = site / rel; p.parent.mkdir(parents=True, exist_ok=True); p.write_bytes(os.urandom(n)); rec.append(rel + ",,")
+              rec += [f"{name}-1.0.dist-info/METADATA,,", f"{name}-1.0.dist-info/RECORD,,"]
+              (di / "RECORD").write_text("\n".join(rec) + "\n")
+          dist("torch", {"torch/__init__.py": 40, "torch/lib/big.dll": 3000000})
+          dist("scipy", {"scipy/__init__.py": 40})
+          dist("transformers", {"transformers/__init__.py": 40})
+          dist("numpy", {"numpy/__init__.py": 40})
+          '@ | python -
+      - name: Build the thin installer (small parts, served from localhost)
+        shell: pwsh
+        run: |
+          ./installer/build_online.ps1 -Thin -RuntimeSite build\fake-site -Tag v0.0.0-beta -BaseUrl http://127.0.0.1:8098 -ManifestUrl http://127.0.0.1:8098/manifest-beta.json -LimitMib 1 -Python python
+          Start-Process python -ArgumentList "-m","http.server","8098","--bind","127.0.0.1","--directory","build\online-release" -WindowStyle Hidden
+          Start-Sleep 3
+      - name: Silent install leaves the shell without PyTorch; the module manager unpacks it into the shared runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $p = Start-Process build\online-release\voxprint-audiobook-builder-setup-win-x64.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SKIPGPUCHECK","/SkipSuite=1","/DIR=C:\vxthin","/LOG=C:\vxthin.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content C:\vxthin.log -Tail 60; throw "install exit code $($p.ExitCode)" }
+          if (-not (Test-Path -LiteralPath "C:\vxthin\voxprint-audiobook-builder.exe")) { throw "the shell is missing" }
+          if (-not (Test-Path C:\vxthin\_internal\modules.json)) { throw "modules.json is missing" }
+          if (Test-Path C:\vxthin\_internal\torch) { throw "the thin installer installed a runtime module into the shell" }
+          $env:VOXPRINT_MODULES_CONFIG = "C:\vxthin\_internal\modules.json"
+          $env:VOXPRINT_HOME = "C:\vxhome"
+          python main.py --modules-status
+          python main.py --install-modules
+          if ($LASTEXITCODE -ne 0) { throw "--install-modules failed" }
+          $shared = "C:\vxhome\shared\runtime\py314-torch2.11-cu130\torch\lib\big.dll"
+          if (-not (Test-Path $shared)) { throw "the torch module was not unpacked into the shared runtime ($shared)" }
+          if (Test-Path C:\vxhome\runtime\torch) { throw "torch landed in the legacy runtime folder" }
+          python main.py --modules-status
+      - name: Setup log
+        if: always()
+        shell: pwsh
+        run: if (Test-Path C:\vxthin.log) { Get-Content C:\vxthin.log -Tail 40 }
+
+  # THE ONLINE INSTALLER (docs/THIN-INSTALLER.md): builds only our small shell (Qt + program) and a manifest that points to the libraries at
+  # their upstream sites (PyPI, download.pytorch.org - infra/runtime_lock.json).  No PyTorch is installed, repacked or uploaded here: minutes, not an hour.
+  # Besides building, the job really installs the runtime from upstream with the frozen shell (CPU PyTorch = 100 MB) and imports it,
+  # then repeats it with "another program's" PyTorch to prove the reuse path.
+  build-thin:
+    needs: audit
+    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.smoke_only) || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) }}
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: "1"
+      # Internal: unit tests and the CPU PyTorch install on this runner. Not a user setting.
+      VOXPRINT_ALLOW_NO_GPU: "1"
+      REL_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Inno Setup 6
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Visual C++ runtime from Microsoft (embedded in the installer, installed only when the PC lacks it)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force installer\redist | Out-Null
+          Invoke-WebRequest https://aka.ms/vs/17/release/vc_redist.x64.exe -OutFile installer\redist\vc_redist.x64.exe
+      - name: The lock is still valid (every file exists upstream with the pinned size)
+        shell: pwsh
+        run: python tools\check_lock_urls.py
+      - name: Shell environment (only the pinned packages the shell bundles) + PyInstaller
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          python -m pip install -q uv
+          python tools\make_runtime_lock.py --test-requirements | Out-File -Encoding ascii build-req.txt
+          Get-Content build-req.txt
+          # The suite pin carries --hash. pip then requires a hash on every package in the command.
+          uv pip install --python .venv\Scripts\python.exe -r build-req.txt -r requirements-docs.txt pyinstaller pytest pytest-timeout
+      - name: Tests that need no PyTorch
+        if: ${{ !inputs.skip_tests }}
+        timeout-minutes: 25
+        env:
+          VOXPRINT_TEST_TRACEBACK_S: "150"
+        shell: pwsh
+        run: |
+          $recorded = $null
+          & .venv\Scripts\python.exe -m pytest -q -p faulthandler --timeout=180 --timeout-method=thread --deselect tests/test_ui.py::test_selftest_imports_reports_and_writes_log --deselect tests/test_frozen_install.py --deselect tests/test_linux_package.py::test_text_selftest_passes_without_models 2>&1 | ForEach-Object {
+            $line = "$_"
+            Write-Host $line
+            if ($line -match 'VOXPRINT_PYTEST_RC=(\d+)') { $script:recorded = [int]$Matches[1] }
+          }
+          # Same rule as pr-check: prefer the status pytest recorded before shutdown (tests/conftest.py). A Qt DLL
+          # detach on Python 3.14 can make the process exit non-zero after a green session (run 54). No recorded
+          # status means the process died during the tests, and that still fails the step.
+          $rc = $LASTEXITCODE
+          if ($null -ne $script:recorded) { $rc = $script:recorded }
+          Write-Host "pytest process exit $LASTEXITCODE, recorded status $script:recorded -> $rc"
+          exit $rc
+      - name: Build number (BUILD.json build field, or the release tag; a failed run does not consume a number) and codename into credits.json
+        shell: pwsh
+        run: |
+          $n = python tools\build_number.py --stamp
+          if ($LASTEXITCODE -ne 0) { throw "build number failed" }
+          $c = (Get-Content BUILD.json -Raw | ConvertFrom-Json).codename
+          "VOXPRINT_BUILD=$n" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "VOXPRINT_CODENAME=$c" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "build $n `"$c`""
+      - name: Thin shell (PyInstaller, heavy libraries excluded)
+        shell: cmd
+        run: build_thin.bat
+      - name: Exe patch files (GUI exe, its hash, patch.json)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -c @'
+          import hashlib, json, os
+          from pathlib import Path
+          exe = Path("dist/thin/voxprint-audiobook-builder/voxprint-audiobook-builder.exe")
+          if not exe.is_file():
+              raise SystemExit(f"thin shell exe is missing: {exe}")
+          sha = hashlib.sha256(exe.read_bytes()).hexdigest()
+          lock = hashlib.sha256(Path("infra/runtime_lock.json").read_bytes()).hexdigest()
+          (exe.parent / "voxprint-audiobook-builder.exe.sha256").write_text(
+              f"{sha}  voxprint-audiobook-builder.exe\n", encoding="ascii")
+          credits = json.loads(Path("credits.json").read_text(encoding="utf-8"))
+          patch = {
+              "build": int(os.environ["VOXPRINT_BUILD"]),
+              "codename": os.environ.get("VOXPRINT_CODENAME", ""),
+              "version": str(credits["app"]["version"]),
+              "exe": "voxprint-audiobook-builder.exe",
+              "sha256": sha,
+              "runtime_lock_sha256": lock,
+          }
+          (exe.parent / "patch.json").write_text(json.dumps(patch) + "\n", encoding="ascii")
+          print(json.dumps(patch))
+          '@
+      - name: Online installer = shell zip + manifest (libraries stay upstream) + voxprint-audiobook-builder-setup-win-x64.exe
+        shell: pwsh
+        run: |
+          if ($env:REL_TAG) {
+            ./installer/build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag $env:REL_TAG -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json
+          } else {
+            ./installer/build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag v0.0.0-ci -Repo "${{ github.repository }}" -Thin -RuntimeLock infra\runtime_lock.json -LocalAssets
+          }
+          python tools\check_manifest_tags.py build\online-release
+          if ($LASTEXITCODE -ne 0) { throw "a manifest URL names a GitHub tag that does not exist" }
+          if (Select-String -Path build\online-release\*.json -Pattern "v0.0.0-dev" -Quiet) { throw "manifest still points at v0.0.0-dev" }
+          Get-ChildItem build\online-release | Format-Table Name, Length
+      - name: End to end with the frozen shell - download the runtime from upstream (CPU PyTorch, internal CI only) and import it
+        shell: pwsh
+        env:
+          VOXPRINT_TORCH_FLAVOR: cpu   # internal: this runner has no NVIDIA GPU
+          VOXPRINT_NO_REUSE: "1"
+          VOXPRINT_HOME: C:\vxhome1
+        run: |
+          $ErrorActionPreference = "Stop"
+          $src = (Resolve-Path build\online-release\manifest-thin-*.json).Path
+          if ($env:REL_TAG) {
+            # the few files we ship ourselves (the shell, wheels built from sdists) are not on the release yet: serve them from localhost
+            $tag = $env:REL_TAG
+            $man = "C:\vx-manifest.json"
+            (Get-Content $src -Raw).Replace("https://github.com/${{ github.repository }}/releases/download/$tag", "http://127.0.0.1:8099") | Out-File -Encoding ascii $man
+            Start-Process python -ArgumentList "-m","http.server","8099","--bind","127.0.0.1","--directory","build\online-release" -WindowStyle Hidden
+            Start-Sleep 3
+            @{ schema = 1; manifest_url = $man } | ConvertTo-Json | Out-File -Encoding ascii C:\vx-modules.json
+          } else {
+            # file-name components resolve beside this manifest; upstream https URLs stay
+            @{ schema = 1; manifest_url = $src } | ConvertTo-Json | Out-File -Encoding ascii C:\vx-modules.json
+          }
+          $env:VOXPRINT_MODULES_CONFIG = "C:\vx-modules.json"
+          $exe = (Resolve-Path "dist\thin\voxprint-audiobook-builder\voxprint-audiobook-builder.exe").Path
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          $p = Start-Process $exe -ArgumentList "--install-modules" -Wait -PassThru
+          "install-modules: exit $($p.ExitCode) in $([int]$sw.Elapsed.TotalSeconds) s"
+          Get-Content C:\vxhome1\logs\modules.txt | Select-Object -Last 15
+          if ($p.ExitCode -ne 0) { throw "--install-modules failed" }
+          $p = Start-Process $exe -ArgumentList "--probe-torch" -Wait -PassThru
+          Get-Content C:\vxhome1\logs\probe_torch.txt
+          if ($p.ExitCode -ne 0) { throw "the frozen shell cannot import the downloaded PyTorch" }
+          # the whole chain the program uses (requests -> http.cookies, transformers, qwen_asr, qwen_tts ...) and EVERY standard-library module
+          # that imports in the build Python must import inside the frozen shell (real PC failure: No module named 'http.cookies')
+          $p = Start-Process $exe -ArgumentList "--selftest-imports","--stdlib-list",(Resolve-Path build\stdlib_bundle\stdlib_modules.txt).Path -Wait -PassThru
+          Get-Content C:\vxhome1\logs\selftest_imports.txt
+          if ($p.ExitCode -ne 0) { throw "the frozen shell lacks standard-library modules or cannot import the downloaded libraries (see the list above)" }
+      - name: End to end - another program's PyTorch is detected, checked and reused instead of downloaded
+        shell: pwsh
+        env:
+          VOXPRINT_TORCH_FLAVOR: cpu   # internal: this runner has no NVIDIA GPU
+          VOXPRINT_HOME: C:\vxhome2
+        run: |
+          $ErrorActionPreference = "Stop"
+          # The first install unpacked the wheels into the shared torch component
+          # <VOXPRINT_HOME>\shared\runtime\py314-torch2.11-cu130. Another Voxprint program keeps that tree at
+          # %LOCALAPPDATA%\Voxprint\shared\runtime\py314-torch2.11-cu130. This home is C:\vxhome2, so that
+          # default folder is a foreign copy and must be reused, not downloaded again.
+          $src = "C:\vxhome1\shared\runtime\py314-torch2.11-cu130"
+          if (-not (Test-Path $src)) {
+            Get-ChildItem C:\vxhome1 -Recurse -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+            throw "the first install did not unpack into the shared torch component ($src)"
+          }
+          Get-ChildItem $src | Select-Object -ExpandProperty Name
+          $other = Join-Path $env:LOCALAPPDATA "Voxprint\shared\runtime\py314-torch2.11-cu130"
+          New-Item -ItemType Directory -Force (Split-Path $other) | Out-Null
+          Copy-Item $src $other -Recurse -Force
+          Get-ChildItem $other | Select-Object -ExpandProperty Name
+          $env:VOXPRINT_MODULES_CONFIG = "C:\vx-modules.json"
+          $exe = (Resolve-Path "dist\thin\voxprint-audiobook-builder\voxprint-audiobook-builder.exe").Path
+          $p = Start-Process $exe -ArgumentList "--install-modules" -Wait -PassThru
+          Get-Content C:\vxhome2\logs\modules.txt
+          Get-Content C:\vxhome2\logs\voxprint.log -ErrorAction SilentlyContinue | Select-String "reuse|PyTorch|torch" | Select-Object -Last 12
+          if ($p.ExitCode -ne 0) { throw "--install-modules failed" }
+          $line = Get-Content C:\vxhome2\logs\modules.txt | Select-String "^torch" | Select-Object -First 1
+          if ($line -notmatch "reused") { throw "PyTorch was not reused: $line" }
+          if (Test-Path C:\vxhome2\shared\runtime\py314-torch2.11-cu130\torch) { throw "PyTorch was downloaded into this home although the shared copy is on the PC" }
+          $p = Start-Process $exe -ArgumentList "--probe-torch" -Wait -PassThru
+          Get-Content C:\vxhome2\logs\probe_torch.txt
+          if ($p.ExitCode -ne 0) { throw "the reused PyTorch does not work" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voxprint-audiobook-builder-setup
+          path: |
+            build/online-release/voxprint-audiobook-builder-setup*.exe
+            build/online-release/voxprint-audiobook-builder-setup*.exe.sha256
+            build/online-release/manifest-thin-*.json
+            build/online-release/embedded-manifest.json
+            build/online-release/Voxprint-shell-*.zip
+            build/online-release/*.whl
+          retention-days: 14
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Voxprint-patch
+          path: |
+            dist/thin/voxprint-audiobook-builder/voxprint-audiobook-builder.exe
+            dist/thin/voxprint-audiobook-builder/voxprint-audiobook-builder.exe.sha256
+            dist/thin/voxprint-audiobook-builder/patch.json
+          retention-days: 14

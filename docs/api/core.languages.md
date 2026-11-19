@@ -1,0 +1,3 @@
+# `core.languages`
+
+::: core.languages

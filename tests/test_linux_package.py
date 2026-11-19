@@ -1,0 +1,218 @@
+"""The experimental Linux package: XDG data folder, the package builder (tools/make_linux_package.py), the installer script
+and the menu entry.  Nothing is installed; the script is only syntax-checked and run with --check/--help."""
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tarfile
+import zipfile
+from pathlib import Path
+
+import pytest
+
+from infra import paths
+from tests.test_online_installer import Server
+from tools import make_linux_package as mk
+from tools import online_fetch as of
+
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = ROOT / "installer" / "linux" / "install-voxprint-linux.sh"
+
+
+def test_linux_data_dir_is_xdg_and_lower_case(monkeypatch, tmp_path):
+    monkeypatch.delenv("VOXPRINT_HOME", raising=False)
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+    assert paths.app_home() == tmp_path / "xdg" / "voxprint-ai-suite"
+    monkeypatch.delenv("XDG_DATA_HOME")
+    monkeypatch.setenv("HOME", str(tmp_path / "h"))
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "h"))
+    assert paths.app_home() == tmp_path / "h" / ".local" / "share" / "voxprint-ai-suite"
+    monkeypatch.setenv("XDG_DATA_HOME", "relative/path")       # XDG says: relative values are invalid
+    assert paths.app_home() == tmp_path / "h" / ".local" / "share" / "voxprint-ai-suite"
+
+
+def test_voxprint_home_overrides_everywhere(monkeypatch, tmp_path):
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "x"))
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert paths.app_home() == tmp_path / "x"
+
+
+def test_earlier_capitalised_linux_folder_is_still_found(monkeypatch, tmp_path):
+    """Before the lower-case name an XDG install used ``~/.local/share/Voxprint``: its models/settings are adopted."""
+    monkeypatch.delenv("VOXPRINT_HOME", raising=False)
+    monkeypatch.delenv("VOXPRINT_PREVIOUS_HOMES", raising=False)
+    monkeypatch.setattr(sys, "platform", "linux")
+    h = tmp_path / "h"
+    (h / ".local" / "share" / "Voxprint" / "models").mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: h))
+    monkeypatch.setenv("XDG_DATA_HOME", str(h / ".local" / "share"))
+    cur = paths.app_home()
+    assert cur.name == "voxprint-ai-suite"
+    old = h / ".local" / "share" / "Voxprint"
+    # A case-insensitive disk treats Voxprint as the legacy voxprint folder, so the
+    # suite library moves it. A case-sensitive disk leaves it as an earlier home.
+    if old.exists() and not old.samefile(cur):
+        assert old.name in [p.name for p in paths.previous_homes()]
+    else:
+        assert (cur / "models").is_dir()
+
+
+@pytest.fixture
+def built(tmp_path):
+    out = tmp_path / "srv"
+    srv = Server(out)
+    man = mk.build(ROOT, out, "v0.1.0-beta", "o/r", base_url=srv.url)
+    yield srv, man, out
+    srv.close()
+
+
+def test_package_contents_and_manifest(built):
+    srv, man, out = built
+    m = json.loads(man.read_text(encoding="utf-8"))
+    assert man.name == "manifest-linux.json" and m["schema"] == 1 and m["experimental"] is True and m["platform"] == "linux"
+    (c,) = m["components"]
+    assert c["file"] == "Voxprint-linux-app.zip" and c["sha256"] == mk.sha256_of(out / c["file"]) and c["size"] == (out / c["file"]).stat().st_size
+    with zipfile.ZipFile(out / c["file"]) as z:
+        names = set(z.namelist())
+    assert {"main.py", "credits.json", "requirements.txt", "core/translate.py", "ui/studio.py", "locales/en.json",
+            "installer/linux/voxprint-audiobook-builder.desktop", "installer/linux/install-voxprint-linux.sh", "assets/voxprint.png"} <= names
+    assert not any(n.startswith(("tests/", ".github/", "docs/manual")) or "__pycache__" in n or n.endswith(".pyc") for n in names)
+    assert "installer/Voxprint.iss" not in names and "build.bat" not in names
+    sums = (out / "SHA256SUMS-linux.txt").read_text(encoding="utf-8")
+    for n in ("Voxprint-linux-app.zip", "manifest-linux.json", "voxprint-fetch.py", "install-voxprint-linux.sh", "Voxprint-linux-experimental.tar.gz"):
+        assert f"{mk.sha256_of(out / n)}  {n}" in sums
+
+
+def test_tarball_has_installer_and_app_tree(built):
+    _, _, out = built
+    with tarfile.open(out / "Voxprint-linux-experimental.tar.gz") as t:
+        names = t.getnames()
+        mode = t.getmember("voxprint-linux/install-voxprint-linux.sh").mode
+    assert "voxprint-linux/app/main.py" in names and "voxprint-linux/voxprint-fetch.py" in names and mode & 0o111
+
+
+def test_release_and_tag_are_filled_into_the_script(built):
+    _, _, out = built
+    text = (out / "install-voxprint-linux.sh").read_text(encoding="utf-8")
+    assert "@REPO@" not in text and "@TAG@" not in text and 'TAG="${VOXPRINT_TAG:-v0.1.0-beta}"' in text
+    assert "@REPO@" in SCRIPT.read_text(encoding="utf-8")        # the template stays a template
+
+
+def test_the_windows_downloader_installs_the_linux_component(built, tmp_path):
+    srv, man, out = built
+    dest = tmp_path / "app"
+    rc = of.main(["--manifest", str(man), "--dest", str(dest), "--cache", str(tmp_path / "cache")])
+    assert rc == 0 and (dest / "main.py").is_file() and (dest / "core" / "translate.py").is_file()
+    assert any("Voxprint-linux-app.zip" in p for p, _ in srv.requests)
+
+
+def _os_release(path: Path, body: str) -> None:
+    path.write_text(body, encoding="utf-8")
+
+
+@pytest.mark.skipif(shutil.which("bash") is None or sys.platform == "win32", reason="bash needed")
+def test_old_distro_warns_and_a_current_one_does_not(tmp_path):
+    """Release year from os-release: before 2025 warns and does not change the exit code."""
+    old = tmp_path / "old"
+    new = tmp_path / "new"
+    plain = tmp_path / "plain"
+    missing = tmp_path / "missing"
+    _os_release(old, 'NAME="Ubuntu"\nVERSION_ID="24.04"\nVERSION="24.04.3 LTS (Noble Numbat)"\nPRETTY_NAME="Ubuntu 24.04.3 LTS"\n')
+    _os_release(new, 'NAME="Ubuntu"\nVERSION_ID="25.04"\nPRETTY_NAME="Ubuntu 25.04"\n')
+    _os_release(plain, 'NAME="Debian GNU/Linux"\nVERSION_ID="13"\nVERSION="13 (trixie)"\nPRETTY_NAME="Debian GNU/Linux 13 (trixie)"\n')
+    dated = tmp_path / "dated"
+    _os_release(dated, 'NAME="openSUSE Tumbleweed"\nVERSION_ID="20241001"\nPRETTY_NAME="openSUSE Tumbleweed"\n')
+
+    def check(path: Path):
+        env = dict(os.environ)
+        env["VOXPRINT_OS_RELEASE"] = str(path)
+        env["VOXPRINT_PYTHON"] = sys.executable
+        return subprocess.run(["bash", str(SCRIPT), "--check"], capture_output=True, text=True, env=env)
+
+    warned = check(old)
+    quiet = check(new)
+    undated = check(plain)
+    tumble = check(dated)
+    absent = check(missing)
+    assert "older than 2025" in warned.stderr and "Installation continues" in warned.stderr
+    assert "Ubuntu 24.04.3 LTS" in warned.stderr
+    assert "older than 2025" not in quiet.stderr
+    assert "older than 2025" not in undated.stderr          # no year in the file: best effort, no warning
+    assert "older than 2025" in tumble.stderr               # calendar year in VERSION_ID
+    assert "older than 2025" not in absent.stderr
+    assert warned.returncode == quiet.returncode == undated.returncode == tumble.returncode == absent.returncode
+
+
+@pytest.mark.skipif(shutil.which("bash") is None or sys.platform == "win32", reason="bash needed")
+def test_installer_script_syntax_and_help():
+    assert subprocess.run(["bash", "-n", str(SCRIPT)], capture_output=True).returncode == 0
+    r = subprocess.run(["bash", str(SCRIPT), "--help"], capture_output=True, text=True)
+    assert r.returncode == 0 and "--uninstall" in r.stdout and "--install-deps" in r.stdout
+    r = subprocess.run(["bash", str(SCRIPT), "--bogus"], capture_output=True, text=True)
+    assert r.returncode != 0
+
+
+def test_installer_script_uses_the_suite_home_and_registers_the_app():
+    """The suite library migrates ~/.local/share/voxprint on first use, so the script must not
+    export VOXPRINT_HOME (that would skip the migration) and must register/unregister the app
+    through voxprint-mdl against the voxprint-ai-suite home."""
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert 'DATA="${VOXPRINT_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/voxprint-ai-suite}"' in text
+    assert "voxprint-ai-suite" in text and 'DATA="${VOXPRINT_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/voxprint}"' not in text
+    assert "export VOXPRINT_HOME" not in text
+    assert '"$VPY" "$APP/main.py" --run-mdl register --app audiobook-builder --path "$APP"' in text
+    assert '--descriptor "$APP/voxprint-app-models.json"' in text
+    assert '"$VPY" "$APP/main.py" --run-mdl unregister --app audiobook-builder' in text
+    # registration comes before the model download and is not gated on VOXPRINT_SKIP_SUITE
+    assert text.index("--run-mdl register") < text.index("--run-mdl download")
+    assert text.index("--run-mdl register") < text.index('VOXPRINT_SKIP_SUITE:-')
+    # --purge only removes this app's data, never the shared suite folders or suite-wide state
+    purge = text[text.index('if [ "$PURGE" = 1 ]'):]
+    assert 'rm -rf "$DATA"' not in purge
+    assert '"$DATA/models/views/audiobook-builder"' in purge and '"$DATA/models/derived/audiobook-builder"' in purge
+    assert '"$DATA/state/updater_state.json"' in purge and '"$DATA/state/last_adapter.json"' in purge
+    assert '"$DATA/state/models_dir.txt"' in purge
+    assert '"$DATA/voices"' not in purge and '"$DATA/logs"' not in purge
+    assert '"$DATA/state/language"' not in purge and '"$DATA/state/privacy_ack"' not in purge
+
+
+def test_register_display_name_views_optin_repair_store_and_download_all():
+    text = SCRIPT.read_text(encoding="utf-8")
+    # a human-readable name in the suite registry
+    assert '--display-name "VOXPrint AI Audiobook Builder"' in text
+    # the views opt-in runs right after register, always - also with VOXPRINT_SKIP_SUITE=1
+    views = "from voxprint_common.paths import models_dir; (models_dir() / 'views' / 'audiobook-builder').mkdir(parents=True, exist_ok=True)"
+    assert views in text
+    assert text.index("--run-mdl register") < text.index("mkdir(parents=True, exist_ok=True)")
+    assert text.index("mkdir(parents=True, exist_ok=True)") < text.index('VOXPRINT_SKIP_SUITE:-')
+    # on-disk copies are adopted before the download; exit 0 and 2 are fine, else warn
+    assert "--run-mdl repair-store --app audiobook-builder" in text
+    assert '--manifest "$APP/voxprint-app-models.json"' in text
+    assert 'REPAIR_EXTRA+=(--from "$HOME/.local/share/voxprint/models")' in text
+    assert text.index("repair-store") < text.index("--run-mdl download")
+    assert 'warn "repair-store exited with' in text
+    # --download-all passes --all to the download; the download never takes --model
+    assert "--download-all" in text and "DL_EXTRA+=(--all)" in text
+    mdl = text[text.index("--run-mdl register"):]
+    assert "--model" not in mdl
+    dl_line = text[text.index('"$VPY" "$APP/main.py" --run-mdl download'):].splitlines()[0]
+    assert '"${DL_EXTRA[@]}"' in dl_line
+
+
+def test_desktop_entry_and_icon():
+    text = (ROOT / "installer" / "linux" / "voxprint-audiobook-builder.desktop").read_text(encoding="utf-8")
+    kv = dict(line.split("=", 1) for line in text.splitlines() if "=" in line and not line.startswith("#"))
+    assert kv["Type"] == "Application" and kv["Icon"] == "voxprint" and kv["Exec"].startswith("@LAUNCHER@")
+    assert kv["Categories"].endswith(";") and kv["Terminal"] == "false"
+    png = (ROOT / "installer" / "linux" / "voxprint-256.png").read_bytes()
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_text_selftest_passes_without_models():
+    from workers import selftest_text
+
+    assert selftest_text.run() == 0

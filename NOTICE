@@ -1,0 +1,41 @@
+Voxprint AI Audiobook Builder
+Copyright 2026 Aleksandr Mitroshenkov
+
+The source code of this program is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Not covered by that licence (each has its own terms):
+  * Third-party software and models that Voxprint uses or downloads - see THIRD_PARTY_NOTICES.md and the licenses/ folder.
+  * Voice packages (trained LoRA adapters with their reference sample). Every voice carries its own licence in its voice.json.
+    Voices meant for testing carry the "test use only" licence (custom/test-use-only): test use only, no public release of
+    audio generated with them, no commercial use.
+    The voice published with the project (voices-v1 release): "Open universal voice" (trained on the public-domain LJ Speech
+    dataset) is CC0-1.0. Voices you train yourself are personal use only by default (custom/personal-only).
+  * The models downloaded at run time (for example Qwen3-TTS, Qwen3-ASR-0.6B / 1.7B: Apache-2.0, (c) Alibaba Cloud / Qwen team) -
+    see their model cards for their licences.
+  * DNSMOS P.835 (sig_bak_ovr.onnx), downloaded for the automatic voice check: (c) Microsoft Corporation, from
+    https://github.com/microsoft/DNS-Challenge (commit 591184a9), licensed under CC BY 4.0
+    (https://creativecommons.org/licenses/by/4.0/), used unmodified. Reddy, Gopal, Cutler: "DNSMOS P.835: a non-intrusive
+    perceptual objective speech quality metric to evaluate noise suppressors", ICASSP 2022. core/mos.py follows the
+    MIT-licensed reference code DNSMOS/dnsmos_local.py of the same repository (licenses/dnsmos-code.txt).
+  * DeepFilterNet3 noise clean-up (the deep-filter 0.5.6 program, which embeds the model), optional download on request:
+    (c) 2021 Hendrik Schröter, https://github.com/Rikorose/DeepFilterNet, dual-licensed MIT OR Apache-2.0, used under the
+    MIT licence (licenses/deepfilternet.txt), unmodified. Schröter, Rosenkranz, Escalante-B., Maier: "DeepFilterNet:
+    Perceptually Motivated Real-Time Speech Enhancement", INTERSPEECH 2023.
+  * Opus-MT translation models (downloaded with the other models): the tc-big models Helsinki-NLP/opus-mt-tc-big-en-zle,
+    -zle-en, -zle-de and -de-zle (revisions 708be1d3, 09a40f72, b2e247f0, d4db2a2c) and Helsinki-NLP/opus-mt-de-en, -en-de,
+    -ru-en, -en-ru: (c) Language Technology Research Group at the University of Helsinki (Helsinki-NLP), from
+    https://huggingface.co/Helsinki-NLP, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/; opus-mt-en-ru
+    and -de-en under Apache-2.0), used unmodified. Tiedemann, Aulamo, Bakshandaeva, Boggia, Grönroos, Nieminen, Raganato, Scherrer,
+    Vázquez, Virpioja: "Democratizing neural machine translation with OPUS-MT", Language Resources and Evaluation 58 (2024);
+    Tiedemann, Thottingal: "OPUS-MT - Building open translation services for the World", EAMT 2020.
+  * Russian letter-yo dictionary shipped with the program (`core/data/yo_safe.txt`): dictionary/safe.txt from
+    eyo-kernel (c) 2026 Denis Seleznev, https://github.com/e2yo/eyo-kernel, MIT (core/data/yo_safe.LICENSE).
+    SHA-256 11fc6d9c3cc6d0fff6a21cd642fa6aecbf3f9eb784f84ccd78141f32e51e0693. The lookup is reimplemented in
+    core/yo.py. Ambiguous homographs are not in this file.
+  * Optional AI text model (downloaded only on request): Gemma 4 12B Instruct by Google DeepMind, Apache-2.0
+    (https://huggingface.co/google/gemma-4-12B-it), as the GGUF Q4_K_M conversion by Unsloth
+    (unsloth/gemma-4-12b-it-GGUF, revision fc034cff), used unmodified; run by llama.cpp (llama-server build b11476,
+    (c) The ggml authors, MIT, licenses/llama.cpp.txt), unmodified.
+
+Voxprint AI Audiobook Builder is an independent project and is not affiliated with other products or services
+with similar names.

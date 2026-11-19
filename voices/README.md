@@ -1,0 +1,65 @@
+# Voices index
+
+`index.json` is the default voices index of VOXPrint (schema 1). Published packages are **release assets** of the tag `voices-v1`
+(`open-universal.zip`, `tirzah.zip`, `gideon.zip`, `asher.zip`, `noa.zip`, `eitan.zip`) and `voices-v2` (`levi.zip`, `natan.zip`, `shimon.zip`, `miriam.zip`, `rivka.zip`); the index carries their URL, size and SHA-256. Rebuild a package and its entry with
+`tools/make_voice_package.py`.
+
+| id | licence | note |
+|---|---|---|
+| `open-universal` | `CC0-1.0` | open English female voice trained only from public-domain LJ Speech; free for any use, attribution appreciated |
+| `tirzah` | `CC0-1.0` | **retired**: bundled up to build 702; an install that has it keeps it |
+| `gideon` | `CC0-1.0` | **retired**: bundled up to build 702 (replaced Boaz); an install that has it keeps it |
+| `asher` | `CC0-1.0` | optional Russian male catalog voice; not part of the standard download |
+| `noa` | `CC0-1.0` | optional Russian female catalog voice; not part of the standard download |
+| `eitan` | `CC0-1.0` | **retired** (`"retired": true, "hidden": true`): kept for older builds, not offered by builds with the catalog fix |
+| `levi` | `CC0-1.0` | Russian male (LibriVox reader Виталий, Chekhov short stories); **bundled** from build 703, default narrator (see [BUNDLED.md](BUNDLED.md)) |
+| `natan` | `CC0-1.0` | Russian male (Victor Seremet, Tolstoy *Detstvo*); catalog voice, default first male role when installed |
+| `shimon` | `CC0-1.0` | Russian male (Create, Andreyev *Angelochek*); catalog voice, default second male role when installed |
+| `miriam` | `CC0-1.0` | Russian female (Maya S, Ehrenburg *Portraits of Russian Poets*); **bundled** from build 703, default female voice |
+| `rivka` | `CC0-1.0` | Russian female (Irina Grinberg, Griboyedov *Woe from Wit*) |
+
+*Boaz* shipped with 0.1.3 and is no longer in this index. It is not installed.
+
+**Voices v2 (2026-10-09).** Tirzah, Gideon, Asher and Eitan are marked `"retired": true, "hidden": true`; their entries stay so
+older builds keep working (build 703 replaced the bundled pair Gideon/Tirzah with Levi/Miriam in `infra/bundled_voices.py`).
+New voices Levi, Natan, Shimon, Miriam, Rivka (assets of the `voices-v2` release; specs with source files and SHA-1 in
+`tools/voice_specs/<id>.json`) were trained on the PC with build 702 exactly like Eitan (`voxprint train <folder> --name <Name>
+--type <male|female> --language ru --consent commercial --speaker <reader> --license CC0-1.0`, no-transcript mode). Noa stays.
+
+## Asher and Noa (catalog only)
+
+Asher (male, LibriVox reader Vladimir Anyanov, *Teachings of Christ* by Leo Tolstoy) and Noa (female, LibriVox reader
+Hanna Ponomarenko, *Izbrannye* by Sholem Aleichem) are **not** part of the standard download. Specs:
+`tools/voice_specs/asher.json`, `tools/voice_specs/noa.json`. Their packages are
+`voices-v1/asher.zip` (53,066,747 bytes, `795778a10b85495e5850d885484c313e3f7799f76ea4d81d41fe50162165a583`) and
+`voices-v1/noa.zip` (53,197,567 bytes, `755aeb47cc90a7bfb03d9349ed0fa8effbcc270fda22e5e9dc7b9539a462beed`).
+Do not set `bundled`.
+
+Eitan (male, LibriVox reader tovarisch, *Записки охотника (Zapiski Okhotnika)* by Ivan Turgenev, sections 02 and 04, 28.6 min;
+Internet Archive `zapiskiohotnika_2409_librivox`, Public Domain Mark 1.0) is catalog-only too. Spec: `tools/voice_specs/eitan.json`
+(source files and SHA-1). Package: `voices-v1/eitan.zip` (53,156,021 bytes,
+`81627365a5f23824b13798486207eaa48950a36cb5869388949eb1a1d5f7d708`). Trained on the PC with
+`voxprint train <folder> --name Eitan --type male --language ru --consent commercial --speaker tovarisch --license CC0-1.0`
+(no-transcript mode: 146 of 147 clips kept, 1711 s).
+
+To rebuild one from a trained folder `train-<id>/<Name>_Voxprint`:
+
+```
+python tools/make_voice_package.py --adapter <train-id>/<Name>_Voxprint --spec tools/voice_specs/asher.json --out <dir> --plain-names --url https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/voices-v1/asher.zip
+```
+
+(same for `noa.json`). A rebuilt zip has a new hash: update `url`, `sha256` and `size_bytes` in `index.json`.
+
+Files the packager reads from that folder:
+
+| File | Role |
+|---|---|
+| `adapter_model.safetensors` | required |
+| `adapter_config.json` | required |
+| `voice.json` | training facts (duration, epochs, base model); merged with the spec into the published `voice.json` |
+| `ref_sample.wav` | reference clip; copied when present |
+| `training_meta.json` | reference text; copied when present (`ref_sample_audio` is rewritten to the file name) |
+| `speaker_centroid.safetensors` | copied when present |
+| `preview.wav`, `preview.mp3` | copied when present |
+
+The importer also accepts `consent_statement.wav` if it is inside the zip. The packager does not copy that file.

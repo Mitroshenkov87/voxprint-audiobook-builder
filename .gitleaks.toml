@@ -1,0 +1,16 @@
+# Extends the default gitleaks rules. The only allowlist is the public SHA-256
+# pins in the text-model registry: generic-api-key matches a 64-hex digest
+# inside a quoted tuple. Those strings are content hashes of Hugging Face
+# files, not credentials. Any other rule, and any other file, still fails the audit.
+title = "Voxprint AI Audiobook Builder"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "SHA-256 pins of public model files in infra/text_models.py"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''(^|/)infra/text_models\.py$''']
+regexTarget = "line"
+regexes = ['''(?i)[0-9a-f]{64}''']

@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+dist/
+build/
+*.spec
+models/
+output/
+dataset/
+*.safetensors
+*.wav
+!assets/**/*.wav
+
+# audit (tools/audit.py)
+audit-report.txt
+.coverage
+
+# mkdocs output
+site/

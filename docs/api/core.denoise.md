@@ -1,0 +1,3 @@
+# `core.denoise`
+
+::: core.denoise

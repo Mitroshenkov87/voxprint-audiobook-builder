@@ -1,0 +1,152 @@
+name: build-linux
+
+# EXPERIMENTAL Linux package of Voxprint (no frozen build: the program is Python source, installed into a venv by
+# install-voxprint-linux.sh).  On a clean, free ubuntu-24.04 runner this job
+#   1. builds the package twice: a test copy that points at a local web server, and the release copy that points at GitHub;
+#   2. runs the installer from the test copy (apt dependencies, venv, PyTorch via uv). This runner has no NVIDIA GPU,
+#      so the job passes the internal --skip-gpu-check switch and VOXPRINT_ALLOW_NO_GPU=1 (not user options; CPU torch
+#      here is for CI only). Then the launcher, the .desktop entry and the self-tests;
+#   3. runs the unit-test suite with the installed environment (QT_QPA_PLATFORM=offscreen);
+#   4. smoke-tests the installed launcher, the menu entry, a second run (update) and --uninstall;
+#   5. keeps the Voxprint-linux-* assets + SHA256SUMS-linux.txt as CI artifacts only (no GitHub release is created or changed).
+# GPU / CUDA, audio output and a real desktop session cannot be tested here: see docs/LINUX-TEST-CHECKLIST.md.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      QT_QPA_PLATFORM: offscreen
+      # Internal: this runner has no RTX 40-series GPU. Not a user setting.
+      VOXPRINT_ALLOW_NO_GPU: "1"
+      REL_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Build number (BUILD.json build field, or the release tag) into credits.json
+        run: |
+          n=$(python3 tools/build_number.py --stamp)
+          echo "VOXPRINT_BUILD=$n" >> "$GITHUB_ENV"
+          c=$(python3 -c 'import json; print(json.load(open("BUILD.json", encoding="utf-8"))["codename"])')
+          echo "VOXPRINT_CODENAME=$c" >> "$GITHUB_ENV"
+          echo "build $n \"$c\""
+
+      - name: Build the package (test copy -> local server, release copy -> GitHub)
+        run: |
+          TAG="${REL_TAG:-v0.0.0-ci}"
+          python3 tools/make_linux_package.py --out build/linux-test --tag "$TAG" --repo "$GITHUB_REPOSITORY" --base-url http://127.0.0.1:8099
+          python3 tools/make_linux_package.py --out build/linux --tag "$TAG" --repo "$GITHUB_REPOSITORY"
+          ls -l build/linux
+          bash -n build/linux/install-voxprint-linux.sh
+
+      - name: Install it like a user would (apt dependencies, venv, PyTorch, launcher, self-tests)
+        run: |
+          python3 -m http.server 8099 --bind 127.0.0.1 --directory build/linux-test >/dev/null 2>&1 &
+          sleep 1
+          export VOXPRINT_BASE_URL=http://127.0.0.1:8099
+          export VOXPRINT_PYTHON="$(python -c 'import sys; print(sys.executable)')"
+          export VOXPRINT_SKIP_SUITE=1
+          bash build/linux-test/install-voxprint-linux.sh --check || true
+          bash build/linux-test/install-voxprint-linux.sh --install-deps --yes --skip-gpu-check --torch-backend cpu
+          test -x /usr/local/bin/voxprint-audiobook-cli
+          test -x /usr/local/bin/voxprint
+          test -d /opt/voxprint-ai-suite/audiobook-builder
+          test ! -e ~/.local/share/voxprint/app
+          test -f /usr/share/applications/voxprint-audiobook-builder.desktop
+          test -f /usr/share/icons/hicolor/256x256/apps/voxprint.png
+          test -d ~/.local/share/voxprint-ai-suite/models/views/audiobook-builder
+          cat ~/.local/share/voxprint-ai-suite/install.json
+          python3 - <<'PY'
+          import json, os, pathlib
+          reg = pathlib.Path(os.path.expanduser("~/.local/share/voxprint-ai-suite/state/installed-apps.json"))
+          apps = json.loads(reg.read_text(encoding="utf-8"))["apps"]
+          assert any(a.get("id") == "audiobook-builder" for a in apps), apps
+          PY
+
+      - name: Unit tests with the installed environment
+        run: |
+          V=/opt/voxprint-ai-suite/audiobook-builder/venv
+          $V/bin/uv pip install --python $V/bin/python -r requirements-dev.txt -r requirements-docs.txt
+          set -o pipefail
+          fail=0
+          failed=
+          # One process per module. A native crash (Qt plus torch, or the loopback read in
+          # test_thin_modules) must not abort the rest of the suite, and must still fail this job.
+          for f in tests/test_*.py; do
+            echo "=== $f ==="
+            set +e
+            $V/bin/python -m pytest -q -p no:cacheprovider -p faulthandler --timeout=300 --tb=line "$f"
+            rc=$?
+            set -e
+            # 5: the module collected nothing (optional imports such as weasyprint). A signal or a failed test still fails the job.
+            if [ "$rc" -eq 0 ] || [ "$rc" -eq 5 ]; then
+              if [ "$rc" -eq 5 ]; then echo "no tests collected in $f"; fi
+            else
+              echo "FAILED $f (exit $rc)"
+              fail=1
+              failed="$failed $f"
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "Failed modules:$failed"
+            exit 1
+          fi
+
+      - name: Smoke tests of the installed program
+        run: |
+          export PATH="/usr/local/bin:$PATH"
+          voxprint-audiobook-cli --selftest-imports
+          voxprint-audiobook-cli --selftest-text
+          voxprint-audiobook-cli --selftest-speech
+          voxprint-audiobook-cli --selftest
+          sudo apt-get install -y desktop-file-utils
+          desktop-file-validate /usr/share/applications/voxprint-audiobook-builder.desktop
+          # update path: running the installer again keeps the environment and succeeds quickly
+          VOXPRINT_SKIP_SUITE=1 VOXPRINT_BASE_URL=http://127.0.0.1:8099 bash build/linux-test/install-voxprint-linux.sh --yes --skip-check --skip-gpu-check
+          # the one-file archive installs from its own tree (no network for the program itself)
+          mkdir -p /tmp/tarcheck && tar xzf build/linux/Voxprint-linux-experimental.tar.gz -C /tmp/tarcheck
+          test -f /tmp/tarcheck/voxprint-linux/app/main.py
+          bash /tmp/tarcheck/voxprint-linux/install-voxprint-linux.sh --help | grep -q uninstall
+          # removal
+          bash build/linux-test/install-voxprint-linux.sh --uninstall
+          test ! -e /usr/local/bin/voxprint-audiobook-cli
+          test ! -e /usr/local/bin/voxprint
+          test ! -e /opt/voxprint-ai-suite/audiobook-builder
+          test ! -e /usr/share/applications/voxprint-audiobook-builder.desktop
+          test -d ~/.local/share/voxprint-ai-suite
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.path.expanduser("~/.local/share/voxprint-ai-suite"))
+          reg = root / "state" / "installed-apps.json"
+          apps = json.loads(reg.read_text(encoding="utf-8"))["apps"] if reg.is_file() else []
+          assert not any(a.get("id") == "audiobook-builder" for a in apps), apps
+          assert root.is_dir()
+          PY
+
+      - name: SHA-256 of the release assets
+        run: |
+          cd build/linux
+          sha256sum -c SHA256SUMS-linux.txt
+          cat SHA256SUMS-linux.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Voxprint-linux-experimental
+          path: |
+            build/linux/Voxprint-linux-app.zip
+            build/linux/Voxprint-linux-experimental.tar.gz
+            build/linux/manifest-linux.json
+            build/linux/voxprint-fetch.py
+            build/linux/install-voxprint-linux.sh
+            build/linux/SHA256SUMS-linux.txt
+

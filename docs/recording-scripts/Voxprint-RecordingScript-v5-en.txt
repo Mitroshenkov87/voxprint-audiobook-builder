@@ -1,0 +1,247 @@
+=== VOICE RECORDING FOR THE PROGRAM. READING SCRIPT, VERSION 5 (ENGLISH) ===
+
+[HOW TO READ. Four simple rules:]
+[1. Read only the ordinary lines. Everything in square brackets and the lines with === are hints: do not read them aloud.]
+[2. One line is one sentence. Read it, take an easy breath, wait a second, then go on to the next line.]
+[3. Stumbled? Stay silent for a second and read the same sentence again from its beginning. There is no need to stop the recording.]
+[4. You do not have to act out the emotions: a slight change of voice is enough. If it does not come naturally, use your normal voice. Blocks marked OPTIONAL can be skipped entirely.]
+[Before you start: a quiet room, the microphone a hand's width from your mouth, no sound enhancement.]
+
+=== BLOCK 1. GREETING ===
+[In a normal, friendly voice.]
+
+Hello there! This is a recording of my voice, and in a moment I will calmly read a short text for the program.
+The program will listen carefully, slowly learn to speak in a similar way, and then it will be able to read books and all sorts of texts aloud.
+I will read without hurrying, in an even voice, as if I were telling something to a good friend.
+There is no need to rush, and there is no audience waiting behind the door: only a quiet room and an honest recording.
+
+=== BLOCK 2. THE STORY OF THE IDEA ===
+[Calmly, as if you were telling a friend. This is the longest passage, so take your time.]
+
+Long ago, when computers filled whole rooms, people were already dreaming that a machine would one day learn to talk.
+The first talking devices sounded hollow and mechanical, and you could only understand them with a good deal of effort.
+Later came programs that put speech together from tiny snippets of recorded words, and they sounded much clearer, although they were still rather monotonous.
+For years everyone simply got used to robots reading in a flat and tiresome way, without a smile or a sigh.
+Yet a living voice always carries warmth: you can hear when a person is smiling, when they are tired, and when they are about to say something important.
+Then neural networks arrived, learning from real speech and noticing little things like intonation, breathing and the short pause before the right word.
+It turned out that a good result does not need dozens of hours of recording, only clean sound, a little patience and some time for training.
+The first smartphone had a very similar story.
+The touch screen, the music player and the internet had all existed long before it, but each of them lived on its own.
+Then somebody gathered them into one handy device, and everyone suddenly realised that this was how it should have been from the start.
+Something like that is happening with voices now: the right pieces have been lying on the table for a while, and all that remains is to put them together in a single window.
+Everything is done at home, on your own computer, and the recording of your voice is never sent anywhere.
+You simply choose a recording, press one button and wait calmly while the program gets used to your voice.
+The idea is really quite simple: let favourite books sound as if they were being read by someone close and familiar.
+
+=== BLOCK 3. NUMBERS AND DATES ===
+[Clearly and without hurrying.]
+
+Today is the third of October, twenty twenty-six, and the clock has just shown half past nine in the morning.
+The folder holds one hundred and twenty-four files, about three and a half gigabytes in all.
+The installation will take roughly fifteen minutes, while the training, depending on the computer, lasts anywhere from half an hour to two hours.
+The first version of the program came out in June, and the second one will appear in the autumn, closer to the end of October.
+Everything together costs one thousand two hundred and fifty dollars, which is a modest price rather than a high one.
+The internet runs at a hundred megabits per second, so the download should not drag on for long.
+The meeting is set for nine thirty in the morning, so it is better to leave a little early.
+The holidays run from the twenty-fifth of December to the ninth of January, and spring is welcomed on the eighth of March.
+Chapter twelve ends on page two hundred and forty-seven, and the next chapter begins at page two hundred and forty-eight.
+
+=== BLOCK 4. SMOOTH SENTENCES FOR DIFFERENT SOUNDS ===
+[In a normal voice, calmly, as in conversation. There are no tongue-twisters here: read smoothly and without rushing.]
+
+Rain was falling, and the wide river shone slowly under low grey clouds.
+A black cat sat on the warm windowsill and squinted at the bright morning light.
+The flowers stood in a yellow vase, and a faint scent of summer drifted through the room.
+We drove for a long time along a winding road through the forest, and then stopped by the river for a cup of hot tea.
+Bread, cheese and ripe apples lay on the table, which made the kitchen feel especially cosy.
+The children played in the yard until evening, until their parents called them home one after another.
+In winter, white smoke rose above the rooftops, and it seemed as though the whole town was breathing quietly.
+Grandmother baked cherry pies and always saved the most golden one for whoever arrived first.
+The boy drew a blue ship with great white sails and gave it to a younger sibling.
+Early in the morning a thick fog lay over the lake, and somewhere far away a bird called softly.
+A hedgehog hid under a big leaf and listened to the rain tapping on the branches.
+The wind rustled in the tall trees, and light leaves slowly circled above the path.
+Three thrushes thrived in the thicket while the southern wind shifted the soft shadows.
+Fresh fish sizzled in the skillet, and the chef checked the recipe with quiet care.
+The photographer framed five fragile photographs of frost on the window glass.
+Velvet violets and vivid roses filled the vase near the velvet chair.
+
+=== BLOCK 5. NEUTRAL ===
+[Evenly, like a news announcer.]
+
+The program starts and opens the main window right away, with the list of voices on the left and the text to be read on the right.
+It is enough to choose the voice you want and press the button, and the work begins.
+The finished file will appear in the chosen folder within a few minutes.
+Progress is shown as a simple percentage, and the status line names the current stage without unnecessary detail.
+
+=== BLOCK 6. CALM ===
+[Say it a little softer and slower, without hurrying.]
+
+A quiet evening has settled in, and outside the window the rain is murmuring gently.
+The tea on the table is slowly cooling, and the fan is running so quietly that you can hardly hear it.
+There is nowhere to rush to today, and it is lovely to simply sit in the silence without thinking about anything at all.
+The lamp throws a soft circle of light across the desk, and the rest of the room stays pleasantly dim.
+Breathing comes easily, and each sentence can land without any hurry at all.
+
+=== BLOCK 7. JOY ===
+[Say it a little warmer, with a smile. No need to act.]
+
+It worked! The voice has finished learning, and it sounds simply wonderful!
+What marvellous news, and every single check passed on the first try!
+Hooray, everything is ready, and now we can celebrate in peace!
+It is such a lovely day, and it makes me want to smile at everyone listening to this recording!
+I can hardly believe how clear it sounds, and I keep wanting to play the sample again.
+
+=== BLOCK 8. SADNESS ===
+[Say it a little softer and slower. No need to act.]
+
+Unfortunately it did not work out this time, and that is a little sad.
+The file was damaged, and however hard we tried, it could not be recovered.
+So many hours of work have been lost for nothing, and now everything has to start over from the beginning.
+It happens sometimes, and still it is a pity to lose all that time.
+The room feels quieter than usual, and even the rain outside sounds heavier.
+
+=== BLOCK 9. IRRITATION ===
+[Say it a little firmer and sharper, but do not shout. A few rough words appear here only as colour, now and then, inside ordinary sentences, and none of them is a swear word.]
+
+Not that same error again, and how many more times do I have to restart the whole thing?
+That is the third time in a row that it crashes in exactly the same place, and it is beginning to get on my nerves.
+Damn it, is it really so hard to find that bug and finally fix it?
+That stupid thing froze at the worst possible moment, and now there is a long wait ahead.
+That is enough, please: find the error and fix it as soon as you can!
+Why does the update keep breaking the same setting every single time?
+
+=== BLOCK 10. SURPRISE ===
+[Say it a little higher and livelier, as if you had been pleasantly surprised.]
+
+Can it really be true, and the program found the error all by itself?
+Well, how about that, nobody expected it to do that!
+Wait a moment, are you sure that this is not a real person reading right now?
+How does all of this even work?
+Look at that timing: the whole chapter finished sooner than anyone guessed!
+
+=== BLOCK 11. WHISPER AND LOUD ===
+[First whisper, closer to the microphone, but do not blow into it. Then loud: move a full arm's length away from the microphone and do not shout with all your strength.]
+[Whispering:]
+
+Quiet, please, everyone fell asleep ages ago, and the screen is barely glowing in the dark.
+Just do not make a sound, we will wait one more minute, and it will all work out.
+Keep your voice soft, because the hallway carries every little noise tonight.
+The file is almost ready, so stay still and breathe gently until the light stops blinking.
+
+[Loud:]
+
+Attention, save all your files while there is still time!
+Stop, do not turn off the computer while it is recording!
+Careful, everything is about to shut down, so press the Save button right now!
+
+=== BLOCK 12. STORY ONE: THE LAUNCH ===
+[Evenly, like a narrator in a book. The character's own words may be a little livelier.]
+
+Someone sat down at the computer, clicked on the program icon and settled in to wait patiently.
+The window did not appear at once: first a picture flashed on the screen, and then a thin bar began to crawl along.
+"Come on, you stubborn thing," the person muttered, "I am not planning to wait until the evening."
+Meanwhile the program was checking everything it needed, step by step, and doing it with surprising care.
+At last the words "Ready to work" appeared on the screen, and the person breathed out with relief.
+"Well, damn, it actually works," they said in amazement, and opened the first file.
+A short welcome message asked for a quiet room, a steady microphone and a little patience.
+
+=== BLOCK 13. STORY TWO: A CONVERSATION WITH THE PROGRAM ===
+[Read both roles yourself. Do not read the speaker names in brackets aloud. The person speaks more lively, the program more evenly and dryly.]
+
+[Person, lively]
+Tell me, please, how long will the training take?
+
+[Program, even and dry]
+About twenty minutes, but please do not close the window.
+
+[Person, surprised]
+That quickly? I thought we would be waiting for hours.
+
+[Program, even and dry]
+The graphics card is working well today, so everything is going faster than usual, and ninety percent remains.
+
+[Person, a little annoyed]
+What a dumb old driver that was, it wasted a whole week for nothing.
+
+[Program, even and dry]
+The driver has been updated, and there are no more errors.
+
+[Person, with a smile]
+Then I will make some tea in the meantime, and by the time I come back everything will be done.
+
+[Program, even and dry]
+A short break is fine, as long as the computer stays awake and the window stays open.
+
+[Person, curious]
+And if the power flickers for a second, will the progress survive?
+
+[Program, even and dry]
+Yes, the checkpoint is saved automatically, so the work can continue from the last safe step.
+
+=== BLOCK 14. STORY THREE: THE TRAINING ===
+[At first a little tense, calmer toward the end.]
+
+Late at night the only light in the room came from the screen, where numbers slowly replaced one another.
+The count of errors kept getting smaller, while the fan hummed louder and louder, as though the whole house were listening to that steady sound.
+"Come on, do not let me down, you silly hunk of metal," the person said quietly, though they knew perfectly well that nobody could hear.
+Then the numbers finally stopped, and a short message appeared: "Training complete."
+The person pressed the button with care, and a familiar, wonderfully clear voice came out of the speakers.
+For a moment nobody moved, as if a sudden noise might scare the new voice away.
+Then a sample sentence filled the room, warm and even, and the person laughed with quiet relief.
+
+=== BLOCK 15. OPTIONAL: STORY FOUR, A BAD DAY ===
+[You can skip this block entirely. Read it with a slight smile, like a funny story about a rotten day. Rough words such as "idiot" or "jerk" are aimed at the machine and the circumstances, never at real people. There is no swearing here.]
+
+The morning went wrong from the very beginning: the alarm did not ring, the tea went cold, and the computer greeted the day with a long and completely useless silence.
+"What a stubborn jerk of a machine," the person muttered, "it was working like a charm only yesterday."
+They restarted the system, waited, restarted it once more, and finally decided that some lousy driver was to blame for everything.
+"What idiot came up with an update like this?" they asked the empty room, and the room, as usual, said nothing.
+When the screen finally came to life, it turned out that all the work from the night before had been saved, which was a small miracle.
+"You daft thing, I should have known better," the person said fondly, but pressed the Save button twice anyway, just in case.
+By evening it became clear that the whole trouble had come from one stupid cable that somebody had caught with a foot, and of course nobody admitted to it.
+"What a load of nonsense," the person thought, "all this fuss over one little cable."
+And the printer, that bloody nuisance, never did accept the new driver, so the person only waved a hand, with no anger left at all.
+"Well, what a day, I must say," they said, laughed, and poured a fresh cup of tea.
+
+=== BLOCK 16. OPTIONAL: TERMS ===
+[You can skip this block entirely. These are difficult or foreign words from the program. Read them one by one, with a pause after each. In brackets is how the word is written in the program; do not read it aloud.]
+
+Voxprint
+LoRA adapter [LoRA]
+Qwen three T T S [Qwen3-TTS]
+neural network
+speech synthesis
+speech recognition
+graphics card
+driver
+pipeline
+cache
+server
+inference
+checkpoint
+epoch
+gradient
+bug
+script
+commit
+release
+gigabyte
+megabit
+processor
+interface
+microphone
+audio file
+voice training
+
+=== BLOCK 17. VOICE OWNER CONSENT — VERY END OF THE RECORDING ===
+[Calmly, clearly, in your normal voice. Read ONE sentence of the three: the one with the level of permission you really give. Do not read the other two. This is the only exception to the rule about brackets: instead of the words in square brackets, say your own name and today's date. The program recognises the sentence, works out the name, the date and the level, and shows you the result for confirmation. If the sentence is unclear, the strictest level, "personal use only", will be chosen. This is a record of your consent, not legal advice. Read this sentence only if the voice is yours or you have the voice owner's permission. This block is not part of the training text.]
+
+A. COMMERCIAL (the audio may be sold):
+I, [YOUR NAME], today, [DATE, e.g. October third, twenty twenty-six], give permission to use this recording and the characteristics of my voice for training neural networks and for speech synthesis, including commercial purposes: the audio may be sold.
+
+B. PUBLIC NON-COMMERCIAL (may be published free, not sold):
+I, [YOUR NAME], today, [DATE, e.g. October third, twenty twenty-six], give permission to use this recording and the characteristics of my voice for training neural networks and for speech synthesis for non-commercial purposes: the audio may be published freely but may not be sold.
+
+C. PRIVATE ONLY (not to be published):
+I, [YOUR NAME], today, [DATE, e.g. October third, twenty twenty-six], give permission to use this recording and the characteristics of my voice for training neural networks and for speech synthesis for personal use only: the audio must not be published and must stay on the user's computer.

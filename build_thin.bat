@@ -1,0 +1,82 @@
+@echo off
+rem  THIN shell of Voxprint (see docs\THIN-INSTALLER.md).  Same environment as build.bat (run build.bat once, or at least its venv
+rem  and "uv pip install" steps, first): this script only runs PyInstaller with the heavy libraries EXCLUDED, so the folder
+rem  dist\thin\voxprint-audiobook-builder contains Qt, numpy, soundfile and the program (about 150-250 MB) - nothing else.  The libraries it leaves
+rem  out are packed as runtime modules by installer\build_online.ps1 -Thin and downloaded by the app (infra\modules.py).
+rem  pydub and audioop-lts (the audioop module on Python 3.13+) stay in the audio module, not in this shell.
+rem  Usage:  build_thin.bat   then   powershell installer\build_online.ps1 -Dist "dist\thin\voxprint-audiobook-builder" -Tag v0.1.0-beta -Thin
+setlocal
+chcp 65001 >nul
+cd /d "%~dp0"
+if not exist ".venv\Scripts\python.exe" ( echo [ERROR] Run build.bat first ^(it creates .venv^). & exit /b 1 )
+call .venv\Scripts\activate.bat
+if not exist "build\notices" mkdir "build\notices"
+python tools\gen_notices.py --with-installed --out "build\notices\THIRD_PARTY_NOTICES.md" || (echo [ERROR] THIRD_PARTY_NOTICES.md was not created. & exit /b 1)
+
+set HEAVY=torch torchaudio transformers tokenizers safetensors huggingface_hub hf_xet accelerate peft bitsandbytes sentencepiece ^
+ scipy librosa numba llvmlite sklearn joblib onnxruntime av nagisa qwen_asr qwen_tts einops sox pydub imageio_ffmpeg PIL ^
+ pymorphy3 pymorphy3_dicts_ru ru_normalizr rutextnorm num2words eng_to_ipa dynet cython yaml regex requests urllib3 tqdm
+set EXCL=
+for %%m in (%HEAVY%) do call set EXCL=%%EXCL%% --exclude-module %%m
+
+rem  The runtime (PyTorch & co.) is downloaded later and imports the WHOLE standard library (timeit, unittest ...): bundle all of it.
+python tools\gen_stdlib_bundle.py build\stdlib_bundle || (echo [ERROR] stdlib list. & exit /b 1)
+
+rem  PyInstaller drops the *.dist-info of bundled packages; the downloaded libraries look them up (transformers: "No package metadata was
+rem  found for packaging").  Copy the metadata of every shell package listed in infra\runtime_lock.json "shell".
+set META=
+for /f "delims=" %%a in ('python tools\make_runtime_lock.py --pyinstaller-metadata-args') do set META=%%a
+if "%META%"=="" (echo [ERROR] shell metadata list. & exit /b 1)
+
+rem  Bake the CI build number into core\build_stamp.py so the frozen code knows it, then restore the git values.
+python tools\embed_build_stamp.py --write-module || (echo [ERROR] build stamp. & exit /b 1)
+
+echo === Build thin shell ===
+pyinstaller --onedir --windowed --noconfirm --clean --name "voxprint-audiobook-builder" --distpath dist\thin --workpath build\thin-work --specpath build\thin-work ^
+  --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" --add-data "%CD%\assets\splash.jpg;assets" --add-data "%CD%\assets\easter-egg.jpg;assets" ^
+  --add-data "%CD%\assets\icons;assets\icons" ^
+  --paths "%CD%" --paths "%CD%\infra" --paths "%CD%\third_party" --paths "%CD%\build\stdlib_bundle" --hidden-import _vx_stdlib ^
+  --hidden-import openvoice --hidden-import openvoice.models --hidden-import openvoice.modules ^
+  --hidden-import openvoice.attentions --hidden-import openvoice.commons ^
+  --hidden-import openvoice.mel_processing --hidden-import openvoice.transforms ^
+  --add-data "%CD%\infra\verified_manifest.json;infra" --add-data "%CD%\infra\assets_manifest.json;infra" --add-data "%CD%\infra\runtime_lock.json;infra" ^
+  --add-data "%CD%\locales;locales" --add-data "%CD%\prompts;prompts" --add-data "%CD%\credits.json;." --add-data "%CD%\licenses;licenses" ^
+  --add-data "%CD%\core\data;core\data" ^
+  --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^
+  --collect-submodules core --collect-submodules infra --collect-submodules ui --collect-submodules workers --collect-submodules tools ^
+  --hidden-import netroute --hidden-import soundfile --collect-all certifi --collect-all voxprint_common ^
+  --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
+  %META% %EXCL% main.py
+set PYI_ERR=%ERRORLEVEL%
+python tools\embed_build_stamp.py --restore-module
+if not "%PYI_ERR%"=="0" (echo [ERROR] PyInstaller failed. & exit /b 1)
+rem  The bootloader ignores a trailer. Swapping only this exe updates the build status reports.
+python tools\embed_build_stamp.py --exe "%CD%\dist\thin\voxprint-audiobook-builder\voxprint-audiobook-builder.exe" || (echo [ERROR] exe stamp. & exit /b 1)
+
+rem  Console companion: same code, console subsystem, so a script gets this process's exit code.
+rem  This second PyInstaller stays AFTER the windowed exe stamp (tests/test_shell_metadata.py).
+rem  Only the exe is copied into the windowed folder; both share that folder's _internal.
+echo === Build console companion ===
+pyinstaller --onedir --console --noconfirm --name voxprint-audiobook-cli --distpath dist\thin --workpath build\thin-cli-work --specpath build\thin-cli-work ^
+  --icon "%CD%\assets\voxprint.ico" --add-data "%CD%\assets\voxprint.ico;assets" --add-data "%CD%\assets\check.png;assets" --add-data "%CD%\assets\splash.jpg;assets" --add-data "%CD%\assets\easter-egg.jpg;assets" ^
+  --add-data "%CD%\assets\icons;assets\icons" ^
+  --paths "%CD%" --paths "%CD%\infra" --paths "%CD%\third_party" --paths "%CD%\build\stdlib_bundle" --hidden-import _vx_stdlib ^
+  --hidden-import openvoice --hidden-import openvoice.models --hidden-import openvoice.modules ^
+  --hidden-import openvoice.attentions --hidden-import openvoice.commons ^
+  --hidden-import openvoice.mel_processing --hidden-import openvoice.transforms ^
+  --add-data "%CD%\infra\verified_manifest.json;infra" --add-data "%CD%\infra\assets_manifest.json;infra" --add-data "%CD%\infra\runtime_lock.json;infra" ^
+  --add-data "%CD%\locales;locales" --add-data "%CD%\prompts;prompts" --add-data "%CD%\credits.json;." --add-data "%CD%\licenses;licenses" ^
+  --add-data "%CD%\core\data;core\data" ^
+  --add-data "%CD%\build\notices\THIRD_PARTY_NOTICES.md;." ^
+  --collect-submodules core --collect-submodules infra --collect-submodules ui --collect-submodules workers --collect-submodules tools ^
+  --hidden-import netroute --hidden-import soundfile --collect-all certifi --collect-all voxprint_common ^
+  --exclude-module gradio --exclude-module flask --exclude-module soynlp --exclude-module tkinter --exclude-module matplotlib ^
+  %META% %EXCL% main.py
+if errorlevel 1 (echo [ERROR] Console PyInstaller failed. & exit /b 1)
+copy /Y "dist\thin\voxprint-audiobook-cli\voxprint-audiobook-cli.exe" "dist\thin\voxprint-audiobook-builder\voxprint-audiobook-cli.exe" || (echo [ERROR] voxprint-audiobook-cli.exe was not copied. & exit /b 1)
+copy /Y "voxprint-app-models.json" "dist\thin\voxprint-audiobook-builder\voxprint-app-models.json" || exit /b 1
+copy /Y "installer\voxprint-mdl.cmd" "dist\thin\voxprint-audiobook-builder\voxprint-mdl.cmd" || exit /b 1
+python tools\embed_build_stamp.py --exe "%CD%\dist\thin\voxprint-audiobook-builder\voxprint-audiobook-cli.exe" || (echo [ERROR] cli exe stamp. & exit /b 1)
+rmdir /s /q "dist\thin\voxprint-audiobook-cli"
+echo Thin shell: dist\thin\voxprint-audiobook-builder  ^(the packaging step adds _internal\modules.json^)
+endlocal

@@ -1,0 +1,298 @@
+"""VOXPrint MDL: the app manifest, the ready gate, voice migration, and release-tag checks."""
+import importlib.util
+import io
+import json
+import zipfile
+from pathlib import Path
+
+import pytest
+
+import cli
+from infra import mdl_gate, paths
+from infra.stdio_guard import write_utf8
+from tools import check_manifest_tags as tags
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_app_manifest_lists_required_models_and_leaves_the_rest_on_demand():
+    document = json.loads((ROOT / "voxprint-app-models.json").read_text(encoding="utf-8"))
+    assert document["schema"] == 1 and document["app"] == "audiobook-builder"
+    by_id: dict[str, list[dict]] = {}
+    for model in document["models"]:
+        by_id.setdefault(model["id"], []).append(model)
+    tiers = {row["vram_tier"] for row in by_id["qwen3-tts"]}
+    assert tiers == {"8gb", "16gb"}
+    assert all(not row["on_demand"] for row in by_id["qwen3-tts"])
+    assert by_id["qwen3-tts-tokenizer"][0]["on_demand"] is False
+    assert by_id["voice-levi"][0]["on_demand"] is False
+    assert by_id["voice-miriam"][0]["on_demand"] is False
+    for name in ("opus-mt-tc-big-en-zle", "opus-mt-en-ru"):
+        assert by_id[name][0]["on_demand"] is False
+    for name in ("gemma-4-12b", "ace-step", "voice-natan", "voice-rivka"):
+        assert by_id[name][0]["on_demand"] is True
+    blob = json.dumps(document)
+    assert "yo" not in {row["id"] for row in document["models"]}
+    assert "core/data" not in blob
+
+
+def test_app_manifest_fills_the_mdl_display_fields_and_keeps_vram_tiers():
+    document = json.loads((ROOT / "voxprint-app-models.json").read_text(encoding="utf-8"))
+    expected = {
+        ("qwen3-tts", "8gb"): ("Qwen3-TTS 0.6B", "Compact narrator for 8 GB cards.", "voice"),
+        ("qwen3-tts", "16gb"): ("Qwen3-TTS 1.7B Base", "Default narrator for 16 GB cards.", "voice"),
+        ("qwen3-tts-tokenizer", "any"): ("Qwen3-TTS speech tokenizer", "Tokenizes speech for the Qwen3-TTS narrators.", "internal"),
+        ("qwen3-forcedaligner", "any"): ("Qwen3 Forced Aligner 0.6B", "Aligns a transcript with the recording during voice training.", "transcribe"),
+        ("qwen3-asr-1.7b", "any"): ("Qwen3-ASR 1.7B", "Recognizes speech; the default recognizer on NVIDIA GPUs.", "transcribe"),
+        ("qwen3-asr-0.6b", "any"): ("Qwen3-ASR 0.6B", "Recognizes speech on weaker GPUs, on the CPU, or when chosen in Settings.", "transcribe"),
+        ("sage-fredt5", "any"): ("SAGE FRED-T5", "Cleans up Russian text before narration.", "internal"),
+        ("openvoice-v2", "any"): ("OpenVoice V2", "Converts a recording to sound like your voice.", "voice"),
+        ("dnsmos", "any"): ("DNSMOS P.835", "Scores how clean and natural a recording sounds.", "internal"),
+        ("deepfilternet", "any"): ("DeepFilterNet3", "Noise clean-up for recordings.", "restore"),
+        ("opus-mt-en-ru", "any"): ("English to Russian", "Translates book text from English to Russian.", "translate"),
+        ("opus-mt-ru-en", "any"): ("Russian to English", "Translates book text from Russian to English.", "translate"),
+        ("opus-mt-tc-bible-big-deu-eng-fra-por-spa-gmw", "any"): ("European to West Germanic", "Translates West European book text into English or German.", "translate"),
+        ("opus-mt-tc-bible-big-gmw-deu-eng-fra-por-spa", "any"): ("West Germanic to European", "Translates English or German book text into West European languages.", "translate"),
+        ("opus-mt-tc-big-de-zle", "any"): ("German to East Slavic", "Translates book text from German to Russian or Ukrainian.", "translate"),
+        ("opus-mt-tc-big-en-zle", "any"): ("English to East Slavic", "Translates book text from English to Russian or Ukrainian.", "translate"),
+        ("opus-mt-tc-big-zle-de", "any"): ("East Slavic to German", "Translates book text from Russian or Ukrainian to German.", "translate"),
+        ("opus-mt-tc-big-zle-en", "any"): ("East Slavic to English", "Translates book text from Russian or Ukrainian to English.", "translate"),
+        ("gemma-4-12b", "any"): ("Gemma 4 12B", "Drafts speaker marks and book structure.", "writer"),
+        ("ace-step", "any"): ("ACE-Step", "Creates background music and ambience for the audiobook.", "generate"),
+        ("voice-open-universal", "any"): ("Open universal voice", "Open English voice trained on public-domain LJ Speech.", "voice"),
+        ("voice-noa", "any"): ("Noa", "Optional female Russian voice for narration.", "voice"),
+        ("voice-levi", "any"): ("Levi", "Male Russian voice for narration.", "voice"),
+        ("voice-natan", "any"): ("Natan", "Male Russian voice for narration.", "voice"),
+        ("voice-shimon", "any"): ("Shimon", "Male Russian voice for narration.", "voice"),
+        ("voice-miriam", "any"): ("Miriam", "Female Russian voice for narration.", "voice"),
+        ("voice-rivka", "any"): ("Rivka", "Female Russian voice for narration.", "voice"),
+    }
+    groups = {"generate", "edit", "upscale", "restore", "voice", "transcribe", "translate", "writer", "safety", "internal"}
+    seen = set()
+    for row in document["models"]:
+        key = (row["id"], row["vram_tier"])
+        seen.add(key)
+        assert key in expected, key
+        label, purpose, group = expected[key]
+        assert row["label"] == label
+        assert row["purpose"] == purpose
+        assert row["group"] == group and group in groups
+        assert len(row["label"]) <= 40 and len(row["purpose"]) <= 80 and "\n" not in row["purpose"]
+    assert seen == set(expected)
+    tiers = {row["vram_tier"] for row in document["models"] if row["id"] == "qwen3-tts"}
+    assert tiers == {"8gb", "16gb"}
+
+
+def test_models_ready_asks_mdl_for_this_app(monkeypatch):
+    monkeypatch.delenv("VOXPRINT_SKIP_SUITE", raising=False)
+    seen = []
+
+    def fake(target=None):
+        seen.append(target)
+        return target == "audiobook-builder"
+
+    monkeypatch.setattr(mdl_gate, "ready", fake)
+    assert mdl_gate.models_ready() is True
+    assert seen == ["audiobook-builder"]
+    monkeypatch.setattr(mdl_gate, "ready", lambda target=None: False)
+    assert mdl_gate.models_ready() is False
+
+
+def test_skip_suite_does_not_ask_mdl(monkeypatch):
+    monkeypatch.setenv("VOXPRINT_SKIP_SUITE", "1")
+
+    def fake(target=None):
+        raise AssertionError(target)
+
+    monkeypatch.setattr(mdl_gate, "ready", fake)
+    assert mdl_gate.models_ready() is True
+
+
+def test_installers_download_without_asking_ready():
+    iss = (ROOT / "installer" / "Voxprint.iss").read_text(encoding="utf-8-sig")
+    body = iss[iss.index("procedure RunSuiteInstall"):iss.index("procedure AddAppToUserPath")]
+    assert "SkipSuiteInstall()" in body
+    assert body.index("SkipSuiteInstall()") < body.index("download --app audiobook-builder")
+    assert iss.index("procedure UnregisterSuite();") < iss.index("procedure RunSuiteInstall();")
+    assert "--json" in body and "ready()" not in body and "mdl.ready" not in body
+    linux = (ROOT / "installer" / "linux" / "install-voxprint-linux.sh").read_text(encoding="utf-8")
+    block = linux[linux.index("Downloading the required models"):linux.index("Creating the launcher")]
+    assert "download --app audiobook-builder" in block and "--json" in block
+    assert "ready" not in block
+
+
+def test_narrate_exits_4_when_models_are_not_ready(tmp_path, monkeypatch):
+    monkeypatch.delenv("VOXPRINT_SKIP_SUITE", raising=False)
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "home"))
+    monkeypatch.setattr(mdl_gate, "ready", lambda target=None: False)
+    book = tmp_path / "book.txt"
+    book.write_text("Hello\n", encoding="utf-8")
+    out = tmp_path / "out"
+    out.mkdir()
+    code = cli.main(["narrate", str(book), "--voice", "levi", "--out", str(out), "--json"])
+    assert code == cli.EXIT_MISSING
+
+
+def test_status_runs_when_models_are_not_ready(tmp_path, monkeypatch):
+    monkeypatch.delenv("VOXPRINT_SKIP_SUITE", raising=False)
+    monkeypatch.setenv("VOXPRINT_HOME", str(tmp_path / "home"))
+    monkeypatch.setattr(mdl_gate, "ready", lambda target=None: False)
+    assert cli.main(["status", "--json"]) == 0
+
+
+def test_json_result_writes_cyrillic_as_utf8(monkeypatch):
+    buf = io.BytesIO()
+    wrapper = io.TextIOWrapper(buf, encoding="cp1252", newline="\n")
+    monkeypatch.setattr(cli.sys, "stdout", wrapper)
+    monkeypatch.setattr(cli.sys, "stderr", io.StringIO())
+    cli._json_stdout = None
+    cli.begin_json_stdout()
+    try:
+        cli._emit_result(
+            ok=False, command="narrate", exit_code=4, outputs=[], warnings=[], duration_s=0.1,
+            error="Готово", hint=None,
+        )
+        wrapper.flush()
+        text = buf.getvalue().decode("utf-8")
+    finally:
+        cli.end_json_stdout()
+    assert "Готово" in text and "\\u" not in text
+
+
+def test_json_is_utf8_when_the_console_cannot_change_code_page(monkeypatch):
+    buf = io.BytesIO()
+
+    class Stuck(io.TextIOWrapper):
+        def reconfigure(self, **kwargs):
+            raise OSError("code page")
+
+    wrapper = Stuck(buf, encoding="cp1252", newline="\n")
+    monkeypatch.setattr(cli.sys, "stdout", wrapper)
+    monkeypatch.setattr(cli.sys, "stderr", io.StringIO())
+    cli._json_stdout = None
+    cli.begin_json_stdout()
+    try:
+        cli._emit_result(
+            ok=False, command="status", exit_code=1, outputs=[], warnings=[], duration_s=0.1,
+            error="Готово", hint=None,
+        )
+    finally:
+        cli.end_json_stdout()
+    text = buf.getvalue().decode("utf-8")
+    assert "Готово" in text and "\\u" not in text
+    write_utf8(wrapper, "ещё")
+    assert "ещё" in buf.getvalue().decode("utf-8")
+
+
+def test_existing_voices_move_into_the_shared_folder(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    monkeypatch.setenv("VOXPRINT_HOME", str(home))
+    old = tmp_path / "old"
+    (old / "state").mkdir(parents=True)
+    monkeypatch.setattr(paths, "previous_homes", lambda: [old])
+    voice = old / "voices" / "levi"
+    voice.mkdir(parents=True)
+    (voice / "voice.json").write_text('{"id": "levi"}\n', encoding="utf-8")
+    shared = home / "shared" / "voices" / "miriam"
+    shared.mkdir(parents=True)
+    (shared / "voice.json").write_text('{"id": "miriam"}\n', encoding="utf-8")
+    target = paths.voices_dir()
+    assert (target / "levi" / "voice.json").is_file()
+    assert (target / "miriam" / "voice.json").is_file()
+    assert not (shared / "voice.json").exists()
+
+
+def test_a_missing_model_is_not_downloaded_here(tmp_path, monkeypatch):
+    """ensure_model asks VOXPrint MDL (never the app itself); a missing model is a Manage-models error, not a download."""
+    from core.errors import ModelDownloadError
+    from infra import model_downloader as md
+
+    import subprocess
+
+    def boom(*a, **k):
+        raise AssertionError("the app must not start a download process")
+
+    monkeypatch.setattr(subprocess, "Popen", boom)
+    with pytest.raises(ModelDownloadError) as ei:
+        md.ensure_model("Qwen/Qwen3-ForcedAligner-0.6B", lambda s, f, m: None)
+    assert "Manage models" in str(ei.value)
+    assert importlib.util.find_spec("infra.parallel_download") is None
+
+
+def test_manage_models_opens_the_mdl_window():
+    argv = mdl_gate.manage_argv()
+    assert "download" not in argv and "ensure" not in argv
+    assert argv[argv.index("--manifest") + 1] == str(mdl_gate.manifest_path())
+    assert argv[argv.index("--gui") + 1] == "--app"
+    assert "audiobook-builder" in argv
+
+
+def test_a_manifest_url_for_a_missing_tag_fails(tmp_path):
+    good = tmp_path / "local.json"
+    good.write_text(json.dumps({"url": "http://127.0.0.1:8097/manifest-thin-beta.json"}), encoding="utf-8")
+    bad = tmp_path / "remote.json"
+    bad.write_text(json.dumps({
+        "url": "https://github.com/Mitroshenkov87/voxprint-audiobook-builder/releases/download/v0.0.0-dev/manifest-thin-beta.json",
+    }), encoding="utf-8")
+    seen = []
+
+    def exists(repo, tag):
+        seen.append((repo, tag))
+        return tag != "v0.0.0-dev"
+
+    assert tags.check([good, bad], exists=exists) == [
+        f"{bad}: GitHub tag v0.0.0-dev does not exist (Mitroshenkov87/voxprint-audiobook-builder)",
+    ]
+    assert seen == [("Mitroshenkov87/voxprint-audiobook-builder", "v0.0.0-dev")]
+    assert tags.check([good], exists=exists) == []
+
+
+def test_cli_imports_the_stock_voice_into_the_shared_folder(tmp_path, monkeypatch, capsys):
+    """The window and the CLI both read ``<home>/voices``. A full install leaves the zip in an MDL view."""
+    from core.voice_library import VoiceLibrary
+    from infra import mdl_models
+
+    blob = io.BytesIO()
+    with zipfile.ZipFile(blob, "w") as archive:
+        archive.writestr("adapter_model.safetensors", b"adapter")
+        archive.writestr("adapter_config.json", b"{}")
+        archive.writestr("voice.json", json.dumps({"schema": 3, "name": "Levi", "language": "en", "license": "CC-BY-4.0"}))
+    raw = blob.getvalue()
+    view = tmp_path / "views" / "audiobook-builder" / "voice-levi-deadbeef"
+    (view / "voices").mkdir(parents=True)
+    (view / "voices" / "levi.zip").write_bytes(raw)
+
+    monkeypatch.delenv("VOXPRINT_SKIP_SUITE", raising=False)
+    monkeypatch.setattr(mdl_gate, "_reported_ready", lambda: True)
+    monkeypatch.setattr(mdl_gate, "inspect_view", lambda *a, **k: "ok")
+    monkeypatch.setattr(mdl_models, "view_dir", lambda model_id: view)
+    assert cli.main(["voices", "list"]) == 0
+    listed = capsys.readouterr().out
+    assert listed.split("\t", 1)[0] == "levi"
+    folder = paths.voices_dir() / "levi"
+    assert (folder / "voice.json").is_file()
+    assert VoiceLibrary().root == paths.voices_dir()
+    assert [voice.id for voice in VoiceLibrary().list_voices()] == ["levi"]
+
+
+def test_pydub_syntaxwarning_and_the_flash_attn_note_stay_quiet():
+    import sys
+    import warnings
+
+    from infra import diagnostics
+
+    out, err = sys.stdout, sys.stderr
+    try:
+        diagnostics.silence_library_notes()
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.warn_explicit(
+                r"invalid escape sequence '\.'", SyntaxWarning, filename="pydub/utils.py", lineno=1, module="pydub.utils",
+            )
+            warnings.warn_explicit("keep me", SyntaxWarning, filename="other.py", lineno=1, module="other")
+        assert [item.message.args[0] for item in caught] == ["keep me"]
+    finally:
+        sys.stdout, sys.stderr = out, err
+    buf = io.StringIO()
+    quiet = diagnostics._QuietNotes(buf)
+    quiet.write("Warning: flash-attn is not installed\nkept line\n")
+    assert buf.getvalue() == "kept line\n"

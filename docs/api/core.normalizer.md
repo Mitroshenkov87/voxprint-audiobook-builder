@@ -1,0 +1,3 @@
+# `core.normalizer`
+
+::: core.normalizer

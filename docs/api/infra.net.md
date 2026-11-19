@@ -1,0 +1,3 @@
+# `infra.net`
+
+::: infra.net

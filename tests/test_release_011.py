@@ -1,0 +1,269 @@
+"""0.1.1 fixes from the first PC test: no stray start-up window, aligned Settings, one "Check & repair" button, dialogs
+with the main window's look, the window size after Narrate, the projects folder, FLAC training clips."""
+import os
+
+import pytest
+
+pytest.importorskip("PySide6")
+from PySide6.QtCore import QEvent, QObject, QSize  # noqa: E402
+from PySide6.QtWidgets import QApplication, QComboBox, QGridLayout  # noqa: E402
+
+from tests.test_studio import app, lib, make_studio  # noqa: E402,F401
+
+
+class _Shows(QObject):
+    def __init__(self):
+        super().__init__()
+        self.windows = []
+
+    def eventFilter(self, obj, e):  # noqa: N802
+        if e.type() == QEvent.Type.Show and obj.isWidgetType() and obj.isWindow():
+            self.windows.append(type(obj).__name__ + ":" + obj.objectName())
+        return False
+
+
+def test_no_stray_top_level_window_while_the_studio_is_built(app, lib):  # noqa: F811
+    """A button made visible before it had a parent flashed as its own blank "Voxprint" window at start-up."""
+    f = _Shows()
+    app.installEventFilter(f)
+    try:
+        s = make_studio(lib)
+        s.show_studio()
+        QApplication.processEvents()
+    finally:
+        app.removeEventFilter(f)
+    assert f.windows == ["StudioWindow:root"], f.windows
+    assert not s.narrate_window.btn_back.isHidden() and s.narrate_window.btn_back.parent() is not None
+    s.shutdown()
+
+
+def test_settings_combos_share_one_grid_and_repair_is_one_button(app, lib):  # noqa: F811
+    from core import i18n
+
+    i18n.set_language("en")
+    s = make_studio(lib)
+    d = s.settings_dialog()
+    grids = [lay for lay in d.findChildren(QGridLayout)]
+    combos = (d.cmb_lang, d.cmb_transparency, d.cmb_net, d.cmb_asr)
+    assert any(all(g.indexOf(c) >= 0 for c in combos) for g in grids)
+    assert all(c.sizeAdjustPolicy() == QComboBox.SizeAdjustPolicy.AdjustToContents for c in combos)
+    assert d.btn_repair is d.btn_autorepair and d.btn_autorepair.text() == "Check && repair"
+    assert "SHA-256" in d.lbl_repair_desc.text()
+    s.shutdown()
+
+
+def test_dialogs_use_the_glass_look(app):  # noqa: F811
+    from PySide6.QtCore import Qt
+
+    from ui.about_dialog import AboutDialog
+    from ui.glass import GlassDialog
+    from ui.modules_dialog import ModulesDialog
+    from ui.settings_dialog import SettingsDialog
+    from ui.upgrade_dialog import UpgradeOfferDialog
+
+    for cls in (AboutDialog, ModulesDialog, SettingsDialog, UpgradeOfferDialog):
+        assert issubclass(cls, GlassDialog)
+    d = AboutDialog()
+    assert d.objectName() == "root" and d.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+    d.show()
+    QApplication.processEvents()
+    assert d.styleSheet()                      # apply_look ran on show
+    d.close()
+
+
+def test_back_from_narrate_restores_the_earlier_size(app, lib):  # noqa: F811
+    s = make_studio(lib)
+    s.show_studio()
+    s.resize(900, 600)
+    QApplication.processEvents()
+    s.narrate_window.wide_width = lambda: 1300
+    s.navigate("narrate")
+    QApplication.processEvents()
+    s.navigate("studio")
+    QApplication.processEvents()
+    assert s.size() == QSize(900, 600) or s.width() <= 900
+    s.shutdown()
+
+
+def test_accessible_names_of_the_cards(app, lib):  # noqa: F811
+    s = make_studio(lib)
+    assert s.card_narrate.accessibleName() and s.card_train.accessibleDescription()
+    s.shutdown()
+
+
+def test_projects_folder_default_choice_onedrive_and_shortcut(tmp_path, monkeypatch):
+    from infra import paths, projects
+
+    assert projects.projects_dir() == paths.app_home() / "Projects" and projects.projects_dir().is_dir()
+    other = tmp_path / "big" / "Projects"
+    assert projects.set_projects_dir(other) == other and projects.sub(projects.VOICES) == other / "Voices"
+    assert projects.set_projects_dir(None) == paths.app_home() / "Projects"
+    monkeypatch.setenv("OneDrive", str(tmp_path / "OneDrive"))
+    assert projects.in_onedrive(tmp_path / "OneDrive" / "Documents" / "Voxprint")
+    assert not projects.in_onedrive(tmp_path / "local")
+    assert projects.documents_dir(lambda: str(tmp_path / "OneDrive" / "Documents")) == tmp_path / "OneDrive" / "Documents"
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    made = []
+    link = projects.ensure_shortcut(other, docs, make_link=lambda lnk, tgt: made.append((lnk, tgt)))
+    assert link is not None and link.parent == docs and made == [(link, other)]
+    if os.name != "nt":
+        assert projects.ensure_shortcut(other, docs) == docs / "VOXPrint Projects"
+        assert (docs / "VOXPrint Projects").resolve() == other.resolve()
+
+
+def test_training_project_goes_into_the_projects_folder(tmp_path):
+    from workers.pipeline_runner import TaskRequest
+
+    req = TaskRequest(kind="dataset", audio=tmp_path / "a" / "anna.wav", text=tmp_path / "a" / "t.txt",
+                      projects_root=tmp_path / "Projects" / "Voices")
+    assert req.resolved_root() == tmp_path / "Projects" / "Voices" / "anna_Voxprint"
+    old = TaskRequest(kind="dataset", audio=tmp_path / "a" / "anna.wav", text=tmp_path / "a" / "t.txt")
+    assert old.resolved_root().parent == (tmp_path / "a").resolve()
+
+
+def test_training_clips_are_flac():
+    from core.types import Segment
+
+    assert Segment(index=7, start=0.0, end=1.0, text="x").filename == "segment_007.flac"
+
+
+def test_build_number_and_codename(tmp_path, monkeypatch):
+    import json
+
+    from tools import build_number as bn
+
+    # offset is history. The number is BUILD.json "build" (1006) or a tag that ends in +N / -buildN.
+    # GITHUB_RUN_NUMBER is ignored, including the runs that used to move the offset.
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "57"}) == 1006
+    assert bn.build_number({"GITHUB_RUN_NUMBER": "56"}) == 1006
+    assert bn.build_number({}) == 1006
+    assert bn.build_number({"GITHUB_REF": "refs/tags/v1.0.0-rc.4", "GITHUB_REF_NAME": "v1.0.0-rc.4"}) == 1006
+    assert bn.build_number({"REL_TAG": "v1.0.0-rc.5+1005", "GITHUB_RUN_NUMBER": "99"}) == 1005
+    assert bn.build_number({"GITHUB_REF": "refs/tags/v1.0.0-rc.5-build1003",
+                            "GITHUB_REF_NAME": "v1.0.0-rc.5-build1003"}) == 1003
+    assert bn.build_number({"VOXPRINT_BUILD": "700", "GITHUB_RUN_NUMBER": "34", "REL_TAG": "v1.0.0-rc.5+1005"}) == 700
+    assert bn.build_number({"VOXPRINT_BUILD": "0"}) == 0
+    assert bn.info()["build"] == 1006
+    assert bn.info()["offset"] == 944
+    note = bn.info()["offset_note"]
+    assert "946" in note and "run 53" in note and "Nachon" in note and "run 55 + 945 = 1000" in note and "Chazak" in note
+    assert "run 56 + 945 = 1001" in note and "run 57 + 944 = 1001" in note and "Tamim" in note
+    assert "1002" in note and "Ometz" in note and "v1.0.0-rc.4" in note
+    assert "1003" in note and "Amud" in note and "v1.0.0-rc.5" in note
+    assert "1004" in note and "Shomer" in note and "v1.0.0-rc.6" in note
+    assert "1005" in note and "Yachad" in note and "v1.0.0-rc.7" in note
+    assert "1006" in note and "Chesed" in note and "v1.0.0-rc.8" in note
+    name = bn.info()["codename"]
+    assert name == "Chesed" and name.isascii() and name.isalpha()
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    credits = json.loads((root / "credits.json").read_text(encoding="utf-8"))
+    assert credits["app"]["version"] == "1.0.0-rc.8" and credits["app"]["channel"] == "rc"
+    assert credits["app"]["codename"] == "Chesed"
+    iss = (root / "installer" / "Voxprint.iss").read_text(encoding="utf-8")
+    assert '#define AppVersion "1.0.0-rc.8"' in iss
+    assert '#define AppVersionInfo "1.0.0"' in iss
+    assert "VersionInfoVersion={#AppVersionInfo}.{#AppBuild}" in iss
+    log = (root / "CHANGELOG.md").read_text(encoding="utf-8")
+    heading = '## [1.0.0-rc] - 2026-10-10 - build 999 "Nachon"'
+    assert heading in log and log.index("## [Unreleased]") < log.index(heading) < log.index("## [0.2.4-beta]")
+    heading2 = '## [1.0.0-rc.2] - 2026-10-10 - build 1000 "Chazak"'
+    assert heading2 in log and log.index("## [Unreleased]") < log.index(heading2) < log.index(heading)
+    heading3 = '## [1.0.0-rc.3] - 2026-10-10 - build 1001 "Tamim"'
+    assert heading3 in log and log.index("## [Unreleased]") < log.index(heading3) < log.index(heading2)
+    heading4 = '## [1.0.0-rc.4] - 2026-10-11 - build 1002 "Ometz"'
+    assert heading4 in log and log.index("## [Unreleased]") < log.index(heading4) < log.index(heading3)
+    heading5 = '## [1.0.0-rc.5] - 2026-10-11 - build 1003 "Amud"'
+    assert heading5 in log and log.index("## [Unreleased]") < log.index(heading5) < log.index(heading4)
+    heading6 = '## [1.0.0-rc.6] - 2026-10-11 - build 1004 "Shomer"'
+    assert heading6 in log and log.index("## [Unreleased]") < log.index(heading6) < log.index(heading5)
+    heading7 = '## [1.0.0-rc.7] - 2026-11-10 - build 1005 "Yachad"'
+    assert heading7 in log and log.index("## [Unreleased]") < log.index(heading7) < log.index(heading6)
+    heading8 = '## [1.0.0-rc.8] - 2026-11-10 - build 1006 "Chesed"'
+    assert heading8 in log and log.index("## [Unreleased]") < log.index(heading8) < log.index(heading7)
+    notes = (root / "docs" / "RELEASE-NOTES-1006-CHESED.md").read_text(encoding="utf-8")
+    assert notes.startswith("**VOXPrint 1.0.0 RC8")
+    assert "Chesed" in notes and "v1.0.0-rc.8" in notes and "1006" in notes
+    assert "Tehillim" not in notes
+    notes = (root / "docs" / "RELEASE-NOTES-1005-YACHAD.md").read_text(encoding="utf-8")
+    assert notes.startswith("**VOXPrint 1.0.0 RC7")
+    assert "Yachad" in notes and "v1.0.0-rc.7" in notes and "1005" in notes
+    assert "Tehillim" not in notes
+    notes = (root / "docs" / "RELEASE-NOTES-1004-SHOMER.md").read_text(encoding="utf-8")
+    assert notes.startswith("**VOXPrint 1.0.0 RC6")
+    assert "Shomer" in notes and "v1.0.0-rc.6" in notes and "1004" in notes
+    assert "Tehillim" not in notes
+    notes = (root / "docs" / "RELEASE-NOTES-1003-AMUD.md").read_text(encoding="utf-8")
+    assert notes.startswith("**VOXPrint 1.0.0 RC5")
+    assert "Amud" in notes and "v1.0.0-rc.5" in notes and "1003" in notes
+    notes = (root / "docs" / "RELEASE-NOTES-1002-OMETZ.md").read_text(encoding="utf-8")
+    assert notes.startswith("**VOXPrint 1.0.0 RC4")
+    assert "Ometz" in notes and "v1.0.0-rc.4" in notes and "1002" in notes
+    notes = (root / "docs" / "RELEASE-NOTES-1001-TAMIM.md").read_text(encoding="utf-8")
+    assert "945" in notes and "run 56" in notes and "Tamim" in notes and "v1.0.0-rc.3" in notes
+    notes = (root / "docs" / "RELEASE-NOTES-1000-CHAZAK.md").read_text(encoding="utf-8")
+    assert "945" in notes and "run 55" in notes and "Chazak" in notes and "v1.0.0-rc.2" in notes
+    notes = (root / "docs" / "RELEASE-NOTES-700-KAPORET.md").read_text(encoding="utf-8")
+    assert "655" in notes and "run 45" in notes and "does not delete" in notes and "Kaporet" in notes
+    notes = (root / "docs" / "RELEASE-NOTES-701-SHALEM.md").read_text(encoding="utf-8")
+    assert "654" in notes and "run 47" in notes and "Shalem" in notes and "22/22" in notes
+    notes = (root / "docs" / "RELEASE-NOTES-702-SHELISHI.md").read_text(encoding="utf-8")
+    assert "654" in notes and "run 48" in notes and "Shelishi" in notes and "Eitan" in notes
+    notes = (root / "docs" / "RELEASE-NOTES-703-TOLEDOT.md").read_text(encoding="utf-8")
+    assert "654" in notes and "run 49" in notes and "Toledot" in notes and "Levi" in notes and "Miriam" in notes
+    notes = (root / "docs" / "RELEASE-NOTES-704-ACHIM.md").read_text(encoding="utf-8")
+    assert "653" in notes and "run 51" in notes and "Achim" in notes and "suite.json" in notes
+    c = tmp_path / "credits.json"
+    c.write_text(json.dumps({"app": {"version": "0.1.1"}}), encoding="utf-8")
+    bn.stamp(c, 665, "0123456789abcdef", "Tikkun")
+    assert json.loads(c.read_text(encoding="utf-8"))["app"] == {"version": "0.1.1", "build": 665, "codename": "Tikkun",
+                                                               "commit": "01234567"}
+    from core import appinfo
+
+    monkeypatch.setattr(appinfo, "APP_BUILD", 999)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Nachon")
+    monkeypatch.setattr(appinfo, "APP_CHANNEL", "rc")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc")
+    assert appinfo.release_version() == "1.0.0-rc"
+    assert appinfo.version_label() == '1.0.0 RC \u00b7 build 999 "Nachon"'
+    monkeypatch.setattr(appinfo, "APP_BUILD", 1000)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Chazak")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.2")
+    assert appinfo.release_version() == "1.0.0-rc.2"
+    assert appinfo.version_label() == '1.0.0 RC2 \u00b7 build 1000 "Chazak"'
+    monkeypatch.setattr(appinfo, "APP_BUILD", 1001)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Tamim")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.3")
+    assert appinfo.release_version() == "1.0.0-rc.3"
+    assert appinfo.version_label() == '1.0.0 RC3 \u00b7 build 1001 "Tamim"'
+    monkeypatch.setattr(appinfo, "APP_BUILD", 1002)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Ometz")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.4")
+    assert appinfo.release_version() == "1.0.0-rc.4"
+    assert appinfo.version_label() == '1.0.0 RC4 \u00b7 build 1002 "Ometz"'
+    monkeypatch.setattr(appinfo, "APP_BUILD", 1003)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Amud")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.5")
+    assert appinfo.release_version() == "1.0.0-rc.5"
+    assert appinfo.version_label() == '1.0.0 RC5 \u00b7 build 1003 "Amud"'
+    monkeypatch.setattr(appinfo, "APP_BUILD", 1004)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Shomer")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.6")
+    assert appinfo.release_version() == "1.0.0-rc.6"
+    assert appinfo.version_label() == '1.0.0 RC6 \u00b7 build 1004 "Shomer"'
+    monkeypatch.setattr(appinfo, "APP_BUILD", 1005)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Yachad")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.7")
+    assert appinfo.release_version() == "1.0.0-rc.7"
+    assert appinfo.version_label() == '1.0.0 RC7 \u00b7 build 1005 "Yachad"'
+    monkeypatch.setattr(appinfo, "APP_BUILD", 1006)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Chesed")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "1.0.0-rc.8")
+    assert appinfo.release_version() == "1.0.0-rc.8"
+    assert appinfo.version_label() == '1.0.0 RC8 \u00b7 build 1006 "Chesed"'
+    monkeypatch.setattr(appinfo, "APP_BUILD", 665)
+    monkeypatch.setattr(appinfo, "APP_CODENAME", "Tikkun")
+    monkeypatch.setattr(appinfo, "APP_CHANNEL", "beta")
+    monkeypatch.setattr(appinfo, "APP_VERSION", "0.1.1")
+    assert appinfo.version_label() == '0.1.1-beta \u00b7 build 665 "Tikkun"'

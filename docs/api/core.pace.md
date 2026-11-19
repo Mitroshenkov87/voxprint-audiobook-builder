@@ -1,0 +1,3 @@
+# `core.pace`
+
+::: core.pace

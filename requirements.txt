@@ -1,0 +1,57 @@
+# Suite library voxprint-common v0.8.0, pinned at commit 2ec81bb17c33c00d748aa9e21301d2bad80df7db
+# (untagged; the release pages are gone). The matching wheel is built from that commit
+# (pip wheel --no-deps git+https://...@<commit>; reproducible) and its SHA-256 stays in
+# infra/runtime_lock.json (suite) for an installer with no git pin.
+# pip turns on hash-checking mode for the whole file, so install this file with uv.
+voxprint-common[ui] @ git+https://github.com/Mitroshenkov87/voxprint-common@2ec81bb17c33c00d748aa9e21301d2bad80df7db
+
+# Voxprint - dependencies (no hard pins here; only lower bounds and the upper bounds that are needed).
+# Installation order on Windows (done by build.bat):
+#   1) uv pip install torch==2.11.0 torchaudio==2.11.0 --torch-backend=cu130    (fallback: requirements-torch.txt)
+#   2) uv pip install -r requirements.txt -r requirements-verified.txt   (this file + the verified versions)
+#   3) uv pip install --no-deps -r requirements-nodeps.txt     (qwen-asr, qwen-tts-hf - see the comment below)
+# Do not use "uv run" without --no-sync (it replaces CUDA torch with the CPU build). flash-attn is not needed on Windows.
+
+PySide6>=6.11
+numpy
+scipy
+soundfile
+pydub
+audioop-lts; python_version >= "3.13"   # pydub uses audioop, which was removed in Python 3.13
+imageio-ffmpeg                          # ffmpeg for pydub (MP3/M4A etc.) without a manual install
+librosa
+packaging
+safetensors
+certifi                                 # fallback root certificates (a fresh Windows/Server without the needed CAs)
+hf_xet                                  # fast model downloads from HF (on Windows the AMD64 platform marker does not fire in the hub's dependencies)
+
+# transformers 5.16.1: CVE-2026-9856 is fixed in 5.10.1. 5.16.1 is the newest 5.x whose Mimi RoPE path matches
+# the one qwen-tts-hf was written for (5.15.1 reads rope_parameters["rope_theta"], not config.rope_theta).
+# 5.17+ goes through ROPE_INIT_FUNCTIONS["default"] and breaks MimiConfig. Stay below 5.17.
+# qwen-asr 0.0.6 still says transformers==4.57.6 in its METADATA. It is installed with --no-deps; infra/qwen_tf_compat.py
+# patches the two import breaks. qwen-tts-hf 0.1.1.post1 (import name qwen_tts) needs transformers>=5.15.1,<6.
+transformers>=5.16.1,<5.17
+huggingface_hub>=1.32.0,<2              # AIKIDO-2026-285573 fixed in 1.32.0; 2.x is httpx2
+sentencepiece                           # tokenizer of the Opus-MT translation models (MarianTokenizer)
+ctranslate2                             # CTranslate2 wheels are CUDA 12 builds; see infra/cuda12_libs.py
+nvidia-cublas-cu12==12.9.2.10           # CUDA 12 runtime for CTranslate2 (not shipped by torch cu130)
+nvidia-cudnn-cu12==9.27.0.42
+accelerate>=1.12
+peft>=0.17                              # tested: 0.18.1 (as in Alexandria) and 0.21.2
+bitsandbytes>=0.46                      # 8-bit AdamW (wheels exist for Windows); without it plain AdamW is used
+
+# Russian text normalization (numbers, abbreviations) before alignment; without them a built-in minimum is used
+ru-normalizr
+rutextnorm
+
+# dependencies of qwen-asr / qwen-tts-hf (the packages themselves are in requirements-nodeps.txt)
+einops
+onnxruntime
+six               # needed by nagisa/qwen-asr (without it the PyInstaller build fails: No module named six)
+nagisa            # soynlp (GPLv3) is deliberately NOT installed: qwen-asr imports it lazily, for Korean only
+sox
+qwen-omni-utils
+# build/packaging tool pulled in by PyTorch: at least the release with the PackageIndex path-traversal fix (PYSEC-2025-49)
+setuptools>=78.1.1
+# Torch's CPU wheel installs filelock 3.32.3. CVE-2026-112940 is fixed in 4.2.1.
+filelock>=4.2.1

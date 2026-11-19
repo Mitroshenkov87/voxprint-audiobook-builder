@@ -1,0 +1,16 @@
+{
+  "id": "open-voice",
+  "name": "Open Voice",
+  "names": {"ru": "Открытый голос", "en": "Open Voice", "de": "Offene Stimme"},
+  "language": "Russian",
+  "author": "Voxprint contributors",
+  "voice_type": "",
+  "license": "CC-BY-4.0",
+  "description": "A fully open example voice (placeholder entry for the voices index).",
+  "descriptions": {
+    "ru": "Полностью открытый голос-пример (заглушка записи в индексе голосов).",
+    "en": "A fully open example voice (placeholder entry for the voices index).",
+    "de": "Eine vollständig offene Beispielstimme (Platzhalter-Eintrag für den Stimmenindex)."
+  },
+  "consent": {"scope": "commercial", "name": "", "method": "manual", "confirmed": true}
+}

@@ -1,0 +1,36 @@
+Voxprint icon and splash - original artwork
+===========================================
+
+The application icon and the start-up splash are original artwork made for
+this project by Aleksandr Mitroshenkov. They are not third-party material
+and they are not derived from Tabler Icons.
+
+Icon
+----
+assets/voxprint.png is the square icon: one fused mark, a fingerprint whose
+right ridges become sound-wave bars, cyan to blue, on a dark navy rounded
+tile. assets/voxprint.ico and assets/voxprint-setup.ico are built from that
+PNG and are what the window, the taskbar, the installer and the uninstall
+entry use. installer/linux/voxprint-256.png is the same mark at 256 px for
+the Linux desktop entry.
+
+Splash
+------
+assets/splash.jpg is the 16:9 start-up art (1920×1080): the same logo in a
+painterly alpine evening (darkening blue sky, golden rye, pale haze, a soft
+red glow), with no houses, no river and no text. The suite splash loads this
+filename.
+
+Easter egg
+----------
+assets/easter-egg.jpg is original generated artwork, no real person's likeness.
+Six clicks within two seconds on the suite splash show it, with the caption
+easter_egg.caption ("Кури ушную серу!", the same Russian line in every UI
+language), for three seconds or until another click, once per launch. The
+suite window stays the splash; the picture is a separate window opened from
+the splash on_click hook.
+
+Suite action icons
+------------------
+assets/icons/ holds the save, save-as, save-copy, export and download drawings.
+See assets/icons/LICENSE.txt. They are original drawings (Apache-2.0).

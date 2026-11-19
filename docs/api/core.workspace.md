@@ -1,0 +1,3 @@
+# `core.workspace`
+
+::: core.workspace

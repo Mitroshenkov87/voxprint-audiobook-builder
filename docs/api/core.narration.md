@@ -1,0 +1,3 @@
+# `core.narration`
+
+::: core.narration

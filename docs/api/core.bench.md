@@ -1,0 +1,3 @@
+# `core.bench`
+
+::: core.bench

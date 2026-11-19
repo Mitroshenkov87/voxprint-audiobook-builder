@@ -1,0 +1,88 @@
+# Building, running from source and contributing
+
+## Build the installer locally
+`build.bat` produces `installer\Output\voxprint-audiobook-builder-setup-<version>-win-x64.exe` (Inno Setup 6, per-machine install, Windows 11 x64; about 1.8 GB because PyTorch is inside).
+The installer does not contain the models: on first start Voxprint downloads about 7 GB once (internet needed).
+The wizard is available in **English, Russian and German** and has a page **"Models folder"** (right after the install folder): default = the current location `%LOCALAPPDATA%\Voxprint\models`, or any other folder / drive (Program Files is refused: the app runs without admin rights).
+The installer **copies nothing**; it only writes the chosen path to `%LOCALAPPDATA%\Voxprint\state\models_dir.txt` (UTF-8; removed when the default is kept). The app then keeps using models already complete in the default folder, picks up models the chosen folder already holds
+(Voxprint layout, Hugging Face cache) and downloads the rest into the chosen folder ([details](MODELS.md#models-folder)). A folder with a **Voxprint backup** (`voxprint-backup.json`) is not a models folder: it is written to `state\existing_models_dir.txt` instead, the default folder stays the live store, and the app restores models and voices from the backup on its first start. Voices and settings stay in `%LOCALAPPDATA%\Voxprint`. Silent install: `voxprint-audiobook-builder-setup-<version>-win-x64.exe /VERYSILENT /ModelsFolder="D:\Voxprint models"`; the older `/ModelsDir="D:\old\models"` (a folder to import models from) still works.
+Caveat: the installer runs elevated (per-machine); if the administrator account differs from the account that uses the program, `%LOCALAPPDATA%` is the administrator's - then set the folder in *Settings* instead.
+
+## Run from source (Windows)
+```bat
+py -3.14 -m venv .venv && .venv\Scripts\activate
+pip install uv
+uv pip install torch==2.11.0 torchaudio==2.11.0 --torch-backend=cu130       :: fallback: pip install -r requirements-torch.txt
+uv pip install -r requirements.txt -r requirements-verified.txt
+uv pip install --no-deps -r requirements-nodeps.txt        :: qwen-asr/qwen-tts-hf: their transformers pins conflict with ours
+python -m bitsandbytes                                     :: optional check of the 8-bit optimizer (plain AdamW otherwise - fine)
+python main.py
+```
+**Never run `uv run` without `--no-sync`** - it re-syncs the environment and replaces CUDA torch with the CPU build. flash-attn is not needed on Windows.
+
+## Build options
+```bat
+build.bat              :: venv + torch (uv, CUDA auto-detect) + dependencies + notices + tests + dist\voxprint-audiobook-builder.exe and dist\voxprint-audiobook-cli.exe (--onefile) + installer if Inno Setup 6 exists
+build.bat onedir       :: dist\voxprint-audiobook-builder\ folder (preferred: faster start, and Qt/PySide6 stay replaceable - see Licences)
+:: quick rebuild:  set VOX_SKIP_TESTS=1 & set VOX_SKIP_INSTALLER=1 & build.bat onedir
+:: verify a frozen build contains every library:  "dist\voxprint-audiobook-builder\voxprint-audiobook-builder.exe" --selftest-imports   (result in <app home>\logs\selftest_imports.txt)
+```
+Experimental thin installer (shell only, modules downloaded by the app): `build_thin.bat`, then `installer\build_online.ps1 -Thin` - see [THIN-INSTALLER.md](THIN-INSTALLER.md).
+Command-line maintenance flags of `main.py`: `--prefetch` (download models now), `--selftest`, `--selftest-imports`, `--selftest-speech` (model-free TTS / ASR smoke), `--selftest-narrate [voice]` (headless: narrates two sentences with the first voice, result in `<app home>\logs\selftest_narrate.txt`, exit code 0 / 1 / 2 = no voice), `--verify-install`, `--repair`.
+App data lives in `%LOCALAPPDATA%\Voxprint` (`models\`, `logs\`, `state\`, ...; override with `VOXPRINT_HOME`).
+Interface language override: `VOXPRINT_LANG=en|de|ru|uk|lv`.
+
+## Contributing
+Contributions are welcome - see [`CONTRIBUTING.md`](../CONTRIBUTING.md) and [`DEVELOPMENT.md`](DEVELOPMENT.md) (setup, tests, code style, localization, how to propose changes) and
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) (module map, data flow). Quick start for developers:
+```bash
+python -m venv .venv && . .venv/bin/activate        # Linux: enough to run the tests
+pip install uv                                       # requirements.txt hashes the suite wheel; pip cannot install that file
+uv pip install -r requirements.txt -r requirements-verified.txt -r requirements-dev.txt
+uv pip install --no-deps -r requirements-nodeps.txt
+QT_QPA_PLATFORM=offscreen python -m pytest          # ~350 tests, no GPU, no network
+python -m core.cli audio.wav text.txt --out dataset --fake-aligner     # dry run of the pipeline without a neural network
+```
+CLI for stage-by-stage checks on a GPU machine: `python -m core.cli audio.wav text.txt --out dataset [--language Russian] [--device cuda] [--train --output-dir output]`.
+Regenerate the notices after editing `credits.json`: `python tools/gen_notices.py` (a test checks they are in sync).
+
+### Localization
+The UI is **English-only** (since v1.0.0-rc.7). The catalog is one flat JSON file `locales/en.json` (`"ui.start": "...{name}..."`);
+`core/i18n.py` provides `tr(key, **params)`. Language order: `VOXPRINT_LANG`, saved choice (`state\language`), Windows user locale, English. A system language
+that is not English falls back to English. Tests check that every key used in code exists in the catalog and that no user-facing literals are left in the code.
+Russian stays a fully supported *content* language (narration, TTS, yo/stress, training) - it is just no longer a UI language.
+
+#### Adding a language
+The interface is English-only; there is nothing to translate. If a second UI language is ever added back: append its code to
+`LANGS` / `LANG_NAMES` in `core/i18n.py`, copy `locales/en.json` to `locales/<code>.json` (a test enforces identical keys
+and `{placeholder}`s), add its text to every `purpose`/`note` in `credits.json`, and mention it in the README.
+
+### Repository link
+The GitHub URL lives in one place: `"repo_url"` in `credits.json` (read as `core.appinfo.REPO_URL`). A placeholder containing `OWNER` hides the link in **About**.
+
+### Build numbers and codenames
+The build number is the `build` field in `BUILD.json` (**1006** for this RC), or the release tag when that tag ends in
+`+<number>` or `-build<number>` (`v1.0.0-rc.8+1007`, `v1.0.0-rc.8-build1006`). A plain version tag such as `v1.0.0-rc.8` does
+not carry a number, so `build` is used. `VOXPRINT_BUILD` overrides both. `GITHUB_RUN_NUMBER` is not added to anything.
+`offset` stays in `BUILD.json` as the history of how earlier numbers were chosen; it is not applied, and a failed CI run
+does not consume a number. `BUILD.json` also holds the **codename**: one Biblical Hebrew word in Latin transliteration
+(ASCII letters only) that names the build's changes - edit it for each release. `tools/build_number.py --stamp` writes
+number, codename and commit into `credits.json` before the Windows shell and the Linux package are built;
+`tools/embed_build_stamp.py` reads the same number onto `voxprint-audiobook-builder.exe`. The app shows `1.0.0 RC8 · build 1006 "Chesed"`
+once that stamp is in the build (About, splash, Settings, diagnostic report), the installer gets `VersionInfoVersion`
+`1.0.0.1006`. The setup file is `voxprint-audiobook-builder-setup-<version>-win-x64.exe` (the plain `voxprint-audiobook-builder-setup-win-x64.exe`
+stays for stable links), and the components manifest records `build`, so the Components window offers a same-version
+build only when its number is higher. `VOXPRINT_BUILD=0` leaves a local executable unstamped. The next codename must be
+unique in this repository and in the suite codename registry. See [RELEASING.md](RELEASING.md).
+History, when the number was `GITHUB_RUN_NUMBER` + `offset` (that sum is no longer used). The offset was **628** for 0.1.4: run 39 stamped 668 with offset 629, but that installer was built with an empty release tag (manifest URL `v0.0.0-dev`, setup HTTP 404) and cannot be installed. Run 40 + 628 = 668, codename **Kolot**. Runs 41-44 were test or failed runs and published nothing public. The offset was **655** for **0.2.0-beta**, build **700**, codename **Kaporet**: run 45 + 655 = 700. Run 46 failed in the Windows unit tests before it published anything, so the offset is **654** for **0.2.1-beta**, build **701**, codename **Shalem**: run 47 + 654 = 701. The offset stays **654** for **0.2.2-beta**, build **702**, codename **Shelishi**: run 48 + 654 = 702, for **0.2.3-beta**, build **703**, codename **Toledot**: run 49 + 654 = 703. Run 50 failed in the Windows tests before it published anything, so the offset is **653** for **0.2.4-beta**, build **704**, codename **Achim**: run 51 + 653 = 704. Run 52 failed in the Windows tests before it published anything, so the offset is **946** for **1.0.0-rc**, build **999**, codename **Nachon** (Genesis 41:32, established, ready): run 53 + 946 = 999, release tag `v1.0.0-rc`. Run 54 failed in the Windows tests before it published anything, so the offset is **945** for **1.0.0-rc.2**, build **1000**, codename **Chazak** (Deuteronomy 31:6, *chazak ve'ematz*, be strong): run 55 + 945 = 1000, release tag `v1.0.0-rc.2`. The offset stays **945** for **1.0.0-rc.3**, build **1001**, codename **Tamim** (Bereshit 17:1; Devarim 18:13, whole and complete): run 56 + 945 = 1001, release tag `v1.0.0-rc.3`. Run 56 failed before it published anything, so the offset is **944** from run 57 on: run 57 + 944 = 1001, release tag `v1.0.0-rc.3`. From **1.0.0-rc.4** the number is the explicit `build` field, **1002**, codename **Ometz** (Devarim 31:6, courage and resolve), release tag `v1.0.0-rc.4`. From **1.0.0-rc.5** the number is the explicit `build` field, **1003**, codename **Amud** (Shemot 13:21, pillar), release tag `v1.0.0-rc.5`. From **1.0.0-rc.6** the number is the explicit `build` field, **1004**, codename **Shomer**, release tag `v1.0.0-rc.6`. From **1.0.0-rc.7** the number is the explicit `build` field, **1005**, codename **Yachad**, release tag `v1.0.0-rc.7`. From **1.0.0-rc.8** the number is the explicit `build` field, **1006**, codename **Chesed**, release tag `v1.0.0-rc.8`.
+
+### Versions: "verified by VOXPrint"
+`infra/verified_manifest.json` pins the package versions and model revisions (HF commit shas) Voxprint was tested with. The updater installs exactly those
+(rolling back if needed: `restore_verified()`) and merely logs newer PyPI releases as "not verified yet". Channel "latest": `VOXPRINT_CHANNEL=latest`
+(or `{"channel":"latest"}` in `state\updater_state.json`). `requirements-verified.txt` / `requirements-nodeps.txt` are generated from the manifest
+(`python -m infra.verified_manifest [--nodeps]`; a test keeps them in sync).
+
+### Closing the app and model downloads (runtime behaviour)
+- **X on the main window = hard exit.** `ui/studio.py` calls `infra.hard_exit.fire()` from `closeEvent`: every descendant process is killed and the process ends with `os._exit` (no waiting for threads that sit in a socket read). `main.py` arms it only for a real run; tests and `--selftest*` are unaffected. On Windows `arm()` also puts the process into a job object with KILL_ON_JOB_CLOSE. Interrupted downloads are resumable (`.partial` folders), so nothing is lost.
+- **One download per model.** `infra.model_downloader.ensure_model` takes an OS file lock `models/.<name>.lock`; a second process/thread asking for the same model waits and then returns the finished folder. The lock is released by the OS when its owner dies.
+- **Finishing a download** (`finalize_download`): `.partial` that is already complete is not downloaded again; the rename is retried (10 attempts, ~30 s), the hub's `.cache` is removed first, and a copy is the last resort. The log names the processes that hold files open.

@@ -1,0 +1,3 @@
+# `infra.sysinfo`
+
+::: infra.sysinfo

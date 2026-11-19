@@ -1,0 +1,3 @@
+# `infra.paths`
+
+::: infra.paths

@@ -1,0 +1,25 @@
+{
+  "id": "open-universal",
+  "name": "Open universal voice",
+  "names": {
+    "ru": "Открытый универсальный голос",
+    "en": "Open universal voice",
+    "de": "Offene Universalstimme"
+  },
+  "language": "English",
+  "author": "Linda Johnson (LibriVox) / Keith Ito (LJ Speech) - public domain",
+  "voice_type": "female",
+  "license": "CC0-1.0",
+  "description": "Open universal voice: trained only from public-domain speech (LJ Speech 1.1, reader Linda Johnson, LibriVox). Free for any use, also commercial. Attribution appreciated: LJ Speech dataset, Keith Ito, https://keithito.com/LJ-Speech-Dataset/",
+  "descriptions": {
+    "ru": "Открытый универсальный голос: обучен только на речи из общественного достояния (LJ Speech 1.1, читает Linda Johnson, LibriVox). Свободен для любого использования, в том числе коммерческого. Атрибуция приветствуется: набор LJ Speech, Keith Ito, https://keithito.com/LJ-Speech-Dataset/",
+    "en": "Open universal voice: trained only from public-domain speech (LJ Speech 1.1, reader Linda Johnson, LibriVox). Free for any use, also commercial. Attribution appreciated: LJ Speech dataset, Keith Ito, https://keithito.com/LJ-Speech-Dataset/",
+    "de": "Offene Universalstimme: nur mit gemeinfreier Sprache trainiert (LJ Speech 1.1, Sprecherin Linda Johnson, LibriVox). Frei für jede Nutzung, auch kommerziell. Namensnennung erwünscht: LJ Speech, Keith Ito, https://keithito.com/LJ-Speech-Dataset/"
+  },
+  "consent": {
+    "scope": "commercial",
+    "name": "Linda Johnson (LibriVox volunteer reader, recordings dedicated to the public domain)",
+    "method": "manual",
+    "confirmed": true
+  }
+}

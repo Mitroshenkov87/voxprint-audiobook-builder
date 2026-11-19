@@ -1,0 +1,617 @@
+"""Reuse what is already on the PC before anything is downloaded (thin installer, see docs/THIN-INSTALLER.md).
+
+PyTorch is the only big part (2.5 GB), and many people already have a working copy in a system Python, a conda/venv project or a
+Pinokio app.  :func:`find_torch` looks for such copies WITHOUT running anything from them (it reads ``torch-*.dist-info`` in the
+``site-packages`` folders it finds); :func:`assess` applies the compatibility rules below; :func:`verify` imports the candidate in a
+child process of Voxprint itself and runs a tiny computation (on the GPU when there is one).  Only a candidate that passes is used -
+its ``site-packages`` is put at the END of ``sys.path`` (``activate()`` in ``infra/modules.py``), so our own pinned libraries always
+win and the foreign environment only supplies ``torch`` and ``torchaudio``.  If anything fails the module is downloaded as usual.
+
+Compatibility rules (all must hold; every rejection is logged with its reason):
+
+1. same CPython minor version as the running Voxprint (binary wheels: the ``Tag:`` in the wheel's ``WHEEL`` file, e.g. ``cp314``) and
+   64-bit Windows (``win_amd64``);
+2. ``torch`` version inside ``compat.torch`` of ``infra/runtime_lock.json`` (a range around the version we tested);
+3. ``torchaudio`` is installed in the same ``site-packages``, the same release number as ``torch``, and the same flavor
+   when both wheels carry one (its native ops are built against that torch);
+4. flavor: a CPU build is accepted only on a PC without an NVIDIA GPU; a CUDA build must not be newer than the driver supports
+   (an older CUDA build than the driver offers is fine); a build without a local tag on Windows is a CPU build;
+5. ``torch/lib`` and the package folders really exist (a half-deleted environment is skipped);
+6. the child-process check passes (``import torch``, a tensor computation, ``.numpy()`` round trip, and a CUDA computation if the
+   driver offers a GPU), within the time limit.
+
+Ready copies from an earlier run are in ``<app home>/runtime`` and recorded by the downloader (SHA-256), so a reinstall or an update
+that does not change a part downloads nothing.  ``VOXPRINT_NO_REUSE=1`` turns the search off.
+"""
+from __future__ import annotations
+
+import datetime
+import json
+import logging
+import os
+import re
+import subprocess
+import sys
+import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Callable, Dict, Iterable, List, Optional, Tuple
+
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from packaging.version import InvalidVersion, Version
+
+from infra import env_probe, paths, suite_shared
+
+log = logging.getLogger("voxprint.reuse")
+
+STATE_NAME = "reuse.json"
+VERIFY_TIMEOUT = 150
+MAX_ROOTS = 80
+OK_MARK = "VXTORCH OK"
+
+
+# ------------------------------------------------------------------------------------------------ what was found
+@dataclass
+class ExternalTorch:
+    """A PyTorch install found in another program's site-packages."""
+
+    site: str                  # the site-packages folder that holds torch (and torchaudio)
+    torch: str                 # '2.11.0+cu128'
+    torchaudio: str            # '' when missing
+    py_tag: str                # 'cp311' from the wheel's WHEEL file, '' when unknown
+    platform: str              # 'win_amd64' ...
+    flavor: str                # 'cu128' / 'cpu' / 'unknown'
+
+    def key(self) -> Tuple[Version, str]:
+        """A sort key of the torch version and the site-packages path."""
+        try:
+            return (Version(self.torch.split("+")[0]), self.site)
+        except InvalidVersion:
+            return (Version("0"), self.site)
+
+
+_LOCAL_TAG = re.compile(r"^(\d+(?:\.\d+)+)_(cu\d+|cpu|rocm\d+)$", re.I)
+
+
+def normalize_torch_version(version: str) -> str:
+    """``2.11.0+cu130`` stays; a wheel filename that escaped ``+`` as ``_`` (``2.11.0_cu130``) becomes ``2.11.0+cu130``."""
+    text = (version or "").strip()
+    match = _LOCAL_TAG.fullmatch(text)
+    if match:
+        return f"{match.group(1)}+{match.group(2)}"
+    return text
+
+
+def _version_of(dist: Path, folder_version: str) -> str:
+    """Version from METADATA, keeping a local tag that lives only on the dist-info folder name."""
+    folder = normalize_torch_version(folder_version)
+    meta = ""
+    try:
+        meta = (dist / "METADATA").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return folder
+    recorded = ""
+    for line in meta.splitlines():
+        if line.startswith("Version:"):
+            recorded = normalize_torch_version(line.split(":", 1)[1].strip())
+            break
+        if line == "":
+            break
+    if recorded and "+" not in recorded and "+" in folder:
+        return folder
+    return recorded or folder
+
+
+def _running_python_tag() -> str:
+    """``cp314`` for this interpreter, plus ``t`` when it is free-threaded."""
+    flags = getattr(sys, "abiflags", "") or ""
+    return f"cp{sys.version_info.major}{sys.version_info.minor}{flags}"
+
+
+def _pick_wheel_tag(tags: List[Tuple[str, str, str]]) -> Tuple[str, str]:
+    """``(python tag, platform)`` of the tag that matches this interpreter.
+
+    A wheel may list ``py3-none-any`` and then ``cp314-cp314-win_amd64``. The generic tag is not a match for a
+    binary torch wheel. A free-threaded tag (``cp314t``) matches only a free-threaded interpreter. ``abi3`` is
+    accepted. When nothing matches, the first specific tag is returned so :func:`assess` can name the mismatch.
+    """
+    exact = _running_python_tag()
+    base = f"cp{sys.version_info.major}{sys.version_info.minor}"
+    ours_free = exact.endswith("t")
+    foreign: Tuple[str, str] = ("", "")
+    for py, abi, plat in tags:
+        if py in ("py3", "py2.py3") and abi == "none":
+            continue
+        theirs_free = py.endswith("t") or (abi.endswith("t") and abi != "abi3")
+        if theirs_free != ours_free and abi not in ("abi3", "none"):
+            shown = abi if abi.endswith("t") else py
+            foreign = foreign if foreign[0] else (shown, plat)
+            continue
+        if py in (exact, base, "py3") and abi in (exact, base, "abi3", "none"):
+            return (exact if py == "py3" else py, plat)
+        foreign = foreign if foreign[0] else (py, plat)
+    return foreign
+
+
+def _read_dist(site: Path, name: str) -> Optional[Tuple[str, str, str]]:
+    """(version, python tag, platform) of distribution ``name`` in ``site`` from its dist-info, or None."""
+    try:
+        cands = [d for d in site.iterdir() if d.is_dir() and d.name.lower().startswith(name + "-") and d.name.endswith(".dist-info")]
+    except OSError:
+        return None
+    for d in cands:
+        m = re.match(rf"^{name}-(.+)\.dist-info$", d.name, re.I)
+        if not m:
+            continue
+        py = plat = ""
+        tags: List[Tuple[str, str, str]] = []
+        try:
+            for line in (d / "WHEEL").read_text(encoding="utf-8", errors="replace").splitlines():
+                if not line.startswith("Tag:"):
+                    continue
+                parts = line.split(":", 1)[1].strip().split("-")
+                if len(parts) >= 3:
+                    tags.append((parts[0], parts[1], parts[-1]))
+        except OSError:
+            pass
+        if tags:
+            py, plat = _pick_wheel_tag(tags)
+        return _version_of(d, m.group(1)), py, plat
+    return None
+
+
+def flavor_of(version: str) -> str:
+    """'2.11.0+cu128' -> 'cu128'.  No local tag: on Windows the PyPI wheel is a CPU build."""
+    f = env_probe.torch_flavor_of(version)
+    if f:
+        return f
+    return "cpu" if sys.platform == "win32" else "unknown"
+
+
+def inspect_site(site: Path) -> Optional[ExternalTorch]:
+    """Read torch and torchaudio from ``site``, or None when torch is not there."""
+    t = _read_dist(site, "torch")
+    if t is None:
+        return None
+    a = _read_dist(site, "torchaudio")
+    return ExternalTorch(str(site), t[0], a[0] if a else "", t[1], t[2], flavor_of(t[0]))
+
+
+def _site_dirs_of(prefix: Path) -> List[Path]:
+    out = []
+    for rel in ("Lib/site-packages", "lib/site-packages"):
+        out.append(prefix / rel)
+    try:
+        out += sorted((prefix / "lib").glob("python3.*/site-packages"))
+    except OSError:
+        pass
+    return [p for p in out if p.is_dir()]
+
+
+def _suite_runtime_prefixes(env: Dict[str, str], home: Path) -> List[Path]:
+    """Movie Dubber and the shared suite tree, which a project-venv scan does not see.
+
+    Movie Dubber installs a venv at ``%LOCALAPPDATA%\\Voxprint\\runtime-<key>\\env`` (torch in
+    ``env/Lib/site-packages``). The shared suite runtime is ``<Voxprint home>/shared/runtime``.
+    """
+    roots: List[Path] = []
+    if env.get("VOXPRINT_HOME"):
+        roots.append(Path(env["VOXPRINT_HOME"]))
+    if env.get("VOXPRINT_SHARED"):
+        roots.append(Path(env["VOXPRINT_SHARED"]).parent)
+    if env.get("LOCALAPPDATA"):
+        roots.append(Path(env["LOCALAPPDATA"]) / "Voxprint")
+    xdg = env.get("XDG_DATA_HOME", "").strip()
+    if xdg:
+        roots.append(Path(xdg) / "voxprint")
+    roots.append(home / ".local" / "share" / "voxprint")
+    found: List[Path] = []
+    seen = set()
+    for root in roots:
+        key = str(root)
+        if key in seen:
+            continue
+        seen.add(key)
+        found.append(root / "shared" / "runtime")
+        found.append(root / "shared" / "runtime" / "py314-torch2.11-cu130")
+        try:
+            children = sorted(p for p in root.glob("runtime-*") if p.is_dir())
+        except OSError:
+            children = []
+        for child in children[:40]:
+            found.append(child / "env")
+            found.append(child)
+    return found
+
+
+def candidate_prefixes(environ: Optional[Dict[str, str]] = None, home: Optional[Path] = None) -> List[Path]:
+    """Folders that may be a Python installation / virtual environment (cheap globs, capped; nothing is executed)."""
+    env = os.environ if environ is None else environ
+    try:
+        home = home or Path.home()
+    except (RuntimeError, OSError):
+        home = Path(".")
+    pre: List[Path] = []
+
+    def add(p: Path) -> None:
+        try:
+            if p not in pre and p.is_dir():
+                pre.append(p)
+        except OSError:
+            pass
+
+    for folder in _suite_runtime_prefixes(dict(env), home):
+        add(folder)
+    for var in ("VIRTUAL_ENV", "CONDA_PREFIX", "PYTHONHOME"):
+        if env.get(var):
+            add(Path(env[var]))
+    try:
+        for exe, _src in env_probe.candidate_pythons(environ=dict(env)):
+            e = Path(exe)
+            add(e.parent.parent if e.parent.name.lower() in ("scripts", "bin") else e.parent)
+    except Exception:  # noqa: BLE001
+        pass
+    la, ad = env.get("LOCALAPPDATA"), env.get("APPDATA")
+    pf = [env.get("ProgramFiles"), env.get("ProgramFiles(x86)"), env.get("ProgramData"), "C:\\"]
+    roots: List[Path] = []
+    if la:
+        roots.append(Path(la) / "Programs" / "Python")
+    for base in pf:
+        if base:
+            roots.append(Path(base))
+    for r in roots:
+        try:
+            for d in sorted(r.glob("Python3*")):
+                add(d)
+        except OSError:
+            pass
+    if ad:
+        try:
+            for d in sorted((Path(ad) / "Python").glob("Python3*")):
+                if (d / "site-packages").is_dir():
+                    add(d)                                    # the per-user site: <prefix>/site-packages
+        except OSError:
+            pass
+    conda_roots = [home / n for n in ("miniconda3", "anaconda3", "miniforge3", "mambaforge", ".conda")]
+    for base in pf[:3]:
+        if base:
+            conda_roots += [Path(base) / n for n in ("miniconda3", "anaconda3", "miniforge3")]
+    for c in conda_roots:
+        add(c)
+        try:
+            for d in sorted((c / "envs").iterdir())[:40]:
+                add(d)
+        except OSError:
+            pass
+    for pk in ([Path(env["PINOKIO_HOME"])] if env.get("PINOKIO_HOME") else []) + [home / "pinokio"]:
+        try:
+            for app in sorted((pk / "api").iterdir())[:80]:
+                for sub in ("env", "venv", ".venv", "app/env", "app/venv", "app/.venv"):
+                    add(app / sub)
+        except OSError:
+            pass
+    # virtual environments of the user's projects: <folder>/<project>/<venv> and <folder>/<group>/<project>/<venv>
+    def venvs(proj: Path) -> None:
+        for v in (".venv", "venv", "env"):
+            add(proj / v)
+        add(proj)
+
+    for top in (home, home / "Documents", home / "Desktop", home / "source" / "repos", home / "projects", home / "Projects",
+                home / "Downloads", home / "dev", Path("C:/AI"), Path("D:/AI")):
+        try:
+            level1 = sorted(p for p in top.iterdir() if p.is_dir() and not p.name.startswith("."))[:100]
+        except OSError:
+            continue
+        for proj in level1:
+            venvs(proj)
+            try:
+                for child in sorted(p for p in proj.iterdir() if p.is_dir() and not p.name.startswith("."))[:40]:
+                    venvs(child)
+            except OSError:
+                continue
+    return pre
+
+
+def _looks_like_site(folder: Path) -> bool:
+    """True when ``folder`` itself is a site-packages tree (``torch`` unpacked directly into it).
+
+    ``modules.install`` writes wheels into the shared torch component that way. A venv still has them under
+    ``Lib/site-packages``, which :func:`_site_dirs_of` already covers.
+    """
+    try:
+        if (folder / "torch").is_dir():
+            return True
+        return any(folder.glob("torch-*.dist-info"))
+    except OSError:
+        return False
+
+
+def _candidate_sites(prefix: Path) -> List[Path]:
+    """Site-packages folders under ``prefix``, plus ``prefix`` when the wheels were unpacked straight into it."""
+    sites = _site_dirs_of(prefix)
+    if (prefix / "site-packages").is_dir():
+        sites.append(prefix / "site-packages")
+    if _looks_like_site(prefix):
+        sites.append(prefix)
+    return sites
+
+
+def _own_runtime_dirs(own_runtime: Optional[Path] = None) -> set:
+    """This install's runtime folders. A copy there is ours, not another program's."""
+    folders = [own_runtime] if own_runtime is not None else []
+    if own_runtime is None:
+        folders.append(paths.app_home() / "runtime")
+        shared = os.environ.get("VOXPRINT_SHARED", "").strip()
+        folders.append((Path(shared) / "runtime") if shared else (paths.app_home() / "shared" / "runtime"))
+        try:
+            folders.append(suite_shared.torch_dir())
+        except OSError:
+            pass
+    found = set()
+    for folder in folders:
+        if folder is None:
+            continue
+        try:
+            found.add(Path(folder).resolve())
+        except OSError:
+            continue
+    return found
+
+
+def find_torch(prefixes: Optional[Iterable[Path]] = None, own_runtime: Optional[Path] = None) -> List[ExternalTorch]:
+    """All foreign ``torch`` installations found (newest first).  Only file names / small text files are read.
+
+    A prefix may be a venv (``Lib/site-packages``) or the shared runtime folder itself (wheels unpacked into
+    ``<Voxprint>/shared/runtime``). This install's own runtime folders are skipped.
+    """
+    seen, found = set(), []
+    own = _own_runtime_dirs(own_runtime)
+    n = 0
+    for pre in (prefixes if prefixes is not None else candidate_prefixes()):
+        for site in _candidate_sites(pre):
+            try:
+                key = site.resolve()
+            except OSError:
+                continue
+            if key in seen or key in own:
+                continue
+            seen.add(key)
+            n += 1
+            if n > MAX_ROOTS:
+                break
+            ext = inspect_site(site)
+            if ext is not None:
+                found.append(ext)
+    found.sort(key=lambda e: e.key(), reverse=True)
+    return found
+
+
+# ------------------------------------------------------------------------------------------------ rules
+def assess(ext: ExternalTorch, lock: Dict, wanted_flavor: str, driver_cuda: Optional[Tuple[int, int]],
+           py_tag: Optional[str] = None) -> Tuple[bool, str]:
+    """Apply the compatibility rules 1-5 (see the module docstring); returns (ok, reason)."""
+    py_tag = py_tag or _running_python_tag()
+    if ext.py_tag and ext.py_tag != py_tag:
+        return False, f"built for {ext.py_tag}, Voxprint runs {py_tag}"
+    if not ext.py_tag:
+        return False, "the Python version of the wheel is unknown"
+    want_plat = "win_amd64" if sys.platform == "win32" else ext.platform
+    if ext.platform and ext.platform != want_plat:
+        return False, f"platform {ext.platform}"
+    spec = str(lock.get("compat", {}).get("torch", ""))
+    try:
+        v = Version(ext.torch.split("+")[0])
+        if spec and v not in SpecifierSet(spec):
+            return False, f"torch {ext.torch} is outside the supported range {spec}"
+    except (InvalidVersion, InvalidSpecifier):
+        return False, f"unreadable torch version {ext.torch!r}"
+    if not ext.torchaudio:
+        return False, "torchaudio is not installed next to torch"
+    if not _torchaudio_pairs(ext.torch, ext.torchaudio):
+        return False, f"torchaudio {ext.torchaudio} does not match torch {ext.torch}"
+    have_gpu = driver_cuda is not None and wanted_flavor != "cpu"
+    if ext.flavor == "cpu" and have_gpu:
+        return False, "a CPU build, but this PC has an NVIDIA GPU"
+    if ext.flavor.startswith("cu"):
+        cu = env_probe._cuda_tuple(ext.flavor)
+        if have_gpu and cu and driver_cuda and cu > driver_cuda:
+            return False, f"{ext.flavor} needs a newer NVIDIA driver than installed (CUDA {driver_cuda[0]}.{driver_cuda[1]})"
+    site = Path(ext.site)
+    for need in ("torch/lib", "torch/__init__.py", "torchaudio/__init__.py"):
+        if not (site / need).exists():
+            return False, f"{need} is missing"
+    return True, "ok"
+
+
+def probe_command() -> List[str]:
+    """Command line of the Voxprint instance that runs the check (``--probe-torch``)."""
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "--probe-torch"]
+    return [sys.executable, str(Path(__file__).resolve().parent.parent / "main.py"), "--probe-torch"]
+
+
+def verify(ext: ExternalTorch, run: Optional[Callable[[List[str], Dict[str, str], int], Tuple[int, str]]] = None) -> Tuple[bool, str]:
+    """Rule 6: import and use the candidate in a child process of Voxprint (its own interpreter / DLLs / numpy)."""
+    import tempfile
+
+    env = dict(os.environ)
+    env["VOXPRINT_EXTRA_SITE"] = ext.site
+    fd, result_file = tempfile.mkstemp(prefix="vxprobe", suffix=".txt")      # a windowed exe has no stdout: the result also goes to a file
+    os.close(fd)
+    env["VOXPRINT_PROBE_OUT"] = result_file
+    run = run or _run_child
+    rc, out = run(probe_command(), env, VERIFY_TIMEOUT)
+    try:
+        out = out + "\n" + Path(result_file).read_text(encoding="utf-8", errors="replace")
+        os.unlink(result_file)
+    except OSError:
+        pass
+    ok = rc == 0 and OK_MARK in out
+    detail = next((l for l in out.splitlines() if OK_MARK in l), (out.strip().splitlines() or [""])[-1])
+    return ok, detail[:300]
+
+
+def _run_child(cmd: List[str], env: Dict[str, str], timeout: int) -> Tuple[int, str]:
+    flags = 0x08000000 if sys.platform == "win32" else 0        # CREATE_NO_WINDOW
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=timeout, env=env, creationflags=flags)
+        return p.returncode, (p.stdout or "") + (p.stderr or "")[-800:]
+    except (OSError, subprocess.SubprocessError) as exc:
+        return 1, f"{type(exc).__name__}: {exc}"
+
+
+def probe_torch_main() -> int:
+    """``Voxprint --probe-torch``: import torch from ``VOXPRINT_EXTRA_SITE`` (added at the END of sys.path) and compute something."""
+    extra = os.environ.get("VOXPRINT_EXTRA_SITE", "")
+    if extra and extra not in sys.path:
+        sys.path.append(extra)
+
+    def say(line: str) -> None:
+        try:
+            print(line, flush=True)
+        except Exception:  # noqa: BLE001 - no console
+            pass
+        try:
+            target = os.environ.get("VOXPRINT_PROBE_OUT") or str(paths.logs_dir() / "probe_torch.txt")
+            Path(target).write_text(line + "\n", encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
+
+    try:
+        import numpy as np
+        import torch
+        import torchaudio  # noqa: F401
+
+        x = torch.arange(4, dtype=torch.float32) * 2 + 1
+        assert float(x.sum()) == 16.0 and np.asarray(x.numpy()).shape == (4,)
+        dev = "cpu"
+        if torch.cuda.is_available():
+            y = (x.cuda() @ x.cuda())
+            torch.cuda.synchronize()
+            assert float(y) == 1 + 9 + 25 + 49
+            dev = "cuda:" + torch.cuda.get_device_name(0)
+        say(f"{OK_MARK} torch {torch.__version__} from {Path(torch.__file__).parent.parent} on {dev}")
+        return 0
+    except BaseException as exc:  # noqa: BLE001 - any failure = not usable
+        say(f"VXTORCH FAIL {type(exc).__name__}: {exc}")
+        return 1
+
+
+# ------------------------------------------------------------------------------------------------ remembered choice
+def state_path() -> Path:
+    """Path of the file that remembers a reused runtime."""
+    return paths.app_home() / "runtime" / STATE_NAME
+
+
+def load_state() -> Dict[str, Dict]:
+    """The remembered runtimes, or an empty dict when the file is missing."""
+    try:
+        d = json.loads(state_path().read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_choice(group: str, ext: ExternalTorch) -> None:
+    """Remember ``ext`` as the chosen copy for ``group``."""
+    st = load_state()
+    st[group] = dict(asdict(ext), verified=datetime.datetime.now().isoformat(timespec="seconds"))
+    p = state_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(st, indent=1), encoding="utf-8")
+    os.replace(tmp, p)
+
+
+def forget(group: str = "torch") -> None:
+    """Forget the remembered copy for ``group``."""
+    st = load_state()
+    if st.pop(group, None) is not None:
+        p = state_path()
+        p.write_text(json.dumps(st, indent=1), encoding="utf-8")
+
+
+def reused(group: str = "torch") -> Optional[ExternalTorch]:
+    """The remembered foreign copy, if it is still there unchanged (same version in the same folder); no import, no subprocess."""
+    d = load_state().get(group)
+    if not d or os.environ.get("VOXPRINT_NO_REUSE", "") not in ("", "0"):
+        return None
+    try:
+        ext = ExternalTorch(**{k: d[k] for k in ("site", "torch", "torchaudio", "py_tag", "platform", "flavor")})
+    except (KeyError, TypeError):
+        return None
+    now = inspect_site(Path(ext.site))
+    if now is None or now.torch != ext.torch or now.torchaudio != ext.torchaudio:
+        return None
+    for need in ("torch/lib", "torch/__init__.py"):
+        if not (Path(ext.site) / need).exists():
+            return None
+    return ext
+
+
+def extra_paths() -> List[str]:
+    """Folders to append to ``sys.path`` (end) for the reused copies."""
+    e = reused("torch")
+    return [e.site] if e else []
+
+
+# ------------------------------------------------------------------------------------------------ the decision
+def _torchaudio_pairs(torch_ver: str, audio_ver: str) -> bool:
+    """True when both wheels are the same release. A flavor tag, when both sides have one, must match too.
+
+    TorchAudio's native ops are compiled against that torch. A later torch is not a pair: there is no TorchAudio
+    wheel for 2.12-2.14 on CUDA 13 and Python 3.14.
+    """
+    torch_base, torch_sep, torch_flavor = torch_ver.partition("+")
+    audio_base, audio_sep, audio_flavor = audio_ver.partition("+")
+    if not torch_base or torch_base != audio_base:
+        return False
+    if torch_sep and audio_sep and torch_flavor != audio_flavor:
+        return False
+    return True
+
+
+def choose_flavor(flavors: List[str], driver_cuda: Optional[Tuple[int, int]]) -> str:
+    """Best CUDA flavor of the lock for this PC. ``""`` when none fits: users do not get a CPU wheel.
+
+    ``VOXPRINT_TORCH_FLAVOR`` forces a flavor. It is internal (CI and tests); ``cpu`` is accepted even when the
+    public flavor list is only ``cu130``: CI installs the CPU wheels and does not offer them to users.
+    """
+    forced = os.environ.get("VOXPRINT_TORCH_FLAVOR", "").strip()
+    if forced == "cpu" or (forced and forced in flavors):
+        return forced
+    best, best_cu = "", (0, 0)
+    for f in flavors:
+        cu = env_probe._cuda_tuple(f)
+        if cu and driver_cuda and cu <= driver_cuda and cu > best_cu:
+            best, best_cu = f, cu
+    return best
+
+
+def try_reuse_torch(lock: Dict, driver_cuda: Optional[Tuple[int, int]], wanted_flavor: str,
+                    progress: Callable[[str], None] = lambda t: None, prefixes: Optional[Iterable[Path]] = None,
+                    verifier: Optional[Callable[[ExternalTorch], Tuple[bool, str]]] = None) -> Optional[ExternalTorch]:
+    """Find, assess and verify a foreign PyTorch; remembers and returns the first that passes, else None (-> download)."""
+    if os.environ.get("VOXPRINT_NO_REUSE", "") not in ("", "0"):
+        log.info("reuse of existing libraries is switched off (VOXPRINT_NO_REUSE)")
+        return None
+    t0 = time.monotonic()
+    progress("Looking for an existing PyTorch on this PC")
+    prefixes = list(prefixes) if prefixes is not None else candidate_prefixes()
+    log.info("looking for PyTorch in %d folders, e.g. %s; VIRTUAL_ENV=%s", len(prefixes), [str(p) for p in prefixes[:4]],
+             os.environ.get("VIRTUAL_ENV", ""))
+    found = find_torch(prefixes)
+    log.info("existing PyTorch copies found: %s (%.1f s)", [f"{e.torch} in {e.site}" for e in found] or "none", time.monotonic() - t0)
+    for ext in found:
+        ok, why = assess(ext, lock, wanted_flavor, driver_cuda)
+        if not ok:
+            log.info("not reused: torch %s in %s - %s", ext.torch, ext.site, why)
+            continue
+        progress(f"Checking PyTorch {ext.torch} found in {ext.site}")
+        good, detail = (verifier or verify)(ext)
+        if good:
+            log.info("PyTorch %s in %s is reused: %s", ext.torch, ext.site, detail)
+            save_choice("torch", ext)
+            return ext
+        log.warning("not reused: torch %s in %s failed the check: %s", ext.torch, ext.site, detail)
+    return None
