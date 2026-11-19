@@ -45,7 +45,7 @@ jobs:
         run: .app/bin/python -m pytest -q -p no:cacheprovider tests/test_docs_site.py
       - name: Build the site
         run: .app/bin/python -m mkdocs build --strict
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
